@@ -210,6 +210,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "User info retrieved" })
   async getMe(@Req() req: Request) {
     const tenantId = req.tenantId!;
+    console.log(req.user);
     return this.authService.getCurrentUser(tenantId, req.user.sub);
   }
 }

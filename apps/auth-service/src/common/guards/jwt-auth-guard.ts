@@ -13,16 +13,25 @@ import { Observable } from "rxjs";
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
-    return super.canActivate(context);
-  }
-
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     if (err || !user) {
       throw err || new UnauthorizedException("Invalid or expired token");
     }
+
+    const req = context.switchToHttp().getRequest();
+
+    // 1️⃣ Tenant binding
+    const tokenTenant = user.tenantId;
+    const requestTenant = req.tenant?.id;
+
+    if (!tokenTenant || !requestTenant) {
+      throw new UnauthorizedException("Tenant missing");
+    }
+
+    if (tokenTenant !== requestTenant) {
+      throw new UnauthorizedException("Cross-tenant token");
+    }
+
     return user;
   }
 }
