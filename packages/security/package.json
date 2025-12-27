@@ -1,0 +1,17 @@
+{
+  "name": "@repo/security",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "argon2": "^0.44.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*"
+  }
+}

@@ -1,0 +1,4064 @@
+CODE CONSOLIDATION REPORT
+Generated: 2025-10-06T18:02:32.360Z
+Input Directory: /Users/rishitshivesh/Projects/Auth/identity
+================================================================================
+
+
+================================================================================
+FILE: .eslintrc.js
+SIZE: 663 B | LINES: 26
+================================================================================
+
+module.exports = {
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    project: 'tsconfig.json',
+    tsconfigRootDir: __dirname,
+    sourceType: 'module',
+  },
+  plugins: ['@typescript-eslint/eslint-plugin'],
+  extends: [
+    'plugin:@typescript-eslint/recommended',
+    'plugin:prettier/recommended',
+  ],
+  root: true,
+  env: {
+    node: true,
+    jest: true,
+  },
+  ignorePatterns: ['.eslintrc.js'],
+  rules: {
+    '@typescript-eslint/interface-name-prefix': 'off',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
+  },
+};
+
+
+
+================================================================================
+FILE: .yarnrc.yml
+SIZE: 24 B | LINES: 1
+================================================================================
+
+nodeLinker: node-modules
+
+
+================================================================================
+FILE: README.md
+SIZE: 4.92 KB | LINES: 99
+================================================================================
+
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
+
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
+
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+
+## Description
+
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+## Project setup
+
+```bash
+$ yarn install
+```
+
+## Compile and run the project
+
+```bash
+# development
+$ yarn run start
+
+# watch mode
+$ yarn run start:dev
+
+# production mode
+$ yarn run start:prod
+```
+
+## Run tests
+
+```bash
+# unit tests
+$ yarn run test
+
+# e2e tests
+$ yarn run test:e2e
+
+# test coverage
+$ yarn run test:cov
+```
+
+## Deployment
+
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+
+```bash
+$ yarn install -g @nestjs/mau
+$ mau deploy
+```
+
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+
+## Resources
+
+Check out a few resources that may come in handy when working with NestJS:
+
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+
+## Support
+
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+
+## Stay in touch
+
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+
+
+================================================================================
+FILE: api-management/nest-be/api-docs.yaml
+SIZE: 2.19 KB | LINES: 112
+================================================================================
+
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "HealthCheckController_welcome",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/api/health-check": {
+      "get": {
+        "operationId": "HealthCheckController_serviceCheck",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/api-docs.yaml": {
+      "get": {
+        "operationId": "HealthCheckController_getSwaggerYaml",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns API Docs Yaml."
+          }
+        },
+        "summary": "Returns Api docs Yaml",
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/stats/system": {
+      "get": {
+        "operationId": "StatsController_getSystemStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/stats/throughput": {
+      "get": {
+        "operationId": "StatsController_getThroughput",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/stats/increment": {
+      "get": {
+        "operationId": "StatsController_incrementRequestCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "identity-server",
+    "description": "API for Identity Server",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  },
+  "externalDocs": {
+    "description": "Sample",
+    "url": "https://id.sample.com"
+  }
+}
+
+
+================================================================================
+FILE: consolidate.js
+SIZE: 9.59 KB | LINES: 379
+================================================================================
+
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Code Consolidator Script
+ * Recursively scans directories and consolidates all code files into a single text file
+ */
+
+class CodeConsolidator {
+  constructor() {
+    // Common code file extensions
+    this.codeExtensions = new Set([
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      '.py',
+      '.java',
+      '.c',
+      '.cpp',
+      '.cc',
+      '.cxx',
+      '.cs',
+      '.php',
+      '.rb',
+      '.go',
+      '.rs',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.r',
+      '.m',
+      '.mm',
+      '.html',
+      '.htm',
+      '.css',
+      '.scss',
+      '.sass',
+      '.less',
+      '.xml',
+      '.json',
+      '.yaml',
+      '.yml',
+      '.toml',
+      '.sh',
+      '.bash',
+      '.zsh',
+      '.fish',
+      '.ps1',
+      '.bat',
+      '.sql',
+      '.graphql',
+      '.proto',
+      '.thrift',
+      '.dockerfile',
+      '.makefile',
+      '.cmake',
+      '.vue',
+      '.svelte',
+      '.dart',
+      '.lua',
+      '.pl',
+      '.pm',
+    ]);
+
+    // Files to exclude
+    this.excludeFiles = new Set([
+      'package-lock.json',
+      'yarn.lock',
+      '.DS_Store',
+      'Thumbs.db',
+      '.env',
+      '.env.local',
+      '.env.production',
+      '.env.development',
+    ]);
+
+    // Directories to exclude
+    this.excludeDirs = new Set([
+      'node_modules',
+      '.git',
+      '.svn',
+      '.hg',
+      'dist',
+      'build',
+      'target',
+      'bin',
+      'obj',
+      '__pycache__',
+      '.pytest_cache',
+      'venv',
+      'env',
+      '.venv',
+      '.env',
+      'vendor',
+      '.idea',
+      '.vscode',
+      '.vs',
+      'coverage',
+      '.nyc_output',
+      '.cache',
+    ]);
+
+    this.stats = {
+      filesProcessed: 0,
+      totalLines: 0,
+      skippedFiles: 0,
+      errors: 0,
+    };
+  }
+
+  /**
+   * Check if file should be processed based on extension
+   */
+  isCodeFile(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const basename = path.basename(filePath).toLowerCase();
+
+    // Special files without extensions
+    const specialFiles = [
+      'dockerfile',
+      'makefile',
+      'jenkinsfile',
+      'readme',
+      'license',
+      'changelog',
+    ];
+    if (specialFiles.some((name) => basename.includes(name))) {
+      return true;
+    }
+
+    return this.codeExtensions.has(ext);
+  }
+
+  /**
+   * Check if file/directory should be excluded
+   */
+  shouldExclude(itemPath, isDirectory = false) {
+    const basename = path.basename(itemPath);
+
+    if (isDirectory) {
+      return this.excludeDirs.has(basename) || basename.startsWith('.');
+    }
+
+    return (
+      this.excludeFiles.has(basename) ||
+      (basename.startsWith('.') && !this.isCodeFile(itemPath))
+    );
+  }
+
+  /**
+   * Get file size in a readable format
+   */
+  getFileSize(filePath) {
+    try {
+      const stats = fs.statSync(filePath);
+      const bytes = stats.size;
+
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    } catch (error) {
+      return 'Unknown';
+    }
+  }
+
+  /**
+   * Process a single file and add its content to the output
+   */
+  processFile(filePath, outputStream) {
+    try {
+      const relativePath = path.relative(process.cwd(), filePath);
+      const fileSize = this.getFileSize(filePath);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lineCount = content.split('\n').length;
+
+      // Write file header
+      outputStream.write('\n' + '='.repeat(80) + '\n');
+      outputStream.write(`FILE: ${relativePath}\n`);
+      outputStream.write(`SIZE: ${fileSize} | LINES: ${lineCount}\n`);
+      outputStream.write('='.repeat(80) + '\n\n');
+
+      // Write file content
+      outputStream.write(content);
+      outputStream.write('\n\n');
+
+      this.stats.filesProcessed++;
+      this.stats.totalLines += lineCount;
+
+      console.log(`✓ Processed: ${relativePath} (${lineCount} lines)`);
+    } catch (error) {
+      console.error(`✗ Error processing ${filePath}: ${error.message}`);
+      this.stats.errors++;
+    }
+  }
+
+  /**
+   * Recursively scan directory and process all code files
+   */
+  scanDirectory(dirPath, outputStream) {
+    try {
+      const items = fs.readdirSync(dirPath);
+
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item);
+        const stats = fs.statSync(itemPath);
+
+        if (stats.isDirectory()) {
+          if (!this.shouldExclude(itemPath, true)) {
+            this.scanDirectory(itemPath, outputStream);
+          } else {
+            console.log(
+              `⏭ Skipping directory: ${path.relative(process.cwd(), itemPath)}`,
+            );
+          }
+        } else if (stats.isFile()) {
+          if (
+            this.isCodeFile(itemPath) &&
+            !this.shouldExclude(itemPath, false)
+          ) {
+            this.processFile(itemPath, outputStream);
+          } else {
+            this.stats.skippedFiles++;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`✗ Error scanning directory ${dirPath}: ${error.message}`);
+      this.stats.errors++;
+    }
+  }
+
+  /**
+   * Main consolidation function
+   */
+  consolidate(inputPath = '.', outputPath = 'consolidated-code.txt') {
+    console.log('🚀 Starting code consolidation...\n');
+    console.log(`Input: ${path.resolve(inputPath)}`);
+    console.log(`Output: ${path.resolve(outputPath)}\n`);
+
+    const outputStream = fs.createWriteStream(outputPath);
+
+    // Write header
+    const timestamp = new Date().toISOString();
+    outputStream.write(`CODE CONSOLIDATION REPORT\n`);
+    outputStream.write(`Generated: ${timestamp}\n`);
+    outputStream.write(`Input Directory: ${path.resolve(inputPath)}\n`);
+    outputStream.write(`${'='.repeat(80)}\n\n`);
+
+    try {
+      const inputStats = fs.statSync(inputPath);
+
+      if (inputStats.isDirectory()) {
+        this.scanDirectory(inputPath, outputStream);
+      } else if (inputStats.isFile()) {
+        this.processFile(inputPath, outputStream);
+      } else {
+        throw new Error('Input path is neither a file nor a directory');
+      }
+
+      // Write footer with statistics
+      outputStream.write('\n' + '='.repeat(80) + '\n');
+      outputStream.write('CONSOLIDATION SUMMARY\n');
+      outputStream.write('='.repeat(80) + '\n');
+      outputStream.write(`Files Processed: ${this.stats.filesProcessed}\n`);
+      outputStream.write(
+        `Total Lines: ${this.stats.totalLines.toLocaleString()}\n`,
+      );
+      outputStream.write(`Files Skipped: ${this.stats.skippedFiles}\n`);
+      outputStream.write(`Errors: ${this.stats.errors}\n`);
+      outputStream.write(`Generated: ${timestamp}\n`);
+
+      outputStream.end();
+
+      console.log('\n✅ Consolidation completed successfully!');
+      console.log(`📊 Statistics:`);
+      console.log(`   • Files processed: ${this.stats.filesProcessed}`);
+      console.log(
+        `   • Total lines: ${this.stats.totalLines.toLocaleString()}`,
+      );
+      console.log(`   • Files skipped: ${this.stats.skippedFiles}`);
+      console.log(`   • Errors: ${this.stats.errors}`);
+      console.log(`📁 Output saved to: ${path.resolve(outputPath)}`);
+    } catch (error) {
+      console.error(`💥 Fatal error: ${error.message}`);
+      outputStream.destroy();
+    }
+  }
+
+  /**
+   * Add custom file extensions
+   */
+  addExtensions(extensions) {
+    extensions.forEach((ext) => {
+      if (!ext.startsWith('.')) ext = '.' + ext;
+      this.codeExtensions.add(ext.toLowerCase());
+    });
+  }
+
+  /**
+   * Add custom exclude patterns
+   */
+  addExcludes(files = [], dirs = []) {
+    files.forEach((file) => this.excludeFiles.add(file));
+    dirs.forEach((dir) => this.excludeDirs.add(dir));
+  }
+}
+
+// CLI Usage
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  const consolidator = new CodeConsolidator();
+
+  // Parse command line arguments
+  let inputPath = '.';
+  let outputPath = 'consolidated-code.txt';
+  let customExtensions = [];
+  let excludeFiles = [];
+  let excludeDirs = [];
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--input':
+      case '-i':
+        inputPath = args[++i];
+        break;
+      case '--output':
+      case '-o':
+        outputPath = args[++i];
+        break;
+      case '--extensions':
+      case '-e':
+        customExtensions = args[++i].split(',');
+        break;
+      case '--exclude-files':
+        excludeFiles = args[++i].split(',');
+        break;
+      case '--exclude-dirs':
+        excludeDirs = args[++i].split(',');
+        break;
+      case '--help':
+      case '-h':
+        console.log(`
+Code Consolidator - Merge all code files into one text file
+
+Usage: node consolidate.js [options]
+
+Options:
+  -i, --input <path>          Input directory or file (default: current directory)
+  -o, --output <path>         Output file path (default: consolidated-code.txt)
+  -e, --extensions <list>     Additional file extensions (comma-separated)
+  --exclude-files <list>      Additional files to exclude (comma-separated)
+  --exclude-dirs <list>       Additional directories to exclude (comma-separated)
+  -h, --help                  Show this help
+
+Examples:
+  node consolidate.js
+  node consolidate.js -i ./src -o output.txt
+  node consolidate.js -e "md,txt" --exclude-dirs "temp,cache"
+                `);
+        process.exit(0);
+    }
+  }
+
+  // Apply custom settings
+  if (customExtensions.length) consolidator.addExtensions(customExtensions);
+  if (excludeFiles.length || excludeDirs.length)
+    consolidator.addExcludes(excludeFiles, excludeDirs);
+
+  // Run consolidation
+  consolidator.consolidate(inputPath, outputPath);
+}
+
+module.exports = CodeConsolidator;
+
+
+
+================================================================================
+FILE: nest-cli.json
+SIZE: 171 B | LINES: 9
+================================================================================
+
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true
+  }
+}
+
+
+
+================================================================================
+FILE: package.json
+SIZE: 2.63 KB | LINES: 96
+================================================================================
+
+{
+  "name": "identity",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/sequelize": "^11.0.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@types/sequelize": "^6.12.0",
+    "axios": "^1.12.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "cookie-parser": "^1.4.7",
+    "express-session": "^1.18.2",
+    "ioredis": "^5.8.0",
+    "joi": "^18.0.1",
+    "passport": "^0.7.0",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "pino": "^10.0.0",
+    "pino-pretty": "^13.1.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "sequelize": "^6.37.7",
+    "sequelize-typescript": "^2.1.6",
+    "typeorm": "^0.3.27"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.18.0",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.1",
+    "@types/cookie-parser": "^1",
+    "@types/express": "^5.0.0",
+    "@types/express-session": "^1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.10.7",
+    "@types/passport": "^0",
+    "@types/pg": "^8",
+    "@types/supertest": "^6.0.2",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.2",
+    "globals": "^16.0.0",
+    "jest": "^30.0.0",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+
+
+
+================================================================================
+FILE: src/common/constants/cache.ts
+SIZE: 181 B | LINES: 9
+================================================================================
+
+export enum CacheTTL {
+  tenMinutes = 60 * 10,
+  fifteenMinutes = 60 * 15,
+  oneHour = 60 * 60,
+  twoHours = 60 * 60 * 2,
+  oneDay = 60 * 60 * 24,
+  threeDays = 60 * 60 * 24 * 3,
+}
+
+
+
+================================================================================
+FILE: src/common/constants/countries.ts
+SIZE: 20.01 KB | LINES: 1243
+================================================================================
+
+export const COUNTRIES_MAP = {
+  AF: 'Afghanistan',
+  AL: 'Albania',
+  DZ: 'Algeria',
+  AS: 'American Samoa',
+  AD: 'Andorra',
+  AO: 'Angola',
+  AI: 'Anguilla',
+  AQ: 'Antarctica',
+  AG: 'Antigua and Barbuda',
+  AR: 'Argentina',
+  AM: 'Armenia',
+  AW: 'Aruba',
+  AU: 'Australia',
+  AT: 'Austria',
+  AZ: 'Azerbaijan',
+  BS: 'Bahamas',
+  BH: 'Bahrain',
+  BD: 'Bangladesh',
+  BB: 'Barbados',
+  BY: 'Belarus',
+  BE: 'Belgium',
+  BZ: 'Belize',
+  BJ: 'Benin',
+  BM: 'Bermuda',
+  BT: 'Bhutan',
+  BO: 'Bolivia',
+  BA: 'Bosnia and Herzegovina',
+  BW: 'Botswana',
+  BV: 'Bouvet Island',
+  BR: 'Brazil',
+  IO: 'British Indian Ocean Territory',
+  BN: 'Brunei Darussalam',
+  BG: 'Bulgaria',
+  BF: 'Burkina Faso',
+  BI: 'Burundi',
+  KH: 'Cambodia',
+  CM: 'Cameroon',
+  CA: 'Canada',
+  CV: 'Cape Verde',
+  KY: 'Cayman Islands',
+  CF: 'Central African Republic',
+  TD: 'Chad',
+  CL: 'Chile',
+  CN: ["People's Republic of China", 'China'],
+  CX: 'Christmas Island',
+  CC: 'Cocos (Keeling) Islands',
+  CO: 'Colombia',
+  KM: 'Comoros',
+  CG: ['Republic of the Congo', 'Congo'],
+  CD: ['Democratic Republic of the Congo', 'Congo'],
+  CK: 'Cook Islands',
+  CR: 'Costa Rica',
+  CI: ["Cote d'Ivoire", "Côte d'Ivoire", 'Ivory Coast'],
+  HR: 'Croatia',
+  CU: 'Cuba',
+  CY: 'Cyprus',
+  CZ: ['Czech Republic', 'Czechia'],
+  DK: 'Denmark',
+  DJ: 'Djibouti',
+  DM: 'Dominica',
+  DO: 'Dominican Republic',
+  EC: 'Ecuador',
+  EG: 'Egypt',
+  SV: 'El Salvador',
+  GQ: 'Equatorial Guinea',
+  ER: 'Eritrea',
+  EE: 'Estonia',
+  ET: 'Ethiopia',
+  FK: 'Falkland Islands (Malvinas)',
+  FO: 'Faroe Islands',
+  FJ: 'Fiji',
+  FI: 'Finland',
+  FR: 'France',
+  GF: 'French Guiana',
+  PF: 'French Polynesia',
+  TF: 'French Southern Territories',
+  GA: 'Gabon',
+  GM: ['Republic of The Gambia', 'The Gambia', 'Gambia'],
+  GE: 'Georgia',
+  DE: 'Germany',
+  GH: 'Ghana',
+  GI: 'Gibraltar',
+  GR: 'Greece',
+  GL: 'Greenland',
+  GD: 'Grenada',
+  GP: 'Guadeloupe',
+  GU: 'Guam',
+  GT: 'Guatemala',
+  GN: 'Guinea',
+  GW: 'Guinea-Bissau',
+  GY: 'Guyana',
+  HT: 'Haiti',
+  HM: 'Heard Island and McDonald Islands',
+  VA: 'Holy See (Vatican City State)',
+  HN: 'Honduras',
+  HK: 'Hong Kong',
+  HU: 'Hungary',
+  IS: 'Iceland',
+  IN: 'India',
+  ID: 'Indonesia',
+  IR: ['Islamic Republic of Iran', 'Iran'],
+  IQ: 'Iraq',
+  IE: 'Ireland',
+  IL: 'Israel',
+  IT: 'Italy',
+  JM: 'Jamaica',
+  JP: 'Japan',
+  JO: 'Jordan',
+  KZ: 'Kazakhstan',
+  KE: 'Kenya',
+  KI: 'Kiribati',
+  KP: 'North Korea',
+  KR: ['South Korea', 'Korea, Republic of', 'Republic of Korea'],
+  KW: 'Kuwait',
+  KG: 'Kyrgyzstan',
+  LA: "Lao People's Democratic Republic",
+  LV: 'Latvia',
+  LB: 'Lebanon',
+  LS: 'Lesotho',
+  LR: 'Liberia',
+  LY: 'Libya',
+  LI: 'Liechtenstein',
+  LT: 'Lithuania',
+  LU: 'Luxembourg',
+  MO: 'Macao',
+  MG: 'Madagascar',
+  MW: 'Malawi',
+  MY: 'Malaysia',
+  MV: 'Maldives',
+  ML: 'Mali',
+  MT: 'Malta',
+  MH: 'Marshall Islands',
+  MQ: 'Martinique',
+  MR: 'Mauritania',
+  MU: 'Mauritius',
+  YT: 'Mayotte',
+  MX: 'Mexico',
+  FM: 'Micronesia, Federated States of',
+  MD: 'Moldova, Republic of',
+  MC: 'Monaco',
+  MN: 'Mongolia',
+  MS: 'Montserrat',
+  MA: 'Morocco',
+  MZ: 'Mozambique',
+  MM: 'Myanmar',
+  NA: 'Namibia',
+  NR: 'Nauru',
+  NP: 'Nepal',
+  NL: ['Netherlands', 'The Netherlands', 'Netherlands (Kingdom of the)'],
+  NC: 'New Caledonia',
+  NZ: 'New Zealand',
+  NI: 'Nicaragua',
+  NE: 'Niger',
+  NG: 'Nigeria',
+  NU: 'Niue',
+  NF: 'Norfolk Island',
+  MK: ['The Republic of North Macedonia', 'North Macedonia'],
+  MP: 'Northern Mariana Islands',
+  NO: 'Norway',
+  OM: 'Oman',
+  PK: 'Pakistan',
+  PW: 'Palau',
+  PS: ['State of Palestine', 'Palestine'],
+  PA: 'Panama',
+  PG: 'Papua New Guinea',
+  PY: 'Paraguay',
+  PE: 'Peru',
+  PH: 'Philippines',
+  PN: ['Pitcairn', 'Pitcairn Islands'],
+  PL: 'Poland',
+  PT: 'Portugal',
+  PR: 'Puerto Rico',
+  QA: 'Qatar',
+  RE: 'Reunion',
+  RO: 'Romania',
+  RU: ['Russian Federation', 'Russia'],
+  RW: 'Rwanda',
+  SH: 'Saint Helena',
+  KN: 'Saint Kitts and Nevis',
+  LC: 'Saint Lucia',
+  PM: 'Saint Pierre and Miquelon',
+  VC: 'Saint Vincent and the Grenadines',
+  WS: 'Samoa',
+  SM: 'San Marino',
+  ST: 'Sao Tome and Principe',
+  SA: 'Saudi Arabia',
+  SN: 'Senegal',
+  SC: 'Seychelles',
+  SL: 'Sierra Leone',
+  SG: 'Singapore',
+  SK: 'Slovakia',
+  SI: 'Slovenia',
+  SB: 'Solomon Islands',
+  SO: 'Somalia',
+  ZA: 'South Africa',
+  GS: 'South Georgia and the South Sandwich Islands',
+  ES: 'Spain',
+  LK: 'Sri Lanka',
+  SD: 'Sudan',
+  SR: 'Suriname',
+  SJ: 'Svalbard and Jan Mayen',
+  SZ: 'Eswatini',
+  SE: 'Sweden',
+  CH: 'Switzerland',
+  SY: 'Syrian Arab Republic',
+  TW: ['Taiwan, Province of China', 'Taiwan'],
+  TJ: 'Tajikistan',
+  TZ: ['United Republic of Tanzania', 'Tanzania'],
+  TH: 'Thailand',
+  TL: 'Timor-Leste',
+  TG: 'Togo',
+  TK: 'Tokelau',
+  TO: 'Tonga',
+  TT: 'Trinidad and Tobago',
+  TN: 'Tunisia',
+  TR: ['Türkiye', 'Turkey'],
+  TM: 'Turkmenistan',
+  TC: 'Turks and Caicos Islands',
+  TV: 'Tuvalu',
+  UG: 'Uganda',
+  UA: 'Ukraine',
+  AE: ['United Arab Emirates', 'UAE'],
+  GB: ['United Kingdom', 'UK', 'Great Britain'],
+  US: [
+    'United States of America',
+    'United States',
+    'USA',
+    'U.S.A.',
+    'US',
+    'U.S.',
+  ],
+  UM: 'United States Minor Outlying Islands',
+  UY: 'Uruguay',
+  UZ: 'Uzbekistan',
+  VU: 'Vanuatu',
+  VE: 'Venezuela',
+  VN: 'Vietnam',
+  VG: 'Virgin Islands, British',
+  VI: 'Virgin Islands, U.S.',
+  WF: 'Wallis and Futuna',
+  EH: 'Western Sahara',
+  YE: 'Yemen',
+  ZM: 'Zambia',
+  ZW: 'Zimbabwe',
+  AX: ['Åland Islands', 'Aland Islands'],
+  BQ: 'Bonaire, Sint Eustatius and Saba',
+  CW: 'Curaçao',
+  GG: 'Guernsey',
+  IM: 'Isle of Man',
+  JE: 'Jersey',
+  ME: 'Montenegro',
+  BL: 'Saint Barthélemy',
+  MF: 'Saint Martin (French part)',
+  RS: 'Serbia',
+  SX: 'Sint Maarten (Dutch part)',
+  SS: 'South Sudan',
+  XK: 'Kosovo',
+};
+
+export const LIST_OF_COUNTRIES = [
+  {
+    country: 'Afghanistan',
+    abbreviation: 'AF',
+  },
+  {
+    country: 'Albania',
+    abbreviation: 'AL',
+  },
+  {
+    country: 'Algeria',
+    abbreviation: 'DZ',
+  },
+  {
+    country: 'American Samoa',
+    abbreviation: 'AS',
+  },
+  {
+    country: 'Andorra',
+    abbreviation: 'AD',
+  },
+  {
+    country: 'Angola',
+    abbreviation: 'AO',
+  },
+  {
+    country: 'Anguilla',
+    abbreviation: 'AI',
+  },
+  {
+    country: 'Antarctica',
+    abbreviation: 'AQ',
+  },
+  {
+    country: 'Antigua and Barbuda',
+    abbreviation: 'AG',
+  },
+  {
+    country: 'Argentina',
+    abbreviation: 'AR',
+  },
+  {
+    country: 'Armenia',
+    abbreviation: 'AM',
+  },
+  {
+    country: 'Aruba',
+    abbreviation: 'AW',
+  },
+  {
+    country: 'Australia',
+    abbreviation: 'AU',
+  },
+  {
+    country: 'Austria',
+    abbreviation: 'AT',
+  },
+  {
+    country: 'Azerbaijan',
+    abbreviation: 'AZ',
+  },
+  {
+    country: 'Bahamas',
+    abbreviation: 'BS',
+  },
+  {
+    country: 'Bahrain',
+    abbreviation: 'BH',
+  },
+  {
+    country: 'Bangladesh',
+    abbreviation: 'BD',
+  },
+  {
+    country: 'Barbados',
+    abbreviation: 'BB',
+  },
+  {
+    country: 'Belarus',
+    abbreviation: 'BY',
+  },
+  {
+    country: 'Belgium',
+    abbreviation: 'BE',
+  },
+  {
+    country: 'Belize',
+    abbreviation: 'BZ',
+  },
+  {
+    country: 'Benin',
+    abbreviation: 'BJ',
+  },
+  {
+    country: 'Bermuda',
+    abbreviation: 'BM',
+  },
+  {
+    country: 'Bhutan',
+    abbreviation: 'BT',
+  },
+  {
+    country: 'Bolivia',
+    abbreviation: 'BO',
+  },
+  {
+    country: 'Bosnia and Herzegovina',
+    abbreviation: 'BA',
+  },
+  {
+    country: 'Botswana',
+    abbreviation: 'BW',
+  },
+  {
+    country: 'Bouvet Island',
+    abbreviation: 'BV',
+  },
+  {
+    country: 'Brazil',
+    abbreviation: 'BR',
+  },
+  {
+    country: 'British Indian Ocean Territory',
+    abbreviation: 'IO',
+  },
+  {
+    country: 'Brunei',
+    abbreviation: 'BN',
+  },
+  {
+    country: 'Bulgaria',
+    abbreviation: 'BG',
+  },
+  {
+    country: 'Burkina Faso',
+    abbreviation: 'BF',
+  },
+  {
+    country: 'Burundi',
+    abbreviation: 'BI',
+  },
+  {
+    country: 'Cambodia',
+    abbreviation: 'KH',
+  },
+  {
+    country: 'Cameroon',
+    abbreviation: 'CM',
+  },
+  {
+    country: 'Canada',
+    abbreviation: 'CA',
+  },
+  {
+    country: 'Cape Verde',
+    abbreviation: 'CV',
+  },
+  {
+    country: 'Cayman Islands',
+    abbreviation: 'KY',
+  },
+  {
+    country: 'Central African Republic',
+    abbreviation: 'CF',
+  },
+  {
+    country: 'Chad',
+    abbreviation: 'TD',
+  },
+  {
+    country: 'Chile',
+    abbreviation: 'CL',
+  },
+  {
+    country: 'China',
+    abbreviation: 'CN',
+  },
+  {
+    country: 'Christmas Island',
+    abbreviation: 'CX',
+  },
+  {
+    country: 'Cocos (Keeling) Islands',
+    abbreviation: 'CC',
+  },
+  {
+    country: 'Colombia',
+    abbreviation: 'CO',
+  },
+  {
+    country: 'Comoros',
+    abbreviation: 'KM',
+  },
+  {
+    country: 'Congo',
+    abbreviation: 'CG',
+  },
+  {
+    country: 'Cook Islands',
+    abbreviation: 'CK',
+  },
+  {
+    country: 'Costa Rica',
+    abbreviation: 'CR',
+  },
+  {
+    country: 'Croatia',
+    abbreviation: 'HR',
+  },
+  {
+    country: 'Cuba',
+    abbreviation: 'CU',
+  },
+  {
+    country: 'Cyprus',
+    abbreviation: 'CY',
+  },
+  {
+    country: 'Czech Republic',
+    abbreviation: 'CZ',
+  },
+  {
+    country: 'Denmark',
+    abbreviation: 'DK',
+  },
+  {
+    country: 'Djibouti',
+    abbreviation: 'DJ',
+  },
+  {
+    country: 'Dominica',
+    abbreviation: 'DM',
+  },
+  {
+    country: 'Dominican Republic',
+    abbreviation: 'DO',
+  },
+  {
+    country: 'East Timor',
+    abbreviation: 'TP',
+  },
+  {
+    country: 'Ecuador',
+    abbreviation: 'EC',
+  },
+  {
+    country: 'Egypt',
+    abbreviation: 'EG',
+  },
+  {
+    country: 'El Salvador',
+    abbreviation: 'SV',
+  },
+  {
+    country: 'Equatorial Guinea',
+    abbreviation: 'GQ',
+  },
+  {
+    country: 'Eritrea',
+    abbreviation: 'ER',
+  },
+  {
+    country: 'Estonia',
+    abbreviation: 'EE',
+  },
+  {
+    country: 'Eswatini',
+    abbreviation: 'SZ',
+  },
+  {
+    country: 'Ethiopia',
+    abbreviation: 'ET',
+  },
+  {
+    country: 'Falkland Islands',
+    abbreviation: 'FK',
+  },
+  {
+    country: 'Faroe Islands',
+    abbreviation: 'FO',
+  },
+  {
+    country: 'Fiji Islands',
+    abbreviation: 'FJ',
+  },
+  {
+    country: 'Finland',
+    abbreviation: 'FI',
+  },
+  {
+    country: 'France',
+    abbreviation: 'FR',
+  },
+  {
+    country: 'French Guiana',
+    abbreviation: 'GF',
+  },
+  {
+    country: 'French Polynesia',
+    abbreviation: 'PF',
+  },
+  {
+    country: 'French Southern territories',
+    abbreviation: 'TF',
+  },
+  {
+    country: 'Gabon',
+    abbreviation: 'GA',
+  },
+  {
+    country: 'Gambia',
+    abbreviation: 'GM',
+  },
+  {
+    country: 'Georgia',
+    abbreviation: 'GE',
+  },
+  {
+    country: 'Germany',
+    abbreviation: 'DE',
+  },
+  {
+    country: 'Ghana',
+    abbreviation: 'GH',
+  },
+  {
+    country: 'Gibraltar',
+    abbreviation: 'GI',
+  },
+  {
+    country: 'Greece',
+    abbreviation: 'GR',
+  },
+  {
+    country: 'Greenland',
+    abbreviation: 'GL',
+  },
+  {
+    country: 'Grenada',
+    abbreviation: 'GD',
+  },
+  {
+    country: 'Guadeloupe',
+    abbreviation: 'GP',
+  },
+  {
+    country: 'Guam',
+    abbreviation: 'GU',
+  },
+  {
+    country: 'Guatemala',
+    abbreviation: 'GT',
+  },
+  {
+    country: 'Guernsey',
+    abbreviation: 'GG',
+  },
+  {
+    country: 'Guinea',
+    abbreviation: 'GN',
+  },
+  {
+    country: 'Guinea-Bissau',
+    abbreviation: 'GW',
+  },
+  {
+    country: 'Guyana',
+    abbreviation: 'GY',
+  },
+  {
+    country: 'Haiti',
+    abbreviation: 'HT',
+  },
+  {
+    country: 'Heard Island and McDonald Islands',
+    abbreviation: 'HM',
+  },
+  {
+    country: 'Holy See (Vatican City State)',
+    abbreviation: 'VA',
+  },
+  {
+    country: 'Honduras',
+    abbreviation: 'HN',
+  },
+  {
+    country: 'Hong Kong',
+    abbreviation: 'HK',
+  },
+  {
+    country: 'Hungary',
+    abbreviation: 'HU',
+  },
+  {
+    country: 'Iceland',
+    abbreviation: 'IS',
+  },
+  {
+    country: 'India',
+    abbreviation: 'IN',
+  },
+  {
+    country: 'Indonesia',
+    abbreviation: 'ID',
+  },
+  {
+    country: 'Iran',
+    abbreviation: 'IR',
+  },
+  {
+    country: 'Iraq',
+    abbreviation: 'IQ',
+  },
+  {
+    country: 'Ireland',
+    abbreviation: 'IE',
+  },
+  {
+    country: 'Isle of Man',
+    abbreviation: 'IM',
+  },
+  {
+    country: 'Israel',
+    abbreviation: 'IL',
+  },
+  {
+    country: 'Italy',
+    abbreviation: 'IT',
+  },
+  {
+    country: 'Ivory Coast',
+    abbreviation: 'CI',
+  },
+  {
+    country: 'Jamaica',
+    abbreviation: 'JM',
+  },
+  {
+    country: 'Japan',
+    abbreviation: 'JP',
+  },
+  {
+    country: 'Jersey',
+    abbreviation: 'JE',
+  },
+  {
+    country: 'Jordan',
+    abbreviation: 'JO',
+  },
+  {
+    country: 'Kazakhstan',
+    abbreviation: 'KZ',
+  },
+  {
+    country: 'Kenya',
+    abbreviation: 'KE',
+  },
+  {
+    country: 'Kiribati',
+    abbreviation: 'KI',
+  },
+  {
+    country: 'Kuwait',
+    abbreviation: 'KW',
+  },
+  {
+    country: 'Kyrgyzstan',
+    abbreviation: 'KG',
+  },
+  {
+    country: 'Laos',
+    abbreviation: 'LA',
+  },
+  {
+    country: 'Latvia',
+    abbreviation: 'LV',
+  },
+  {
+    country: 'Lebanon',
+    abbreviation: 'LB',
+  },
+  {
+    country: 'Lesotho',
+    abbreviation: 'LS',
+  },
+  {
+    country: 'Liberia',
+    abbreviation: 'LR',
+  },
+  {
+    country: 'Libya',
+    abbreviation: 'LY',
+  },
+  {
+    country: 'Liechtenstein',
+    abbreviation: 'LI',
+  },
+  {
+    country: 'Lithuania',
+    abbreviation: 'LT',
+  },
+  {
+    country: 'Luxembourg',
+    abbreviation: 'LU',
+  },
+  {
+    country: 'Macao',
+    abbreviation: 'MO',
+  },
+  {
+    country: 'North Macedonia',
+    abbreviation: 'MK',
+  },
+  {
+    country: 'Madagascar',
+    abbreviation: 'MG',
+  },
+  {
+    country: 'Malawi',
+    abbreviation: 'MW',
+  },
+  {
+    country: 'Malaysia',
+    abbreviation: 'MY',
+  },
+  {
+    country: 'Maldives',
+    abbreviation: 'MV',
+  },
+  {
+    country: 'Mali',
+    abbreviation: 'ML',
+  },
+  {
+    country: 'Malta',
+    abbreviation: 'MT',
+  },
+  {
+    country: 'Marshall Islands',
+    abbreviation: 'MH',
+  },
+  {
+    country: 'Martinique',
+    abbreviation: 'MQ',
+  },
+  {
+    country: 'Mauritania',
+    abbreviation: 'MR',
+  },
+  {
+    country: 'Mauritius',
+    abbreviation: 'MU',
+  },
+  {
+    country: 'Mayotte',
+    abbreviation: 'YT',
+  },
+  {
+    country: 'Mexico',
+    abbreviation: 'MX',
+  },
+  {
+    country: 'Micronesia, Federated States of',
+    abbreviation: 'FM',
+  },
+  {
+    country: 'Moldova',
+    abbreviation: 'MD',
+  },
+  {
+    country: 'Monaco',
+    abbreviation: 'MC',
+  },
+  {
+    country: 'Mongolia',
+    abbreviation: 'MN',
+  },
+  {
+    country: 'Montenegro',
+    abbreviation: 'ME',
+  },
+  {
+    country: 'Montserrat',
+    abbreviation: 'MS',
+  },
+  {
+    country: 'Morocco',
+    abbreviation: 'MA',
+  },
+  {
+    country: 'Mozambique',
+    abbreviation: 'MZ',
+  },
+  {
+    country: 'Myanmar',
+    abbreviation: 'MM',
+  },
+  {
+    country: 'Namibia',
+    abbreviation: 'NA',
+  },
+  {
+    country: 'Nauru',
+    abbreviation: 'NR',
+  },
+  {
+    country: 'Nepal',
+    abbreviation: 'NP',
+  },
+  {
+    country: 'Netherlands',
+    abbreviation: 'NL',
+  },
+  {
+    country: 'Netherlands Antilles',
+    abbreviation: 'AN',
+  },
+  {
+    country: 'New Caledonia',
+    abbreviation: 'NC',
+  },
+  {
+    country: 'New Zealand',
+    abbreviation: 'NZ',
+  },
+  {
+    country: 'Nicaragua',
+    abbreviation: 'NI',
+  },
+  {
+    country: 'Niger',
+    abbreviation: 'NE',
+  },
+  {
+    country: 'Nigeria',
+    abbreviation: 'NG',
+  },
+  {
+    country: 'Niue',
+    abbreviation: 'NU',
+  },
+  {
+    country: 'Norfolk Island',
+    abbreviation: 'NF',
+  },
+  {
+    country: 'North Korea',
+    abbreviation: 'KP',
+  },
+  {
+    country: 'Northern Ireland',
+    abbreviation: 'GB',
+  },
+  {
+    country: 'Northern Mariana Islands',
+    abbreviation: 'MP',
+  },
+  {
+    country: 'Norway',
+    abbreviation: 'NO',
+  },
+  {
+    country: 'Oman',
+    abbreviation: 'OM',
+  },
+  {
+    country: 'Pakistan',
+    abbreviation: 'PK',
+  },
+  {
+    country: 'Palau',
+    abbreviation: 'PW',
+  },
+  {
+    country: 'Palestine',
+    abbreviation: 'PS',
+  },
+  {
+    country: 'Panama',
+    abbreviation: 'PA',
+  },
+  {
+    country: 'Papua New Guinea',
+    abbreviation: 'PG',
+  },
+  {
+    country: 'Paraguay',
+    abbreviation: 'PY',
+  },
+  {
+    country: 'Peru',
+    abbreviation: 'PE',
+  },
+  {
+    country: 'Philippines',
+    abbreviation: 'PH',
+  },
+  {
+    country: 'Pitcairn',
+    abbreviation: 'PN',
+  },
+  {
+    country: 'Poland',
+    abbreviation: 'PL',
+  },
+  {
+    country: 'Portugal',
+    abbreviation: 'PT',
+  },
+  {
+    country: 'Puerto Rico',
+    abbreviation: 'PR',
+  },
+  {
+    country: 'Qatar',
+    abbreviation: 'QA',
+  },
+  {
+    country: 'Reunion',
+    abbreviation: 'RE',
+  },
+  {
+    country: 'Romania',
+    abbreviation: 'RO',
+  },
+  {
+    country: 'Russia',
+    abbreviation: 'RU',
+  },
+  {
+    country: 'Rwanda',
+    abbreviation: 'RW',
+  },
+  {
+    country: 'Saint Helena',
+    abbreviation: 'SH',
+  },
+  {
+    country: 'Saint Kitts and Nevis',
+    abbreviation: 'KN',
+  },
+  {
+    country: 'Saint Lucia',
+    abbreviation: 'LC',
+  },
+  {
+    country: 'Saint Pierre and Miquelon',
+    abbreviation: 'PM',
+  },
+  {
+    country: 'Saint Vincent and the Grenadines',
+    abbreviation: 'VC',
+  },
+  {
+    country: 'Samoa',
+    abbreviation: 'WS',
+  },
+  {
+    country: 'San Marino',
+    abbreviation: 'SM',
+  },
+  {
+    country: 'Sao Tome and Principe',
+    abbreviation: 'ST',
+  },
+  {
+    country: 'Saudi Arabia',
+    abbreviation: 'SA',
+  },
+  {
+    country: 'Senegal',
+    abbreviation: 'SN',
+  },
+  {
+    country: 'Serbia',
+    abbreviation: 'RS',
+  },
+  {
+    country: 'Seychelles',
+    abbreviation: 'SC',
+  },
+  {
+    country: 'Sierra Leone',
+    abbreviation: 'SL',
+  },
+  {
+    country: 'Singapore',
+    abbreviation: 'SG',
+  },
+  {
+    country: 'Slovakia',
+    abbreviation: 'SK',
+  },
+  {
+    country: 'Slovenia',
+    abbreviation: 'SI',
+  },
+  {
+    country: 'Solomon Islands',
+    abbreviation: 'SB',
+  },
+  {
+    country: 'Somalia',
+    abbreviation: 'SO',
+  },
+  {
+    country: 'South Africa',
+    abbreviation: 'ZA',
+  },
+  {
+    country: 'South Georgia and the South Sandwich Islands',
+    abbreviation: 'GS',
+  },
+  {
+    country: 'South Korea',
+    abbreviation: 'KR',
+  },
+  {
+    country: 'South Sudan',
+    abbreviation: 'SS',
+  },
+  {
+    country: 'Spain',
+    abbreviation: 'ES',
+  },
+  {
+    country: 'Sri Lanka',
+    abbreviation: 'LK',
+  },
+  {
+    country: 'Sudan',
+    abbreviation: 'SD',
+  },
+  {
+    country: 'Suriname',
+    abbreviation: 'SR',
+  },
+  {
+    country: 'Svalbard and Jan Mayen',
+    abbreviation: 'SJ',
+  },
+  {
+    country: 'Sweden',
+    abbreviation: 'SE',
+  },
+  {
+    country: 'Switzerland',
+    abbreviation: 'CH',
+  },
+  {
+    country: 'Syria',
+    abbreviation: 'SY',
+  },
+  {
+    country: 'Tajikistan',
+    abbreviation: 'TJ',
+  },
+  {
+    country: 'Tanzania',
+    abbreviation: 'TZ',
+  },
+  {
+    country: 'Thailand',
+    abbreviation: 'TH',
+  },
+  {
+    country: 'The Democratic Republic of Congo',
+    abbreviation: 'CD',
+  },
+  {
+    country: 'Timor-Leste',
+    abbreviation: 'TL',
+  },
+  {
+    country: 'Togo',
+    abbreviation: 'TG',
+  },
+  {
+    country: 'Tokelau',
+    abbreviation: 'TK',
+  },
+  {
+    country: 'Tonga',
+    abbreviation: 'TO',
+  },
+  {
+    country: 'Trinidad and Tobago',
+    abbreviation: 'TT',
+  },
+  {
+    country: 'Tunisia',
+    abbreviation: 'TN',
+  },
+  {
+    country: 'Turkey',
+    abbreviation: 'TR',
+  },
+  {
+    country: 'Turkmenistan',
+    abbreviation: 'TM',
+  },
+  {
+    country: 'Turks and Caicos Islands',
+    abbreviation: 'TC',
+  },
+  {
+    country: 'Tuvalu',
+    abbreviation: 'TV',
+  },
+  {
+    country: 'Uganda',
+    abbreviation: 'UG',
+  },
+  {
+    country: 'Ukraine',
+    abbreviation: 'UA',
+  },
+  {
+    country: 'United Arab Emirates',
+    abbreviation: 'AE',
+  },
+  {
+    country: 'United Kingdom',
+    abbreviation: 'UK',
+  },
+  {
+    country: 'United States',
+    abbreviation: 'US',
+  },
+  {
+    country: 'United States Minor Outlying Islands',
+    abbreviation: 'UM',
+  },
+  {
+    country: 'Uruguay',
+    abbreviation: 'UY',
+  },
+  {
+    country: 'Uzbekistan',
+    abbreviation: 'UZ',
+  },
+  {
+    country: 'Vanuatu',
+    abbreviation: 'VU',
+  },
+  {
+    country: 'Venezuela',
+    abbreviation: 'VE',
+  },
+  {
+    country: 'Vietnam',
+    abbreviation: 'VN',
+  },
+  {
+    country: 'Virgin Islands, British',
+    abbreviation: 'VG',
+  },
+  {
+    country: 'Virgin Islands, U.S.',
+    abbreviation: 'VI',
+  },
+  {
+    country: 'Wallis and Futuna',
+    abbreviation: 'WF',
+  },
+  {
+    country: 'Western Sahara',
+    abbreviation: 'EH',
+  },
+  {
+    country: 'Yemen',
+    abbreviation: 'YE',
+  },
+  {
+    country: 'Zambia',
+    abbreviation: 'ZM',
+  },
+  {
+    country: 'Zimbabwe',
+    abbreviation: 'ZW',
+  },
+];
+
+
+
+================================================================================
+FILE: src/common/constants/errors.ts
+SIZE: 121 B | LINES: 5
+================================================================================
+
+export const ERROR_CODES = {
+  PROVIDER_MISMATCH: 'P001E_MISMATCH',
+  EMAIL_NOT_VERIFIED: 'P002E_EMAIL_NOT_VERIFIED',
+};
+
+
+
+================================================================================
+FILE: src/common/constants/index.ts
+SIZE: 1.38 KB | LINES: 51
+================================================================================
+
+export const AUTHORIZATION_KEY = 'x-authorization';
+
+export const ALLOWED_URLS = ['*'];
+
+export const EXPIRES_IN = {
+  ONE_MINUTE: 60,
+  FIVE_MINUTES: 300,
+  ONE_HOUR: 3600,
+  ONE_DAY: 86400,
+  ONE_WEEK: 604800,
+  ONE_MONTH: 2592000,
+  ONE_YEAR: 31536000,
+};
+
+export const CRON_TIMES = {
+  every10s: '*/10 * * * * *',
+  everyMinute: '* * * * *',
+  everyFiveMinutes: '*/5 * * * *',
+  everyTenMinutes: '*/10 * * * *',
+  everyFifteenMinutes: '*/15 * * * *',
+  everyThirtyMinutes: '*/30 * * * *',
+  hourly: '0 * * * *',
+  everyThreeHours: '0 */3 * * *',
+  everySixHours: '0 */6 * * *',
+  everyTwelveHours: '0 */12 * * *',
+  daily: '0 0 * * *',
+  weekly: '0 0 * * 0',
+  monthly: '0 0 1 * *',
+  yearly: '0 0 1 1 *',
+};
+
+export enum AuditEventType {
+  PROFILE_NAME_CHANGE = 'PROFILE_NAME_CHANGE',
+  HANDLE_UPDATE = 'HANDLE_UPDATE',
+  PROFILE_PICTURE_UPDATE = 'PROFILE_PICTURE_UPDATE',
+  HEADER_IMAGE_UPDATE = 'HEADER_IMAGE_UPDATE',
+  BIO_UPDATE = 'BIO_UPDATE',
+  PASSWORD_CHANGE = 'PASSWORD_CHANGE',
+  PASSWORD_RESET = 'PASSWORD_RESET',
+  EMAIL_UPDATE = 'EMAIL_UPDATE',
+  LOGIN_LOCATION = 'LOGIN_LOCATION',
+  USER_REGISTER = 'USER_REGISTER',
+  ADMIN_POST_STATUS_CHANGE = 'ADMIN_POST_STATUS_CHANGE',
+  POST_DELETE = 'POST_DELETE',
+  POST_ARCHIVE = 'POST_ARCHIVE',
+  POST_UNARCHIVE = 'POST_UNARCHIVE',
+  PHONE_CHANGE = 'PHONE_CHANGE',
+  DEACTIVATE_ACCOUNT = 'DEACTIVATE_ACCOUNT',
+  UPDATE_PROFILE = 'UPDATE_PROFILE',
+}
+
+
+
+================================================================================
+FILE: src/common/constants/languages.ts
+SIZE: 14.98 KB | LINES: 913
+================================================================================
+
+export const LANGUAGES = [
+  {
+    code: 'ab',
+    name: 'Abkhaz',
+    nativeName: 'аҧсуа',
+  },
+  {
+    code: 'aa',
+    name: 'Afar',
+    nativeName: 'Afaraf',
+  },
+  {
+    code: 'af',
+    name: 'Afrikaans',
+    nativeName: 'Afrikaans',
+  },
+  {
+    code: 'ak',
+    name: 'Akan',
+    nativeName: 'Akan',
+  },
+  {
+    code: 'sq',
+    name: 'Albanian',
+    nativeName: 'Shqip',
+  },
+  {
+    code: 'am',
+    name: 'Amharic',
+    nativeName: 'አማርኛ',
+  },
+  {
+    code: 'ar',
+    name: 'Arabic',
+    nativeName: 'العربية',
+  },
+  {
+    code: 'an',
+    name: 'Aragonese',
+    nativeName: 'Aragonés',
+  },
+  {
+    code: 'hy',
+    name: 'Armenian',
+    nativeName: 'Հայերեն',
+  },
+  {
+    code: 'as',
+    name: 'Assamese',
+    nativeName: 'অসমীয়া',
+  },
+  {
+    code: 'av',
+    name: 'Avaric',
+    nativeName: 'авар мацӀ, магӀарул мацӀ',
+  },
+  {
+    code: 'ae',
+    name: 'Avestan',
+    nativeName: 'avesta',
+  },
+  {
+    code: 'ay',
+    name: 'Aymara',
+    nativeName: 'aymar aru',
+  },
+  {
+    code: 'az',
+    name: 'Azerbaijani',
+    nativeName: 'azərbaycan dili',
+  },
+  {
+    code: 'bm',
+    name: 'Bambara',
+    nativeName: 'bamanankan',
+  },
+  {
+    code: 'ba',
+    name: 'Bashkir',
+    nativeName: 'башҡорт теле',
+  },
+  {
+    code: 'eu',
+    name: 'Basque',
+    nativeName: 'euskara, euskera',
+  },
+  {
+    code: 'be',
+    name: 'Belarusian',
+    nativeName: 'Беларуская',
+  },
+  {
+    code: 'bn',
+    name: 'Bengali',
+    nativeName: 'বাংলা',
+  },
+  {
+    code: 'bh',
+    name: 'Bihari',
+    nativeName: 'भोजपुरी',
+  },
+  {
+    code: 'bi',
+    name: 'Bislama',
+    nativeName: 'Bislama',
+  },
+  {
+    code: 'bs',
+    name: 'Bosnian',
+    nativeName: 'bosanski jezik',
+  },
+  {
+    code: 'br',
+    name: 'Breton',
+    nativeName: 'brezhoneg',
+  },
+  {
+    code: 'bg',
+    name: 'Bulgarian',
+    nativeName: 'български език',
+  },
+  {
+    code: 'my',
+    name: 'Burmese',
+    nativeName: 'ဗမာစာ',
+  },
+  {
+    code: 'ca',
+    name: 'Catalan; Valencian',
+    nativeName: 'Català',
+  },
+  {
+    code: 'ch',
+    name: 'Chamorro',
+    nativeName: 'Chamoru',
+  },
+  {
+    code: 'ce',
+    name: 'Chechen',
+    nativeName: 'нохчийн мотт',
+  },
+  {
+    code: 'ny',
+    name: 'Chichewa; Chewa; Nyanja',
+    nativeName: 'chiCheŵa, chinyanja',
+  },
+  {
+    code: 'zh',
+    name: 'Chinese',
+    nativeName: '中文 (Zhōngwén), 汉语, 漢語',
+  },
+  {
+    code: 'cv',
+    name: 'Chuvash',
+    nativeName: 'чӑваш чӗлхи',
+  },
+  {
+    code: 'kw',
+    name: 'Cornish',
+    nativeName: 'Kernewek',
+  },
+  {
+    code: 'co',
+    name: 'Corsican',
+    nativeName: 'corsu, lingua corsa',
+  },
+  {
+    code: 'cr',
+    name: 'Cree',
+    nativeName: 'ᓀᐦᐃᔭᐍᐏᐣ',
+  },
+  {
+    code: 'hr',
+    name: 'Croatian',
+    nativeName: 'hrvatski',
+  },
+  {
+    code: 'cs',
+    name: 'Czech',
+    nativeName: 'česky, čeština',
+  },
+  {
+    code: 'da',
+    name: 'Danish',
+    nativeName: 'dansk',
+  },
+  {
+    code: 'dv',
+    name: 'Divehi; Dhivehi; Maldivian;',
+    nativeName: 'ދިވެހި',
+  },
+  {
+    code: 'nl',
+    name: 'Dutch',
+    nativeName: 'Nederlands, Vlaams',
+  },
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+  },
+  {
+    code: 'eo',
+    name: 'Esperanto',
+    nativeName: 'Esperanto',
+  },
+  {
+    code: 'et',
+    name: 'Estonian',
+    nativeName: 'eesti, eesti keel',
+  },
+  {
+    code: 'ee',
+    name: 'Ewe',
+    nativeName: 'Eʋegbe',
+  },
+  {
+    code: 'fo',
+    name: 'Faroese',
+    nativeName: 'føroyskt',
+  },
+  {
+    code: 'fj',
+    name: 'Fijian',
+    nativeName: 'vosa Vakaviti',
+  },
+  {
+    code: 'fi',
+    name: 'Finnish',
+    nativeName: 'suomi, suomen kieli',
+  },
+  {
+    code: 'fr',
+    name: 'French',
+    nativeName: 'français, langue française',
+  },
+  {
+    code: 'ff',
+    name: 'Fula; Fulah; Pulaar; Pular',
+    nativeName: 'Fulfulde, Pulaar, Pular',
+  },
+  {
+    code: 'gl',
+    name: 'Galician',
+    nativeName: 'Galego',
+  },
+  {
+    code: 'ka',
+    name: 'Georgian',
+    nativeName: 'ქართული',
+  },
+  {
+    code: 'de',
+    name: 'German',
+    nativeName: 'Deutsch',
+  },
+  {
+    code: 'el',
+    name: 'Greek, Modern',
+    nativeName: 'Ελληνικά',
+  },
+  {
+    code: 'gn',
+    name: 'Guaraní',
+    nativeName: 'Avañeẽ',
+  },
+  {
+    code: 'gu',
+    name: 'Gujarati',
+    nativeName: 'ગુજરાતી',
+  },
+  {
+    code: 'ht',
+    name: 'Haitian; Haitian Creole',
+    nativeName: 'Kreyòl ayisyen',
+  },
+  {
+    code: 'ha',
+    name: 'Hausa',
+    nativeName: 'Hausa, هَوُسَ',
+  },
+  {
+    code: 'he',
+    name: 'Hebrew (modern)',
+    nativeName: 'עברית',
+  },
+  {
+    code: 'hz',
+    name: 'Herero',
+    nativeName: 'Otjiherero',
+  },
+  {
+    code: 'hi',
+    name: 'Hindi',
+    nativeName: 'हिन्दी, हिंदी',
+  },
+  {
+    code: 'ho',
+    name: 'Hiri Motu',
+    nativeName: 'Hiri Motu',
+  },
+  {
+    code: 'hu',
+    name: 'Hungarian',
+    nativeName: 'Magyar',
+  },
+  {
+    code: 'ia',
+    name: 'Interlingua',
+    nativeName: 'Interlingua',
+  },
+  {
+    code: 'id',
+    name: 'Indonesian',
+    nativeName: 'Bahasa Indonesia',
+  },
+  {
+    code: 'ie',
+    name: 'Interlingue',
+    nativeName: 'Originally called Occidental; then Interlingue after WWII',
+  },
+  {
+    code: 'ga',
+    name: 'Irish',
+    nativeName: 'Gaeilge',
+  },
+  {
+    code: 'ig',
+    name: 'Igbo',
+    nativeName: 'Asụsụ Igbo',
+  },
+  {
+    code: 'ik',
+    name: 'Inupiaq',
+    nativeName: 'Iñupiaq, Iñupiatun',
+  },
+  {
+    code: 'io',
+    name: 'Ido',
+    nativeName: 'Ido',
+  },
+  {
+    code: 'is',
+    name: 'Icelandic',
+    nativeName: 'Íslenska',
+  },
+  {
+    code: 'it',
+    name: 'Italian',
+    nativeName: 'Italiano',
+  },
+  {
+    code: 'iu',
+    name: 'Inuktitut',
+    nativeName: 'ᐃᓄᒃᑎᑐᑦ',
+  },
+  {
+    code: 'ja',
+    name: 'Japanese',
+    nativeName: '日本語 (にほんご／にっぽんご)',
+  },
+  {
+    code: 'jv',
+    name: 'Javanese',
+    nativeName: 'basa Jawa',
+  },
+  {
+    code: 'kl',
+    name: 'Kalaallisut, Greenlandic',
+    nativeName: 'kalaallisut, kalaallit oqaasii',
+  },
+  {
+    code: 'kn',
+    name: 'Kannada',
+    nativeName: 'ಕನ್ನಡ',
+  },
+  {
+    code: 'kr',
+    name: 'Kanuri',
+    nativeName: 'Kanuri',
+  },
+  {
+    code: 'ks',
+    name: 'Kashmiri',
+    nativeName: 'कश्मीरी, كشميري‎',
+  },
+  {
+    code: 'kk',
+    name: 'Kazakh',
+    nativeName: 'Қазақ тілі',
+  },
+  {
+    code: 'km',
+    name: 'Khmer',
+    nativeName: 'ភាសាខ្មែរ',
+  },
+  {
+    code: 'ki',
+    name: 'Kikuyu, Gikuyu',
+    nativeName: 'Gĩkũyũ',
+  },
+  {
+    code: 'rw',
+    name: 'Kinyarwanda',
+    nativeName: 'Ikinyarwanda',
+  },
+  {
+    code: 'ky',
+    name: 'Kirghiz, Kyrgyz',
+    nativeName: 'кыргыз тили',
+  },
+  {
+    code: 'kv',
+    name: 'Komi',
+    nativeName: 'коми кыв',
+  },
+  {
+    code: 'kg',
+    name: 'Kongo',
+    nativeName: 'KiKongo',
+  },
+  {
+    code: 'ko',
+    name: 'Korean',
+    nativeName: '한국어 (韓國語), 조선말 (朝鮮語)',
+  },
+  {
+    code: 'ku',
+    name: 'Kurdish',
+    nativeName: 'Kurdî, كوردی‎',
+  },
+  {
+    code: 'kj',
+    name: 'Kwanyama, Kuanyama',
+    nativeName: 'Kuanyama',
+  },
+  {
+    code: 'la',
+    name: 'Latin',
+    nativeName: 'latine, lingua latina',
+  },
+  {
+    code: 'lb',
+    name: 'Luxembourgish, Letzeburgesch',
+    nativeName: 'Lëtzebuergesch',
+  },
+  {
+    code: 'lg',
+    name: 'Luganda',
+    nativeName: 'Luganda',
+  },
+  {
+    code: 'li',
+    name: 'Limburgish, Limburgan, Limburger',
+    nativeName: 'Limburgs',
+  },
+  {
+    code: 'ln',
+    name: 'Lingala',
+    nativeName: 'Lingála',
+  },
+  {
+    code: 'lo',
+    name: 'Lao',
+    nativeName: 'ພາສາລາວ',
+  },
+  {
+    code: 'lt',
+    name: 'Lithuanian',
+    nativeName: 'lietuvių kalba',
+  },
+  {
+    code: 'lu',
+    name: 'Luba-Katanga',
+    nativeName: '',
+  },
+  {
+    code: 'lv',
+    name: 'Latvian',
+    nativeName: 'latviešu valoda',
+  },
+  {
+    code: 'gv',
+    name: 'Manx',
+    nativeName: 'Gaelg, Gailck',
+  },
+  {
+    code: 'mk',
+    name: 'Macedonian',
+    nativeName: 'македонски јазик',
+  },
+  {
+    code: 'mg',
+    name: 'Malagasy',
+    nativeName: 'Malagasy fiteny',
+  },
+  {
+    code: 'ms',
+    name: 'Malay',
+    nativeName: 'bahasa Melayu, بهاس ملايو‎',
+  },
+  {
+    code: 'ml',
+    name: 'Malayalam',
+    nativeName: 'മലയാളം',
+  },
+  {
+    code: 'mt',
+    name: 'Maltese',
+    nativeName: 'Malti',
+  },
+  {
+    code: 'mi',
+    name: 'Māori',
+    nativeName: 'te reo Māori',
+  },
+  {
+    code: 'mr',
+    name: 'Marathi (Marāṭhī)',
+    nativeName: 'मराठी',
+  },
+  {
+    code: 'mh',
+    name: 'Marshallese',
+    nativeName: 'Kajin M̧ajeļ',
+  },
+  {
+    code: 'mn',
+    name: 'Mongolian',
+    nativeName: 'монгол',
+  },
+  {
+    code: 'na',
+    name: 'Nauru',
+    nativeName: 'Ekakairũ Naoero',
+  },
+  {
+    code: 'nv',
+    name: 'Navajo, Navaho',
+    nativeName: 'Diné bizaad, Dinékʼehǰí',
+  },
+  {
+    code: 'nb',
+    name: 'Norwegian Bokmål',
+    nativeName: 'Norsk bokmål',
+  },
+  {
+    code: 'nd',
+    name: 'North Ndebele',
+    nativeName: 'isiNdebele',
+  },
+  {
+    code: 'ne',
+    name: 'Nepali',
+    nativeName: 'नेपाली',
+  },
+  {
+    code: 'ng',
+    name: 'Ndonga',
+    nativeName: 'Owambo',
+  },
+  {
+    code: 'nn',
+    name: 'Norwegian Nynorsk',
+    nativeName: 'Norsk nynorsk',
+  },
+  {
+    code: 'no',
+    name: 'Norwegian',
+    nativeName: 'Norsk',
+  },
+  {
+    code: 'ii',
+    name: 'Nuosu',
+    nativeName: 'ꆈꌠ꒿ Nuosuhxop',
+  },
+  {
+    code: 'nr',
+    name: 'South Ndebele',
+    nativeName: 'isiNdebele',
+  },
+  {
+    code: 'oc',
+    name: 'Occitan',
+    nativeName: 'Occitan',
+  },
+  {
+    code: 'oj',
+    name: 'Ojibwe, Ojibwa',
+    nativeName: 'ᐊᓂᔑᓈᐯᒧᐎᓐ',
+  },
+  {
+    code: 'cu',
+    name: 'Old Church Slavonic, Church Slavic, Church Slavonic, Old Bulgarian, Old Slavonic',
+    nativeName: 'ѩзыкъ словѣньскъ',
+  },
+  {
+    code: 'om',
+    name: 'Oromo',
+    nativeName: 'Afaan Oromoo',
+  },
+  {
+    code: 'or',
+    name: 'Oriya',
+    nativeName: 'ଓଡ଼ିଆ',
+  },
+  {
+    code: 'os',
+    name: 'Ossetian, Ossetic',
+    nativeName: 'ирон æвзаг',
+  },
+  {
+    code: 'pa',
+    name: 'Panjabi, Punjabi',
+    nativeName: 'ਪੰਜਾਬੀ, پنجابی‎',
+  },
+  {
+    code: 'pi',
+    name: 'Pāli',
+    nativeName: 'पाऴि',
+  },
+  {
+    code: 'fa',
+    name: 'Persian',
+    nativeName: 'فارسی',
+  },
+  {
+    code: 'pl',
+    name: 'Polish',
+    nativeName: 'polski',
+  },
+  {
+    code: 'ps',
+    name: 'Pashto, Pushto',
+    nativeName: 'پښتو',
+  },
+  {
+    code: 'pt',
+    name: 'Portuguese',
+    nativeName: 'Português',
+  },
+  {
+    code: 'qu',
+    name: 'Quechua',
+    nativeName: 'Runa Simi, Kichwa',
+  },
+  {
+    code: 'rm',
+    name: 'Romansh',
+    nativeName: 'rumantsch grischun',
+  },
+  {
+    code: 'rn',
+    name: 'Kirundi',
+    nativeName: 'kiRundi',
+  },
+  {
+    code: 'ro',
+    name: 'Romanian, Moldavian, Moldovan',
+    nativeName: 'română',
+  },
+  {
+    code: 'ru',
+    name: 'Russian',
+    nativeName: 'русский язык',
+  },
+  {
+    code: 'sa',
+    name: 'Sanskrit (Saṁskṛta)',
+    nativeName: 'संस्कृतम्',
+  },
+  {
+    code: 'sc',
+    name: 'Sardinian',
+    nativeName: 'sardu',
+  },
+  {
+    code: 'sd',
+    name: 'Sindhi',
+    nativeName: 'सिन्धी, سنڌي، سندھی‎',
+  },
+  {
+    code: 'se',
+    name: 'Northern Sami',
+    nativeName: 'Davvisámegiella',
+  },
+  {
+    code: 'sm',
+    name: 'Samoan',
+    nativeName: 'gagana faa Samoa',
+  },
+  {
+    code: 'sg',
+    name: 'Sango',
+    nativeName: 'yângâ tî sängö',
+  },
+  {
+    code: 'sr',
+    name: 'Serbian',
+    nativeName: 'српски језик',
+  },
+  {
+    code: 'gd',
+    name: 'Scottish Gaelic; Gaelic',
+    nativeName: 'Gàidhlig',
+  },
+  {
+    code: 'sn',
+    name: 'Shona',
+    nativeName: 'chiShona',
+  },
+  {
+    code: 'si',
+    name: 'Sinhala, Sinhalese',
+    nativeName: 'සිංහල',
+  },
+  {
+    code: 'sk',
+    name: 'Slovak',
+    nativeName: 'slovenčina',
+  },
+  {
+    code: 'sl',
+    name: 'Slovene',
+    nativeName: 'slovenščina',
+  },
+  {
+    code: 'so',
+    name: 'Somali',
+    nativeName: 'Soomaaliga, af Soomaali',
+  },
+  {
+    code: 'st',
+    name: 'Southern Sotho',
+    nativeName: 'Sesotho',
+  },
+  {
+    code: 'es',
+    name: 'Spanish; Castilian',
+    nativeName: 'español, castellano',
+  },
+  {
+    code: 'su',
+    name: 'Sundanese',
+    nativeName: 'Basa Sunda',
+  },
+  {
+    code: 'sw',
+    name: 'Swahili',
+    nativeName: 'Kiswahili',
+  },
+  {
+    code: 'ss',
+    name: 'Swati',
+    nativeName: 'SiSwati',
+  },
+  {
+    code: 'sv',
+    name: 'Swedish',
+    nativeName: 'svenska',
+  },
+  {
+    code: 'ta',
+    name: 'Tamil',
+    nativeName: 'தமிழ்',
+  },
+  {
+    code: 'te',
+    name: 'Telugu',
+    nativeName: 'తెలుగు',
+  },
+  {
+    code: 'tg',
+    name: 'Tajik',
+    nativeName: 'тоҷикӣ, toğikī, تاجیکی‎',
+  },
+  {
+    code: 'th',
+    name: 'Thai',
+    nativeName: 'ไทย',
+  },
+  {
+    code: 'ti',
+    name: 'Tigrinya',
+    nativeName: 'ትግርኛ',
+  },
+  {
+    code: 'bo',
+    name: 'Tibetan Standard, Tibetan, Central',
+    nativeName: 'བོད་ཡིག',
+  },
+  {
+    code: 'tk',
+    name: 'Turkmen',
+    nativeName: 'Türkmen, Түркмен',
+  },
+  {
+    code: 'tl',
+    name: 'Tagalog',
+    nativeName: 'Wikang Tagalog, ᜏᜒᜃᜅ᜔ ᜆᜄᜎᜓᜄ᜔',
+  },
+  {
+    code: 'tn',
+    name: 'Tswana',
+    nativeName: 'Setswana',
+  },
+  {
+    code: 'to',
+    name: 'Tonga (Tonga Islands)',
+    nativeName: 'faka Tonga',
+  },
+  {
+    code: 'tr',
+    name: 'Turkish',
+    nativeName: 'Türkçe',
+  },
+  {
+    code: 'ts',
+    name: 'Tsonga',
+    nativeName: 'Xitsonga',
+  },
+  {
+    code: 'tt',
+    name: 'Tatar',
+    nativeName: 'татарча, tatarça, تاتارچا‎',
+  },
+  {
+    code: 'tw',
+    name: 'Twi',
+    nativeName: 'Twi',
+  },
+  {
+    code: 'ty',
+    name: 'Tahitian',
+    nativeName: 'Reo Tahiti',
+  },
+  {
+    code: 'ug',
+    name: 'Uighur, Uyghur',
+    nativeName: 'Uyƣurqə, ئۇيغۇرچە‎',
+  },
+  {
+    code: 'uk',
+    name: 'Ukrainian',
+    nativeName: 'українська',
+  },
+  {
+    code: 'ur',
+    name: 'Urdu',
+    nativeName: 'اردو',
+  },
+  {
+    code: 'uz',
+    name: 'Uzbek',
+    nativeName: 'zbek, Ўзбек, أۇزبېك‎',
+  },
+  {
+    code: 've',
+    name: 'Venda',
+    nativeName: 'Tshivenḓa',
+  },
+  {
+    code: 'vi',
+    name: 'Vietnamese',
+    nativeName: 'Tiếng Việt',
+  },
+  {
+    code: 'vo',
+    name: 'Volapük',
+    nativeName: 'Volapük',
+  },
+  {
+    code: 'wa',
+    name: 'Walloon',
+    nativeName: 'Walon',
+  },
+  {
+    code: 'cy',
+    name: 'Welsh',
+    nativeName: 'Cymraeg',
+  },
+  {
+    code: 'wo',
+    name: 'Wolof',
+    nativeName: 'Wollof',
+  },
+  {
+    code: 'fy',
+    name: 'Western Frisian',
+    nativeName: 'Frysk',
+  },
+  {
+    code: 'xh',
+    name: 'Xhosa',
+    nativeName: 'isiXhosa',
+  },
+  {
+    code: 'yi',
+    name: 'Yiddish',
+    nativeName: 'ייִדיש',
+  },
+  {
+    code: 'yo',
+    name: 'Yoruba',
+    nativeName: 'Yorùbá',
+  },
+  {
+    code: 'za',
+    name: 'Zhuang, Chuang',
+    nativeName: 'Saɯ cueŋƅ, Saw cuengh',
+  },
+];
+
+
+
+================================================================================
+FILE: src/common/decorators/metadata/pagination.ts
+SIZE: 1.44 KB | LINES: 59
+================================================================================
+
+export function PaginationMetadata(): MethodDecorator {
+  return function (
+    target: any,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor,
+  ) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      const { page = '1', size: pageSize = '10' } = args[0];
+
+      const result = await originalMethod.apply(this, args);
+
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+
+      const paginatedResults = result.data.slice(startIndex, endIndex);
+
+      const metadata = {
+        page,
+        pageSize,
+        totalPages: Math.ceil(result.data.length / pageSize),
+        totalRecords: result.data.length,
+      };
+
+      return { metadata, results: paginatedResults };
+    };
+
+    return descriptor;
+  };
+}
+
+export function PaginationMetadataUsers(): MethodDecorator {
+  return function (
+    target: any,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor,
+  ) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      const { page = '1', size: pageSize = '10' } = args[0];
+
+      const result = await originalMethod.apply(this, args);
+
+      const metadata = {
+        page,
+        pageSize,
+        totalPages: Math.ceil(result.data.length / pageSize),
+        totalRecords: result.data.length,
+      };
+
+      return { metadata, result };
+    };
+
+    return descriptor;
+  };
+}
+
+
+
+================================================================================
+FILE: src/common/decorators/permission.decorator.ts
+SIZE: 195 B | LINES: 6
+================================================================================
+
+import { SetMetadata } from '@nestjs/common';
+
+export const PERMISSIONS_KEY = 'permissions';
+export const Permissions = (...permissions: string[]) =>
+  SetMetadata(PERMISSIONS_KEY, permissions);
+
+
+
+================================================================================
+FILE: src/common/dto/pagination.dto.ts
+SIZE: 558 B | LINES: 24
+================================================================================
+
+import { IsOptional, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class PaginationQueryDto {
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @Min(1)
+  @ApiProperty({ default: 1, description: 'Page number' })
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @Min(1)
+  @ApiProperty({ default: 10, description: 'Number of items per page' })
+  limit?: number = 10;
+
+  @IsOptional()
+  @ApiProperty({ description: 'Search query' })
+  q?: string;
+}
+
+
+
+================================================================================
+FILE: src/common/filters/http-exception.filter.ts
+SIZE: 1.13 KB | LINES: 50
+================================================================================
+
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+    const status = exception.getStatus();
+    const res = exception.getResponse() as
+      | string
+      | { message?: string | string[]; [key: string]: any };
+
+    const message =
+      typeof res === 'string'
+        ? res
+        : Array.isArray(res.message)
+        ? res.message.join(', ')
+        : res.message || 'Unexpected error';
+
+    let code = 'INTERNAL_SERVER_ERROR';
+    switch (status) {
+      case HttpStatus.BAD_REQUEST:
+        code = 'BAD_REQUEST';
+        break;
+      case HttpStatus.UNAUTHORIZED:
+        code = 'UNAUTHORIZED';
+        break;
+      case HttpStatus.FORBIDDEN:
+        code = 'FORBIDDEN';
+        break;
+      case HttpStatus.CONFLICT:
+        code = 'CONFLICT';
+        break;
+    }
+
+    response.status(status).json({
+      error: {
+        code,
+        message,
+      },
+    });
+  }
+}
+
+
+
+================================================================================
+FILE: src/common/guards/index.ts
+SIZE: 44 B | LINES: 2
+================================================================================
+
+export * from './token-verification.guard';
+
+
+
+================================================================================
+FILE: src/common/guards/token-verification.guard.ts
+SIZE: 1.93 KB | LINES: 72
+================================================================================
+
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { logger } from '../logger';
+
+@Injectable()
+export class TokenVerificationGuard implements CanActivate {
+  constructor(private readonly jwtService: JwtService) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const token =
+      request.cookies.accessToken ??
+      request.headers['x-authorization'] ??
+      request.headers['authorization'];
+
+    if (!token) {
+      return false;
+    }
+
+    try {
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET,
+      });
+      if (!decoded) {
+        return false;
+      }
+      request.user = decoded;
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+}
+
+@Injectable()
+/**
+ * Add Request User to the request object if present.
+ * This guard is used to check if the user is authenticated.
+ * If the user is authenticated, the user object is added to the request object.
+ * If the user is not authenticated, the request object is not modified.
+ * This will NOT block or PROTECT the route.
+ *
+ * If Protection is required, please use one of the above two Guards.
+ */
+export class RequestUserGuard implements CanActivate {
+  constructor(private readonly jwtService: JwtService) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const token =
+      request.cookies.accessToken ??
+      request.headers['x-authorization'] ??
+      request.headers['authorization'];
+
+    try {
+      if (token) {
+        const decoded = this.jwtService.verify(token, {
+          secret: process.env.JWT_SECRET,
+        });
+        if (decoded) request.user = decoded;
+      }
+      return true;
+    } catch (error) {
+      logger.error({
+        message: 'Failed to verify token',
+        error,
+      });
+      return true;
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: src/common/interceptors/response.interceptors.ts
+SIZE: 472 B | LINES: 23
+================================================================================
+
+import {
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  Injectable,
+} from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+@Injectable()
+export class ResponseInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      map((data) => {
+        return {
+          status: 200,
+          data,
+        };
+      }),
+    );
+  }
+}
+
+
+
+================================================================================
+FILE: src/common/logger.ts
+SIZE: 162 B | LINES: 7
+================================================================================
+
+import pino, { Logger } from 'pino';
+import pretty from 'pino-pretty';
+
+const options = pretty({ colorize: true });
+
+export const logger: Logger = pino(options);
+
+
+
+================================================================================
+FILE: src/config/configuration.ts
+SIZE: 200 B | LINES: 6
+================================================================================
+
+export default () => ({
+  dbUrl: process.env.DB_URL!,
+  dbSsl: /^(1|true|yes|on)$/i.test(process.env.DB_SSL || 'false'),
+  dbLogging: /^(1|true|yes|on)$/i.test(process.env.DB_LOGGING || 'false'),
+});
+
+
+
+================================================================================
+FILE: src/config/database.config.ts
+SIZE: 535 B | LINES: 17
+================================================================================
+
+import { SequelizeModuleOptions } from '@nestjs/sequelize';
+
+/**
+ * @deprecated
+ * */
+export const databaseConfig: SequelizeModuleOptions = {
+  dialect: 'postgres',
+  host: process.env.DATABASE_HOST,
+  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+  username: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
+  autoLoadModels: true,
+  synchronize: process.env.NODE_ENV === 'development',
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+};
+
+
+
+================================================================================
+FILE: src/config/env.validation.ts
+SIZE: 1.12 KB | LINES: 34
+================================================================================
+
+import * as Joi from 'joi';
+
+export const validationSchema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'production')
+    .default('development'),
+  PORT: Joi.number().port().default(4000),
+
+  ISSUER_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .required(),
+  TENANT_RESOLUTION: Joi.string().valid('path', 'subdomain').default('path'),
+
+  JWT_ALG: Joi.string().valid('RS256', 'EdDSA').default('RS256'),
+  JWKS_CACHE_SECONDS: Joi.number().integer().min(0).default(300),
+
+  DB_URL: Joi.string().required(),
+  REDIS_URL: Joi.string().allow(''),
+
+  KEY_ACTIVE_TTL_DAYS: Joi.number().integer().min(1).default(90),
+  KEY_ROTATION_GRACE_DAYS: Joi.number().integer().min(0).default(2),
+
+  KEYRING_MASTER_KEY: Joi.string().base64().length(44).required(), // 32 bytes base64 = 44 chars
+  DB_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .required(),
+  DB_SSL: Joi.string()
+    .valid('true', 'false', '1', '0', 'yes', 'no', 'on', 'off')
+    .default('false'),
+  DB_LOGGING: Joi.string()
+    .valid('true', 'false', '1', '0', 'yes', 'no', 'on', 'off')
+    .default('false'),
+});
+
+
+
+================================================================================
+FILE: src/config/index.ts
+SIZE: 655 B | LINES: 22
+================================================================================
+
+export default () => ({
+  nodeEnv: process.env.NODE_ENV ?? 'development',
+  port: parseInt(process.env.PORT ?? '4000', 10),
+
+  issuerBaseUrl: process.env.ISSUER_BASE_URL!,
+  tenantResolution: process.env.TENANT_RESOLUTION ?? 'path',
+
+  jwtAlg: process.env.JWT_ALG ?? 'RS256',
+  jwksCacheSeconds: parseInt(process.env.JWKS_CACHE_SECONDS ?? '300', 10),
+
+  dbUrl: process.env.DB_URL!,
+  redisUrl: process.env.REDIS_URL ?? '',
+
+  keyActiveTtlDays: parseInt(process.env.KEY_ACTIVE_TTL_DAYS ?? '90', 10),
+  keyRotationGraceDays: parseInt(
+    process.env.KEY_ROTATION_GRACE_DAYS ?? '2',
+    10,
+  ),
+
+  keyringMasterKeyB64: process.env.KEYRING_MASTER_KEY!,
+});
+
+
+
+================================================================================
+FILE: src/core/app.module.ts
+SIZE: 1.9 KB | LINES: 61
+================================================================================
+
+import { Module, ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppApiModule } from './modules/app-module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { logger } from 'src/common/logger';
+import { ResponseInterceptor } from 'src/common/interceptors/response.interceptors';
+import { saveApiDoc } from './services/utility/utility.service';
+import { ALLOWED_URLS } from '../common/constants';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+
+@Module({
+  imports: [],
+})
+export class AppModule {
+  static async startApp(): Promise<void> {
+    const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
+    app.enableCors({
+      origin: ALLOWED_URLS,
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      optionsSuccessStatus: 200,
+      credentials: true,
+    });
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    );
+
+    const config = new DocumentBuilder()
+      .setTitle('identity-server')
+      .setDescription('API for Identity Server')
+      .setVersion('1.0')
+      .setExternalDoc('Sample', 'https://id.sample.com')
+      .addBearerAuth()
+      .build();
+
+    const documentForGeneralApis = SwaggerModule.createDocument(app, config);
+
+    SwaggerModule.setup('api-docs', app, documentForGeneralApis);
+    saveApiDoc('api-docs', documentForGeneralApis, 'nest-be');
+
+    if (app) {
+      logger.info('Application started successfully');
+      logger.info(`Application is running on: ${process.env.PORT}`);
+      app.useGlobalInterceptors(new ResponseInterceptor());
+      app.use(cookieParser());
+      // app.setGlobalPrefix('api');
+      app.use(
+        session({
+          secret: 'nest-session-secret',
+          resave: false,
+          saveUninitialized: false,
+        }),
+      );
+      await app.listen(process.env.PORT || 4000);
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/config/index.ts
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: src/core/libraries/request.ts
+SIZE: 69 B | LINES: 4
+================================================================================
+
+import axios from 'axios';
+
+export const request = axios.create({});
+
+
+
+================================================================================
+FILE: src/core/modules/app-module.ts
+SIZE: 217 B | LINES: 9
+================================================================================
+
+import { Module } from '@nestjs/common';
+import { GlobalModule } from './global';
+import { StatsModule } from './stats/stats.module';
+
+@Module({
+  imports: [GlobalModule, StatsModule],
+})
+export class AppApiModule {}
+
+
+
+================================================================================
+FILE: src/core/modules/cache/cache.service.ts
+SIZE: 1.47 KB | LINES: 63
+================================================================================
+
+import { Injectable } from '@nestjs/common';
+import Redis from 'ioredis';
+import { CacheTTL } from '@src/common/constants/cache';
+
+type RedisConfig = {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+};
+
+@Injectable()
+export class RedisCacheService {
+  private readonly redis: Redis;
+
+  constructor() {
+    this.redis = new Redis(RedisCacheService.getConfig());
+  }
+
+  static getConfig() {
+    const config: RedisConfig = {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    };
+    if (process.env.REDIS_USERNAME) {
+      config.username = process.env.REDIS_USERNAME;
+    }
+
+    if (process.env.REDIS_PASSWORD) {
+      config.password = process.env.REDIS_PASSWORD;
+    }
+
+    return config;
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const value = await this.redis.get(key);
+    return value ? JSON.parse(value) : null;
+  }
+
+  async set(key: string, value: unknown, ttlSeconds = CacheTTL.threeDays) {
+    await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
+  }
+
+  async update(key: string, value: unknown) {
+    await this.redis.set(key, JSON.stringify(value), 'KEEPTTL');
+  }
+
+  async del(key: string) {
+    await this.redis.del(key);
+  }
+
+  async flush() {
+    await this.redis.flushall();
+  }
+
+  async deleteByPattern(pattern: string): Promise<string[]> {
+    const keys = await this.redis.keys(pattern);
+    if (keys.length) await this.redis.del(...keys);
+    return keys;
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/modules/global/index.ts
+SIZE: 1.09 KB | LINES: 30
+================================================================================
+
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import { HealthCheckModule } from '../health-check/health-check.module';
+import { SequelizeModule } from '@nestjs/sequelize';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: process.env.ENV === 'production' ? '.env' : '.env',
+    }),
+    HealthCheckModule,
+    SequelizeModule.forRootAsync({
+      imports: [ConfigModule], // Make ConfigModule available
+      useFactory: (configService: ConfigService) => ({
+        dialect: 'postgres',
+        host: configService.get<string>('DATABASE_HOST'),
+        port: configService.get<number>('DATABASE_PORT'),
+        username: configService.get<string>('DATABASE_USER'),
+        password: configService.get<string>('DATABASE_PASSWORD'),
+        database: configService.get<string>('DATABASE_NAME'),
+        autoLoadModels: true,
+        synchronize: true, // Be cautious with this in production
+      }),
+      inject: [ConfigService], // Inject ConfigService into the factory
+    }),
+  ],
+})
+export class GlobalModule {}
+
+
+
+================================================================================
+FILE: src/core/modules/health-check/health-check.controller.ts
+SIZE: 1.05 KB | LINES: 36
+================================================================================
+
+import { Controller, Get, Req, Res } from '@nestjs/common';
+import { HealthCheckService } from './health-check.service';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+@ApiTags('Health Check')
+@Controller('/')
+export class HealthCheckController {
+  constructor(private readonly healthCheckService: HealthCheckService) {}
+
+  @Get('')
+  async welcome(): Promise<Record<string, unknown>> {
+    return this.healthCheckService.welcome();
+  }
+
+  @Get('/api/health-check')
+  async serviceCheck() {
+    return {
+      message: 'Health Check - All Services are up and running!',
+      status: 200,
+    };
+  }
+
+  @ApiOperation({ summary: 'Returns Api docs Yaml' })
+  @ApiResponse({ status: 200, description: 'Returns API Docs Yaml.' })
+  @Get('api-docs.yaml')
+  async getSwaggerYaml(@Req() req, @Res() res) {
+    if (req.query['secret'] !== 'DhaivatRocks') {
+      return res.status(401).send('Unauthorized');
+    }
+
+    const data = await this.healthCheckService.getSwaggerYaml();
+    res.setHeader('Content-Type', 'application/x-yaml');
+    res.send(data);
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/modules/health-check/health-check.module.ts
+SIZE: 307 B | LINES: 11
+================================================================================
+
+import { Module } from '@nestjs/common';
+import { HealthCheckController } from './health-check.controller';
+import { HealthCheckService } from './health-check.service';
+
+@Module({
+  imports: [],
+  controllers: [HealthCheckController],
+  providers: [HealthCheckService],
+})
+export class HealthCheckModule {}
+
+
+
+================================================================================
+FILE: src/core/modules/health-check/health-check.service.ts
+SIZE: 477 B | LINES: 24
+================================================================================
+
+import { Injectable } from '@nestjs/common';
+import { readFileSync } from 'fs';
+
+@Injectable()
+export class HealthCheckService {
+  constructor() {}
+
+  async welcome() {
+    return {
+      message: 'Hola Amigos, Welcome to Identity!',
+      status: 200,
+    };
+  }
+
+  async getSwaggerYaml() {
+    // read the swagger.yaml file and return it
+    const swaggerYaml = readFileSync(
+      './api-management/nest-be/api-docs.yaml',
+      'utf8',
+    );
+    return swaggerYaml;
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/modules/stats/stats.controller.ts
+SIZE: 625 B | LINES: 25
+================================================================================
+
+import { Controller, Get } from '@nestjs/common';
+import { StatsService } from './stats.service';
+
+@Controller('stats')
+export class StatsController {
+  constructor(private readonly statsService: StatsService) {}
+
+  @Get('system')
+  getSystemStats() {
+    return this.statsService.getSystemStats();
+  }
+
+  @Get('throughput')
+  getThroughput() {
+    return this.statsService.getThroughput();
+  }
+
+  // Middleware or interceptor can be added to increment the request count
+  @Get('increment')
+  incrementRequestCount() {
+    this.statsService.incrementRequestCount();
+    return { message: 'Request count incremented' };
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/modules/stats/stats.module.ts
+SIZE: 248 B | LINES: 10
+================================================================================
+
+import { Module } from '@nestjs/common';
+import { StatsService } from './stats.service';
+import { StatsController } from './stats.controller';
+
+@Module({
+  providers: [StatsService],
+  controllers: [StatsController],
+})
+export class StatsModule {}
+
+
+
+================================================================================
+FILE: src/core/modules/stats/stats.service.ts
+SIZE: 986 B | LINES: 48
+================================================================================
+
+import { Injectable } from '@nestjs/common';
+import * as os from 'os';
+
+@Injectable()
+export class StatsService {
+  private startTime: number;
+  private requestCount: number;
+
+  constructor() {
+    this.startTime = Date.now();
+    this.requestCount = 0;
+  }
+
+  getSystemStats() {
+    const uptime = os.uptime();
+    const loadAverage = os.loadavg();
+    const memoryUsage = process.memoryUsage();
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const cpuUsage = os.cpus();
+
+    return {
+      uptime,
+      loadAverage,
+      memoryUsage,
+      totalMemory,
+      freeMemory,
+      cpuUsage,
+    };
+  }
+
+  incrementRequestCount() {
+    this.requestCount++;
+  }
+
+  getThroughput() {
+    const currentTime = Date.now();
+    const elapsedTime = (currentTime - this.startTime) / 1000; // in seconds
+    const throughput = this.requestCount / elapsedTime;
+
+    return {
+      requestCount: this.requestCount,
+      elapsedTime,
+      throughput,
+    };
+  }
+}
+
+
+
+================================================================================
+FILE: src/core/services/utility/utility.service.ts
+SIZE: 428 B | LINES: 14
+================================================================================
+
+import { Injectable } from '@nestjs/common';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+
+@Injectable()
+export class UtilityService {}
+
+export function saveApiDoc(fileName: string, document, folderName: string) {
+  const dir = `./api-management/${folderName}`;
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(`${dir}/${fileName}.yaml`, JSON.stringify(document, null, 2));
+}
+
+
+
+================================================================================
+FILE: src/database/data-source.ts
+SIZE: 1.01 KB | LINES: 28
+================================================================================
+
+import 'reflect-metadata';
+import { DataSource } from 'typeorm';
+import { join } from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+// Load env for CLI: prefer DOTENV_CONFIG_PATH, else apps/auth-server/.env if exists
+const defaultEnv = join(process.cwd(), 'apps/auth-server/.env');
+const dotenvPath =
+  process.env.DOTENV_CONFIG_PATH ||
+  (fs.existsSync(defaultEnv) ? defaultEnv : undefined);
+if (dotenvPath) dotenv.config({ path: dotenvPath });
+
+function bool(v: string | undefined, def = false) {
+  if (v === undefined) return def;
+  return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
+}
+
+export const AppDataSource = new DataSource({
+  type: 'postgres',
+  url: process.env.DB_URL,
+  ssl: bool(process.env.DB_SSL) ? { rejectUnauthorized: false } : false,
+  logging: bool(process.env.DB_LOGGING),
+  // When running with ts-node, these globs include .ts; when compiled, .js
+  entities: [join(__dirname, '../**/*.entity.{ts,js}')],
+  migrations: [join(__dirname, '../../migrations/*.{ts,js}')],
+});
+
+
+
+================================================================================
+FILE: src/database/database.module.ts
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: src/database/migrations/index.ts
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: src/database/seeders/index.ts
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: src/main.ts
+SIZE: 331 B | LINES: 17
+================================================================================
+
+import { logger } from './common/logger';
+import { AppModule } from './core/app.module';
+
+async function bootstrap() {
+  try {
+    console.log(process.env);
+
+    await AppModule.startApp();
+  } catch (err) {
+    logger.error('Error starting the application: ', err);
+    logger.error(err);
+    process.exit(1);
+  }
+}
+
+bootstrap();
+
+
+
+================================================================================
+FILE: src/modules/tenancy/tenant.entity.ts
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: test/app.e2e-spec.ts
+SIZE: 669 B | LINES: 26
+================================================================================
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from './../src/app.module';
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!');
+  });
+});
+
+
+
+================================================================================
+FILE: test/jest-e2e.json
+SIZE: 183 B | LINES: 10
+================================================================================
+
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  }
+}
+
+
+
+================================================================================
+FILE: tsconfig.build.json
+SIZE: 97 B | LINES: 5
+================================================================================
+
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}
+
+
+
+================================================================================
+FILE: tsconfig.json
+SIZE: 763 B | LINES: 30
+================================================================================
+
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@src/*": ["src/*"],
+      "@common/*": ["src/common/*"]
+    }
+  },
+}
+
+
+
+================================================================================
+CONSOLIDATION SUMMARY
+================================================================================
+Files Processed: 47
+Total Lines: 3,721
+Files Skipped: 6
+Errors: 0
+Generated: 2025-10-06T18:02:32.360Z

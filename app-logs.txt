@@ -1,0 +1,93 @@
+turbo 2.6.1
+
+• Packages in scope: @repo/database, @repo/eslint-config, @repo/security, @repo/shared, @repo/typescript-config, @repo/ui, auth-service, docs, travel
+• Running dev in 9 packages
+• Remote caching disabled
+@repo/security:dev: cache bypass, force executing e7ca199ed0a14c57
+auth-service:dev: cache bypass, force executing 310639249ed82832
+@repo/database:dev: cache bypass, force executing 734d14d4ab5048bd
+travel:dev: cache bypass, force executing 08e82d1108337b9b
+docs:dev: cache bypass, force executing 431578fc100bf82b
+@repo/security:dev: [2J[3J[H3:54:58 PM - Starting compilation in watch mode...
+@repo/security:dev: 
+travel:dev:  ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+travel:dev:  We detected multiple lockfiles and selected the directory of /Users/rishitshivesh/package-lock.json as the root directory.
+travel:dev:  To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+travel:dev:    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+travel:dev:  Detected additional lockfiles: 
+travel:dev:    * /Users/rishitshivesh/Projects/Personal/my-auth/yarn.lock
+travel:dev: 
+travel:dev:    ▲ Next.js 16.0.1 (Turbopack)
+travel:dev:    - Local:        http://localhost:3000
+travel:dev:    - Network:      http://192.168.0.10:3000
+travel:dev: 
+travel:dev:  ✓ Starting...
+travel:dev: [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+@repo/database:dev: [2J[3J[H3:54:58 PM - Starting compilation in watch mode...
+@repo/database:dev: 
+auth-service:dev: [2J[3J[H[[90m3:54:58 PM[0m] Starting compilation in watch mode...
+auth-service:dev: 
+travel:dev:  ✓ Ready in 223ms
+docs:dev:  ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+docs:dev:  We detected multiple lockfiles and selected the directory of /Users/rishitshivesh/package-lock.json as the root directory.
+docs:dev:  To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+docs:dev:    See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+docs:dev:  Detected additional lockfiles: 
+docs:dev:    * /Users/rishitshivesh/Projects/Personal/my-auth/yarn.lock
+docs:dev: 
+docs:dev:    ▲ Next.js 16.0.1 (Turbopack)
+docs:dev:    - Local:        http://localhost:3001
+docs:dev:    - Network:      http://192.168.0.10:3001
+docs:dev: 
+docs:dev:  ✓ Starting...
+docs:dev: [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+@repo/security:dev: 
+@repo/security:dev: 3:54:58 PM - Found 0 errors. Watching for file changes.
+docs:dev:  ✓ Ready in 234ms
+@repo/database:dev: 
+@repo/database:dev: 3:54:59 PM - Found 0 errors. Watching for file changes.
+auth-service:dev: [96msrc/modules/auth/auth.service.ts[0m:[93m430[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'null' is not assignable to type '(() => string) | _QueryDeepPartialEntity<string | undefined>'.
+auth-service:dev: 
+auth-service:dev: [7m430[0m       passwordResetToken: null,
+auth-service:dev: [7m   [0m [91m      ~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev: 
+auth-service:dev:   [96m../../packages/database/dist/src/entities/user.entity.d.ts[0m:[93m37[0m:[93m5[0m
+auth-service:dev:     [7m37[0m     passwordResetToken?: string;
+auth-service:dev:     [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev:     The expected type comes from property 'passwordResetToken' which is declared here on type '_QueryDeepPartialEntity<User>'
+auth-service:dev: 
+auth-service:dev: [96msrc/modules/auth/auth.service.ts[0m:[93m431[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'null' is not assignable to type '(() => string) | _QueryDeepPartialEntity<Date | undefined>'.
+auth-service:dev: 
+auth-service:dev: [7m431[0m       passwordResetExpiresAt: null,
+auth-service:dev: [7m   [0m [91m      ~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev: 
+auth-service:dev:   [96m../../packages/database/dist/src/entities/user.entity.d.ts[0m:[93m38[0m:[93m5[0m
+auth-service:dev:     [7m38[0m     passwordResetExpiresAt?: Date;
+auth-service:dev:     [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev:     The expected type comes from property 'passwordResetExpiresAt' which is declared here on type '_QueryDeepPartialEntity<User>'
+auth-service:dev: 
+auth-service:dev: [96msrc/modules/auth/auth.service.ts[0m:[93m473[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'null' is not assignable to type '(() => string) | _QueryDeepPartialEntity<string | undefined>'.
+auth-service:dev: 
+auth-service:dev: [7m473[0m       emailVerificationToken: null,
+auth-service:dev: [7m   [0m [91m      ~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev: 
+auth-service:dev:   [96m../../packages/database/dist/src/entities/user.entity.d.ts[0m:[93m35[0m:[93m5[0m
+auth-service:dev:     [7m35[0m     emailVerificationToken?: string;
+auth-service:dev:     [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev:     The expected type comes from property 'emailVerificationToken' which is declared here on type '_QueryDeepPartialEntity<User>'
+auth-service:dev: 
+auth-service:dev: [96msrc/modules/auth/auth.service.ts[0m:[93m474[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'null' is not assignable to type '(() => string) | _QueryDeepPartialEntity<Date | undefined>'.
+auth-service:dev: 
+auth-service:dev: [7m474[0m       emailVerificationExpiresAt: null,
+auth-service:dev: [7m   [0m [91m      ~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev: 
+auth-service:dev:   [96m../../packages/database/dist/src/entities/user.entity.d.ts[0m:[93m36[0m:[93m5[0m
+auth-service:dev:     [7m36[0m     emailVerificationExpiresAt?: Date;
+auth-service:dev:     [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+auth-service:dev:     The expected type comes from property 'emailVerificationExpiresAt' which is declared here on type '_QueryDeepPartialEntity<User>'
+auth-service:dev: 
+auth-service:dev: [[90m3:54:59 PM[0m] Found 4 errors. Watching for file changes.
+auth-service:dev: 
+docs:dev: [?25h
+travel:dev: [?25h
+ ERROR  run failed: command  exited (1)

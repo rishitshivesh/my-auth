@@ -1,0 +1,112 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "HealthCheckController_welcome",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/api/health-check": {
+      "get": {
+        "operationId": "HealthCheckController_serviceCheck",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/api-docs.yaml": {
+      "get": {
+        "operationId": "HealthCheckController_getSwaggerYaml",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns API Docs Yaml."
+          }
+        },
+        "summary": "Returns Api docs Yaml",
+        "tags": [
+          "Health Check"
+        ]
+      }
+    },
+    "/stats/system": {
+      "get": {
+        "operationId": "StatsController_getSystemStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/stats/throughput": {
+      "get": {
+        "operationId": "StatsController_getThroughput",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    },
+    "/stats/increment": {
+      "get": {
+        "operationId": "StatsController_incrementRequestCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Stats"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "identity-server",
+    "description": "API for Identity Server",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  },
+  "externalDocs": {
+    "description": "Sample",
+    "url": "https://id.sample.com"
+  }
+}

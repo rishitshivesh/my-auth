@@ -1,0 +1,33 @@
+{
+  "name": "@repo/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeORM entities and migrations for Fort Knox authentication system",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "npm run typeorm -- migration:generate -d ./src/data-source.ts",
+    "migration:create": "npm run typeorm -- migration:create",
+    "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/data-source.ts",
+    "schema:sync": "npm run typeorm -- schema:sync -d src/data-source.ts",
+    "schema:drop": "npm run typeorm -- schema:drop -d src/data-source.ts"
+  },
+  "dependencies": {
+    "@repo/shared": "*",
+    "pg": "^8.13.1",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
