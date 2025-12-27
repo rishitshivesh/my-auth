@@ -1,20 +1,32 @@
-import { Entity, Column, OneToOne, JoinColumn } from "typeorm";
+import {
+  Entity,
+  Column,
+  Index,
+  OneToOne,
+  JoinColumn,
+  ManyToOne,
+} from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
+import { Tenant } from "./tenant.entity";
 
 /**
- * MFA Settings Entity
- *
- * Manages multi-factor authentication settings for users:
- * - TOTP (Google Authenticator)
- * - SMS OTP
- * - Email OTP
- * - WebAuthn/FIDO2
- * - Backup codes
+ * MFA Settings Entity (UPDATED FOR MULTI-TENANT)
  */
 @Entity("mfa_settings")
+@Index(["tenantId", "userId"], { unique: true }) // ← Add tenant index
 export class MfaSettings extends BaseEntity {
-  @Column({ type: "uuid", name: "user_id", unique: true })
+  // ✅ ADD THIS - Tenant ID
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  @Column({ type: "uuid", name: "user_id", unique: false }) // ← Change to false
   userId!: string;
 
   @OneToOne(() => User, (user) => user.mfaSettings, {
@@ -22,6 +34,8 @@ export class MfaSettings extends BaseEntity {
   })
   @JoinColumn({ name: "user_id" })
   user!: User;
+
+  // ... rest of the fields (keep as is)
 
   // TOTP Settings
   @Column({

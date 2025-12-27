@@ -3,19 +3,19 @@ import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 
 /**
- * Session Entity
- *
- * Tracks active user sessions with:
- * - Device fingerprinting
- * - IP and location tracking
- * - Activity monitoring
- * - Automatic expiration
+ * Session Entity (UPDATED FOR MULTI-TENANT)
  */
 @Entity("sessions")
-@Index(["userId"])
+@Index(["tenantId", "userId"]) // ← Add tenant index
+@Index(["tenantId", "refreshTokenHash"]) // ← Add tenant index
+@Index(["tenantId", "revokedAt"]) // ← Add tenant index
 @Index(["tokenHash"], { unique: true })
 @Index(["expiresAt"])
 export class Session extends BaseEntity {
+  // ✅ ADD THIS - Tenant ID (denormalized for performance)
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
   @Column({ type: "uuid", name: "user_id" })
   userId!: string;
 
@@ -33,6 +33,35 @@ export class Session extends BaseEntity {
     comment: "Hashed session token",
   })
   tokenHash!: string;
+
+  // ✅ ADD THIS - For refresh token rotation
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "refresh_token_hash",
+    comment: "Hashed refresh token",
+  })
+  refreshTokenHash?: string;
+
+  // ✅ ADD THIS - For token rotation + reuse detection
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "refresh_token_family_id",
+    comment: "Token family for rotation tracking",
+  })
+  refreshTokenFamilyId?: string;
+
+  // ✅ ADD THIS - Device identifier
+  @Column({
+    type: "varchar",
+    length: 100,
+    nullable: true,
+    name: "device_id",
+    comment: "Unique device identifier",
+  })
+  deviceId?: string;
 
   @Column({
     type: "jsonb",
@@ -79,22 +108,6 @@ export class Session extends BaseEntity {
     name: "expires_at",
   })
   expiresAt!: Date;
-
-  @Column({
-    type: "boolean",
-    default: true,
-    name: "is_active",
-  })
-  isActive!: boolean;
-
-  @Column({
-    type: "varchar",
-    length: 255,
-    nullable: true,
-    name: "refresh_token_hash",
-    comment: "Hashed refresh token",
-  })
-  refreshTokenHash?: string;
 
   @Column({
     type: "timestamp with time zone",

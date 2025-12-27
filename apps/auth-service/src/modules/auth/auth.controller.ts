@@ -8,7 +8,7 @@ import {
   Headers,
   Get,
   UseGuards,
-  Request,
+  Req,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -24,6 +24,7 @@ import {
   ResetPasswordDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { type Request } from "express";
 
 /**
  * Authentication Controller
@@ -50,12 +51,15 @@ export class AuthController {
   @ApiResponse({ status: 400, description: "Bad request - validation failed" })
   @ApiResponse({ status: 409, description: "User already exists" })
   async register(
+    @Req() req: Request,
     @Body() registerDto: RegisterDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
+    const tenantId = req.tenantId!;
     return this.authService.register({
       ...registerDto,
+      tenantId,
       ip,
       userAgent: userAgent || "unknown",
     });
@@ -74,13 +78,16 @@ export class AuthController {
   })
   @ApiResponse({ status: 423, description: "Account locked" })
   async login(
+    @Req() req: Request,
     @Body() loginDto: LoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
+    const tenantId = req.tenantId!;
     return this.authService.login({
       ...loginDto,
       ip,
+      tenantId,
       userAgent: userAgent || "unknown",
     });
   }
@@ -94,8 +101,11 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
-  async logout(@Request() req: any) {
-    await this.authService.logout(req.user.sub);
+  async logout(@Req() req: any) {
+    const tenantId = req.tenantId!;
+    const userId = req.user.sub;
+    const sessionId = req.user.sessionId;
+    await this.authService.logout(tenantId, userId, sessionId);
     return { message: "Logged out successfully" };
   }
 
@@ -108,10 +118,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Password reset email sent" })
   @ApiResponse({ status: 404, description: "User not found" })
   async forgotPassword(
+    @Req() req: Request,
     @Body() forgotPasswordDto: ForgotPasswordDto,
     @Ip() ip: string,
   ) {
-    await this.authService.forgotPassword(forgotPasswordDto.email, ip);
+    const tenantId = req.tenantId!;
+    await this.authService.forgotPassword(
+      tenantId,
+      forgotPasswordDto.email,
+      ip,
+    );
     return {
       message:
         "If an account exists with this email, a password reset link has been sent",
@@ -126,8 +142,14 @@ export class AuthController {
   @ApiOperation({ summary: "Reset password using token" })
   @ApiResponse({ status: 200, description: "Password reset successful" })
   @ApiResponse({ status: 400, description: "Invalid or expired token" })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  async resetPassword(
+    @Req() req: Request,
+    @Body() resetPasswordDto: ResetPasswordDto,
+  ) {
+    const tenantId = req.tenantId!;
+
     await this.authService.resetPassword(
+      tenantId,
       resetPasswordDto.token,
       resetPasswordDto.password,
     );
@@ -142,8 +164,9 @@ export class AuthController {
   @ApiOperation({ summary: "Verify email address" })
   @ApiResponse({ status: 200, description: "Email verified successfully" })
   @ApiResponse({ status: 400, description: "Invalid or expired token" })
-  async verifyEmail(@Body("token") token: string) {
-    await this.authService.verifyEmail(token);
+  async verifyEmail(@Req() req: Request, @Body("token") token: string) {
+    const tenantId = req.tenantId!;
+    await this.authService.verifyEmail(tenantId, token);
     return { message: "Email verified successfully" };
   }
 
@@ -154,8 +177,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resend email verification" })
   @ApiResponse({ status: 200, description: "Verification email sent" })
-  async resendVerification(@Body("email") email: string) {
-    await this.authService.resendVerification(email);
+  async resendVerification(@Req() req: Request, @Body("email") email: string) {
+    const tenantId = req.tenantId!;
+    await this.authService.resendVerification(tenantId, email);
     return { message: "Verification email sent" };
   }
 
@@ -167,8 +191,13 @@ export class AuthController {
   @ApiOperation({ summary: "Refresh access token" })
   @ApiResponse({ status: 200, description: "Token refreshed successfully" })
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
-  async refresh(@Body("refreshToken") refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Body("refreshToken") refreshToken: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    return this.authService.refreshToken(tenantId, refreshToken);
   }
 
   /**
@@ -179,7 +208,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get current authenticated user" })
   @ApiResponse({ status: 200, description: "User info retrieved" })
-  async getMe(@Request() req: any) {
-    return this.authService.getCurrentUser(req.user.sub);
+  async getMe(@Req() req: Request) {
+    const tenantId = req.tenantId!;
+    return this.authService.getCurrentUser(tenantId, req.user.sub);
   }
 }

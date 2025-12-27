@@ -355,26 +355,26 @@ export class InitialMigration1735289000000 implements MigrationInterface {
     // =======================================================================
     // SEED DEFAULT PERMISSIONS
     // =======================================================================
-    await queryRunner.query(`
-      INSERT INTO "permissions" ("resource", "action", "description") VALUES
-        ('user', 'create', 'Create users'),
-        ('user', 'read', 'Read user information'),
-        ('user', 'update', 'Update user information'),
-        ('user', 'delete', 'Delete users'),
-        ('user', 'impersonate', 'Impersonate users'),
-        ('tenant', 'create', 'Create tenants'),
-        ('tenant', 'read', 'Read tenant information'),
-        ('tenant', 'update', 'Update tenant information'),
-        ('tenant', 'delete', 'Delete tenants'),
-        ('role', 'create', 'Create roles'),
-        ('role', 'read', 'Read role information'),
-        ('role', 'update', 'Update roles'),
-        ('role', 'delete', 'Delete roles'),
-        ('role', 'assign', 'Assign roles to users'),
-        ('settings', 'read', 'Read settings'),
-        ('settings', 'update', 'Update settings'),
-        ('audit', 'read', 'Read audit logs')
-    `);
+    // await queryRunner.query(`
+    //   INSERT INTO "permissions" ("resource", "action", "description") VALUES
+    //     ('user', 'create', 'Create users'),
+    //     ('user', 'read', 'Read user information'),
+    //     ('user', 'update', 'Update user information'),
+    //     ('user', 'delete', 'Delete users'),
+    //     ('user', 'impersonate', 'Impersonate users'),
+    //     ('tenant', 'create', 'Create tenants'),
+    //     ('tenant', 'read', 'Read tenant information'),
+    //     ('tenant', 'update', 'Update tenant information'),
+    //     ('tenant', 'delete', 'Delete tenants'),
+    //     ('role', 'create', 'Create roles'),
+    //     ('role', 'read', 'Read role information'),
+    //     ('role', 'update', 'Update roles'),
+    //     ('role', 'delete', 'Delete roles'),
+    //     ('role', 'assign', 'Assign roles to users'),
+    //     ('settings', 'read', 'Read settings'),
+    //     ('settings', 'update', 'Update settings'),
+    //     ('audit', 'read', 'Read audit logs')
+    // `);
 
     console.log("✅ Initial migration completed successfully");
   }

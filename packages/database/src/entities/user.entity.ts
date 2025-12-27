@@ -127,30 +127,18 @@ export class User extends BaseEntity {
   })
   passwordHistory!: string[];
 
-  // Account Status
-  @Column({
-    type: "enum",
-    enum: ["active", "inactive", "suspended", "deleted"],
-    default: "active",
-  })
-  status!: "active" | "inactive" | "suspended" | "deleted";
-
-  @Column({
-    type: "timestamp with time zone",
-    nullable: true,
-    name: "last_login_at",
-  })
-  lastLoginAt?: Date;
+  // After existing status field, add:
 
   @Column({
     type: "varchar",
-    length: 45,
-    nullable: true,
-    name: "last_login_ip",
+    length: 50,
+    default: "active",
+    comment: "User account status",
   })
-  lastLoginIp?: string;
+  status!: "active" | "inactive" | "suspended" | "deleted";
 
-  // Account Lockout
+  // After password fields, make sure you have:
+
   @Column({
     type: "int",
     default: 0,
@@ -164,6 +152,20 @@ export class User extends BaseEntity {
     name: "locked_until",
   })
   lockedUntil?: Date;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_login_at",
+  })
+  lastLoginAt?: Date;
+
+  @Column({
+    type: "inet",
+    nullable: true,
+    name: "last_login_ip",
+  })
+  lastLoginIp?: string;
 
   // Verification Tokens
   @Column({

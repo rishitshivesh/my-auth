@@ -11,6 +11,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Req,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -46,7 +47,8 @@ export class UserController {
   @ApiOperation({ summary: "Get current user profile" })
   @ApiResponse({ status: 200, description: "User profile retrieved" })
   async getProfile(@Request() req: any) {
-    return this.userService.findById(req.user.sub);
+    const tenantId = req.tenantId!;
+    return this.userService.findById(tenantId, req.user.sub);
   }
 
   /**
@@ -60,7 +62,8 @@ export class UserController {
     @Request() req: any,
     @Body() updateUserDto: UpdateUserDto,
   ) {
-    await this.userService.update(req.user.sub, updateUserDto);
+    const tenantId = req.tenantId!;
+    await this.userService.update(tenantId, req.user.sub, updateUserDto);
     return { message: "Profile updated successfully" };
   }
 
@@ -79,7 +82,9 @@ export class UserController {
     @Request() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
+    const tenantId = req.tenantId!;
     await this.userService.changePassword(
+      tenantId,
       req.user.sub,
       changePasswordDto.currentPassword,
       changePasswordDto.newPassword,
@@ -94,7 +99,8 @@ export class UserController {
   @ApiOperation({ summary: "Get all active sessions" })
   @ApiResponse({ status: 200, description: "Sessions retrieved" })
   async getSessions(@Request() req: any) {
-    return this.userService.getActiveSessions(req.user.sub);
+    const tenantId = req.tenantId!;
+    return this.userService.getActiveSessions(tenantId, req.user.sub);
   }
 
   /**
@@ -109,7 +115,8 @@ export class UserController {
     @Request() req: any,
     @Param("sessionId") sessionId: string,
   ) {
-    await this.userService.revokeSession(req.user.sub, sessionId);
+    const tenantId = req.tenantId!;
+    await this.userService.revokeSession(tenantId, req.user.sub, sessionId);
     return { message: "Session revoked successfully" };
   }
 
@@ -121,7 +128,8 @@ export class UserController {
   @ApiOperation({ summary: "Revoke all sessions except current" })
   @ApiResponse({ status: 200, description: "Sessions revoked" })
   async revokeAllSessions(@Request() req: any) {
-    await this.userService.revokeAllSessions(req.user.sub);
+    const tenantId = req.tenantId!;
+    await this.userService.revokeAllSessions(tenantId, req.user.sub);
     return { message: "All other sessions revoked successfully" };
   }
 
@@ -135,7 +143,9 @@ export class UserController {
     @Request() req: any,
     @Query("limit") limit: string = "50",
   ) {
+    const tenantId = req.tenantId!;
     return this.userService.getSecurityEvents(
+      tenantId,
       req.user.sub,
       parseInt(limit, 10),
     );
@@ -149,7 +159,8 @@ export class UserController {
   @ApiOperation({ summary: "Delete user account" })
   @ApiResponse({ status: 200, description: "Account deleted successfully" })
   async deleteAccount(@Request() req: any, @Body("password") password: string) {
-    await this.userService.deleteAccount(req.user.sub, password);
+    const tenantId = req.tenantId!;
+    await this.userService.deleteAccount(tenantId, req.user.sub, password);
     return { message: "Account deleted successfully" };
   }
 
@@ -160,7 +171,8 @@ export class UserController {
   @ApiOperation({ summary: "Get user by ID" })
   @ApiResponse({ status: 200, description: "User retrieved" })
   @ApiResponse({ status: 404, description: "User not found" })
-  async getUserById(@Param("id") id: string) {
-    return this.userService.findById(id);
+  async getUserById(@Req() req: any, @Param("id") id: string) {
+    const tenantId = req.tenantId!;
+    return this.userService.findById(tenantId, id);
   }
 }

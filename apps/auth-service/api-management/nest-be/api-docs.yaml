@@ -44,6 +44,100 @@
         ]
       }
     },
+    "/tenants/current": {
+      "get": {
+        "operationId": "TenantController_getCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
+    "/tenants": {
+      "post": {
+        "operationId": "TenantController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
+    "/tenants/{id}/custom-domain": {
+      "patch": {
+        "operationId": "TenantController_setCustomDomain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCustomDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
+    "/tenants/{id}/verify-domain": {
+      "post": {
+        "operationId": "TenantController_verifyDomain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Tenant"
+        ]
+      }
+    },
     "/stats/system": {
       "get": {
         "operationId": "StatsController_getSystemStats",
@@ -564,6 +658,14 @@
       }
     },
     "schemas": {
+      "CreateTenantDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SetCustomDomainDto": {
+        "type": "object",
+        "properties": {}
+      },
       "UpdateUserDto": {
         "type": "object",
         "properties": {

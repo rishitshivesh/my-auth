@@ -1,18 +1,33 @@
-import { Entity, Column, Index, ManyToMany } from "typeorm";
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToMany,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { Role } from "./role.entity";
+import { Tenant } from "./tenant.entity";
 
 /**
- * Permission Entity
- *
- * Defines granular permissions in the system:
- * - Resource-based permissions (user, tenant, role, etc.)
- * - Action-based permissions (create, read, update, delete)
+ * Permission Entity (UPDATED FOR MULTI-TENANT)
  */
 @Entity("permissions")
-@Index(["resource", "action"], { unique: true })
+@Index(["tenantId", "resource", "action"], { unique: true }) // ← Tenant-scoped unique
+@Index(["tenantId"])
 @Index(["resource"])
 export class Permission extends BaseEntity {
+  // ✅ ADD THIS - Tenant ID
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
   @Column({ type: "varchar", length: 100 })
   resource!: string;
 

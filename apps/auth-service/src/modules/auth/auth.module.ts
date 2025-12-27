@@ -12,6 +12,7 @@ import {
 import { UserModule } from "../user/user.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
+import { PasswordService } from "@repo/security";
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { AuthController } from "./auth.controller";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, PasswordService],
   exports: [AuthService],
 })
 export class AuthModule {}

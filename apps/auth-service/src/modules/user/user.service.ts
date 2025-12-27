@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan } from "typeorm";
+import { Repository, MoreThan, IsNull } from "typeorm";
 import { User, Session, SecurityEvent } from "@repo/database";
 import { PasswordService } from "@repo/security";
 
@@ -32,9 +32,9 @@ export class UserService {
   /**
    * Find user by ID
    */
-  async findById(id: string): Promise<User> {
+  async findById(tenantId: string, id: string): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id },
+      where: { id, tenantId },
       relations: ["tenant"],
     });
 
@@ -48,7 +48,7 @@ export class UserService {
   /**
    * Find user by email
    */
-  async findByEmail(email: string, tenantId?: string): Promise<User | null> {
+  async findByEmail(tenantId: string, email: string): Promise<User | null> {
     const where: any = { email };
     if (tenantId) {
       where.tenantId = tenantId;
@@ -64,6 +64,7 @@ export class UserService {
    * Update user profile
    */
   async update(
+    tenantId: string,
     userId: string,
     data: {
       firstName?: string;
@@ -75,7 +76,7 @@ export class UserService {
       language?: string;
     },
   ) {
-    const user = await this.findById(userId);
+    const user = await this.findById(tenantId, userId);
 
     Object.assign(user, data);
     await this.userRepository.save(user);
@@ -98,6 +99,7 @@ export class UserService {
    * Change password
    */
   async changePassword(
+    tenantId: string,
     userId: string,
     currentPassword: string,
     newPassword: string,
@@ -108,6 +110,7 @@ export class UserService {
       .addSelect("user.passwordHash")
       .addSelect("user.passwordHistory")
       .where("user.id = :id", { id: userId })
+      .where("user.tenant_id = :tenantId", { tenantId })
       .getOne();
 
     if (!user) {
@@ -180,9 +183,8 @@ export class UserService {
 
     // Revoke all sessions except current (force re-login on other devices)
     await this.sessionRepository.update(
-      { userId, isActive: true },
+      { userId, revokedAt: IsNull() },
       {
-        isActive: false,
         revokedAt: new Date(),
         revokedReason: "password_changed",
       },
@@ -192,11 +194,12 @@ export class UserService {
   /**
    * Get active sessions for user
    */
-  async getActiveSessions(userId: string) {
+  async getActiveSessions(tenantId: string, userId: string) {
     const sessions = await this.sessionRepository.find({
       where: {
         userId,
-        isActive: true,
+        revokedAt: IsNull(),
+        tenantId,
         expiresAt: MoreThan(new Date()),
       },
       order: {
@@ -217,9 +220,9 @@ export class UserService {
   /**
    * Revoke a specific session
    */
-  async revokeSession(userId: string, sessionId: string) {
+  async revokeSession(tenantId: string, userId: string, sessionId: string) {
     const session = await this.sessionRepository.findOne({
-      where: { id: sessionId, userId },
+      where: { id: sessionId, userId, tenantId },
     });
 
     if (!session) {
@@ -227,7 +230,6 @@ export class UserService {
     }
 
     await this.sessionRepository.update(sessionId, {
-      isActive: false,
       revokedAt: new Date(),
       revokedReason: "manual_revocation",
     });
@@ -245,11 +247,10 @@ export class UserService {
   /**
    * Revoke all sessions for user
    */
-  async revokeAllSessions(userId: string) {
+  async revokeAllSessions(tenantId: string, userId: string) {
     await this.sessionRepository.update(
-      { userId, isActive: true },
+      { userId, revokedAt: IsNull(), tenantId },
       {
-        isActive: false,
         revokedAt: new Date(),
         revokedReason: "user_request",
       },
@@ -267,9 +268,13 @@ export class UserService {
   /**
    * Get security events for user
    */
-  async getSecurityEvents(userId: string, limit: number = 50) {
+  async getSecurityEvents(
+    tenantId: string,
+    userId: string,
+    limit: number = 50,
+  ) {
     const events = await this.securityEventRepository.find({
-      where: { userId },
+      where: { userId, tenantId },
       order: { createdAt: "DESC" },
       take: limit,
     });
@@ -288,12 +293,13 @@ export class UserService {
   /**
    * Delete account (soft delete)
    */
-  async deleteAccount(userId: string, password: string) {
+  async deleteAccount(tenantId: string, userId: string, password: string) {
     // Get user with password hash
     const user = await this.userRepository
       .createQueryBuilder("user")
       .addSelect("user.passwordHash")
       .where("user.id = :id", { id: userId })
+      .where("user.tenant_id = :id", { id: tenantId })
       .getOne();
 
     if (!user) {
@@ -322,9 +328,8 @@ export class UserService {
 
     // Revoke all sessions
     await this.sessionRepository.update(
-      { userId, isActive: true },
+      { userId, revokedAt: IsNull() },
       {
-        isActive: false,
         revokedAt: new Date(),
         revokedReason: "account_deleted",
       },
@@ -344,8 +349,8 @@ export class UserService {
   /**
    * Check if account is locked
    */
-  async isAccountLocked(userId: string): Promise<boolean> {
-    const user = await this.findById(userId);
+  async isAccountLocked(tenantId: string, userId: string): Promise<boolean> {
+    const user = await this.findById(tenantId, userId);
 
     if (!user.lockedUntil) {
       return false;
@@ -357,8 +362,8 @@ export class UserService {
   /**
    * Increment failed login attempts
    */
-  async incrementFailedAttempts(userId: string) {
-    const user = await this.findById(userId);
+  async incrementFailedAttempts(tenantId: string, userId: string) {
+    const user = await this.findById(tenantId, userId);
 
     const newAttempts = user.failedLoginAttempts + 1;
 
@@ -387,7 +392,7 @@ export class UserService {
   /**
    * Reset failed login attempts
    */
-  async resetFailedAttempts(userId: string) {
+  async resetFailedAttempts(tenantId: string, userId: string) {
     await this.userRepository.update(userId, {
       failedLoginAttempts: 0,
       lockedUntil: undefined,
@@ -397,7 +402,7 @@ export class UserService {
   /**
    * Update last login timestamp
    */
-  async updateLastLogin(userId: string, ip: string) {
+  async updateLastLogin(tenantId: string, userId: string, ip: string) {
     await this.userRepository.update(userId, {
       lastLoginAt: new Date(),
       lastLoginIp: ip,

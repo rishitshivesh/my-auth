@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan } from "typeorm";
+import { Repository, MoreThan, IsNull } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { User, Session, SecurityEvent, Tenant } from "@repo/database";
@@ -14,15 +14,15 @@ import { PasswordService } from "@repo/security";
 import * as crypto from "crypto";
 
 /**
- * Authentication Service
+ * Authentication Service (Updated for Multi-Tenant)
  *
- * Handles all authentication business logic:
- * - User registration
- * - Login/logout
- * - Password reset
- * - Email verification
- * - Session management
- * - Security event logging
+ * Handles all authentication business logic with tenant scoping:
+ * - User registration (tenant-scoped)
+ * - Login/logout (tenant-scoped)
+ * - Password reset (tenant-scoped)
+ * - Email verification (tenant-scoped)
+ * - Session management (tenant-scoped)
+ * - Security event logging (tenant-scoped)
  */
 @Injectable()
 export class AuthService {
@@ -37,20 +37,30 @@ export class AuthService {
     private readonly tenantRepository: Repository<Tenant>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly passwordService: PasswordService,
   ) {}
 
   /**
-   * Register a new user
+   * Register a new user (TENANT REQUIRED)
    */
   async register(data: {
+    tenantId: string; // ← Now REQUIRED!
     email: string;
     password: string;
-    tenantId?: string;
     firstName?: string;
     lastName?: string;
     ip: string;
     userAgent: string;
   }) {
+    // Validate tenant exists and is active
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: data.tenantId, active: true },
+    });
+
+    if (!tenant) {
+      throw new BadRequestException("Invalid or inactive tenant");
+    }
+
     // Validate password strength
     const validation = PasswordService.validateStrength(data.password);
 
@@ -62,45 +72,28 @@ export class AuthService {
       });
     }
 
-    // Get or create default tenant
-    let tenantId = data.tenantId;
-    if (!tenantId) {
-      // Create a default tenant for this user (you can customize this logic)
-      const defaultTenant = await this.tenantRepository.findOne({
-        where: { subdomain: "default" },
-      });
-
-      if (!defaultTenant) {
-        const newTenant = this.tenantRepository.create({
-          name: "Default Organization",
-          subdomain: "default",
-          status: "active",
-          plan: "free",
-        });
-        const savedTenant = await this.tenantRepository.save(newTenant);
-        tenantId = savedTenant.id;
-      } else {
-        tenantId = defaultTenant.id;
-      }
-    }
-
-    // Check if user already exists
+    // Check if user already exists IN THIS TENANT
     const existingUser = await this.userRepository.findOne({
-      where: { email: data.email, tenantId },
+      where: {
+        email: data.email,
+        tenantId: data.tenantId, // ← Tenant-scoped lookup
+      },
     });
 
     if (existingUser) {
-      // Log failed registration attempt
+      // Log failed registration attempt (tenant-scoped)
       await this.logSecurityEvent({
+        tenantId: data.tenantId,
         eventType: "REGISTRATION_FAILED",
         severity: "warning",
         ipAddress: data.ip,
         userAgent: data.userAgent,
         metadata: { reason: "email_exists", email: data.email },
-        tenantId,
       });
 
-      throw new ConflictException("User with this email already exists");
+      throw new ConflictException(
+        "User with this email already exists in this tenant",
+      );
     }
 
     // Hash password with Argon2id
@@ -109,22 +102,20 @@ export class AuthService {
     // Generate email verification token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-    // Create user
+    // Create user with tenantId
     const user = this.userRepository.create({
+      tenantId: data.tenantId, // ← Always set tenant
       email: data.email,
       passwordHash,
-      tenantId,
       firstName: data.firstName,
       lastName: data.lastName,
       emailVerificationToken,
       emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      passwordChangedAt: new Date(),
-      status: "active",
     });
 
     const savedUser = await this.userRepository.save(user);
 
-    // Log successful registration
+    // Log successful registration (tenant-scoped)
     await this.logSecurityEvent({
       userId: savedUser.id,
       tenantId: savedUser.tenantId,
@@ -149,28 +140,27 @@ export class AuthService {
   }
 
   /**
-   * Login with email and password
+   * Login with email and password (TENANT REQUIRED)
    */
   async login(data: {
+    tenantId: string; // ← Now REQUIRED!
     email: string;
     password: string;
-    tenantId?: string;
     ip: string;
     userAgent: string;
   }) {
-    // Find user with password hash
+    // Find user IN THIS TENANT with password hash
     const user = await this.userRepository
       .createQueryBuilder("user")
       .addSelect("user.passwordHash")
       .where("user.email = :email", { email: data.email })
-      .andWhere(data.tenantId ? "user.tenantId = :tenantId" : "1=1", {
-        tenantId: data.tenantId,
-      })
+      .andWhere("user.tenantId = :tenantId", { tenantId: data.tenantId }) // ← Tenant filter
       .getOne();
 
     if (!user) {
-      // Log failed login
+      // Log failed login (tenant-scoped)
       await this.logSecurityEvent({
+        tenantId: data.tenantId,
         eventType: "LOGIN_FAILED",
         severity: "warning",
         ipAddress: data.ip,
@@ -202,21 +192,6 @@ export class AuthService {
       );
     }
 
-    // Check account status
-    if (user.status !== "active") {
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "account_inactive", status: user.status },
-      });
-
-      throw new UnauthorizedException("Account is not active");
-    }
-
     // Verify password
     const isPasswordValid = await PasswordService.verify(
       user.passwordHash,
@@ -225,7 +200,7 @@ export class AuthService {
 
     if (!isPasswordValid) {
       // Increment failed attempts
-      await this.incrementFailedAttempts(user.id);
+      await this.incrementFailedAttempts(data.tenantId, user.id);
 
       await this.logSecurityEvent({
         userId: user.id,
@@ -241,39 +216,31 @@ export class AuthService {
     }
 
     // Reset failed attempts
-    await this.userRepository.update(user.id, {
-      failedLoginAttempts: 0,
-      lockedUntil: undefined,
-      lastLoginAt: new Date(),
-      lastLoginIp: data.ip,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId: data.tenantId }, // ← Tenant-scoped update
+      {
+        failedLoginAttempts: 0,
+        lockedUntil: undefined,
+        lastLoginAt: new Date(),
+        lastLoginIp: data.ip,
+      },
+    );
 
-    // Create session
-    const sessionToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(sessionToken)
-      .digest("hex");
-
-    const session = this.sessionRepository.create({
+    // Create session (tenant-scoped)
+    const session = await this.createSession({
+      tenantId: data.tenantId,
       userId: user.id,
-      tokenHash,
       ipAddress: data.ip,
       userAgent: data.userAgent,
-      deviceInfo: {
-        fingerprint: crypto.randomBytes(16).toString("hex"),
-      },
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
-    await this.sessionRepository.save(session);
-
-    // Generate JWT tokens
+    // Generate JWT tokens (include tenantId in payload)
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
         tenantId: user.tenantId,
+        sessionId: session.id, // ← Include session ID
       },
       {
         secret: this.configService.get("JWT_SECRET"),
@@ -284,6 +251,8 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(
       {
         sub: user.id,
+        tenantId: user.tenantId,
+        sessionId: session.id,
         type: "refresh",
       },
       {
@@ -292,7 +261,7 @@ export class AuthService {
       },
     );
 
-    // Log successful login
+    // Log successful login (tenant-scoped)
     await this.logSecurityEvent({
       userId: user.id,
       tenantId: user.tenantId,
@@ -317,21 +286,40 @@ export class AuthService {
   }
 
   /**
-   * Logout - revoke current session
+   * Logout - revoke current session (TENANT SCOPED)
    */
-  async logout(userId: string) {
-    // Revoke all active sessions for this user
-    await this.sessionRepository.update(
-      { userId, isActive: true },
-      {
-        isActive: false,
-        revokedAt: new Date(),
-        revokedReason: "user_logout",
-      },
-    );
+  async logout(tenantId: string, userId: string, sessionId?: string) {
+    if (sessionId) {
+      // Revoke specific session
+      await this.sessionRepository.update(
+        {
+          id: sessionId,
+          userId,
+          tenantId, // ← Tenant filter
+        },
+        {
+          revokedAt: new Date(),
+          revokedReason: "user_logout",
+        },
+      );
+    } else {
+      // Revoke all active sessions for this user IN THIS TENANT
+      await this.sessionRepository.update(
+        {
+          userId,
+          tenantId, // ← Tenant filter
+          revokedAt: IsNull(), // Only active sessions
+        },
+        {
+          revokedAt: new Date(),
+          revokedReason: "user_logout",
+        },
+      );
+    }
 
     await this.logSecurityEvent({
       userId,
+      tenantId,
       eventType: "LOGOUT",
       severity: "info",
       ipAddress: "0.0.0.0",
@@ -340,10 +328,15 @@ export class AuthService {
   }
 
   /**
-   * Request password reset
+   * Request password reset (TENANT SCOPED)
    */
-  async forgotPassword(email: string, ip: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async forgotPassword(tenantId: string, email: string, ip: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        email,
+        tenantId, // ← Tenant filter
+      },
+    });
 
     // Don't reveal if user exists or not (security best practice)
     if (!user) {
@@ -357,10 +350,13 @@ export class AuthService {
       .update(resetToken)
       .digest("hex");
 
-    await this.userRepository.update(user.id, {
-      passwordResetToken: resetTokenHash,
-      passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        passwordResetToken: resetTokenHash,
+        passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    );
 
     // Log password reset request
     await this.logSecurityEvent({
@@ -379,9 +375,9 @@ export class AuthService {
   }
 
   /**
-   * Reset password with token
+   * Reset password with token (TENANT SCOPED)
    */
-  async resetPassword(token: string, newPassword: string) {
+  async resetPassword(tenantId: string, token: string, newPassword: string) {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const user = await this.userRepository
@@ -390,6 +386,7 @@ export class AuthService {
       .addSelect("user.passwordHash")
       .addSelect("user.passwordHistory")
       .where("user.passwordResetToken = :tokenHash", { tokenHash })
+      .andWhere("user.tenantId = :tenantId", { tenantId }) // ← Tenant filter
       .andWhere("user.passwordResetExpiresAt > :now", { now: new Date() })
       .getOne();
 
@@ -423,14 +420,15 @@ export class AuthService {
     // Update password and history
     const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
 
-    await this.userRepository.update(user.id, {
-      passwordHash: newPasswordHash,
-      passwordHistory: updatedHistory,
-      passwordChangedAt: new Date(),
-      passwordResetToken: undefined,
-      passwordResetExpiresAt: undefined,
-      forcePasswordChange: false,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        passwordHash: newPasswordHash,
+        passwordHistory: updatedHistory,
+        passwordResetToken: undefined,
+        passwordResetExpiresAt: undefined,
+      },
+    );
 
     // Log password reset
     await this.logSecurityEvent({
@@ -442,11 +440,14 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // Revoke all sessions (force re-login)
+    // Revoke all sessions IN THIS TENANT (force re-login)
     await this.sessionRepository.update(
-      { userId: user.id, isActive: true },
       {
-        isActive: false,
+        userId: user.id,
+        tenantId, // ← Tenant filter
+        revokedAt: IsNull(),
+      },
+      {
         revokedAt: new Date(),
         revokedReason: "password_reset",
       },
@@ -454,11 +455,12 @@ export class AuthService {
   }
 
   /**
-   * Verify email address
+   * Verify email address (TENANT SCOPED)
    */
-  async verifyEmail(token: string) {
+  async verifyEmail(tenantId: string, token: string) {
     const user = await this.userRepository.findOne({
       where: {
+        tenantId, // ← Tenant filter
         emailVerificationToken: token,
         emailVerificationExpiresAt: MoreThan(new Date()),
       },
@@ -468,11 +470,14 @@ export class AuthService {
       throw new BadRequestException("Invalid or expired verification token");
     }
 
-    await this.userRepository.update(user.id, {
-      emailVerified: true,
-      emailVerificationToken: undefined,
-      emailVerificationExpiresAt: undefined,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        emailVerified: true,
+        emailVerificationToken: undefined,
+        emailVerificationExpiresAt: undefined,
+      },
+    );
 
     await this.logSecurityEvent({
       userId: user.id,
@@ -485,10 +490,15 @@ export class AuthService {
   }
 
   /**
-   * Resend verification email
+   * Resend verification email (TENANT SCOPED)
    */
-  async resendVerification(email: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async resendVerification(tenantId: string, email: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        email,
+        tenantId, // ← Tenant filter
+      },
+    });
 
     if (!user) {
       // Don't reveal if user exists
@@ -502,10 +512,13 @@ export class AuthService {
     // Generate new token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-    await this.userRepository.update(user.id, {
-      emailVerificationToken,
-      emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        emailVerificationToken,
+        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    );
 
     // TODO: Send verification email
     // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
@@ -514,9 +527,9 @@ export class AuthService {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token (TENANT SCOPED)
    */
-  async refreshToken(refreshToken: string) {
+  async refreshToken(tenantId: string, refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get("JWT_REFRESH_SECRET"),
@@ -526,12 +539,34 @@ export class AuthService {
         throw new UnauthorizedException("Invalid refresh token");
       }
 
+      // Verify tenant matches
+      if (payload.tenantId !== tenantId) {
+        throw new UnauthorizedException("Invalid tenant for this token");
+      }
+
       const user = await this.userRepository.findOne({
-        where: { id: payload.sub },
+        where: {
+          id: payload.sub,
+          tenantId, // ← Tenant filter
+        },
       });
 
-      if (!user || user.status !== "active") {
-        throw new UnauthorizedException("User not found or inactive");
+      if (!user) {
+        throw new UnauthorizedException("User not found");
+      }
+
+      // Verify session is still active
+      const session = await this.sessionRepository.findOne({
+        where: {
+          id: payload.sessionId,
+          userId: user.id,
+          tenantId, // ← Tenant filter
+          revokedAt: IsNull(),
+        },
+      });
+
+      if (!session) {
+        throw new UnauthorizedException("Session has been revoked");
       }
 
       // Generate new access token
@@ -540,6 +575,7 @@ export class AuthService {
           sub: user.id,
           email: user.email,
           tenantId: user.tenantId,
+          sessionId: session.id,
         },
         {
           secret: this.configService.get("JWT_SECRET"),
@@ -554,11 +590,14 @@ export class AuthService {
   }
 
   /**
-   * Get current user
+   * Get current user (TENANT SCOPED)
    */
-  async getCurrentUser(userId: string) {
+  async getCurrentUser(tenantId: string, userId: string) {
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: {
+        id: userId,
+        tenantId, // ← Tenant filter
+      },
       relations: ["tenant"],
     });
 
@@ -574,20 +613,50 @@ export class AuthService {
       displayName: user.displayName,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
-      status: user.status,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
-        subdomain: user.tenant.subdomain,
+        slug: user.tenant.slug, // ← Use 'slug' not 'subdomain'
       },
     };
   }
 
   /**
-   * Increment failed login attempts
+   * Create session (TENANT SCOPED) - PRIVATE METHOD
    */
-  private async incrementFailedAttempts(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  private async createSession(data: {
+    tenantId: string;
+    userId: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<Session> {
+    const refreshTokenFamilyId = crypto.randomUUID();
+    const deviceId = crypto.randomBytes(16).toString("hex");
+
+    const session = this.sessionRepository.create({
+      tenantId: data.tenantId, // ← Always set tenant
+      userId: data.userId,
+      refreshTokenFamilyId,
+      deviceId,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    return this.sessionRepository.save(session);
+  }
+
+  /**
+   * Increment failed login attempts (TENANT SCOPED) - PRIVATE METHOD
+   */
+  private async incrementFailedAttempts(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        id: userId,
+        tenantId, // ← Tenant filter
+      },
+    });
+
     if (!user) return;
 
     const newAttempts = user.failedLoginAttempts + 1;
@@ -601,15 +670,18 @@ export class AuthService {
       update.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     }
 
-    await this.userRepository.update(userId, update);
+    await this.userRepository.update(
+      { id: userId, tenantId }, // ← Tenant-scoped update
+      update,
+    );
   }
 
   /**
-   * Log security event
+   * Log security event (TENANT SCOPED) - PRIVATE METHOD
    */
   private async logSecurityEvent(data: {
     userId?: string;
-    tenantId?: string;
+    tenantId: string; // ← Now REQUIRED!
     eventType: string;
     severity: "info" | "warning" | "critical";
     ipAddress: string;
@@ -617,8 +689,8 @@ export class AuthService {
     metadata?: Record<string, any>;
   }) {
     await this.securityEventRepository.save({
+      tenantId: data.tenantId, // ← Always set tenant
       userId: data.userId,
-      tenantId: data.tenantId,
       eventType: data.eventType,
       severity: data.severity,
       ipAddress: data.ipAddress,

@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-27T11:11:25.933Z
+Generated: 2025-12-27T17:42:10.107Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 2.19 KB | LINES: 112
+SIZE: 15.55 KB | LINES: 702
 ================================================================================
 
 {
@@ -657,6 +657,466 @@ SIZE: 2.19 KB | LINES: 112
           "Stats"
         ]
       }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "UserController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User profile retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Users"
+        ]
+      },
+      "put": {
+        "operationId": "UserController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully"
+          },
+          "400": {
+            "description": "Bad request - validation failed"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update current user profile",
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_deleteAccount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Account deleted successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete user account",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/change-password": {
+      "post": {
+        "operationId": "UserController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully"
+          },
+          "400": {
+            "description": "Invalid current password or weak new password"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change user password",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/sessions": {
+      "get": {
+        "operationId": "UserController_getSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessions retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all active sessions",
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_revokeAllSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessions revoked"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke all sessions except current",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "UserController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked"
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a specific session",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/me/security-events": {
+      "get": {
+        "operationId": "UserController_getSecurityEvents",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Security events retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get security event history",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "UserController_getUserById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User retrieved"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user by ID",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User successfully registered"
+          },
+          "400": {
+            "description": "Bad request - validation failed"
+          },
+          "409": {
+            "description": "User already exists"
+          }
+        },
+        "summary": "Register a new user",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful"
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials"
+          },
+          "423": {
+            "description": "Account locked"
+          }
+        },
+        "summary": "Login with email and password",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Logout successful"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Logout and revoke session",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset email sent"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "summary": "Request password reset email",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful"
+          },
+          "400": {
+            "description": "Invalid or expired token"
+          }
+        },
+        "summary": "Reset password using token",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Email verified successfully"
+          },
+          "400": {
+            "description": "Invalid or expired token"
+          }
+        },
+        "summary": "Verify email address",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Verification email sent"
+          }
+        },
+        "summary": "Resend email verification",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully"
+          },
+          "401": {
+            "description": "Invalid refresh token"
+          }
+        },
+        "summary": "Refresh access token",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User info retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current authenticated user",
+        "tags": [
+          "Authentication"
+        ]
+      }
     }
   },
   "info": {
@@ -675,7 +1135,137 @@ SIZE: 2.19 KB | LINES: 112
         "type": "http"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Doe"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+1234567890"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "example": "https://example.com/avatar.jpg"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "America/New_York"
+          },
+          "language": {
+            "type": "string",
+            "example": "en"
+          }
+        }
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "example": "CurrentP@ssw0rd123!"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewSecureP@ssw0rd123!"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "SecureP@ssw0rd123!"
+          },
+          "tenantId": {
+            "type": "string",
+            "example": "tenant-uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Doe"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "SecureP@ssw0rd123!"
+          },
+          "tenantId": {
+            "type": "string",
+            "example": "tenant-uuid"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "reset-token-here"
+          },
+          "password": {
+            "type": "string",
+            "example": "NewSecureP@ssw0rd123!"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
+      }
+    }
   },
   "externalDocs": {
     "description": "Sample",
@@ -1088,7 +1678,7 @@ SIZE: 171 B | LINES: 9
 
 ================================================================================
 FILE: apps/auth-service/package.json
-SIZE: 3.47 KB | LINES: 108
+SIZE: 3.51 KB | LINES: 109
 ================================================================================
 
 {
@@ -1133,6 +1723,7 @@ SIZE: 3.47 KB | LINES: 108
     "@repo/security": "*",
     "@repo/shared": "*",
     "axios": "^1.12.2",
+    "cache-manager-redis-store": "^3.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
@@ -3835,6 +4426,158 @@ export const logger: Logger = pino(options);
 
 
 ================================================================================
+FILE: apps/auth-service/src/common/midllewares/tenant-resolver.middleware.ts
+SIZE: 3.7 KB | LINES: 145
+================================================================================
+
+// apps/auth-service/src/common/middleware/tenant-resolver.middleware.ts
+import {
+  Injectable,
+  NestMiddleware,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { Request, Response, NextFunction } from "express";
+import { TenantService } from "../../modules/tenant/tenant.service";
+import { Tenant } from "@repo/database";
+
+// Extend Express Request to include tenant
+declare global {
+  namespace Express {
+    interface Request {
+      tenant?: Tenant;
+      tenantId?: string;
+    }
+  }
+}
+
+@Injectable()
+export class TenantResolverMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(TenantResolverMiddleware.name);
+
+  constructor(private tenantService: TenantService) {}
+
+  async use(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tenant = await this.resolveTenant(req);
+
+      if (!tenant) {
+        // Public endpoints (health, metrics) can proceed
+        if (this.isPublicEndpoint(req.path)) {
+          return next();
+        }
+
+        throw new NotFoundException(
+          "Tenant not found. Please check your domain or tenant ID.",
+        );
+      }
+
+      // Attach tenant to request
+      req.tenant = tenant;
+      req.tenantId = tenant.id;
+
+      // Log for debugging (remove in production)
+      this.logger.debug(
+        `Resolved tenant: ${tenant.slug} (${tenant.id}) from ${req.hostname}`,
+      );
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Resolve tenant from request
+   * Priority:
+   * 1. Custom domain (auth.acme.com)
+   * 2. Subdomain (acme.fortknox.io)
+   * 3. X-Tenant-ID header (fallback)
+   */
+  private async resolveTenant(req: Request): Promise<Tenant | null> {
+    const hostname = req.hostname;
+
+    // Strategy 1: Custom domain lookup
+    // auth.acme.com → check if any tenant has this custom domain
+    const customDomainTenant =
+      await this.tenantService.findByCustomDomain(hostname);
+
+    if (customDomainTenant) {
+      return customDomainTenant;
+    }
+
+    // Strategy 2: Subdomain extraction
+    // acme.fortknox.io → extract "acme"
+    const subdomain = this.extractSubdomain(hostname);
+
+    if (subdomain && subdomain !== "www" && subdomain !== "api") {
+      const subdomainTenant = await this.tenantService.findBySlug(subdomain);
+
+      if (subdomainTenant) {
+        return subdomainTenant;
+      }
+    }
+
+    // Strategy 3: X-Tenant-ID header (for development/testing)
+    const tenantIdHeader = req.headers["x-tenant-id"] as string;
+
+    if (tenantIdHeader) {
+      // Try as ID first
+      let tenant = await this.tenantService.findById(tenantIdHeader);
+
+      // Try as slug if ID lookup fails
+      if (!tenant) {
+        tenant = await this.tenantService.findBySlug(tenantIdHeader);
+      }
+
+      if (tenant) {
+        return tenant;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract subdomain from hostname
+   * Examples:
+   * - acme.fortknox.io → "acme"
+   * - auth.acme.com → "auth"
+   * - localhost:4000 → null
+   */
+  private extractSubdomain(hostname: string): string | null {
+    // Remove port if present
+    const host: string = hostname.split(":")[0] as string;
+
+    // Localhost or IP address
+    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      return null;
+    }
+
+    const parts = host.split(".");
+
+    // Need at least 3 parts for subdomain (sub.domain.tld)
+    if (parts.length < 3) {
+      return null;
+    }
+
+    // Return first part as subdomain
+    return parts[0] as string;
+  }
+
+  /**
+   * Check if endpoint is public (doesn't require tenant)
+   */
+  private isPublicEndpoint(path: string): boolean {
+    const publicPaths = ["/health", "/metrics", "/.well-known", "/favicon.ico"];
+
+    return publicPaths.some((publicPath) => path.startsWith(publicPath));
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/config/configuration.ts
 SIZE: 200 B | LINES: 6
 ================================================================================
@@ -4064,16 +4807,17 @@ export const request = axios.create({});
 
 ================================================================================
 FILE: apps/auth-service/src/core/modules/app-module.ts
-SIZE: 299 B | LINES: 10
+SIZE: 361 B | LINES: 11
 ================================================================================
 
 import { Module } from "@nestjs/common";
 import { GlobalModule } from "./global";
 import { StatsModule } from "./stats/stats.module";
 import { DatabaseModule } from "@/core/database/database.module";
+import { CombinedModules } from "@/modules";
 
 @Module({
-  imports: [GlobalModule, StatsModule, DatabaseModule],
+  imports: [GlobalModule, StatsModule, DatabaseModule, CombinedModules],
 })
 export class AppApiModule {}
 
@@ -4151,14 +4895,17 @@ export class RedisCacheService {
 
 ================================================================================
 FILE: apps/auth-service/src/core/modules/global/index.ts
-SIZE: 1.11 KB | LINES: 39
+SIZE: 2.02 KB | LINES: 62
 ================================================================================
 
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { HealthCheckModule } from "../health-check/health-check.module";
 import { validationSchema } from "@/config/env.validation";
+import { CacheModule } from "@nestjs/cache-manager";
+import * as redisStore from "cache-manager-redis-store";
+import { TenantResolverMiddleware } from "@/common/midllewares/tenant-resolver.middleware";
 
 @Module({
   imports: [
@@ -4170,28 +4917,48 @@ import { validationSchema } from "@/config/env.validation";
 
     HealthCheckModule,
 
-    TypeOrmModule.forRootAsync({
+    // Cache (Redis)
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (cfg: ConfigService) => {
-        const yes = (v?: string, d = false) =>
-          v === undefined
-            ? d
-            : ["1", "true", "yes", "on"].includes(String(v).toLowerCase());
-        return {
-          type: "postgres",
-          url: cfg.get<string>("DB_URL")!,
-          ssl: yes(cfg.get<string>("DB_SSL"))
+      useFactory: (configService: ConfigService) => ({
+        store: redisStore,
+        host: configService.get("REDIS_HOST", "localhost"),
+        port: configService.get("REDIS_PORT", 6379),
+        password: configService.get("REDIS_PASSWORD"),
+        ttl: 300, // 5 minutes default
+      }),
+    }),
+
+    // Database
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: "postgres",
+        host: configService.get("DATABASE_HOST"),
+        port: configService.get("DATABASE_PORT"),
+        username: configService.get("DATABASE_USER"),
+        password: configService.get("DATABASE_PASSWORD"),
+        database: configService.get("DATABASE_NAME"),
+        autoLoadEntities: true,
+        synchronize: false,
+        logging: configService.get("DATABASE_LOGGING") === "true",
+        ssl:
+          configService.get("DB_SSL") === "true"
             ? { rejectUnauthorized: false }
             : false,
-          logging: yes(cfg.get<string>("DB_LOGGING")),
-          autoLoadEntities: true,
-          synchronize: false, // we’ll manage schema with migrations
-        };
-      },
+      }),
     }),
   ],
 })
-export class GlobalModule {}
+export class GlobalModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply tenant resolver to ALL routes
+    consumer.apply(TenantResolverMiddleware).forRoutes("*");
+  }
+}
 
 
 
@@ -4513,8 +5280,72 @@ SIZE: 0 B | LINES: 1
 
 
 ================================================================================
+FILE: apps/auth-service/src/database/seeders/run-seeds.ts
+SIZE: 293 B | LINES: 12
+================================================================================
+
+import AppDataSource from "@repo/database/src/data-source";
+import { seedTenants } from "./tenants.seed";
+
+async function runSeeds() {
+  await AppDataSource.initialize();
+  await seedTenants(AppDataSource);
+  await AppDataSource.destroy();
+  console.log("✅ Seeds completed");
+}
+
+runSeeds();
+
+
+
+================================================================================
+FILE: apps/auth-service/src/database/seeders/tenants.seed.ts
+SIZE: 920 B | LINES: 38
+================================================================================
+
+// Create seed script: apps/auth-service/src/database/seeds/tenants.seed.ts
+import { DataSource } from "typeorm";
+import { Tenant } from "@repo/database";
+
+export async function seedTenants(dataSource: DataSource) {
+  const tenantRepo = dataSource.getRepository(Tenant);
+
+  // Create test tenants
+  const tenants = [
+    {
+      slug: "acme",
+      name: "Acme Corporation",
+      environment: "production",
+      active: true,
+    },
+    {
+      slug: "startup",
+      name: "Startup Inc",
+      environment: "production",
+      active: true,
+    },
+    {
+      slug: "test",
+      name: "Test Tenant",
+      environment: "development",
+      active: true,
+    },
+  ];
+
+  for (const data of tenants) {
+    const exists = await tenantRepo.findOne({ where: { slug: data.slug } });
+    if (!exists) {
+      await tenantRepo.save(tenantRepo.create(data));
+      console.log(`✅ Created tenant: ${data.slug}`);
+    }
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/main.ts
-SIZE: 336 B | LINES: 17
+SIZE: 305 B | LINES: 15
 ================================================================================
 
 import { logger } from "./common/logger";
@@ -4522,8 +5353,6 @@ import { AppModule } from "./core/app.module";
 
 async function bootstrap() {
   try {
-    console.log(process.env);
-
     await AppModule.startApp();
   } catch (err: any) {
     logger.error("Error starting the application: ", err);
@@ -4839,21 +5668,33 @@ export class VerifyEmailDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 942 B | LINES: 30
+SIZE: 1.01 KB | LINES: 42
 ================================================================================
 
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { User, Session, SecurityEvent } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEvent,
+  Tenant,
+  MfaSettings,
+} from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session, SecurityEvent]),
+    TypeOrmModule.forFeature([
+      User,
+      Session,
+      SecurityEvent,
+      Tenant,
+      MfaSettings,
+    ]),
     UserModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -4876,7 +5717,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 16.63 KB | LINES: 630
+SIZE: 18.92 KB | LINES: 702
 ================================================================================
 
 import {
@@ -4895,15 +5736,15 @@ import { PasswordService } from "@repo/security";
 import * as crypto from "crypto";
 
 /**
- * Authentication Service
+ * Authentication Service (Updated for Multi-Tenant)
  *
- * Handles all authentication business logic:
- * - User registration
- * - Login/logout
- * - Password reset
- * - Email verification
- * - Session management
- * - Security event logging
+ * Handles all authentication business logic with tenant scoping:
+ * - User registration (tenant-scoped)
+ * - Login/logout (tenant-scoped)
+ * - Password reset (tenant-scoped)
+ * - Email verification (tenant-scoped)
+ * - Session management (tenant-scoped)
+ * - Security event logging (tenant-scoped)
  */
 @Injectable()
 export class AuthService {
@@ -4918,20 +5759,30 @@ export class AuthService {
     private readonly tenantRepository: Repository<Tenant>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly passwordService: PasswordService,
   ) {}
 
   /**
-   * Register a new user
+   * Register a new user (TENANT REQUIRED)
    */
   async register(data: {
+    tenantId: string; // ← Now REQUIRED!
     email: string;
     password: string;
-    tenantId?: string;
     firstName?: string;
     lastName?: string;
     ip: string;
     userAgent: string;
   }) {
+    // Validate tenant exists and is active
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: data.tenantId, active: true },
+    });
+
+    if (!tenant) {
+      throw new BadRequestException("Invalid or inactive tenant");
+    }
+
     // Validate password strength
     const validation = PasswordService.validateStrength(data.password);
 
@@ -4943,45 +5794,28 @@ export class AuthService {
       });
     }
 
-    // Get or create default tenant
-    let tenantId = data.tenantId;
-    if (!tenantId) {
-      // Create a default tenant for this user (you can customize this logic)
-      const defaultTenant = await this.tenantRepository.findOne({
-        where: { subdomain: "default" },
-      });
-
-      if (!defaultTenant) {
-        const newTenant = this.tenantRepository.create({
-          name: "Default Organization",
-          subdomain: "default",
-          status: "active",
-          plan: "free",
-        });
-        const savedTenant = await this.tenantRepository.save(newTenant);
-        tenantId = savedTenant.id;
-      } else {
-        tenantId = defaultTenant.id;
-      }
-    }
-
-    // Check if user already exists
+    // Check if user already exists IN THIS TENANT
     const existingUser = await this.userRepository.findOne({
-      where: { email: data.email, tenantId },
+      where: {
+        email: data.email,
+        tenantId: data.tenantId, // ← Tenant-scoped lookup
+      },
     });
 
     if (existingUser) {
-      // Log failed registration attempt
+      // Log failed registration attempt (tenant-scoped)
       await this.logSecurityEvent({
+        tenantId: data.tenantId,
         eventType: "REGISTRATION_FAILED",
         severity: "warning",
         ipAddress: data.ip,
         userAgent: data.userAgent,
         metadata: { reason: "email_exists", email: data.email },
-        tenantId,
       });
 
-      throw new ConflictException("User with this email already exists");
+      throw new ConflictException(
+        "User with this email already exists in this tenant",
+      );
     }
 
     // Hash password with Argon2id
@@ -4990,22 +5824,20 @@ export class AuthService {
     // Generate email verification token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-    // Create user
+    // Create user with tenantId
     const user = this.userRepository.create({
+      tenantId: data.tenantId, // ← Always set tenant
       email: data.email,
       passwordHash,
-      tenantId,
       firstName: data.firstName,
       lastName: data.lastName,
       emailVerificationToken,
       emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      passwordChangedAt: new Date(),
-      status: "active",
     });
 
     const savedUser = await this.userRepository.save(user);
 
-    // Log successful registration
+    // Log successful registration (tenant-scoped)
     await this.logSecurityEvent({
       userId: savedUser.id,
       tenantId: savedUser.tenantId,
@@ -5030,28 +5862,27 @@ export class AuthService {
   }
 
   /**
-   * Login with email and password
+   * Login with email and password (TENANT REQUIRED)
    */
   async login(data: {
+    tenantId: string; // ← Now REQUIRED!
     email: string;
     password: string;
-    tenantId?: string;
     ip: string;
     userAgent: string;
   }) {
-    // Find user with password hash
+    // Find user IN THIS TENANT with password hash
     const user = await this.userRepository
       .createQueryBuilder("user")
       .addSelect("user.passwordHash")
       .where("user.email = :email", { email: data.email })
-      .andWhere(data.tenantId ? "user.tenantId = :tenantId" : "1=1", {
-        tenantId: data.tenantId,
-      })
+      .andWhere("user.tenantId = :tenantId", { tenantId: data.tenantId }) // ← Tenant filter
       .getOne();
 
     if (!user) {
-      // Log failed login
+      // Log failed login (tenant-scoped)
       await this.logSecurityEvent({
+        tenantId: data.tenantId,
         eventType: "LOGIN_FAILED",
         severity: "warning",
         ipAddress: data.ip,
@@ -5083,21 +5914,6 @@ export class AuthService {
       );
     }
 
-    // Check account status
-    if (user.status !== "active") {
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "account_inactive", status: user.status },
-      });
-
-      throw new UnauthorizedException("Account is not active");
-    }
-
     // Verify password
     const isPasswordValid = await PasswordService.verify(
       user.passwordHash,
@@ -5106,7 +5922,7 @@ export class AuthService {
 
     if (!isPasswordValid) {
       // Increment failed attempts
-      await this.incrementFailedAttempts(user.id);
+      await this.incrementFailedAttempts(data.tenantId, user.id);
 
       await this.logSecurityEvent({
         userId: user.id,
@@ -5122,39 +5938,31 @@ export class AuthService {
     }
 
     // Reset failed attempts
-    await this.userRepository.update(user.id, {
-      failedLoginAttempts: 0,
-      lockedUntil: undefined,
-      lastLoginAt: new Date(),
-      lastLoginIp: data.ip,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId: data.tenantId }, // ← Tenant-scoped update
+      {
+        failedLoginAttempts: 0,
+        lockedUntil: undefined,
+        lastLoginAt: new Date(),
+        lastLoginIp: data.ip,
+      },
+    );
 
-    // Create session
-    const sessionToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(sessionToken)
-      .digest("hex");
-
-    const session = this.sessionRepository.create({
+    // Create session (tenant-scoped)
+    const session = await this.createSession({
+      tenantId: data.tenantId,
       userId: user.id,
-      tokenHash,
       ipAddress: data.ip,
       userAgent: data.userAgent,
-      deviceInfo: {
-        fingerprint: crypto.randomBytes(16).toString("hex"),
-      },
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
-    await this.sessionRepository.save(session);
-
-    // Generate JWT tokens
+    // Generate JWT tokens (include tenantId in payload)
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
         tenantId: user.tenantId,
+        sessionId: session.id, // ← Include session ID
       },
       {
         secret: this.configService.get("JWT_SECRET"),
@@ -5165,6 +5973,8 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(
       {
         sub: user.id,
+        tenantId: user.tenantId,
+        sessionId: session.id,
         type: "refresh",
       },
       {
@@ -5173,7 +5983,7 @@ export class AuthService {
       },
     );
 
-    // Log successful login
+    // Log successful login (tenant-scoped)
     await this.logSecurityEvent({
       userId: user.id,
       tenantId: user.tenantId,
@@ -5198,21 +6008,40 @@ export class AuthService {
   }
 
   /**
-   * Logout - revoke current session
+   * Logout - revoke current session (TENANT SCOPED)
    */
-  async logout(userId: string) {
-    // Revoke all active sessions for this user
-    await this.sessionRepository.update(
-      { userId, isActive: true },
-      {
-        isActive: false,
-        revokedAt: new Date(),
-        revokedReason: "user_logout",
-      },
-    );
+  async logout(tenantId: string, userId: string, sessionId?: string) {
+    if (sessionId) {
+      // Revoke specific session
+      await this.sessionRepository.update(
+        {
+          id: sessionId,
+          userId,
+          tenantId, // ← Tenant filter
+        },
+        {
+          revokedAt: new Date(),
+          revokedReason: "user_logout",
+        },
+      );
+    } else {
+      // Revoke all active sessions for this user IN THIS TENANT
+      await this.sessionRepository.update(
+        {
+          userId,
+          tenantId, // ← Tenant filter
+          revokedAt: null, // Only active sessions
+        },
+        {
+          revokedAt: new Date(),
+          revokedReason: "user_logout",
+        },
+      );
+    }
 
     await this.logSecurityEvent({
       userId,
+      tenantId,
       eventType: "LOGOUT",
       severity: "info",
       ipAddress: "0.0.0.0",
@@ -5221,10 +6050,15 @@ export class AuthService {
   }
 
   /**
-   * Request password reset
+   * Request password reset (TENANT SCOPED)
    */
-  async forgotPassword(email: string, ip: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async forgotPassword(tenantId: string, email: string, ip: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        email,
+        tenantId, // ← Tenant filter
+      },
+    });
 
     // Don't reveal if user exists or not (security best practice)
     if (!user) {
@@ -5238,10 +6072,13 @@ export class AuthService {
       .update(resetToken)
       .digest("hex");
 
-    await this.userRepository.update(user.id, {
-      passwordResetToken: resetTokenHash,
-      passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        passwordResetToken: resetTokenHash,
+        passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    );
 
     // Log password reset request
     await this.logSecurityEvent({
@@ -5260,9 +6097,9 @@ export class AuthService {
   }
 
   /**
-   * Reset password with token
+   * Reset password with token (TENANT SCOPED)
    */
-  async resetPassword(token: string, newPassword: string) {
+  async resetPassword(tenantId: string, token: string, newPassword: string) {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const user = await this.userRepository
@@ -5271,6 +6108,7 @@ export class AuthService {
       .addSelect("user.passwordHash")
       .addSelect("user.passwordHistory")
       .where("user.passwordResetToken = :tokenHash", { tokenHash })
+      .andWhere("user.tenantId = :tenantId", { tenantId }) // ← Tenant filter
       .andWhere("user.passwordResetExpiresAt > :now", { now: new Date() })
       .getOne();
 
@@ -5304,14 +6142,15 @@ export class AuthService {
     // Update password and history
     const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
 
-    await this.userRepository.update(user.id, {
-      passwordHash: newPasswordHash,
-      passwordHistory: updatedHistory,
-      passwordChangedAt: new Date(),
-      passwordResetToken: undefined,
-      passwordResetExpiresAt: undefined,
-      forcePasswordChange: false,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        passwordHash: newPasswordHash,
+        passwordHistory: updatedHistory,
+        passwordResetToken: undefined,
+        passwordResetExpiresAt: undefined,
+      },
+    );
 
     // Log password reset
     await this.logSecurityEvent({
@@ -5323,11 +6162,14 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // Revoke all sessions (force re-login)
+    // Revoke all sessions IN THIS TENANT (force re-login)
     await this.sessionRepository.update(
-      { userId: user.id, isActive: true },
       {
-        isActive: false,
+        userId: user.id,
+        tenantId, // ← Tenant filter
+        revokedAt: null,
+      },
+      {
         revokedAt: new Date(),
         revokedReason: "password_reset",
       },
@@ -5335,11 +6177,12 @@ export class AuthService {
   }
 
   /**
-   * Verify email address
+   * Verify email address (TENANT SCOPED)
    */
-  async verifyEmail(token: string) {
+  async verifyEmail(tenantId: string, token: string) {
     const user = await this.userRepository.findOne({
       where: {
+        tenantId, // ← Tenant filter
         emailVerificationToken: token,
         emailVerificationExpiresAt: MoreThan(new Date()),
       },
@@ -5349,11 +6192,14 @@ export class AuthService {
       throw new BadRequestException("Invalid or expired verification token");
     }
 
-    await this.userRepository.update(user.id, {
-      emailVerified: true,
-      emailVerificationToken: undefined,
-      emailVerificationExpiresAt: undefined,
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        emailVerified: true,
+        emailVerificationToken: undefined,
+        emailVerificationExpiresAt: undefined,
+      },
+    );
 
     await this.logSecurityEvent({
       userId: user.id,
@@ -5366,10 +6212,15 @@ export class AuthService {
   }
 
   /**
-   * Resend verification email
+   * Resend verification email (TENANT SCOPED)
    */
-  async resendVerification(email: string) {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async resendVerification(tenantId: string, email: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        email,
+        tenantId, // ← Tenant filter
+      },
+    });
 
     if (!user) {
       // Don't reveal if user exists
@@ -5383,10 +6234,13 @@ export class AuthService {
     // Generate new token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
-    await this.userRepository.update(user.id, {
-      emailVerificationToken,
-      emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    });
+    await this.userRepository.update(
+      { id: user.id, tenantId }, // ← Tenant-scoped update
+      {
+        emailVerificationToken,
+        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    );
 
     // TODO: Send verification email
     // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
@@ -5395,9 +6249,9 @@ export class AuthService {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token (TENANT SCOPED)
    */
-  async refreshToken(refreshToken: string) {
+  async refreshToken(tenantId: string, refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get("JWT_REFRESH_SECRET"),
@@ -5407,12 +6261,34 @@ export class AuthService {
         throw new UnauthorizedException("Invalid refresh token");
       }
 
+      // Verify tenant matches
+      if (payload.tenantId !== tenantId) {
+        throw new UnauthorizedException("Invalid tenant for this token");
+      }
+
       const user = await this.userRepository.findOne({
-        where: { id: payload.sub },
+        where: {
+          id: payload.sub,
+          tenantId, // ← Tenant filter
+        },
       });
 
-      if (!user || user.status !== "active") {
-        throw new UnauthorizedException("User not found or inactive");
+      if (!user) {
+        throw new UnauthorizedException("User not found");
+      }
+
+      // Verify session is still active
+      const session = await this.sessionRepository.findOne({
+        where: {
+          id: payload.sessionId,
+          userId: user.id,
+          tenantId, // ← Tenant filter
+          revokedAt: null,
+        },
+      });
+
+      if (!session) {
+        throw new UnauthorizedException("Session has been revoked");
       }
 
       // Generate new access token
@@ -5421,6 +6297,7 @@ export class AuthService {
           sub: user.id,
           email: user.email,
           tenantId: user.tenantId,
+          sessionId: session.id,
         },
         {
           secret: this.configService.get("JWT_SECRET"),
@@ -5435,11 +6312,14 @@ export class AuthService {
   }
 
   /**
-   * Get current user
+   * Get current user (TENANT SCOPED)
    */
-  async getCurrentUser(userId: string) {
+  async getCurrentUser(tenantId: string, userId: string) {
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: {
+        id: userId,
+        tenantId, // ← Tenant filter
+      },
       relations: ["tenant"],
     });
 
@@ -5455,20 +6335,50 @@ export class AuthService {
       displayName: user.displayName,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
-      status: user.status,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
-        subdomain: user.tenant.subdomain,
+        slug: user.tenant.slug, // ← Use 'slug' not 'subdomain'
       },
     };
   }
 
   /**
-   * Increment failed login attempts
+   * Create session (TENANT SCOPED) - PRIVATE METHOD
    */
-  private async incrementFailedAttempts(userId: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+  private async createSession(data: {
+    tenantId: string;
+    userId: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<Session> {
+    const refreshTokenFamilyId = crypto.randomUUID();
+    const deviceId = crypto.randomBytes(16).toString("hex");
+
+    const session = this.sessionRepository.create({
+      tenantId: data.tenantId, // ← Always set tenant
+      userId: data.userId,
+      refreshTokenFamilyId,
+      deviceId,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    return this.sessionRepository.save(session);
+  }
+
+  /**
+   * Increment failed login attempts (TENANT SCOPED) - PRIVATE METHOD
+   */
+  private async incrementFailedAttempts(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        id: userId,
+        tenantId, // ← Tenant filter
+      },
+    });
+
     if (!user) return;
 
     const newAttempts = user.failedLoginAttempts + 1;
@@ -5482,15 +6392,18 @@ export class AuthService {
       update.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     }
 
-    await this.userRepository.update(userId, update);
+    await this.userRepository.update(
+      { id: userId, tenantId }, // ← Tenant-scoped update
+      update,
+    );
   }
 
   /**
-   * Log security event
+   * Log security event (TENANT SCOPED) - PRIVATE METHOD
    */
   private async logSecurityEvent(data: {
     userId?: string;
-    tenantId?: string;
+    tenantId: string; // ← Now REQUIRED!
     eventType: string;
     severity: "info" | "warning" | "critical";
     ipAddress: string;
@@ -5498,14 +6411,316 @@ export class AuthService {
     metadata?: Record<string, any>;
   }) {
     await this.securityEventRepository.save({
+      tenantId: data.tenantId, // ← Always set tenant
       userId: data.userId,
-      tenantId: data.tenantId,
       eventType: data.eventType,
       severity: data.severity,
       ipAddress: data.ipAddress,
       userAgent: data.userAgent,
       metadata: data.metadata || {},
     });
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/index.ts
+SIZE: 315 B | LINES: 10
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { UserModule } from "@/modules/user/user.module";
+import { AuthModule } from "@/modules/auth/auth.module";
+import { TenantModule } from "@/modules/tenant/tenant.module";
+
+@Module({
+  imports: [UserModule, AuthModule, TenantModule],
+})
+export class CombinedModules {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/tenant/tenant.controller.ts
+SIZE: 1.38 KB | LINES: 67
+================================================================================
+
+// apps/auth-service/src/modules/tenant/tenant.controller.ts
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from "@nestjs/common";
+import { type Request } from "express";
+import { TenantService } from "./tenant.service";
+import { JwtAuthGuard } from "@/common/guards";
+
+// DTO for creating tenant
+export class CreateTenantDto {
+  slug!: string;
+  name!: string;
+  environment?: string;
+}
+
+export class SetCustomDomainDto {
+  domain!: string;
+}
+
+@Controller("tenants")
+@UseGuards(JwtAuthGuard) // Only authenticated users
+export class TenantController {
+  constructor(private tenantService: TenantService) {}
+
+  /**
+   * Get current tenant info
+   */
+  @Get("current")
+  async getCurrent(@Req() req: Request) {
+    return req.tenant;
+  }
+
+  /**
+   * Create new tenant (platform admin only - add RBAC later)
+   */
+  @Post()
+  async create(@Body() dto: CreateTenantDto) {
+    return this.tenantService.create(dto);
+  }
+
+  /**
+   * Set custom domain for tenant
+   */
+  @Patch(":id/custom-domain")
+  async setCustomDomain(
+    @Param("id") id: string,
+    @Body() dto: SetCustomDomainDto,
+  ) {
+    return this.tenantService.setCustomDomain(id, dto.domain);
+  }
+
+  /**
+   * Verify custom domain (would be called after DNS verification)
+   */
+  @Post(":id/verify-domain")
+  async verifyDomain(@Param("id") id: string) {
+    return this.tenantService.verifyCustomDomain(id);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/tenant/tenant.module.ts
+SIZE: 655 B | LINES: 22
+================================================================================
+
+// apps/auth-service/src/modules/tenant/tenant.module.ts
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { CacheModule } from "@nestjs/cache-manager";
+import { Tenant } from "@repo/database";
+import { TenantService } from "./tenant.service";
+import { TenantController } from "./tenant.controller";
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Tenant]),
+    CacheModule.register({
+      ttl: 300000, // 5 minutes default
+      max: 1000, // max items in cache
+    }),
+  ],
+  providers: [TenantService],
+  controllers: [TenantController],
+  exports: [TenantService],
+})
+export class TenantModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/tenant/tenant.service.ts
+SIZE: 4 KB | LINES: 175
+================================================================================
+
+// apps/auth-service/src/modules/tenant/tenant.service.ts
+import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Tenant } from "@repo/database";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { type Cache } from "cache-manager";
+
+@Injectable()
+export class TenantService {
+  constructor(
+    @InjectRepository(Tenant)
+    private tenantRepository: Repository<Tenant>,
+
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
+  ) {}
+
+  /**
+   * Find tenant by slug (subdomain)
+   * Cached for 5 minutes
+   */
+  async findBySlug(slug: string): Promise<Tenant | null> {
+    const cacheKey = `tenant:slug:${slug}`;
+
+    // Check cache
+    const cached = await this.cacheManager.get<Tenant>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Query database
+    const tenant = await this.tenantRepository.findOne({
+      where: { slug, active: true },
+    });
+
+    // Cache for 5 minutes
+    if (tenant) {
+      await this.cacheManager.set(cacheKey, tenant, 300000);
+    }
+
+    return tenant;
+  }
+
+  /**
+   * Find tenant by custom domain
+   * Cached for 5 minutes
+   */
+  async findByCustomDomain(domain: string): Promise<Tenant | null> {
+    const cacheKey = `tenant:domain:${domain}`;
+
+    // Check cache
+    const cached = await this.cacheManager.get<Tenant>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Query database
+    const tenant = await this.tenantRepository.findOne({
+      where: {
+        customDomain: domain,
+        customDomainVerified: true,
+        active: true,
+      },
+    });
+
+    // Cache for 5 minutes
+    if (tenant) {
+      await this.cacheManager.set(cacheKey, tenant, 300000);
+    }
+
+    return tenant;
+  }
+
+  /**
+   * Find tenant by ID
+   * Cached for 10 minutes
+   */
+  async findById(id: string): Promise<Tenant | null> {
+    const cacheKey = `tenant:id:${id}`;
+
+    const cached = await this.cacheManager.get<Tenant>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const tenant = await this.tenantRepository.findOne({
+      where: { id, active: true },
+    });
+
+    if (tenant) {
+      await this.cacheManager.set(cacheKey, tenant, 600000);
+    }
+
+    return tenant;
+  }
+
+  /**
+   * Invalidate all caches for a tenant
+   */
+  async invalidateCache(tenantId: string): Promise<void> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) return;
+
+    await this.cacheManager.del(`tenant:id:${tenantId}`);
+    await this.cacheManager.del(`tenant:slug:${tenant.slug}`);
+
+    if (tenant.customDomain) {
+      await this.cacheManager.del(`tenant:domain:${tenant.customDomain}`);
+    }
+  }
+
+  /**
+   * Create tenant (for platform admin)
+   */
+  async create(data: {
+    slug: string;
+    name: string;
+    environment?: string;
+  }): Promise<Tenant> {
+    const tenant = this.tenantRepository.create({
+      slug: data.slug.toLowerCase(),
+      name: data.name,
+      environment: data.environment || "production",
+      active: true,
+    });
+
+    return this.tenantRepository.save(tenant);
+  }
+
+  /**
+   * Set custom domain
+   */
+  async setCustomDomain(tenantId: string, domain: string): Promise<Tenant> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    tenant.customDomain = domain;
+    tenant.customDomainVerified = false; // Require verification
+
+    await this.tenantRepository.save(tenant);
+    await this.invalidateCache(tenantId);
+
+    return tenant;
+  }
+
+  /**
+   * Verify custom domain
+   */
+  async verifyCustomDomain(tenantId: string): Promise<Tenant> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    tenant.customDomainVerified = true;
+
+    await this.tenantRepository.save(tenant);
+    await this.invalidateCache(tenantId);
+
+    return tenant;
   }
 }
 
@@ -7721,7 +8936,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 606 B | LINES: 31
+SIZE: 714 B | LINES: 34
 ================================================================================
 
 {
@@ -7735,6 +8950,7 @@ SIZE: 606 B | LINES: 31
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@types/cache-manager": "^5.0.0",
     "prettier": "^3.6.2",
     "turbo": "^2.6.1",
     "typescript": "5.9.2"
@@ -7748,7 +8964,9 @@ SIZE: 606 B | LINES: 31
     "packages/*"
   ],
   "dependencies": {
+    "@nestjs/cache-manager": "^3.1.0",
     "argon2": "^0.44.0",
+    "cache-manager": "^7.2.7",
     "next": "^16.0.1",
     "react": "^19.2.0",
     "typeorm": "^0.3.28"
@@ -8340,7 +9558,7 @@ When adding new entities:
 
 ================================================================================
 FILE: packages/database/src/data-source.ts
-SIZE: 2.21 KB | LINES: 82
+SIZE: 2.18 KB | LINES: 80
 ================================================================================
 
 import "reflect-metadata";
@@ -8365,8 +9583,6 @@ import { Permission } from "./entities/permission.entity";
 
 const isProduction = process.env.NODE_ENV === "production";
 const useSSL = process.env.DB_SSL === "true";
-
-console.log(process.env);
 
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
@@ -8983,125 +10199,71 @@ export class Session extends BaseEntity {
 
 ================================================================================
 FILE: packages/database/src/entities/tenant.entity.ts
-SIZE: 2.44 KB | LINES: 120
+SIZE: 1.42 KB | LINES: 66
 ================================================================================
 
-import { Entity, Column, Index, OneToMany } from "typeorm";
+// packages/database/src/entities/tenant.entity.ts
+import { Entity, Column, OneToMany, Index } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 
-/**
- * Tenant Entity
- *
- * Represents an organization/tenant in the multi-tenant system.
- * Each tenant is isolated and has its own users, settings, and configuration.
- */
 @Entity("tenants")
-@Index(["subdomain"], { unique: true })
+@Index(["slug"], { unique: true })
 @Index(["customDomain"], { unique: true, where: "custom_domain IS NOT NULL" })
 export class Tenant extends BaseEntity {
+  @Column({ type: "varchar", length: 100, unique: true })
+  slug!: string; // acme, startup, corp
+
   @Column({ type: "varchar", length: 255 })
-  name!: string;
+  name!: string; // Acme Corp
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    unique: true,
+    name: "custom_domain",
+  })
+  customDomain?: string; // auth.acme.com
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "custom_domain_verified",
+  })
+  customDomainVerified!: boolean;
 
   @Column({
     type: "varchar",
     length: 100,
-    unique: true,
-    name: "subdomain",
+    default: "production",
   })
-  subdomain!: string;
+  environment!: string; // production, staging, development
 
   @Column({
-    type: "varchar",
-    length: 255,
+    type: "jsonb",
     nullable: true,
-    name: "custom_domain",
+    name: "feature_flags",
   })
-  customDomain?: string;
-
-  @Column({
-    type: "enum",
-    enum: ["active", "trial", "suspended", "cancelled"],
-    default: "trial",
-  })
-  status!: "active" | "trial" | "suspended" | "cancelled";
-
-  @Column({
-    type: "enum",
-    enum: ["free", "starter", "professional", "enterprise"],
-    default: "free",
-  })
-  plan!: "free" | "starter" | "professional" | "enterprise";
+  featureFlags?: Record<string, boolean>;
 
   @Column({
     type: "jsonb",
-    default: {},
-    comment: "Tenant-specific configuration and settings",
+    nullable: true,
   })
-  settings!: Record<string, any>;
-
-  @Column({
-    type: "jsonb",
-    default: {},
-    comment: "Tenant branding configuration (logo, colors, etc.)",
-  })
-  branding?: Record<string, any>;
+  settings?: {
+    allowSignup?: boolean;
+    requireEmailVerification?: boolean;
+    sessionTimeout?: number;
+    mfaRequired?: boolean;
+  };
 
   @Column({
     type: "boolean",
     default: true,
-    name: "is_active",
   })
-  isActive!: boolean;
+  active!: boolean;
 
-  @Column({
-    type: "timestamp with time zone",
-    nullable: true,
-    name: "trial_ends_at",
-  })
-  trialEndsAt?: Date;
-
-  @Column({
-    type: "int",
-    default: 0,
-    name: "user_limit",
-    comment: "Maximum number of users allowed (0 = unlimited)",
-  })
-  userLimit!: number;
-
-  @Column({
-    type: "int",
-    default: 0,
-    name: "user_count",
-    comment: "Current number of users in tenant",
-  })
-  userCount!: number;
-
-  @Column({
-    type: "jsonb",
-    default: {},
-    name: "feature_flags",
-    comment: "Feature flags for this tenant",
-  })
-  featureFlags!: Record<string, boolean>;
-
-  @Column({
-    type: "varchar",
-    length: 255,
-    nullable: true,
-    name: "contact_email",
-  })
-  contactEmail?: string;
-
-  @Column({
-    type: "varchar",
-    length: 50,
-    nullable: true,
-    name: "contact_phone",
-  })
-  contactPhone?: string;
-
-  // Relations
   @OneToMany(() => User, (user) => user.tenant)
   users!: User[];
 }
@@ -9747,6 +10909,68 @@ export class InitialMigration1735289000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "tenants" CASCADE`);
 
     console.log("✅ Migration reverted successfully");
+  }
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1743947999999 update-tenant-multi.ts
+SIZE: 1.82 KB | LINES: 55
+================================================================================
+
+// packages/database/src/migrations/TIMESTAMP-UpdateTenantForMultiTenant.ts
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class UpdateTenantForMultiTenant1735300000000
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add new columns
+    await queryRunner.query(`
+      ALTER TABLE tenants 
+      ADD COLUMN IF NOT EXISTS custom_domain VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS custom_domain_verified BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS environment VARCHAR(100) DEFAULT 'production',
+      ADD COLUMN IF NOT EXISTS feature_flags JSONB,
+      ADD COLUMN IF NOT EXISTS settings JSONB,
+      ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+    `);
+
+    // Create unique index for custom_domain (where not null)
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain 
+      ON tenants(custom_domain) 
+      WHERE custom_domain IS NOT NULL;
+    `);
+
+    // Create index for slug
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_slug 
+      ON tenants(slug);
+    `);
+
+    // Set default environment for existing tenants
+    await queryRunner.query(`
+      UPDATE tenants 
+      SET environment = 'production' 
+      WHERE environment IS NULL;
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_tenants_custom_domain;`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_tenants_slug;`);
+
+    await queryRunner.query(`
+      ALTER TABLE tenants 
+      DROP COLUMN IF EXISTS custom_domain,
+      DROP COLUMN IF EXISTS custom_domain_verified,
+      DROP COLUMN IF EXISTS environment,
+      DROP COLUMN IF EXISTS feature_flags,
+      DROP COLUMN IF EXISTS settings,
+      DROP COLUMN IF EXISTS active;
+    `);
   }
 }
 
@@ -18666,8 +19890,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 189
-Total Lines: 17,336
+Files Processed: 197
+Total Lines: 18,504
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-27T11:11:25.933Z
+Generated: 2025-12-27T17:42:10.107Z
