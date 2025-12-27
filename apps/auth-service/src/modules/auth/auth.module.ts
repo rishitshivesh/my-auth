@@ -10,6 +10,7 @@ import {
   MfaSettings,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
+import { EmailModule } from "../email/email.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PasswordService } from "@repo/security";
@@ -24,6 +25,7 @@ import { PasswordService } from "@repo/security";
       MfaSettings,
     ]),
     UserModule,
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

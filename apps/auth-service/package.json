@@ -27,6 +27,7 @@
     "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.696.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -45,8 +46,10 @@
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
     "express-session": "^1.18.2",
+    "handlebars": "^4.7.8",
     "ioredis": "^5.8.0",
     "joi": "^18.0.1",
+    "nodemailer": "^6.9.16",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
@@ -67,6 +70,7 @@
     "@types/express-session": "^1",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^6.4.17",
     "@types/passport": "^0",
     "@types/passport-jwt": "^4",
     "@types/pg": "^8",

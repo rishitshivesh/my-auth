@@ -11,6 +11,7 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { User, Session, SecurityEvent, Tenant } from "@repo/database";
 import { PasswordService } from "@repo/security";
+import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 /**
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -126,8 +128,8 @@ export class AuthService {
       metadata: { email: savedUser.email },
     });
 
-    // TODO: Send verification email
-    // await this.emailService.sendVerificationEmail(savedUser.email, emailVerificationToken);
+    // Send welcome and verification email
+    await this.emailService.sendWelcomeEmail(savedUser, emailVerificationToken);
 
     return {
       id: savedUser.id,
@@ -377,8 +379,8 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // TODO: Send password reset email
-    // await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    // Send password reset email
+    await this.emailService.sendPasswordResetEmail(user, resetToken);
 
     console.log("Password reset token:", resetToken); // For development
   }
@@ -448,6 +450,9 @@ export class AuthService {
       ipAddress: "0.0.0.0",
       userAgent: "system",
     });
+
+    // Send password changed confirmation email
+    await this.emailService.sendPasswordChangedEmail(user);
 
     // Revoke all sessions IN THIS TENANT (force re-login)
     await this.sessionRepository.update(
@@ -529,8 +534,8 @@ export class AuthService {
       },
     );
 
-    // TODO: Send verification email
-    // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
+    // Send verification email
+    await this.emailService.sendVerificationEmail(user, emailVerificationToken);
 
     console.log("Verification token:", emailVerificationToken); // For development
   }
