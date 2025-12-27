@@ -11,6 +11,7 @@ import { User } from "./user.entity";
 @Index(["tenantId", "revokedAt"]) // ← Add tenant index
 @Index(["tokenHash"], { unique: true })
 @Index(["expiresAt"])
+@Index(["refreshTokenFamilyId"]) // ← Add this index
 export class Session extends BaseEntity {
   // ✅ ADD THIS - Tenant ID (denormalized for performance)
   @Column({ type: "uuid", name: "tenant_id" })
@@ -31,6 +32,7 @@ export class Session extends BaseEntity {
     unique: true,
     name: "token_hash",
     comment: "Hashed session token",
+    nullable: true,
   })
   tokenHash!: string;
 
@@ -67,6 +69,7 @@ export class Session extends BaseEntity {
     type: "jsonb",
     name: "device_info",
     comment: "Device information (browser, OS, etc.)",
+    nullable: true,
   })
   deviceInfo!: {
     browser?: string;
@@ -102,6 +105,13 @@ export class Session extends BaseEntity {
     default: () => "CURRENT_TIMESTAMP",
   })
   lastActivity!: Date;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_refresh_at",
+  })
+  lastRefreshAt?: Date;
 
   @Column({
     type: "timestamp with time zone",

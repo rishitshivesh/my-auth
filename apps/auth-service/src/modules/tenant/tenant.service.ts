@@ -1,5 +1,10 @@
 // apps/auth-service/src/modules/tenant/tenant.service.ts
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  Inject,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
@@ -83,16 +88,19 @@ export class TenantService {
     if (cached) {
       return cached;
     }
+    try {
+      const tenant = await this.tenantRepository.findOne({
+        where: { id, active: true },
+      });
 
-    const tenant = await this.tenantRepository.findOne({
-      where: { id, active: true },
-    });
+      if (tenant) {
+        await this.cacheManager.set(cacheKey, tenant, 600000);
+      }
 
-    if (tenant) {
-      await this.cacheManager.set(cacheKey, tenant, 600000);
+      return tenant;
+    } catch (e) {
+      throw new BadRequestException("Tenant Not found");
     }
-
-    return tenant;
   }
 
   /**

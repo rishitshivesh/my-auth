@@ -1,9 +1,9 @@
 import AppDataSource from "@repo/database/src/data-source";
-import { seedTenants } from "./tenants.seed";
+import { seed } from "./tenants.seed";
 
 async function runSeeds() {
   await AppDataSource.initialize();
-  await seedTenants(AppDataSource);
+  await seed();
   await AppDataSource.destroy();
   console.log("✅ Seeds completed");
 }

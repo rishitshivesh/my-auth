@@ -12,7 +12,7 @@ import { ConfigService } from "@nestjs/config";
 import { User, Session, SecurityEvent, Tenant } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import * as crypto from "crypto";
-
+import { v4 as uuidv4 } from "uuid";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -143,104 +143,118 @@ export class AuthService {
    * Login with email and password (TENANT REQUIRED)
    */
   async login(data: {
-    tenantId: string; // ← Now REQUIRED!
+    tenantId: string;
     email: string;
     password: string;
     ip: string;
     userAgent: string;
-  }) {
-    // Find user IN THIS TENANT with password hash
-    const user = await this.userRepository
-      .createQueryBuilder("user")
-      .addSelect("user.passwordHash")
-      .where("user.email = :email", { email: data.email })
-      .andWhere("user.tenantId = :tenantId", { tenantId: data.tenantId }) // ← Tenant filter
-      .getOne();
+  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+    const { tenantId, email, password, ip, userAgent } = data;
 
-    if (!user) {
-      // Log failed login (tenant-scoped)
-      await this.logSecurityEvent({
-        tenantId: data.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "user_not_found", email: data.email },
-      });
-
-      throw new UnauthorizedException("Invalid email or password");
-    }
-
-    // Check if account is locked
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const minutesLeft = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / 1000 / 60,
-      );
-
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "account_locked", minutesLeft },
-      });
-
-      throw new UnauthorizedException(
-        `Account is locked. Please try again in ${minutesLeft} minute(s).`,
-      );
-    }
-
-    // Verify password
-    const isPasswordValid = await PasswordService.verify(
-      user.passwordHash,
-      data.password,
-    );
-
-    if (!isPasswordValid) {
-      // Increment failed attempts
-      await this.incrementFailedAttempts(data.tenantId, user.id);
-
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "invalid_password" },
-      });
-
-      throw new UnauthorizedException("Invalid email or password");
-    }
-
-    // Reset failed attempts
-    await this.userRepository.update(
-      { id: user.id, tenantId: data.tenantId }, // ← Tenant-scoped update
-      {
-        failedLoginAttempts: 0,
-        lockedUntil: undefined,
-        lastLoginAt: new Date(),
-        lastLoginIp: data.ip,
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+      relations: ["tenant"],
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true, // ← Force select this hidden field
+        firstName: true,
+        lastName: true,
+        emailVerified: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
       },
-    );
-
-    // Create session (tenant-scoped)
-    const session = await this.createSession({
-      tenantId: data.tenantId,
-      userId: user.id,
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
     });
 
-    // Generate JWT tokens (include tenantId in payload)
+    console.log("🔍 Login attempt:", { email, tenantId, userFound: !!user }); // ← ADD
+
+    if (!user) {
+      await this.logSecurityEvent({
+        tenantId,
+        eventType: "login_failed",
+        severity: "critical",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "user_not_found" },
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    console.log("🔍 User found:", {
+      userId: user.id,
+      user,
+      hasPassword: !!user.passwordHash,
+      passwordHashStart: user.passwordHash?.substring(0, 20),
+    }); // ← ADD
+
+    // Verify password
+    const isValid = await PasswordService.verify(user.passwordHash, password);
+
+    console.log("🔍 Password check:", { isValid }); // ← ADD
+
+    if (!isValid) {
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "login_failed",
+        severity: "critical",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "invalid_password" },
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    // Check if email verified (if required)
+    if (
+      !user.emailVerified &&
+      user.tenant.featureFlags?.emailVerificationRequired
+    ) {
+      throw new UnauthorizedException("Please verify your email first");
+    }
+
+    // Check if account is active
+    if (
+      !user.emailVerified &&
+      user.tenant.featureFlags?.emailVerificationRequired
+    ) {
+      throw new UnauthorizedException("Please verify your email first");
+    }
+    // === REFRESH TOKEN ROTATION LOGIC ===
+
+    // 1. Generate new family ID
+    const familyId = uuidv4();
+
+    // 2. Generate refresh token (opaque random string)
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+
+    // 3. Hash it before storing
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    // 4. Create session with family
+    const session = await this.sessionRepository.save({
+      userId: user.id,
+      tenantId,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent,
+      lastActivity: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    // 5. Generate access token
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
-        tenantId: user.tenantId,
-        sessionId: session.id, // ← Include session ID
+        tenantId,
+        sessionId: session.id,
       },
       {
         secret: this.configService.get("JWT_SECRET"),
@@ -248,39 +262,31 @@ export class AuthService {
       },
     );
 
-    const refreshToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        tenantId: user.tenantId,
-        sessionId: session.id,
-        type: "refresh",
-      },
-      {
-        secret: this.configService.get("JWT_REFRESH_SECRET"),
-        expiresIn: "7d", // 7 days
-      },
-    );
-
-    // Log successful login (tenant-scoped)
+    // Log successful login
     await this.logSecurityEvent({
+      tenantId,
       userId: user.id,
-      tenantId: user.tenantId,
-      eventType: "LOGIN_SUCCESS",
+      eventType: "login_success",
       severity: "info",
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
-      metadata: { sessionId: session.id },
+      ipAddress: ip,
+      userAgent,
+      metadata: { sessionId: session.id, familyId },
     });
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken, // ← Return plaintext token to user
       user: {
-        id: user.id,
+        // id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         emailVerified: user.emailVerified,
+        // tenant: {
+        //   id: user.tenant.id,
+        //   name: user.tenant.name,
+        //   slug: user.tenant.slug,
+        // },
       },
     };
   }
@@ -288,14 +294,18 @@ export class AuthService {
   /**
    * Logout - revoke current session (TENANT SCOPED)
    */
-  async logout(tenantId: string, userId: string, sessionId?: string) {
+  async logout(
+    tenantId: string,
+    userId: string,
+    sessionId?: string,
+  ): Promise<void> {
     if (sessionId) {
-      // Revoke specific session
+      // Logout specific session
       await this.sessionRepository.update(
         {
           id: sessionId,
           userId,
-          tenantId, // ← Tenant filter
+          tenantId,
         },
         {
           revokedAt: new Date(),
@@ -303,28 +313,27 @@ export class AuthService {
         },
       );
     } else {
-      // Revoke all active sessions for this user IN THIS TENANT
+      // Logout all active sessions for user
       await this.sessionRepository.update(
         {
           userId,
-          tenantId, // ← Tenant filter
-          revokedAt: IsNull(), // Only active sessions
+          tenantId,
+          revokedAt: IsNull(),
         },
         {
           revokedAt: new Date(),
-          revokedReason: "user_logout",
+          revokedReason: "user_logout_all",
         },
       );
     }
 
     await this.logSecurityEvent({
-      userId,
       tenantId,
-      eventType: "LOGOUT",
+      userId,
+      eventType: "logout",
       severity: "info",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
-    });
+      metadata: { sessionId },
+    } as any);
   }
 
   /**
@@ -529,64 +538,119 @@ export class AuthService {
   /**
    * Refresh access token (TENANT SCOPED)
    */
-  async refreshToken(tenantId: string, refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get("JWT_REFRESH_SECRET"),
-      });
+  async refreshToken(
+    tenantId: string,
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    // 1. Hash the incoming token
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
 
-      if (payload.type !== "refresh") {
-        throw new UnauthorizedException("Invalid refresh token");
-      }
+    // 2. Find session by hash
+    const session = await this.sessionRepository.findOne({
+      where: {
+        tenantId,
+        refreshTokenHash: tokenHash,
+        revokedAt: IsNull(),
+      },
+      relations: ["user"],
+    });
 
-      // Verify tenant matches
-      if (payload.tenantId !== tenantId) {
-        throw new UnauthorizedException("Invalid tenant for this token");
-      }
-
-      const user = await this.userRepository.findOne({
-        where: {
-          id: payload.sub,
-          tenantId, // ← Tenant filter
-        },
-      });
-
-      if (!user) {
-        throw new UnauthorizedException("User not found");
-      }
-
-      // Verify session is still active
-      const session = await this.sessionRepository.findOne({
-        where: {
-          id: payload.sessionId,
-          userId: user.id,
-          tenantId, // ← Tenant filter
-          revokedAt: IsNull(),
-        },
-      });
-
-      if (!session) {
-        throw new UnauthorizedException("Session has been revoked");
-      }
-
-      // Generate new access token
-      const accessToken = this.jwtService.sign(
-        {
-          sub: user.id,
-          email: user.email,
-          tenantId: user.tenantId,
-          sessionId: session.id,
-        },
-        {
-          secret: this.configService.get("JWT_SECRET"),
-          expiresIn: "15m",
-        },
-      );
-
-      return { accessToken };
-    } catch (error) {
-      throw new UnauthorizedException("Invalid or expired refresh token");
+    if (!session) {
+      throw new UnauthorizedException("Invalid refresh token");
     }
+
+    // 3. Check if session expired
+    if (session.expiresAt && session.expiresAt < new Date()) {
+      await this.sessionRepository.update(session.id, {
+        revokedAt: new Date(),
+        revokedReason: "expired",
+      });
+      throw new UnauthorizedException("Session expired");
+    }
+
+    // === REUSE DETECTION ===
+    // 4. Check if this token was already used
+    if (session.lastRefreshAt) {
+      // TOKEN REUSE DETECTED!
+      // This token was already exchanged for a new one
+      // Someone is replaying an old token → security breach
+
+      console.error("🚨 REFRESH TOKEN REUSE DETECTED", {
+        sessionId: session.id,
+        familyId: session.refreshTokenFamilyId,
+        userId: session.userId,
+        tenantId: session.tenantId,
+      });
+
+      // Revoke entire family
+      await this.revokeSessionFamily(session.refreshTokenFamilyId!);
+
+      // Log critical security event
+      await this.logSecurityEvent({
+        tenantId,
+        userId: session.userId,
+        eventType: "refresh_token_reuse_detected",
+        severity: "critical",
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        metadata: {
+          sessionId: session.id,
+          familyId: session.refreshTokenFamilyId,
+        },
+      });
+
+      throw new UnauthorizedException(
+        "Token reuse detected - all sessions revoked",
+      );
+    }
+
+    // === ROTATION ===
+    // 5. Generate NEW refresh token
+    const newRefreshToken = crypto.randomBytes(32).toString("hex");
+    const newRefreshTokenHash = crypto
+      .createHash("sha256")
+      .update(newRefreshToken)
+      .digest("hex");
+
+    // 6. Update session (rotate token, mark as used)
+    await this.sessionRepository.update(session.id, {
+      refreshTokenHash: newRefreshTokenHash,
+      lastRefreshAt: new Date(), // ← Mark this token as used
+      lastActivity: new Date(),
+    });
+
+    // 7. Generate new access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: session.userId,
+        email: session.user.email,
+        tenantId: session.tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log token refresh
+    await this.logSecurityEvent({
+      tenantId,
+      userId: session.userId,
+      eventType: "token_refreshed",
+      severity: "info",
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      metadata: { sessionId: session.id },
+    });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken, // ← Return NEW token
+    };
   }
 
   /**
@@ -674,6 +738,25 @@ export class AuthService {
       { id: userId, tenantId }, // ← Tenant-scoped update
       update,
     );
+  }
+
+  /**
+   * Revoke all sessions in a token family
+   * Used when token reuse is detected
+   */
+  private async revokeSessionFamily(familyId: string): Promise<void> {
+    await this.sessionRepository.update(
+      {
+        refreshTokenFamilyId: familyId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+        revokedReason: "token_reuse_detected",
+      },
+    );
+
+    console.log(`🔒 Revoked all sessions in family: ${familyId}`);
   }
 
   /**
