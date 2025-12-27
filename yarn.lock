@@ -3452,6 +3452,8 @@ __metadata:
     typescript: "npm:5.9.2"
     vaul: "npm:^1.1.2"
     zod: "npm:^4.1.12"
+  peerDependencies:
+    react-hook-form: ^7.66.0
   languageName: unknown
   linkType: soft
 
@@ -4832,6 +4834,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"admin-portal@workspace:apps/admin-portal":
+  version: 0.0.0-use.local
+  resolution: "admin-portal@workspace:apps/admin-portal"
+  dependencies:
+    "@repo/eslint-config": "npm:*"
+    "@repo/typescript-config": "npm:*"
+    "@repo/ui": "workspace:*"
+    "@types/node": "npm:^22.15.3"
+    "@types/react": "npm:19.2.2"
+    "@types/react-dom": "npm:19.2.2"
+    eslint: "npm:^9.39.1"
+    next: "npm:^16.0.1"
+    react: "npm:^19.2.0"
+    react-dom: "npm:^19.2.0"
+    typescript: "npm:5.9.2"
+  languageName: unknown
+  linkType: soft
+
 "agent-base@npm:^7.1.0, agent-base@npm:^7.1.2":
   version: 7.1.4
   resolution: "agent-base@npm:7.1.4"
@@ -5240,7 +5260,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.12.2":
+"axios@npm:^1.12.2, axios@npm:^1.13.2":
   version: 1.13.2
   resolution: "axios@npm:1.13.2"
   dependencies:
@@ -9329,6 +9349,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lucide-react@npm:^0.562.0":
+  version: 0.562.0
+  resolution: "lucide-react@npm:0.562.0"
+  peerDependencies:
+    react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/c713a2490916e42c678b9df0d7309d8cdb715af1d7139c7eb49c45547901b276a7cf722548012a668dc0e337eeadf5141d5af8c8fcda6721fc58fb2d288efcba
+  languageName: node
+  linkType: hard
+
 "magic-string@npm:0.30.17":
   version: 0.30.17
   resolution: "magic-string@npm:0.30.17"
@@ -10677,6 +10706,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-hook-form@npm:^7.69.0":
+  version: 7.69.0
+  resolution: "react-hook-form@npm:7.69.0"
+  peerDependencies:
+    react: ^16.8.0 || ^17 || ^18 || ^19
+  checksum: 10c0/99440aac1edbbda1f1704e31bea72dd75130d09593f5fce037596d381fb3dbf5a9864b28f49ecd52bd6dfabceb437905578fe2efc20c69411500fbdbc8647df6
+  languageName: node
+  linkType: hard
+
 "react-hot-toast@npm:^2.6.0":
   version: 2.6.0
   resolution: "react-hot-toast@npm:2.6.0"
@@ -11123,13 +11161,18 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "scrolloop@workspace:."
   dependencies:
+    "@hookform/resolvers": "npm:^5.2.2"
     argon2: "npm:^0.44.0"
+    axios: "npm:^1.13.2"
+    lucide-react: "npm:^0.562.0"
     next: "npm:^16.0.1"
     prettier: "npm:^3.6.2"
     react: "npm:^19.2.0"
+    react-hook-form: "npm:^7.69.0"
     turbo: "npm:^2.6.1"
     typeorm: "npm:^0.3.28"
     typescript: "npm:5.9.2"
+    zod: "npm:^4.2.1"
   languageName: unknown
   linkType: soft
 
@@ -13113,5 +13156,12 @@ __metadata:
   version: 4.1.12
   resolution: "zod@npm:4.1.12"
   checksum: 10c0/b64c1feb19e99d77075261eaf613e0b2be4dfcd3551eff65ad8b4f2a079b61e379854d066f7d447491fcf193f45babd8095551a9d47973d30b46b6d8e2c46774
+  languageName: node
+  linkType: hard
+
+"zod@npm:^4.2.1":
+  version: 4.2.1
+  resolution: "zod@npm:4.2.1"
+  checksum: 10c0/ecb5219bddf76a42d092a843fb98ad4cb78f1e1077082772b03ef032ee5cbc80790a4051836b962d26fb4af854323bc784d628bd1b8d9898149eba7af21c5560
   languageName: node
   linkType: hard

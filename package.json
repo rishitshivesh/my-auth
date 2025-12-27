@@ -22,9 +22,14 @@
     "packages/*"
   ],
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "argon2": "^0.44.0",
+    "axios": "^1.13.2",
+    "lucide-react": "^0.562.0",
     "next": "^16.0.1",
     "react": "^19.2.0",
-    "typeorm": "^0.3.28"
+    "react-hook-form": "^7.69.0",
+    "typeorm": "^0.3.28",
+    "zod": "^4.2.1"
   }
 }
