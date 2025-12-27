@@ -1,0 +1,2626 @@
+CODE CONSOLIDATION REPORT
+Generated: 2025-11-11T14:16:20.707Z
+Input Directory: /Users/rishitshivesh/Projects/Scrolloop/scrolloop
+================================================================================
+
+
+================================================================================
+FILE: .eslintrc.import.js
+SIZE: 197 B | LINES: 9
+================================================================================
+
+module.exports = {
+  plugins: ["import"],
+  rules: {
+    "import/no-unused-modules": "error, { unusedExports: true }",
+    "typescript-eslint/no-explicit-any": "off",
+    camelcase: "off",
+  },
+};
+
+
+
+================================================================================
+FILE: .eslintrc.js
+SIZE: 995 B | LINES: 38
+================================================================================
+
+module.exports = {
+  env: {
+    es6: true
+  },
+  globals: {
+    JSX: "readonly",
+    Code: true
+  },
+  extends: [
+    "eslint:recommended",
+    "next",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  plugins: ["eslint-plugin-prettier"],
+  rules: {
+    indent: "off",
+    quote: 0,
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "comma-dangle": ["warn", "never"],
+    "max-len": ["error", { code: 800 }],
+    "consistent-return": 0,
+    "no-unrestricted-syntax": 0,
+    "import/prefer-default-export": 0,
+    "@typescript-eslint/no-shadow": [
+      "warn",
+      { builtinGlobals: false, hoist: "never", allow: [] }
+    ],
+    "react/no-unescaped-entities": 0,
+    "react/jsx-one-expression-per-line": 0,
+    "no-console": ["error", { allow: ["warn", "error"] }],
+    "operator-linebreak": "off",
+    "@typescript-eslint/no-unused-vars": ["error", { args: "none" }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "valid-typeof": "off"
+  }
+};
+
+
+
+================================================================================
+FILE: .yarnrc.yml
+SIZE: 25 B | LINES: 2
+================================================================================
+
+nodeLinker: node-modules
+
+
+
+================================================================================
+FILE: README.md
+SIZE: 4.9 KB | LINES: 136
+================================================================================
+
+# Turborepo starter
+
+This Turborepo starter is maintained by the Turborepo core team.
+
+## Using this example
+
+Run the following command:
+
+```sh
+npx create-turbo@latest
+```
+
+## What's inside?
+
+This Turborepo includes the following packages/apps:
+
+### Apps and Packages
+
+- `docs`: a [Next.js](https://nextjs.org/) app
+- `web`: another [Next.js](https://nextjs.org/) app
+- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
+- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
+- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+
+Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+
+### Utilities
+
+This Turborepo has some additional tools already setup for you:
+
+- [TypeScript](https://www.typescriptlang.org/) for static type checking
+- [ESLint](https://eslint.org/) for code linting
+- [Prettier](https://prettier.io) for code formatting
+
+### Build
+
+To build all apps and packages, run the following command:
+
+```
+cd my-turborepo
+
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo build
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo build
+yarn dlx turbo build
+pnpm exec turbo build
+```
+
+You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+
+```
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo build --filter=docs
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo build --filter=docs
+yarn exec turbo build --filter=docs
+pnpm exec turbo build --filter=docs
+```
+
+### Develop
+
+To develop all apps and packages, run the following command:
+
+```
+cd my-turborepo
+
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo dev
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo dev
+yarn exec turbo dev
+pnpm exec turbo dev
+```
+
+You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+
+```
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo dev --filter=web
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo dev --filter=web
+yarn exec turbo dev --filter=web
+pnpm exec turbo dev --filter=web
+```
+
+### Remote Caching
+
+> [!TIP]
+> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+
+Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+
+By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+
+```
+cd my-turborepo
+
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo login
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo login
+yarn exec turbo login
+pnpm exec turbo login
+```
+
+This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+
+Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+
+```
+# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
+turbo link
+
+# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
+npx turbo link
+yarn exec turbo link
+pnpm exec turbo link
+```
+
+## Useful Links
+
+Learn more about the power of Turborepo:
+
+- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
+- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
+- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
+- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
+- [Configuration Options](https://turborepo.com/docs/reference/configuration)
+- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+
+
+
+================================================================================
+FILE: apps/docs/README.md
+SIZE: 1.38 KB | LINES: 37
+================================================================================
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+
+================================================================================
+FILE: apps/docs/app/globals.css
+SIZE: 592 B | LINES: 51
+================================================================================
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.imgDark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+
+  .imgLight {
+    display: none;
+  }
+  .imgDark {
+    display: unset;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/docs/app/layout.tsx
+SIZE: 673 B | LINES: 32
+================================================================================
+
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import "./globals.css";
+
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist-sans",
+});
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
+});
+
+export const metadata: Metadata = {
+  title: "Create Next App",
+  description: "Generated by create next app",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/docs/app/page.module.css
+SIZE: 3.17 KB | LINES: 187
+================================================================================
+
+.page {
+  --gray-rgb: 0, 0, 0;
+  --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+  --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+  --button-primary-hover: #383838;
+  --button-secondary-hover: #f2f2f2;
+
+  display: grid;
+  grid-template-rows: 20px 1fr 20px;
+  align-items: center;
+  justify-items: center;
+  min-height: 100svh;
+  padding: 80px;
+  gap: 64px;
+  font-synthesis: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --gray-rgb: 255, 255, 255;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+    --button-primary-hover: #ccc;
+    --button-secondary-hover: #1a1a1a;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  grid-row-start: 2;
+}
+
+.main ol {
+  font-family: var(--font-geist-mono);
+  padding-left: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  list-style-position: inside;
+}
+
+.main li:not(:last-of-type) {
+  margin-bottom: 8px;
+}
+
+.main code {
+  font-family: inherit;
+  background: var(--gray-alpha-100);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.ctas {
+  display: flex;
+  gap: 16px;
+}
+
+.ctas a {
+  appearance: none;
+  border-radius: 128px;
+  height: 48px;
+  padding: 0 20px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid transparent;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+a.primary {
+  background: var(--foreground);
+  color: var(--background);
+  gap: 8px;
+}
+
+a.secondary {
+  border-color: var(--gray-alpha-200);
+  min-width: 180px;
+}
+
+button.secondary {
+  appearance: none;
+  border-radius: 128px;
+  height: 48px;
+  padding: 0 20px;
+  font-family: var(--font-geist-sans);
+  border: 1px solid transparent;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  background: transparent;
+  border-color: var(--gray-alpha-200);
+  min-width: 180px;
+}
+
+.footer {
+  font-family: var(--font-geist-sans);
+  grid-row-start: 3;
+  display: flex;
+  gap: 24px;
+}
+
+.footer a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer img {
+  flex-shrink: 0;
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  a.primary:hover {
+    background: var(--button-primary-hover);
+    border-color: transparent;
+  }
+
+  a.secondary:hover {
+    background: var(--button-secondary-hover);
+    border-color: transparent;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 32px;
+    padding-bottom: 80px;
+  }
+
+  .main {
+    align-items: center;
+  }
+
+  .main ol {
+    text-align: center;
+  }
+
+  .ctas {
+    flex-direction: column;
+  }
+
+  .ctas a {
+    font-size: 14px;
+    height: 40px;
+    padding: 0 16px;
+  }
+
+  a.secondary {
+    min-width: auto;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    filter: invert();
+  }
+}
+
+
+
+================================================================================
+FILE: apps/docs/app/page.tsx
+SIZE: 3.18 KB | LINES: 103
+================================================================================
+
+import Image, { type ImageProps } from "next/image";
+import { Button } from "@repo/ui/button";
+import styles from "./page.module.css";
+
+type Props = Omit<ImageProps, "src"> & {
+  srcLight: string;
+  srcDark: string;
+};
+
+const ThemeImage = (props: Props) => {
+  const { srcLight, srcDark, ...rest } = props;
+
+  return (
+    <>
+      <Image {...rest} src={srcLight} className="imgLight" />
+      <Image {...rest} src={srcDark} className="imgDark" />
+    </>
+  );
+};
+
+export default function Home() {
+  return (
+    <div className={styles.page}>
+      <main className={styles.main}>
+        <ThemeImage
+          className={styles.logo}
+          srcLight="turborepo-dark.svg"
+          srcDark="turborepo-light.svg"
+          alt="Turborepo logo"
+          width={180}
+          height={38}
+          priority
+        />
+        <ol>
+          <li>
+            Get started by editing <code>apps/docs/app/page.tsx</code>
+          </li>
+          <li>Save and see your changes instantly.</li>
+        </ol>
+
+        <div className={styles.ctas}>
+          <a
+            className={styles.primary}
+            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              className={styles.logo}
+              src="/vercel.svg"
+              alt="Vercel logomark"
+              width={20}
+              height={20}
+            />
+            Deploy now
+          </a>
+          <a
+            href="https://turborepo.com/docs?utm_source"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.secondary}
+          >
+            Read our docs
+          </a>
+        </div>
+        <Button appName="docs" className={styles.secondary}>
+          Open alert
+        </Button>
+      </main>
+      <footer className={styles.footer}>
+        <a
+          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Image
+            aria-hidden
+            src="/window.svg"
+            alt="Window icon"
+            width={16}
+            height={16}
+          />
+          Examples
+        </a>
+        <a
+          href="https://turborepo.com?utm_source=create-turbo"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Image
+            aria-hidden
+            src="/globe.svg"
+            alt="Globe icon"
+            width={16}
+            height={16}
+          />
+          Go to turborepo.com →
+        </a>
+      </footer>
+    </div>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/docs/eslint.config.js
+SIZE: 138 B | LINES: 5
+================================================================================
+
+import { nextJsConfig } from "@repo/eslint-config/next-js";
+
+/** @type {import("eslint").Linter.Config[]} */
+export default nextJsConfig;
+
+
+
+================================================================================
+FILE: apps/docs/next-env.d.ts
+SIZE: 251 B | LINES: 7
+================================================================================
+
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+import "./.next/dev/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+
+================================================================================
+FILE: apps/docs/next.config.js
+SIZE: 92 B | LINES: 5
+================================================================================
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {};
+
+export default nextConfig;
+
+
+
+================================================================================
+FILE: apps/docs/package.json
+SIZE: 642 B | LINES: 29
+================================================================================
+
+{
+  "name": "docs",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint --max-warnings 0",
+    "check-types": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/ui": "*",
+    "next": "^16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
+
+
+
+================================================================================
+FILE: apps/docs/tsconfig.json
+SIZE: 304 B | LINES: 21
+================================================================================
+
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
+
+
+================================================================================
+FILE: apps/travel/README.md
+SIZE: 1.38 KB | LINES: 37
+================================================================================
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+
+================================================================================
+FILE: apps/travel/app/globals.css
+SIZE: 0 B | LINES: 1
+================================================================================
+
+
+
+
+================================================================================
+FILE: apps/travel/app/layout.tsx
+SIZE: 1.1 KB | LINES: 43
+================================================================================
+
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import Script from "next/script";
+import "@repo/ui/globals.css";
+import { ThemeProvider } from "@repo/ui/components/theme-provider";
+
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist-sans",
+});
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
+});
+
+export const metadata: Metadata = {
+  title: "Create Next App",
+  description: "Generated by create next app",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <head>
+        <Script
+          async={true}
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8195619606985915"
+          crossOrigin="anonymous"
+        ></Script>
+        <meta name="google-adsense-account" content="ca-pub-8195619606985915" />
+      </head>
+
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
+    </html>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/travel/app/page.module.css
+SIZE: 3.38 KB | LINES: 182
+================================================================================
+
+.page {
+    --gray-rgb: 0, 0, 0;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+    --button-primary-hover: #383838;
+    --button-secondary-hover: #f2f2f2;
+
+    display: grid;
+    grid-template-rows: 20px 1fr 20px;
+    align-items: center;
+    justify-items: center;
+    min-height: 100svh;
+    padding: 80px;
+    gap: 64px;
+    font-synthesis: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    .page {
+        --gray-rgb: 255, 255, 255;
+        --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+        --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+        --button-primary-hover: #ccc;
+        --button-secondary-hover: #1a1a1a;
+    }
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    grid-row-start: 2;
+}
+
+.main ol {
+    font-family: var(--font-geist-mono);
+    padding-left: 0;
+    margin: 0;
+    font-size: 14px;
+    line-height: 24px;
+    letter-spacing: -0.01em;
+    list-style-position: inside;
+}
+
+.main li:not(:last-of-type) {
+    margin-bottom: 8px;
+}
+
+.main code {
+    font-family: inherit;
+    background: var(--gray-alpha-100);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.ctas {
+    display: flex;
+    gap: 16px;
+}
+
+.ctas a {
+    appearance: none;
+    border-radius: 128px;
+    height: 48px;
+    padding: 0 20px;
+    font-family: var(--font-geist-sans);
+    border: 1px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+}
+
+a.primary {
+    background: var(--foreground);
+    color: var(--background);
+    gap: 8px;
+}
+
+a.secondary {
+    border-color: var(--gray-alpha-200);
+    min-width: 180px;
+}
+
+button.secondary {
+    appearance: none;
+    border-radius: 128px;
+    height: 48px;
+    padding: 0 20px;
+    font-family: var(--font-geist-sans);
+    border: 1px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    background: transparent;
+    border-color: var(--gray-alpha-200);
+    min-width: 180px;
+}
+
+.footer {
+    font-family: var(--font-geist-sans);
+    grid-row-start: 3;
+    display: flex;
+    gap: 24px;
+}
+
+.footer a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer img {
+    flex-shrink: 0;
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+    a.primary:hover {
+        background: var(--button-primary-hover);
+        border-color: transparent;
+    }
+
+    a.secondary:hover {
+        background: var(--button-secondary-hover);
+        border-color: transparent;
+    }
+
+    .footer a:hover {
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+}
+
+@media (max-width: 600px) {
+    .page {
+        padding: 32px;
+        padding-bottom: 80px;
+    }
+
+    .main {
+        align-items: center;
+    }
+
+    .main ol {
+        text-align: center;
+    }
+
+    .ctas {
+        flex-direction: column;
+    }
+
+    .ctas a {
+        font-size: 14px;
+        height: 40px;
+        padding: 0 16px;
+    }
+
+    a.secondary {
+        min-width: auto;
+    }
+
+    .footer {
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+
+
+
+================================================================================
+FILE: apps/travel/app/page.tsx
+SIZE: 997 B | LINES: 39
+================================================================================
+
+import Image, { type ImageProps } from "next/image";
+import { Button } from "@repo/ui/components/ui/button";
+import styles from "./page.module.css";
+import { Alert, AlertDescription, AlertTitle } from "@repo/ui/*";
+
+type Props = Omit<ImageProps, "src"> & {
+  srcLight: string;
+  srcDark: string;
+};
+
+export default function Home() {
+  return (
+    <div className={styles.page}>
+      <main className={styles.main}>
+        <Image
+          className={styles.logo}
+          src={"/logo.svg"}
+          alt={"Scrolloop"}
+          width={180}
+          height={38}
+          priority
+        />
+
+        <ol>
+          <li>Welcome to Scrolloop!</li>
+          <li>We're brewing something for you. Stay Tuned!.</li>
+        </ol>
+        <Button size={"lg"} variant={"default"} className={"bg-primary"}>
+          Open alert
+        </Button>
+        <Alert>
+          <AlertTitle>Hi</AlertTitle>
+          <AlertDescription>Theme</AlertDescription>
+        </Alert>
+      </main>
+    </div>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/travel/eslint.config.js
+SIZE: 138 B | LINES: 5
+================================================================================
+
+import { nextJsConfig } from "@repo/eslint-config/next-js";
+
+/** @type {import("eslint").Linter.Config[]} */
+export default nextJsConfig;
+
+
+
+================================================================================
+FILE: apps/travel/next-env.d.ts
+SIZE: 251 B | LINES: 7
+================================================================================
+
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+import "./.next/dev/types/routes.d.ts";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+
+================================================================================
+FILE: apps/travel/next.config.js
+SIZE: 129 B | LINES: 7
+================================================================================
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+    transpilePackages: ["@repo/ui"]
+};
+
+export default nextConfig;
+
+
+
+================================================================================
+FILE: apps/travel/package.json
+SIZE: 644 B | LINES: 29
+================================================================================
+
+{
+  "name": "travel",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint --max-warnings 0",
+    "check-types": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/ui": "*",
+    "next": "^16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
+
+
+
+================================================================================
+FILE: apps/travel/postcss.config.js
+SIZE: 138 B | LINES: 6
+================================================================================
+
+/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: { "@tailwindcss/postcss": {} },
+};
+
+export default config;
+
+
+================================================================================
+FILE: apps/travel/tailwind.config.js
+SIZE: 234 B | LINES: 11
+================================================================================
+
+const ui = require("@repo/ui/tailwind.config.js");
+
+module.exports = {
+  presets: [ui],
+  content: [
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "../../packages/ui/src/**/*.{ts,tsx}", // must be included!
+  ],
+};
+
+
+
+================================================================================
+FILE: apps/travel/tsconfig.json
+SIZE: 304 B | LINES: 21
+================================================================================
+
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
+
+
+================================================================================
+FILE: consolidate.js
+SIZE: 9.59 KB | LINES: 379
+================================================================================
+
+#!/usr/bin/env node
+
+const fs = require("fs");
+const path = require("path");
+
+/**
+ * Code Consolidator Script
+ * Recursively scans directories and consolidates all code files into a single text file
+ */
+
+class CodeConsolidator {
+  constructor() {
+    // Common code file extensions
+    this.codeExtensions = new Set([
+      ".js",
+      ".jsx",
+      ".ts",
+      ".tsx",
+      ".py",
+      ".java",
+      ".c",
+      ".cpp",
+      ".cc",
+      ".cxx",
+      ".cs",
+      ".php",
+      ".rb",
+      ".go",
+      ".rs",
+      ".swift",
+      ".kt",
+      ".scala",
+      ".r",
+      ".m",
+      ".mm",
+      ".html",
+      ".htm",
+      ".css",
+      ".scss",
+      ".sass",
+      ".less",
+      ".xml",
+      ".json",
+      ".yaml",
+      ".yml",
+      ".toml",
+      ".sh",
+      ".bash",
+      ".zsh",
+      ".fish",
+      ".ps1",
+      ".bat",
+      ".sql",
+      ".graphql",
+      ".proto",
+      ".thrift",
+      ".dockerfile",
+      ".makefile",
+      ".cmake",
+      ".vue",
+      ".svelte",
+      ".dart",
+      ".lua",
+      ".pl",
+      ".pm",
+    ]);
+
+    // Files to exclude
+    this.excludeFiles = new Set([
+      "package-lock.json",
+      "yarn.lock",
+      ".DS_Store",
+      "Thumbs.db",
+      ".env",
+      ".env.local",
+      ".env.production",
+      ".env.development",
+    ]);
+
+    // Directories to exclude
+    this.excludeDirs = new Set([
+      "node_modules",
+      ".git",
+      ".svn",
+      ".hg",
+      "dist",
+      "build",
+      "target",
+      "bin",
+      "obj",
+      "__pycache__",
+      ".pytest_cache",
+      "venv",
+      "env",
+      ".venv",
+      ".env",
+      "vendor",
+      ".idea",
+      ".vscode",
+      ".vs",
+      "coverage",
+      ".nyc_output",
+      ".cache",
+    ]);
+
+    this.stats = {
+      filesProcessed: 0,
+      totalLines: 0,
+      skippedFiles: 0,
+      errors: 0,
+    };
+  }
+
+  /**
+   * Check if file should be processed based on extension
+   */
+  isCodeFile(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const basename = path.basename(filePath).toLowerCase();
+
+    // Special files without extensions
+    const specialFiles = [
+      "dockerfile",
+      "makefile",
+      "jenkinsfile",
+      "readme",
+      "license",
+      "changelog",
+    ];
+    if (specialFiles.some((name) => basename.includes(name))) {
+      return true;
+    }
+
+    return this.codeExtensions.has(ext);
+  }
+
+  /**
+   * Check if file/directory should be excluded
+   */
+  shouldExclude(itemPath, isDirectory = false) {
+    const basename = path.basename(itemPath);
+
+    if (isDirectory) {
+      return this.excludeDirs.has(basename) || basename.startsWith(".");
+    }
+
+    return (
+      this.excludeFiles.has(basename) ||
+      (basename.startsWith(".") && !this.isCodeFile(itemPath))
+    );
+  }
+
+  /**
+   * Get file size in a readable format
+   */
+  getFileSize(filePath) {
+    try {
+      const stats = fs.statSync(filePath);
+      const bytes = stats.size;
+
+      if (bytes === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    } catch (error) {
+      return "Unknown";
+    }
+  }
+
+  /**
+   * Process a single file and add its content to the output
+   */
+  processFile(filePath, outputStream) {
+    try {
+      const relativePath = path.relative(process.cwd(), filePath);
+      const fileSize = this.getFileSize(filePath);
+      const content = fs.readFileSync(filePath, "utf-8");
+      const lineCount = content.split("\n").length;
+
+      // Write file header
+      outputStream.write("\n" + "=".repeat(80) + "\n");
+      outputStream.write(`FILE: ${relativePath}\n`);
+      outputStream.write(`SIZE: ${fileSize} | LINES: ${lineCount}\n`);
+      outputStream.write("=".repeat(80) + "\n\n");
+
+      // Write file content
+      outputStream.write(content);
+      outputStream.write("\n\n");
+
+      this.stats.filesProcessed++;
+      this.stats.totalLines += lineCount;
+
+      console.log(`✓ Processed: ${relativePath} (${lineCount} lines)`);
+    } catch (error) {
+      console.error(`✗ Error processing ${filePath}: ${error.message}`);
+      this.stats.errors++;
+    }
+  }
+
+  /**
+   * Recursively scan directory and process all code files
+   */
+  scanDirectory(dirPath, outputStream) {
+    try {
+      const items = fs.readdirSync(dirPath);
+
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item);
+        const stats = fs.statSync(itemPath);
+
+        if (stats.isDirectory()) {
+          if (!this.shouldExclude(itemPath, true)) {
+            this.scanDirectory(itemPath, outputStream);
+          } else {
+            console.log(
+              `⏭ Skipping directory: ${path.relative(process.cwd(), itemPath)}`,
+            );
+          }
+        } else if (stats.isFile()) {
+          if (
+            this.isCodeFile(itemPath) &&
+            !this.shouldExclude(itemPath, false)
+          ) {
+            this.processFile(itemPath, outputStream);
+          } else {
+            this.stats.skippedFiles++;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`✗ Error scanning directory ${dirPath}: ${error.message}`);
+      this.stats.errors++;
+    }
+  }
+
+  /**
+   * Main consolidation function
+   */
+  consolidate(inputPath = ".", outputPath = "consolidated-code.txt") {
+    console.log("🚀 Starting code consolidation...\n");
+    console.log(`Input: ${path.resolve(inputPath)}`);
+    console.log(`Output: ${path.resolve(outputPath)}\n`);
+
+    const outputStream = fs.createWriteStream(outputPath);
+
+    // Write header
+    const timestamp = new Date().toISOString();
+    outputStream.write(`CODE CONSOLIDATION REPORT\n`);
+    outputStream.write(`Generated: ${timestamp}\n`);
+    outputStream.write(`Input Directory: ${path.resolve(inputPath)}\n`);
+    outputStream.write(`${"=".repeat(80)}\n\n`);
+
+    try {
+      const inputStats = fs.statSync(inputPath);
+
+      if (inputStats.isDirectory()) {
+        this.scanDirectory(inputPath, outputStream);
+      } else if (inputStats.isFile()) {
+        this.processFile(inputPath, outputStream);
+      } else {
+        throw new Error("Input path is neither a file nor a directory");
+      }
+
+      // Write footer with statistics
+      outputStream.write("\n" + "=".repeat(80) + "\n");
+      outputStream.write("CONSOLIDATION SUMMARY\n");
+      outputStream.write("=".repeat(80) + "\n");
+      outputStream.write(`Files Processed: ${this.stats.filesProcessed}\n`);
+      outputStream.write(
+        `Total Lines: ${this.stats.totalLines.toLocaleString()}\n`,
+      );
+      outputStream.write(`Files Skipped: ${this.stats.skippedFiles}\n`);
+      outputStream.write(`Errors: ${this.stats.errors}\n`);
+      outputStream.write(`Generated: ${timestamp}\n`);
+
+      outputStream.end();
+
+      console.log("\n✅ Consolidation completed successfully!");
+      console.log(`📊 Statistics:`);
+      console.log(`   • Files processed: ${this.stats.filesProcessed}`);
+      console.log(
+        `   • Total lines: ${this.stats.totalLines.toLocaleString()}`,
+      );
+      console.log(`   • Files skipped: ${this.stats.skippedFiles}`);
+      console.log(`   • Errors: ${this.stats.errors}`);
+      console.log(`📁 Output saved to: ${path.resolve(outputPath)}`);
+    } catch (error) {
+      console.error(`💥 Fatal error: ${error.message}`);
+      outputStream.destroy();
+    }
+  }
+
+  /**
+   * Add custom file extensions
+   */
+  addExtensions(extensions) {
+    extensions.forEach((ext) => {
+      if (!ext.startsWith(".")) ext = "." + ext;
+      this.codeExtensions.add(ext.toLowerCase());
+    });
+  }
+
+  /**
+   * Add custom exclude patterns
+   */
+  addExcludes(files = [], dirs = []) {
+    files.forEach((file) => this.excludeFiles.add(file));
+    dirs.forEach((dir) => this.excludeDirs.add(dir));
+  }
+}
+
+// CLI Usage
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  const consolidator = new CodeConsolidator();
+
+  // Parse command line arguments
+  let inputPath = ".";
+  let outputPath = "consolidated-code.txt";
+  let customExtensions = [];
+  let excludeFiles = [];
+  let excludeDirs = [];
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--input":
+      case "-i":
+        inputPath = args[++i];
+        break;
+      case "--output":
+      case "-o":
+        outputPath = args[++i];
+        break;
+      case "--extensions":
+      case "-e":
+        customExtensions = args[++i].split(",");
+        break;
+      case "--exclude-files":
+        excludeFiles = args[++i].split(",");
+        break;
+      case "--exclude-dirs":
+        excludeDirs = args[++i].split(",");
+        break;
+      case "--help":
+      case "-h":
+        console.log(`
+Code Consolidator - Merge all code files into one text file
+
+Usage: node consolidate.js [options]
+
+Options:
+  -i, --input <path>          Input directory or file (default: current directory)
+  -o, --output <path>         Output file path (default: consolidated-code.txt)
+  -e, --extensions <list>     Additional file extensions (comma-separated)
+  --exclude-files <list>      Additional files to exclude (comma-separated)
+  --exclude-dirs <list>       Additional directories to exclude (comma-separated)
+  -h, --help                  Show this help
+
+Examples:
+  node consolidate.js
+  node consolidate.js -i ./src -o output.txt
+  node consolidate.js -e "md,txt" --exclude-dirs "temp,cache"
+                `);
+        process.exit(0);
+    }
+  }
+
+  // Apply custom settings
+  if (customExtensions.length) consolidator.addExtensions(customExtensions);
+  if (excludeFiles.length || excludeDirs.length)
+    consolidator.addExcludes(excludeFiles, excludeDirs);
+
+  // Run consolidation
+  consolidator.consolidate(inputPath, outputPath);
+}
+
+module.exports = CodeConsolidator;
+
+
+
+================================================================================
+FILE: package.json
+SIZE: 484 B | LINES: 25
+================================================================================
+
+{
+  "name": "scrolloop",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.6.1",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "yarn@4.11.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
+
+
+
+================================================================================
+FILE: packages/eslint-config/README.md
+SIZE: 72 B | LINES: 4
+================================================================================
+
+# `@turbo/eslint-config`
+
+Collection of internal eslint configurations.
+
+
+
+================================================================================
+FILE: packages/eslint-config/base.js
+SIZE: 653 B | LINES: 33
+================================================================================
+
+import js from "@eslint/js";
+import eslintConfigPrettier from "eslint-config-prettier";
+import turboPlugin from "eslint-plugin-turbo";
+import tseslint from "typescript-eslint";
+import onlyWarn from "eslint-plugin-only-warn";
+
+/**
+ * A shared ESLint configuration for the repository.
+ *
+ * @type {import("eslint").Linter.Config[]}
+ * */
+export const config = [
+  js.configs.recommended,
+  eslintConfigPrettier,
+  ...tseslint.configs.recommended,
+  {
+    plugins: {
+      turbo: turboPlugin,
+    },
+    rules: {
+      "turbo/no-undeclared-env-vars": "warn",
+    },
+  },
+  {
+    plugins: {
+      onlyWarn,
+    },
+  },
+  {
+    ignores: ["dist/**"],
+  },
+];
+
+
+
+================================================================================
+FILE: packages/eslint-config/next.js
+SIZE: 1.46 KB | LINES: 58
+================================================================================
+
+import js from "@eslint/js";
+import { globalIgnores } from "eslint/config";
+import eslintConfigPrettier from "eslint-config-prettier";
+import tseslint from "typescript-eslint";
+import pluginReactHooks from "eslint-plugin-react-hooks";
+import pluginReact from "eslint-plugin-react";
+import globals from "globals";
+import pluginNext from "@next/eslint-plugin-next";
+import { config as baseConfig } from "./base.js";
+
+/**
+ * A custom ESLint configuration for libraries that use Next.js.
+ *
+ * @type {import("eslint").Linter.Config[]}
+ * */
+export const nextJsConfig = [
+  ...baseConfig,
+  js.configs.recommended,
+  eslintConfigPrettier,
+  ...tseslint.configs.recommended,
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+  {
+    ...pluginReact.configs.flat.recommended,
+    languageOptions: {
+      ...pluginReact.configs.flat.recommended.languageOptions,
+      globals: {
+        ...globals.serviceworker,
+      },
+    },
+  },
+  {
+    plugins: {
+      "@next/next": pluginNext,
+    },
+    rules: {
+      ...pluginNext.configs.recommended.rules,
+      ...pluginNext.configs["core-web-vitals"].rules,
+    },
+  },
+  {
+    plugins: {
+      "react-hooks": pluginReactHooks,
+    },
+    settings: { react: { version: "detect" } },
+    rules: {
+      ...pluginReactHooks.configs.recommended.rules,
+      // React scope no longer necessary with new JSX transform.
+      "react/react-in-jsx-scope": "off",
+    },
+  },
+];
+
+
+
+================================================================================
+FILE: packages/eslint-config/package.json
+SIZE: 634 B | LINES: 25
+================================================================================
+
+{
+  "name": "@repo/eslint-config",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./base": "./base.js",
+    "./next-js": "./next.js",
+    "./react-internal": "./react-internal.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@next/eslint-plugin-next": "^15.5.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-only-warn": "^1.1.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-turbo": "^2.6.0",
+    "globals": "^16.5.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.46.3"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/eslint-config/react-internal.js
+SIZE: 1.06 KB | LINES: 40
+================================================================================
+
+import js from "@eslint/js";
+import eslintConfigPrettier from "eslint-config-prettier";
+import tseslint from "typescript-eslint";
+import pluginReactHooks from "eslint-plugin-react-hooks";
+import pluginReact from "eslint-plugin-react";
+import globals from "globals";
+import { config as baseConfig } from "./base.js";
+
+/**
+ * A custom ESLint configuration for libraries that use React.
+ *
+ * @type {import("eslint").Linter.Config[]} */
+export const config = [
+  ...baseConfig,
+  js.configs.recommended,
+  eslintConfigPrettier,
+  ...tseslint.configs.recommended,
+  pluginReact.configs.flat.recommended,
+  {
+    languageOptions: {
+      ...pluginReact.configs.flat.recommended.languageOptions,
+      globals: {
+        ...globals.serviceworker,
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    plugins: {
+      "react-hooks": pluginReactHooks,
+    },
+    settings: { react: { version: "detect" } },
+    rules: {
+      ...pluginReactHooks.configs.recommended.rules,
+      // React scope no longer necessary with new JSX transform.
+      "react/react-in-jsx-scope": "off",
+    },
+  },
+];
+
+
+
+================================================================================
+FILE: packages/typescript-config/base.json
+SIZE: 500 B | LINES: 20
+================================================================================
+
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "esModuleInterop": true,
+    "incremental": false,
+    "isolatedModules": true,
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleDetection": "force",
+    "moduleResolution": "NodeNext",
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/typescript-config/nextjs.json
+SIZE: 272 B | LINES: 13
+================================================================================
+
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "plugins": [{ "name": "next" }],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "jsx": "preserve",
+    "noEmit": true
+  }
+}
+
+
+
+================================================================================
+FILE: packages/typescript-config/package.json
+SIZE: 150 B | LINES: 10
+================================================================================
+
+{
+  "name": "@repo/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/typescript-config/react-library.json
+SIZE: 136 B | LINES: 8
+================================================================================
+
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/ui/components.json
+SIZE: 465 B | LINES: 21
+================================================================================
+
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@repo/ui/components",
+    "utils": "@repo/ui/lib/utils",
+    "ui": "@repo/ui/components/ui",
+    "lib": "@repo/ui/lib",
+    "hooks": "@repo/ui/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+
+
+================================================================================
+FILE: packages/ui/package.json
+SIZE: 1.15 KB | LINES: 47
+================================================================================
+
+{
+  "name": "@repo/ui",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./*": "./src/index.ts",
+    "./globals.css": "./src/globals.css",
+    "./lib/*": "./src/lib/*.ts",
+    "./hooks/*": [
+      "./src/hooks/*.ts",
+      "./src/hooks/*.tsx"
+    ],
+    "./components/*": "./src/components/*.tsx",
+    "./tailwind.config.js": "./tailwind.config.js"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "generate:component": "turbo gen react-component",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/postcss": "^4.1.17",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.553.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.17",
+    "tw-animate-css": "^1.4.0"
+  },
+  "sideEffects": [
+    "src/globals.css",
+    "tailwind.config.js"
+  ]
+}
+
+
+
+================================================================================
+FILE: packages/ui/postcss.config.js
+SIZE: 138 B | LINES: 6
+================================================================================
+
+/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: { "@tailwindcss/postcss": {} },
+};
+
+export default config;
+
+
+================================================================================
+FILE: packages/ui/src/button.tsx
+SIZE: 376 B | LINES: 21
+================================================================================
+
+"use client";
+
+import { ReactNode } from "react";
+
+interface ButtonProps {
+  children: ReactNode;
+  className?: string;
+  appName: string;
+}
+
+export const Button = ({ children, className, appName }: ButtonProps) => {
+  return (
+    <button
+      className={className}
+      onClick={() => alert(`Hello from your ${appName} app!`)}
+    >
+      {children}
+    </button>
+  );
+};
+
+
+
+================================================================================
+FILE: packages/ui/src/card.tsx
+SIZE: 502 B | LINES: 28
+================================================================================
+
+import { type JSX } from "react";
+
+export function Card({
+  className,
+  title,
+  children,
+  href,
+}: {
+  className?: string;
+  title: string;
+  children: React.ReactNode;
+  href: string;
+}): JSX.Element {
+  return (
+    <a
+      className={className}
+      href={`${href}?utm_source=create-turbo&utm_medium=basic&utm_campaign=create-turbo"`}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      <h2>
+        {title} <span>-&gt;</span>
+      </h2>
+      <p>{children}</p>
+    </a>
+  );
+}
+
+
+
+================================================================================
+FILE: packages/ui/src/code.tsx
+SIZE: 215 B | LINES: 12
+================================================================================
+
+import { type JSX } from "react";
+
+export function Code({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): JSX.Element {
+  return <code className={className}>{children}</code>;
+}
+
+
+
+================================================================================
+FILE: packages/ui/src/components/theme-provider.tsx
+SIZE: 474 B | LINES: 16
+================================================================================
+
+"use client";
+
+import * as React from "react";
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+    React.useEffect(() => {
+        const stored = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+
+        document.documentElement.classList.toggle("dark", theme === "dark");
+    }, []);
+
+    return children;
+}
+
+
+
+================================================================================
+FILE: packages/ui/src/components/ui/alert.tsx
+SIZE: 1.58 KB | LINES: 67
+================================================================================
+
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@repo/ui/lib/utils"
+
+const alertVariants = cva(
+  "relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  {
+    variants: {
+      variant: {
+        default: "bg-card text-card-foreground",
+        destructive:
+          "text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function Alert({
+  className,
+  variant,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+  return (
+    <div
+      data-slot="alert"
+      role="alert"
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
+  )
+}
+
+function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-title"
+      className={cn(
+        "col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-description"
+      className={cn(
+        "text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Alert, AlertTitle, AlertDescription }
+
+
+
+================================================================================
+FILE: packages/ui/src/components/ui/button.tsx
+SIZE: 2.14 KB | LINES: 63
+================================================================================
+
+"use client";
+
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@repo/ui/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        outline:
+          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost:
+          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
+        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        icon: "size-9",
+        "icon-sm": "size-8",
+        "icon-lg": "size-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  },
+);
+
+function Button({
+  className,
+  variant,
+  size,
+  asChild = false,
+  ...props
+}: React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  }) {
+  const Comp = asChild ? Slot : "button";
+
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...props}
+    />
+  );
+}
+
+export { Button, buttonVariants };
+
+
+
+================================================================================
+FILE: packages/ui/src/globals.css
+SIZE: 6.62 KB | LINES: 184
+================================================================================
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --background: rgb(240, 248, 255);
+    --foreground: rgb(55, 65, 81);
+    --card: rgb(255, 255, 255);
+    --card-foreground: rgb(55, 65, 81);
+    --popover: rgb(255, 255, 255);
+    --popover-foreground: rgb(55, 65, 81);
+    --primary: rgb(34, 197, 94);
+    --primary-foreground: rgb(255, 255, 255);
+    --secondary: rgb(224, 242, 254);
+    --secondary-foreground: rgb(75, 85, 99);
+    --muted: rgb(243, 244, 246);
+    --muted-foreground: rgb(107, 114, 128);
+    --accent: rgb(209, 250, 229);
+    --accent-foreground: rgb(55, 65, 81);
+    --destructive: rgb(239, 68, 68);
+    --destructive-foreground: rgb(255, 255, 255);
+    --border: rgb(229, 231, 235);
+    --input: rgb(229, 231, 235);
+    --ring: rgb(34, 197, 94);
+    --chart-1: rgb(34, 197, 94);
+    --chart-2: rgb(16, 185, 129);
+    --chart-3: rgb(5, 150, 105);
+    --chart-4: rgb(4, 120, 87);
+    --chart-5: rgb(6, 95, 70);
+    --sidebar: rgb(224, 242, 254);
+    --sidebar-foreground: rgb(55, 65, 81);
+    --sidebar-primary: rgb(34, 197, 94);
+    --sidebar-primary-foreground: rgb(255, 255, 255);
+    --sidebar-accent: rgb(209, 250, 229);
+    --sidebar-accent-foreground: rgb(55, 65, 81);
+    --sidebar-border: rgb(229, 231, 235);
+    --sidebar-ring: rgb(34, 197, 94);
+    --font-sans: DM Sans, sans-serif;
+    --font-serif: Lora, serif;
+    --font-mono: IBM Plex Mono, monospace;
+    --radius: 0.5rem;
+    --shadow-x: 0px;
+    --shadow-y: 4px;
+    --shadow-blur: 8px;
+    --shadow-spread: -1px;
+    --shadow-opacity: 0.1;
+    --shadow-color: hsl(0 0% 0%);
+    --shadow-2xs: 0px 4px 8px -1px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0px 4px 8px -1px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
+    --shadow: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 8px 10px -2px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
+    --tracking-normal: 0em;
+    --spacing: 0.25rem;
+}
+
+.dark {
+    --background: rgb(15, 23, 42);
+    --foreground: rgb(209, 213, 219);
+    --card: rgb(30, 41, 59);
+    --card-foreground: rgb(209, 213, 219);
+    --popover: rgb(30, 41, 59);
+    --popover-foreground: rgb(209, 213, 219);
+    --primary: rgb(52, 211, 153);
+    --primary-foreground: rgb(15, 23, 42);
+    --secondary: rgb(45, 55, 72);
+    --secondary-foreground: rgb(161, 161, 170);
+    --muted: rgb(30, 41, 59);
+    --muted-foreground: rgb(107, 114, 128);
+    --accent: rgb(55, 65, 81);
+    --accent-foreground: rgb(161, 161, 170);
+    --destructive: rgb(239, 68, 68);
+    --destructive-foreground: rgb(15, 23, 42);
+    --border: rgb(75, 85, 99);
+    --input: rgb(75, 85, 99);
+    --ring: rgb(52, 211, 153);
+    --chart-1: rgb(52, 211, 153);
+    --chart-2: rgb(45, 212, 191);
+    --chart-3: rgb(34, 197, 94);
+    --chart-4: rgb(16, 185, 129);
+    --chart-5: rgb(5, 150, 105);
+    --sidebar: rgb(30, 41, 59);
+    --sidebar-foreground: rgb(209, 213, 219);
+    --sidebar-primary: rgb(52, 211, 153);
+    --sidebar-primary-foreground: rgb(15, 23, 42);
+    --sidebar-accent: rgb(55, 65, 81);
+    --sidebar-accent-foreground: rgb(161, 161, 170);
+    --sidebar-border: rgb(75, 85, 99);
+    --sidebar-ring: rgb(52, 211, 153);
+    --font-sans: DM Sans, sans-serif;
+    --font-serif: Lora, serif;
+    --font-mono: IBM Plex Mono, monospace;
+    --radius: 0.5rem;
+    --shadow-x: 0px;
+    --shadow-y: 4px;
+    --shadow-blur: 8px;
+    --shadow-spread: -1px;
+    --shadow-opacity: 0.1;
+    --shadow-color: hsl(0 0% 0%);
+    --shadow-2xs: 0px 4px 8px -1px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0px 4px 8px -1px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
+    --shadow: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 8px 10px -2px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    --font-sans: var(--font-sans);
+    --font-mono: var(--font-mono);
+    --font-serif: var(--font-serif);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+
+    --shadow-2xs: var(--shadow-2xs);
+    --shadow-xs: var(--shadow-xs);
+    --shadow-sm: var(--shadow-sm);
+    --shadow: var(--shadow);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+    --shadow-xl: var(--shadow-xl);
+    --shadow-2xl: var(--shadow-2xl);
+}
+
+@layer base {
+    button:not(:disabled),
+    [role="button"]:not(:disabled) {
+        cursor: pointer;
+    }
+}
+
+body {
+    color: var(--foreground);
+    background: var(--background);
+}
+
+@media (prefers-color-scheme: dark) {
+    html {
+        color-scheme: dark;
+    }
+}
+
+
+
+================================================================================
+FILE: packages/ui/src/index.ts
+SIZE: 79 B | LINES: 3
+================================================================================
+
+export * from "./components/ui/button";
+export * from "./components/ui/alert";
+
+
+
+================================================================================
+FILE: packages/ui/src/lib/utils.ts
+SIZE: 167 B | LINES: 6
+================================================================================
+
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs))
+}
+
+
+================================================================================
+FILE: packages/ui/tailwind.config.js
+SIZE: 2.7 KB | LINES: 76
+================================================================================
+
+/** @type {import("tailwindcss").Config} */
+module.exports = {
+  darkMode: ["class"],
+  content: [
+    "./src/**/*.{ts,tsx}", // UI components
+    "../../apps/**/*.{ts,tsx}", // Make sure apps inherit UI classes
+  ],
+  theme: {
+    extend: {
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+      },
+      boxShadow: {
+        "2xs": "var(--shadow-2xs)",
+        xs: "var(--shadow-xs)",
+        sm: "var(--shadow-sm)",
+        DEFAULT: "var(--shadow)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-xl)",
+        "2xl": "var(--shadow-2xl)",
+      },
+      fontFamily: {
+        sans: "var(--font-sans)",
+        serif: "var(--font-serif)",
+        mono: "var(--font-mono)",
+      },
+      colors: {
+        background: "rgb(var(--background) / <alpha-value>)",
+        foreground: "rgb(var(--foreground) / <alpha-value>)",
+
+        card: "rgb(var(--card) / <alpha-value>)",
+        "card-foreground": "rgb(var(--card-foreground) / <alpha-value>)",
+
+        popover: "rgb(var(--popover) / <alpha-value>)",
+        "popover-foreground": "rgb(var(--popover-foreground) / <alpha-value>)",
+
+        primary: "rgb(var(--primary) / <alpha-value>)",
+        "primary-foreground": "rgb(var(--primary-foreground) / <alpha-value>)",
+
+        secondary: "rgb(var(--secondary) / <alpha-value>)",
+        "secondary-foreground":
+          "rgb(var(--secondary-foreground) / <alpha-value>)",
+
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        "muted-foreground": "rgb(var(--muted-foreground) / <alpha-value>)",
+
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        "accent-foreground": "rgb(var(--accent-foreground) / <alpha-value>)",
+
+        destructive: "rgb(var(--destructive) / <alpha-value>)",
+        "destructive-foreground":
+          "rgb(var(--destructive-foreground) / <alpha-value>)",
+
+        border: "rgb(var(--border) / <alpha-value>)",
+        input: "rgb(var(--input) / <alpha-value>)",
+        ring: "rgb(var(--ring) / <alpha-value>)",
+
+        sidebar: "rgb(var(--sidebar) / <alpha-value>)",
+        "sidebar-foreground": "rgb(var(--sidebar-foreground) / <alpha-value>)",
+        "sidebar-primary": "rgb(var(--sidebar-primary) / <alpha-value>)",
+        "sidebar-primary-foreground":
+          "rgb(var(--sidebar-primary-foreground) / <alpha-value>)",
+        "sidebar-accent": "rgb(var(--sidebar-accent) / <alpha-value>)",
+        "sidebar-accent-foreground":
+          "rgb(var(--sidebar-accent-foreground) / <alpha-value>)",
+        "sidebar-border": "rgb(var(--sidebar-border) / <alpha-value>)",
+        "sidebar-ring": "rgb(var(--sidebar-ring) / <alpha-value>)",
+      },
+    },
+  },
+};
+
+
+
+================================================================================
+FILE: packages/ui/tsconfig.json
+SIZE: 221 B | LINES: 11
+================================================================================
+
+{
+  "extends": "@repo/typescript-config/react-library.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@repo/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["."],
+  "exclude": ["node_modules", "dist"]
+}
+
+
+================================================================================
+FILE: turbo.json
+SIZE: 414 B | LINES: 22
+================================================================================
+
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+
+
+
+================================================================================
+CONSOLIDATION SUMMARY
+================================================================================
+Files Processed: 52
+Total Lines: 2,248
+Files Skipped: 29
+Errors: 0
+Generated: 2025-11-11T14:16:20.707Z
