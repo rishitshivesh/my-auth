@@ -13,6 +13,9 @@ import { UserModule } from "../user/user.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PasswordService } from "@repo/security";
+import { PassportModule } from "@nestjs/passport";
+import { JwtStrategy } from "@/common/guards/jwt.strategy";
+import { JwtAuthGuard } from "@/common/guards";
 
 @Module({
   imports: [
@@ -24,6 +27,7 @@ import { PasswordService } from "@repo/security";
       MfaSettings,
     ]),
     UserModule,
+    PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -36,7 +40,7 @@ import { PasswordService } from "@repo/security";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService],
+  providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}
