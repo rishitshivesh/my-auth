@@ -2,6 +2,15 @@ import "reflect-metadata";
 import { DataSource, DataSourceOptions } from "typeorm";
 import * as path from "path";
 
+// Import all entities explicitly
+import { Tenant } from "./entities/tenant.entity";
+import { User } from "./entities/user.entity";
+import { Session } from "./entities/session.entity";
+import { MfaSettings } from "./entities/mfa-settings.entity";
+import { SecurityEvent } from "./entities/security-event.entity";
+import { Role } from "./entities/role.entity";
+import { Permission } from "./entities/permission.entity";
+
 /**
  * TypeORM DataSource Configuration
  *
@@ -10,17 +19,28 @@ import * as path from "path";
  */
 
 const isProduction = process.env.NODE_ENV === "production";
+const useSSL = process.env.DB_SSL === "true";
+
+console.log(process.env);
 
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
   host: process.env.DATABASE_HOST || "localhost",
   port: parseInt(process.env.DATABASE_PORT || "5432", 10),
   username: process.env.DATABASE_USER || "postgres",
-  password: process.env.DATABASE_PASSWORD || "fortknox_dev_password",
-  database: process.env.DATABASE_NAME || "fortknox_auth",
+  password: process.env.DATABASE_PASSWORD || "",
+  database: process.env.DATABASE_NAME || "postgres",
 
-  // Entities
-  entities: [path.join(__dirname, "entities", "*.entity.{ts,js}")],
+  // Entities - explicit import for reliability
+  entities: [
+    Tenant,
+    User,
+    Session,
+    MfaSettings,
+    SecurityEvent,
+    Role,
+    Permission,
+  ],
 
   // Migrations
   migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
@@ -30,7 +50,7 @@ export const dataSourceOptions: DataSourceOptions = {
   migrationsRun: false, // Don't auto-run migrations
 
   // Logging
-  logging: process.env.DATABASE_LOGGING === "true" || !isProduction,
+  logging: process.env.DATABASE_LOGGING === "true",
   logger: "advanced-console",
 
   // Connection pool
@@ -41,11 +61,10 @@ export const dataSourceOptions: DataSourceOptions = {
     connectionTimeoutMillis: 2000,
   },
 
-  // SSL (for production)
-  ssl: isProduction
+  // SSL (for production or cloud databases like Supabase)
+  ssl: useSSL
     ? {
-        rejectUnauthorized:
-          process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false",
+        rejectUnauthorized: false, // Supabase requires this
       }
     : false,
 
