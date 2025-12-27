@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-27T09:36:20.302Z
+Generated: 2025-12-27T11:11:25.933Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -1088,7 +1088,7 @@ SIZE: 171 B | LINES: 9
 
 ================================================================================
 FILE: apps/auth-service/package.json
-SIZE: 3.01 KB | LINES: 99
+SIZE: 3.47 KB | LINES: 108
 ================================================================================
 
 {
@@ -1113,20 +1113,25 @@ SIZE: 3.01 KB | LINES: 99
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
-    "db:migrate:create": "npm run typeorm -- migration:create src/database/migrations/Init",
-    "db:migrate:generate": "npm run typeorm -- -d src/database/data-source.ts migration:generate src/database/migrations/Auto -p",
-    "db:migrate:run": "npm run typeorm -- -d src/database/data-source.ts migration:run",
-    "db:migrate:revert": "npm run typeorm -- -d src/database/data-source.ts migration:revert"
+    "db:migrate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:run -d ../../packages/database/src/data-source.ts",
+    "db:migrate:revert": "dotenv -e .env -- typeorm-ts-node-commonjs migration:revert -d ../../packages/database/src/data-source.ts",
+    "db:migrate:show": "dotenv -e .env -- typeorm-ts-node-commonjs migration:show -d ../../packages/database/src/data-source.ts",
+    "db:migrate:generate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:generate -d ../../packages/database/src/data-source.ts",
+    "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/sequelize": "^11.0.1",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
+    "@repo/database": "*",
+    "@repo/security": "*",
+    "@repo/shared": "*",
     "axios": "^1.12.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -1135,6 +1140,7 @@ SIZE: 3.01 KB | LINES: 99
     "ioredis": "^5.8.0",
     "joi": "^18.0.1",
     "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
     "pino": "^10.0.0",
     "pino-pretty": "^13.1.1",
@@ -1154,8 +1160,11 @@ SIZE: 3.01 KB | LINES: 99
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/passport": "^0",
+    "@types/passport-jwt": "^4",
     "@types/pg": "^8",
     "@types/supertest": "^6.0.2",
+    "dotenv": "^17.2.3",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
@@ -3617,10 +3626,88 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 ================================================================================
 FILE: apps/auth-service/src/common/guards/index.ts
-SIZE: 44 B | LINES: 2
+SIZE: 78 B | LINES: 3
 ================================================================================
 
-export * from './token-verification.guard';
+export * from "./token-verification.guard";
+export * from "./jwt-auth-guard";
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/guards/jwt-auth-guard.ts
+SIZE: 648 B | LINES: 29
+================================================================================
+
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { Observable } from "rxjs";
+
+/**
+ * JWT Authentication Guard
+ *
+ * Protects routes by validating JWT tokens
+ */
+@Injectable()
+export class JwtAuthGuard extends AuthGuard("jwt") {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    return super.canActivate(context);
+  }
+
+  handleRequest(err: any, user: any, info: any) {
+    if (err || !user) {
+      throw err || new UnauthorizedException("Invalid or expired token");
+    }
+    return user;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/guards/jwt.strategy.ts
+SIZE: 860 B | LINES: 34
+================================================================================
+
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { ConfigService } from "@nestjs/config";
+
+/**
+ * JWT Strategy
+ *
+ * Validates JWT tokens and extracts user payload
+ */
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(private configService: ConfigService) {
+    // @ts-ignore
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: configService.get("JWT_SECRET"),
+    });
+  }
+
+  async validate(payload: any) {
+    if (!payload.sub) {
+      throw new UnauthorizedException("Invalid token payload");
+    }
+
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      tenantId: payload.tenantId,
+    };
+  }
+}
 
 
 
@@ -3931,6 +4018,40 @@ SIZE: 0 B | LINES: 1
 
 
 ================================================================================
+FILE: apps/auth-service/src/core/database/database.module.ts
+SIZE: 920 B | LINES: 27
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { dataSourceOptions } from "@repo/database";
+
+@Module({
+  imports: [
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        ({
+          ...dataSourceOptions,
+          host: configService.get("DATABASE_HOST"),
+          port: configService.get("DATABASE_PORT"),
+          username: configService.get("DATABASE_USER"),
+          password: configService.get("DATABASE_PASSWORD"),
+          database: configService.get("DATABASE_NAME"),
+          logging: configService.get("DATABASE_LOGGING") === "true",
+          autoLoadEntities: true,
+          synchronize: false, // NEVER use in production
+        }) as any,
+    }),
+  ],
+})
+export class DatabaseModule {}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/core/libraries/request.ts
 SIZE: 69 B | LINES: 4
 ================================================================================
@@ -3943,15 +4064,16 @@ export const request = axios.create({});
 
 ================================================================================
 FILE: apps/auth-service/src/core/modules/app-module.ts
-SIZE: 217 B | LINES: 9
+SIZE: 299 B | LINES: 10
 ================================================================================
 
-import { Module } from '@nestjs/common';
-import { GlobalModule } from './global';
-import { StatsModule } from './stats/stats.module';
+import { Module } from "@nestjs/common";
+import { GlobalModule } from "./global";
+import { StatsModule } from "./stats/stats.module";
+import { DatabaseModule } from "@/core/database/database.module";
 
 @Module({
-  imports: [GlobalModule, StatsModule],
+  imports: [GlobalModule, StatsModule, DatabaseModule],
 })
 export class AppApiModule {}
 
@@ -4356,6 +4478,25 @@ export class Init1759775009913 implements MigrationInterface {
 
 
 ================================================================================
+FILE: apps/auth-service/src/database/migrations/1766831435790-Init.ts
+SIZE: 268 B | LINES: 12
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Init1766831435790 implements MigrationInterface {
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+    }
+
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/database/migrations/index.ts
 SIZE: 0 B | LINES: 1
 ================================================================================
@@ -4396,299 +4537,1696 @@ bootstrap();
 
 
 ================================================================================
-FILE: apps/auth-service/src/modules/rate-limiter/rate-limiter.service.ts
-SIZE: 7.08 KB | LINES: 282
+FILE: apps/auth-service/src/modules/auth/auth.controller.ts
+SIZE: 4.99 KB | LINES: 186
 ================================================================================
 
-import { Redis } from "ioredis";
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Ip,
+  Headers,
+  Get,
+  UseGuards,
+  Request,
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
+import { AuthService } from "./auth.service";
+import {
+  RegisterDto,
+  LoginDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from "./auth.dto";
+import { JwtAuthGuard } from "@/common/guards";
 
 /**
- * Sliding Window Rate Limiter
+ * Authentication Controller
  *
- * Implements a distributed rate limiter using Redis sorted sets.
- * More accurate than fixed window and prevents burst attacks.
+ * Handles all authentication-related endpoints:
+ * - Registration
+ * - Login
+ * - Logout
+ * - Password reset
+ * - Email verification
  */
+@ApiTags("Authentication")
+@Controller("auth")
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
 
-export interface RateLimitConfig {
-  maxRequests: number; // Maximum requests allowed
-  windowMs: number; // Time window in milliseconds
-  keyPrefix?: string; // Redis key prefix
-}
-
-export interface RateLimitResult {
-  allowed: boolean;
-  remaining: number;
-  resetAt: Date;
-  retryAfter?: number; // Seconds until next attempt
-}
-
-export class SlidingWindowRateLimiter {
-  private redis: Redis;
-
-  constructor(redis: Redis) {
-    this.redis = redis;
+  /**
+   * Register a new user
+   */
+  @Post("register")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Register a new user" })
+  @ApiResponse({ status: 201, description: "User successfully registered" })
+  @ApiResponse({ status: 400, description: "Bad request - validation failed" })
+  @ApiResponse({ status: 409, description: "User already exists" })
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    return this.authService.register({
+      ...registerDto,
+      ip,
+      userAgent: userAgent || "unknown",
+    });
   }
 
   /**
-   * Check if request is allowed under rate limit
-   * @param identifier - Unique identifier (IP, user ID, etc.)
-   * @param config - Rate limit configuration
-   * @returns Rate limit result
+   * Login with email and password
    */
-  async isAllowed(
-    identifier: string,
-    config: RateLimitConfig,
-  ): Promise<RateLimitResult> {
-    const key = `${config.keyPrefix || "rate_limit"}:${identifier}`;
-    const now = Date.now();
-    const windowStart = now - config.windowMs;
+  @Post("login")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Login with email and password" })
+  @ApiResponse({ status: 200, description: "Login successful" })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - invalid credentials",
+  })
+  @ApiResponse({ status: 423, description: "Account locked" })
+  async login(
+    @Body() loginDto: LoginDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    return this.authService.login({
+      ...loginDto,
+      ip,
+      userAgent: userAgent || "unknown",
+    });
+  }
 
-    // Use Redis pipeline for atomic operations
-    const pipeline = this.redis.pipeline();
+  /**
+   * Logout - revoke session
+   */
+  @Post("logout")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Logout and revoke session" })
+  @ApiResponse({ status: 200, description: "Logout successful" })
+  async logout(@Request() req: any) {
+    await this.authService.logout(req.user.sub);
+    return { message: "Logged out successfully" };
+  }
 
-    // Remove old entries outside the window
-    pipeline.zremrangebyscore(key, 0, windowStart);
+  /**
+   * Request password reset
+   */
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Request password reset email" })
+  @ApiResponse({ status: 200, description: "Password reset email sent" })
+  @ApiResponse({ status: 404, description: "User not found" })
+  async forgotPassword(
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+    @Ip() ip: string,
+  ) {
+    await this.authService.forgotPassword(forgotPasswordDto.email, ip);
+    return {
+      message:
+        "If an account exists with this email, a password reset link has been sent",
+    };
+  }
 
-    // Count requests in current window
-    pipeline.zcard(key);
+  /**
+   * Reset password with token
+   */
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Reset password using token" })
+  @ApiResponse({ status: 200, description: "Password reset successful" })
+  @ApiResponse({ status: 400, description: "Invalid or expired token" })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
+    return { message: "Password reset successfully" };
+  }
 
-    // Add current request
-    pipeline.zadd(key, now, `${now}-${Math.random()}`);
+  /**
+   * Verify email address
+   */
+  @Post("verify-email")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Verify email address" })
+  @ApiResponse({ status: 200, description: "Email verified successfully" })
+  @ApiResponse({ status: 400, description: "Invalid or expired token" })
+  async verifyEmail(@Body("token") token: string) {
+    await this.authService.verifyEmail(token);
+    return { message: "Email verified successfully" };
+  }
 
-    // Set expiry on the key
-    pipeline.expire(key, Math.ceil(config.windowMs / 1000));
+  /**
+   * Resend verification email
+   */
+  @Post("resend-verification")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resend email verification" })
+  @ApiResponse({ status: 200, description: "Verification email sent" })
+  async resendVerification(@Body("email") email: string) {
+    await this.authService.resendVerification(email);
+    return { message: "Verification email sent" };
+  }
 
-    const results = await pipeline.exec();
+  /**
+   * Refresh access token
+   */
+  @Post("refresh")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Refresh access token" })
+  @ApiResponse({ status: 200, description: "Token refreshed successfully" })
+  @ApiResponse({ status: 401, description: "Invalid refresh token" })
+  async refresh(@Body("refreshToken") refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
+  }
 
-    if (!results) {
-      throw new Error("Redis pipeline execution failed");
+  /**
+   * Get current user info (for testing JWT)
+   */
+  @Get("me")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get current authenticated user" })
+  @ApiResponse({ status: 200, description: "User info retrieved" })
+  async getMe(@Request() req: any) {
+    return this.authService.getCurrentUser(req.user.sub);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/auth/auth.dto.ts
+SIZE: 1.96 KB | LINES: 101
+================================================================================
+
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  Matches,
+  IsOptional,
+  IsNotEmpty,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+
+/**
+ * Register DTO
+ */
+export class RegisterDto {
+  @ApiProperty({ example: "user@example.com" })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ example: "SecureP@ssw0rd123!" })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message:
+      "Password must contain uppercase, lowercase, number and special character",
+  })
+  password!: string;
+
+  @ApiProperty({ example: "tenant-uuid", required: false })
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
+
+  @ApiProperty({ example: "John", required: false })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiProperty({ example: "Doe", required: false })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+}
+
+/**
+ * Login DTO
+ */
+export class LoginDto {
+  @ApiProperty({ example: "user@example.com" })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ example: "SecureP@ssw0rd123!" })
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+
+  @ApiProperty({ example: "tenant-uuid", required: false })
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
+}
+
+/**
+ * Forgot Password DTO
+ */
+export class ForgotPasswordDto {
+  @ApiProperty({ example: "user@example.com" })
+  @IsEmail()
+  email!: string;
+}
+
+/**
+ * Reset Password DTO
+ */
+export class ResetPasswordDto {
+  @ApiProperty({ example: "reset-token-here" })
+  @IsString()
+  token!: string;
+
+  @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message:
+      "Password must contain uppercase, lowercase, number and special character",
+  })
+  password!: string;
+}
+
+/**
+ * Verify Email DTO
+ */
+export class VerifyEmailDto {
+  @ApiProperty({ example: "verification-token-here" })
+  @IsString()
+  token!: string;
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/auth/auth.module.ts
+SIZE: 942 B | LINES: 30
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { User, Session, SecurityEvent } from "@repo/database";
+import { UserModule } from "../user/user.module";
+import { AuthService } from "./auth.service";
+import { AuthController } from "./auth.controller";
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([User, Session, SecurityEvent]),
+    UserModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get("JWT_SECRET"),
+        signOptions: {
+          expiresIn: "15m", // Access token expires in 15 minutes
+        },
+      }),
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService],
+  exports: [AuthService],
+})
+export class AuthModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/auth/auth.service.ts
+SIZE: 16.63 KB | LINES: 630
+================================================================================
+
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, MoreThan } from "typeorm";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { User, Session, SecurityEvent, Tenant } from "@repo/database";
+import { PasswordService } from "@repo/security";
+import * as crypto from "crypto";
+
+/**
+ * Authentication Service
+ *
+ * Handles all authentication business logic:
+ * - User registration
+ * - Login/logout
+ * - Password reset
+ * - Email verification
+ * - Session management
+ * - Security event logging
+ */
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Register a new user
+   */
+  async register(data: {
+    email: string;
+    password: string;
+    tenantId?: string;
+    firstName?: string;
+    lastName?: string;
+    ip: string;
+    userAgent: string;
+  }) {
+    // Validate password strength
+    const validation = PasswordService.validateStrength(data.password);
+
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+        score: validation.score,
+      });
     }
 
-    // Get count from the second command (zcard)
-    const count = ((results[1] as any)[1] as number) || 0;
+    // Get or create default tenant
+    let tenantId = data.tenantId;
+    if (!tenantId) {
+      // Create a default tenant for this user (you can customize this logic)
+      const defaultTenant = await this.tenantRepository.findOne({
+        where: { subdomain: "default" },
+      });
 
-    const allowed = count < config.maxRequests;
-    const remaining = Math.max(0, config.maxRequests - count - 1);
-
-    let retryAfter: number | undefined;
-    if (!allowed) {
-      // Get the oldest request timestamp
-      const oldest = await this.redis.zrange(key, 0, 0, "WITHSCORES");
-      if (oldest.length >= 2) {
-        const oldestTimestamp = parseInt(oldest[1] as string);
-        const resetTime = oldestTimestamp + config.windowMs;
-        retryAfter = Math.ceil((resetTime - now) / 1000);
+      if (!defaultTenant) {
+        const newTenant = this.tenantRepository.create({
+          name: "Default Organization",
+          subdomain: "default",
+          status: "active",
+          plan: "free",
+        });
+        const savedTenant = await this.tenantRepository.save(newTenant);
+        tenantId = savedTenant.id;
+      } else {
+        tenantId = defaultTenant.id;
       }
     }
 
+    // Check if user already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email: data.email, tenantId },
+    });
+
+    if (existingUser) {
+      // Log failed registration attempt
+      await this.logSecurityEvent({
+        eventType: "REGISTRATION_FAILED",
+        severity: "warning",
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        metadata: { reason: "email_exists", email: data.email },
+        tenantId,
+      });
+
+      throw new ConflictException("User with this email already exists");
+    }
+
+    // Hash password with Argon2id
+    const passwordHash = await PasswordService.hash(data.password);
+
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+
+    // Create user
+    const user = this.userRepository.create({
+      email: data.email,
+      passwordHash,
+      tenantId,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      emailVerificationToken,
+      emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      passwordChangedAt: new Date(),
+      status: "active",
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    // Log successful registration
+    await this.logSecurityEvent({
+      userId: savedUser.id,
+      tenantId: savedUser.tenantId,
+      eventType: "USER_CREATED",
+      severity: "info",
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: { email: savedUser.email },
+    });
+
+    // TODO: Send verification email
+    // await this.emailService.sendVerificationEmail(savedUser.email, emailVerificationToken);
+
     return {
-      allowed,
-      remaining,
-      resetAt: new Date(now + config.windowMs),
-      retryAfter,
+      id: savedUser.id,
+      email: savedUser.email,
+      firstName: savedUser.firstName,
+      lastName: savedUser.lastName,
+      message:
+        "Registration successful. Please check your email to verify your account.",
     };
   }
 
   /**
-   * Reset rate limit for an identifier
-   * @param identifier - Unique identifier
-   * @param keyPrefix - Redis key prefix
+   * Login with email and password
    */
-  async reset(
-    identifier: string,
-    keyPrefix: string = "rate_limit",
-  ): Promise<void> {
-    const key = `${keyPrefix}:${identifier}`;
-    await this.redis.del(key);
-  }
+  async login(data: {
+    email: string;
+    password: string;
+    tenantId?: string;
+    ip: string;
+    userAgent: string;
+  }) {
+    // Find user with password hash
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash")
+      .where("user.email = :email", { email: data.email })
+      .andWhere(data.tenantId ? "user.tenantId = :tenantId" : "1=1", {
+        tenantId: data.tenantId,
+      })
+      .getOne();
 
-  /**
-   * Get current usage for an identifier
-   * @param identifier - Unique identifier
-   * @param config - Rate limit configuration
-   * @returns Current request count
-   */
-  async getUsage(identifier: string, config: RateLimitConfig): Promise<number> {
-    const key = `${config.keyPrefix || "rate_limit"}:${identifier}`;
-    const now = Date.now();
-    const windowStart = now - config.windowMs;
+    if (!user) {
+      // Log failed login
+      await this.logSecurityEvent({
+        eventType: "LOGIN_FAILED",
+        severity: "warning",
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        metadata: { reason: "user_not_found", email: data.email },
+      });
 
-    await this.redis.zremrangebyscore(key, 0, windowStart);
-    return await this.redis.zcard(key);
-  }
-}
-
-/**
- * Token Bucket Rate Limiter
- *
- * Allows bursts of traffic while maintaining average rate.
- * Useful for API rate limiting with some flexibility.
- */
-export class TokenBucketRateLimiter {
-  private redis: Redis;
-
-  constructor(redis: Redis) {
-    this.redis = redis;
-  }
-
-  /**
-   * Check if request is allowed and consume token
-   * @param identifier - Unique identifier
-   * @param bucketSize - Maximum tokens in bucket
-   * @param refillRate - Tokens added per second
-   * @param cost - Tokens consumed per request (default: 1)
-   * @returns Rate limit result
-   */
-  async consume(
-    identifier: string,
-    bucketSize: number,
-    refillRate: number,
-    cost: number = 1,
-  ): Promise<RateLimitResult> {
-    const key = `token_bucket:${identifier}`;
-    const now = Date.now();
-
-    const data = await this.redis.get(key);
-    let tokens = bucketSize;
-    let lastRefill = now;
-
-    if (data) {
-      const parsed = JSON.parse(data);
-      tokens = parsed.tokens;
-      lastRefill = parsed.lastRefill;
-
-      // Calculate tokens to add based on time elapsed
-      const timePassed = (now - lastRefill) / 1000; // seconds
-      const tokensToAdd = timePassed * refillRate;
-      tokens = Math.min(bucketSize, tokens + tokensToAdd);
+      throw new UnauthorizedException("Invalid email or password");
     }
 
-    const allowed = tokens >= cost;
-    let remaining = tokens;
+    // Check if account is locked
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 1000 / 60,
+      );
 
-    if (allowed) {
-      remaining = tokens - cost;
-      await this.redis.setex(
-        key,
-        Math.ceil(bucketSize / refillRate) + 60, // TTL
-        JSON.stringify({
-          tokens: remaining,
-          lastRefill: now,
-        }),
+      await this.logSecurityEvent({
+        userId: user.id,
+        tenantId: user.tenantId,
+        eventType: "LOGIN_FAILED",
+        severity: "warning",
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        metadata: { reason: "account_locked", minutesLeft },
+      });
+
+      throw new UnauthorizedException(
+        `Account is locked. Please try again in ${minutesLeft} minute(s).`,
       );
     }
 
-    const resetAt = new Date(
-      now + ((bucketSize - remaining) / refillRate) * 1000,
+    // Check account status
+    if (user.status !== "active") {
+      await this.logSecurityEvent({
+        userId: user.id,
+        tenantId: user.tenantId,
+        eventType: "LOGIN_FAILED",
+        severity: "warning",
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        metadata: { reason: "account_inactive", status: user.status },
+      });
+
+      throw new UnauthorizedException("Account is not active");
+    }
+
+    // Verify password
+    const isPasswordValid = await PasswordService.verify(
+      user.passwordHash,
+      data.password,
     );
-    const retryAfter = allowed
-      ? undefined
-      : Math.ceil((cost - tokens) / refillRate);
+
+    if (!isPasswordValid) {
+      // Increment failed attempts
+      await this.incrementFailedAttempts(user.id);
+
+      await this.logSecurityEvent({
+        userId: user.id,
+        tenantId: user.tenantId,
+        eventType: "LOGIN_FAILED",
+        severity: "warning",
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        metadata: { reason: "invalid_password" },
+      });
+
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    // Reset failed attempts
+    await this.userRepository.update(user.id, {
+      failedLoginAttempts: 0,
+      lockedUntil: undefined,
+      lastLoginAt: new Date(),
+      lastLoginIp: data.ip,
+    });
+
+    // Create session
+    const sessionToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(sessionToken)
+      .digest("hex");
+
+    const session = this.sessionRepository.create({
+      userId: user.id,
+      tokenHash,
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      deviceInfo: {
+        fingerprint: crypto.randomBytes(16).toString("hex"),
+      },
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    });
+
+    await this.sessionRepository.save(session);
+
+    // Generate JWT tokens
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId: user.tenantId,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m", // 15 minutes
+      },
+    );
+
+    const refreshToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        type: "refresh",
+      },
+      {
+        secret: this.configService.get("JWT_REFRESH_SECRET"),
+        expiresIn: "7d", // 7 days
+      },
+    );
+
+    // Log successful login
+    await this.logSecurityEvent({
+      userId: user.id,
+      tenantId: user.tenantId,
+      eventType: "LOGIN_SUCCESS",
+      severity: "info",
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: { sessionId: session.id },
+    });
 
     return {
-      allowed,
-      remaining: Math.floor(remaining),
-      resetAt,
-      retryAfter,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailVerified: user.emailVerified,
+      },
     };
   }
 
   /**
-   * Reset token bucket for an identifier
-   * @param identifier - Unique identifier
+   * Logout - revoke current session
    */
-  async reset(identifier: string): Promise<void> {
-    await this.redis.del(`token_bucket:${identifier}`);
+  async logout(userId: string) {
+    // Revoke all active sessions for this user
+    await this.sessionRepository.update(
+      { userId, isActive: true },
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: "user_logout",
+      },
+    );
+
+    await this.logSecurityEvent({
+      userId,
+      eventType: "LOGOUT",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
   }
+
+  /**
+   * Request password reset
+   */
+  async forgotPassword(email: string, ip: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    // Don't reveal if user exists or not (security best practice)
+    if (!user) {
+      return;
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    await this.userRepository.update(user.id, {
+      passwordResetToken: resetTokenHash,
+      passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+    });
+
+    // Log password reset request
+    await this.logSecurityEvent({
+      userId: user.id,
+      tenantId: user.tenantId,
+      eventType: "PASSWORD_RESET_REQUESTED",
+      severity: "info",
+      ipAddress: ip,
+      userAgent: "system",
+    });
+
+    // TODO: Send password reset email
+    // await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+
+    console.log("Password reset token:", resetToken); // For development
+  }
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordResetToken")
+      .addSelect("user.passwordHash")
+      .addSelect("user.passwordHistory")
+      .where("user.passwordResetToken = :tokenHash", { tokenHash })
+      .andWhere("user.passwordResetExpiresAt > :now", { now: new Date() })
+      .getOne();
+
+    if (!user) {
+      throw new BadRequestException("Invalid or expired password reset token");
+    }
+
+    // Validate new password
+    const validation = PasswordService.validateStrength(newPassword);
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+      });
+    }
+
+    // Check password history
+    const passwordHistory = user.passwordHistory || [];
+    for (const oldHash of passwordHistory) {
+      const isReused = await PasswordService.verify(oldHash, newPassword);
+      if (isReused) {
+        throw new BadRequestException(
+          "Password has been used recently. Please choose a different password.",
+        );
+      }
+    }
+
+    // Hash new password
+    const newPasswordHash = await PasswordService.hash(newPassword);
+
+    // Update password and history
+    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+
+    await this.userRepository.update(user.id, {
+      passwordHash: newPasswordHash,
+      passwordHistory: updatedHistory,
+      passwordChangedAt: new Date(),
+      passwordResetToken: undefined,
+      passwordResetExpiresAt: undefined,
+      forcePasswordChange: false,
+    });
+
+    // Log password reset
+    await this.logSecurityEvent({
+      userId: user.id,
+      tenantId: user.tenantId,
+      eventType: "PASSWORD_RESET_COMPLETED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+
+    // Revoke all sessions (force re-login)
+    await this.sessionRepository.update(
+      { userId: user.id, isActive: true },
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: "password_reset",
+      },
+    );
+  }
+
+  /**
+   * Verify email address
+   */
+  async verifyEmail(token: string) {
+    const user = await this.userRepository.findOne({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpiresAt: MoreThan(new Date()),
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid or expired verification token");
+    }
+
+    await this.userRepository.update(user.id, {
+      emailVerified: true,
+      emailVerificationToken: undefined,
+      emailVerificationExpiresAt: undefined,
+    });
+
+    await this.logSecurityEvent({
+      userId: user.id,
+      tenantId: user.tenantId,
+      eventType: "EMAIL_VERIFIED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+  }
+
+  /**
+   * Resend verification email
+   */
+  async resendVerification(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return;
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException("Email is already verified");
+    }
+
+    // Generate new token
+    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+
+    await this.userRepository.update(user.id, {
+      emailVerificationToken,
+      emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+
+    // TODO: Send verification email
+    // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
+
+    console.log("Verification token:", emailVerificationToken); // For development
+  }
+
+  /**
+   * Refresh access token
+   */
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get("JWT_REFRESH_SECRET"),
+      });
+
+      if (payload.type !== "refresh") {
+        throw new UnauthorizedException("Invalid refresh token");
+      }
+
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub },
+      });
+
+      if (!user || user.status !== "active") {
+        throw new UnauthorizedException("User not found or inactive");
+      }
+
+      // Generate new access token
+      const accessToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          tenantId: user.tenantId,
+        },
+        {
+          secret: this.configService.get("JWT_SECRET"),
+          expiresIn: "15m",
+        },
+      );
+
+      return { accessToken };
+    } catch (error) {
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
+  }
+
+  /**
+   * Get current user
+   */
+  async getCurrentUser(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ["tenant"],
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      phoneVerified: user.phoneVerified,
+      status: user.status,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        subdomain: user.tenant.subdomain,
+      },
+    };
+  }
+
+  /**
+   * Increment failed login attempts
+   */
+  private async incrementFailedAttempts(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    const newAttempts = user.failedLoginAttempts + 1;
+
+    // Lock account after 5 failed attempts
+    const update: any = {
+      failedLoginAttempts: newAttempts,
+    };
+
+    if (newAttempts >= 5) {
+      update.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    }
+
+    await this.userRepository.update(userId, update);
+  }
+
+  /**
+   * Log security event
+   */
+  private async logSecurityEvent(data: {
+    userId?: string;
+    tenantId?: string;
+    eventType: string;
+    severity: "info" | "warning" | "critical";
+    ipAddress: string;
+    userAgent: string;
+    metadata?: Record<string, any>;
+  }) {
+    await this.securityEventRepository.save({
+      userId: data.userId,
+      tenantId: data.tenantId,
+      eventType: data.eventType,
+      severity: data.severity,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      metadata: data.metadata || {},
+    });
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/user/user.controller.ts
+SIZE: 4.53 KB | LINES: 167
+================================================================================
+
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
+import { UserService } from "./user.service";
+import { JwtAuthGuard } from "@/common/guards";
+import { UpdateUserDto, ChangePasswordDto } from "./user.dto";
+
+/**
+ * User Controller
+ *
+ * Handles user management endpoints:
+ * - Get user profile
+ * - Update user profile
+ * - Change password
+ * - Get user sessions
+ * - Delete account
+ */
+@ApiTags("Users")
+@Controller("users")
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  /**
+   * Get current user profile
+   */
+  @Get("me")
+  @ApiOperation({ summary: "Get current user profile" })
+  @ApiResponse({ status: 200, description: "User profile retrieved" })
+  async getProfile(@Request() req: any) {
+    return this.userService.findById(req.user.sub);
+  }
+
+  /**
+   * Update current user profile
+   */
+  @Put("me")
+  @ApiOperation({ summary: "Update current user profile" })
+  @ApiResponse({ status: 200, description: "Profile updated successfully" })
+  @ApiResponse({ status: 400, description: "Bad request - validation failed" })
+  async updateProfile(
+    @Request() req: any,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    await this.userService.update(req.user.sub, updateUserDto);
+    return { message: "Profile updated successfully" };
+  }
+
+  /**
+   * Change password
+   */
+  @Post("me/change-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Change user password" })
+  @ApiResponse({ status: 200, description: "Password changed successfully" })
+  @ApiResponse({
+    status: 400,
+    description: "Invalid current password or weak new password",
+  })
+  async changePassword(
+    @Request() req: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    await this.userService.changePassword(
+      req.user.sub,
+      changePasswordDto.currentPassword,
+      changePasswordDto.newPassword,
+    );
+    return { message: "Password changed successfully" };
+  }
+
+  /**
+   * Get active sessions for current user
+   */
+  @Get("me/sessions")
+  @ApiOperation({ summary: "Get all active sessions" })
+  @ApiResponse({ status: 200, description: "Sessions retrieved" })
+  async getSessions(@Request() req: any) {
+    return this.userService.getActiveSessions(req.user.sub);
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  @Delete("me/sessions/:sessionId")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Revoke a specific session" })
+  @ApiResponse({ status: 200, description: "Session revoked" })
+  @ApiResponse({ status: 404, description: "Session not found" })
+  async revokeSession(
+    @Request() req: any,
+    @Param("sessionId") sessionId: string,
+  ) {
+    await this.userService.revokeSession(req.user.sub, sessionId);
+    return { message: "Session revoked successfully" };
+  }
+
+  /**
+   * Revoke all sessions except current
+   */
+  @Delete("me/sessions")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Revoke all sessions except current" })
+  @ApiResponse({ status: 200, description: "Sessions revoked" })
+  async revokeAllSessions(@Request() req: any) {
+    await this.userService.revokeAllSessions(req.user.sub);
+    return { message: "All other sessions revoked successfully" };
+  }
+
+  /**
+   * Get security events for current user
+   */
+  @Get("me/security-events")
+  @ApiOperation({ summary: "Get security event history" })
+  @ApiResponse({ status: 200, description: "Security events retrieved" })
+  async getSecurityEvents(
+    @Request() req: any,
+    @Query("limit") limit: string = "50",
+  ) {
+    return this.userService.getSecurityEvents(
+      req.user.sub,
+      parseInt(limit, 10),
+    );
+  }
+
+  /**
+   * Delete account (soft delete)
+   */
+  @Delete("me")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Delete user account" })
+  @ApiResponse({ status: 200, description: "Account deleted successfully" })
+  async deleteAccount(@Request() req: any, @Body("password") password: string) {
+    await this.userService.deleteAccount(req.user.sub, password);
+    return { message: "Account deleted successfully" };
+  }
+
+  /**
+   * Get user by ID (admin endpoint - to be protected with role guard later)
+   */
+  @Get(":id")
+  @ApiOperation({ summary: "Get user by ID" })
+  @ApiResponse({ status: 200, description: "User retrieved" })
+  @ApiResponse({ status: 404, description: "User not found" })
+  async getUserById(@Param("id") id: string) {
+    return this.userService.findById(id);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/user/user.dto.ts
+SIZE: 1.42 KB | LINES: 68
+================================================================================
+
+import {
+  IsString,
+  IsOptional,
+  MinLength,
+  MaxLength,
+  Matches,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+
+/**
+ * Update User DTO
+ */
+export class UpdateUserDto {
+  @ApiProperty({ example: "John", required: false })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiProperty({ example: "Doe", required: false })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
+  @ApiProperty({ example: "John Doe", required: false })
+  @IsString()
+  @IsOptional()
+  displayName?: string;
+
+  @ApiProperty({ example: "+1234567890", required: false })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiProperty({ example: "https://example.com/avatar.jpg", required: false })
+  @IsString()
+  @IsOptional()
+  avatarUrl?: string;
+
+  @ApiProperty({ example: "America/New_York", required: false })
+  @IsString()
+  @IsOptional()
+  timezone?: string;
+
+  @ApiProperty({ example: "en", required: false })
+  @IsString()
+  @IsOptional()
+  language?: string;
 }
 
 /**
- * Distributed Leaky Bucket Rate Limiter
- *
- * Processes requests at a constant rate, queuing excess requests.
- * Best for smoothing out traffic spikes.
+ * Change Password DTO
  */
-export class LeakyBucketRateLimiter {
-  private redis: Redis;
+export class ChangePasswordDto {
+  @ApiProperty({ example: "CurrentP@ssw0rd123!" })
+  @IsString()
+  currentPassword!: string;
 
-  constructor(redis: Redis) {
-    this.redis = redis;
-  }
-
-  /**
-   * Check if request can be processed
-   * @param identifier - Unique identifier
-   * @param capacity - Maximum bucket capacity
-   * @param leakRate - Requests processed per second
-   * @returns Rate limit result
-   */
-  async isAllowed(
-    identifier: string,
-    capacity: number,
-    leakRate: number,
-  ): Promise<RateLimitResult> {
-    const key = `leaky_bucket:${identifier}`;
-    const now = Date.now();
-
-    const data = await this.redis.get(key);
-    let level = 0;
-    let lastLeak = now;
-
-    if (data) {
-      const parsed = JSON.parse(data);
-      level = parsed.level;
-      lastLeak = parsed.lastLeak;
-
-      // Calculate how much leaked since last check
-      const timePassed = (now - lastLeak) / 1000; // seconds
-      const leaked = timePassed * leakRate;
-      level = Math.max(0, level - leaked);
-    }
-
-    const allowed = level < capacity;
-
-    if (allowed) {
-      level += 1;
-      await this.redis.setex(
-        key,
-        Math.ceil(capacity / leakRate) + 60, // TTL
-        JSON.stringify({
-          level,
-          lastLeak: now,
-        }),
-      );
-    }
-
-    const remaining = Math.floor(capacity - level);
-    const resetAt = new Date(now + (level / leakRate) * 1000);
-    const retryAfter = allowed
-      ? undefined
-      : Math.ceil((level - capacity + 1) / leakRate);
-
-    return {
-      allowed,
-      remaining,
-      resetAt,
-      retryAfter,
-    };
-  }
-
-  /**
-   * Reset leaky bucket for an identifier
-   * @param identifier - Unique identifier
-   */
-  async reset(identifier: string): Promise<void> {
-    await this.redis.del(`leaky_bucket:${identifier}`);
-  }
+  @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message:
+      "Password must contain uppercase, lowercase, number and special character",
+  })
+  newPassword!: string;
 }
 
 
 
 ================================================================================
-FILE: apps/auth-service/src/modules/tenancy/tenant.entity.ts
-SIZE: 0 B | LINES: 1
+FILE: apps/auth-service/src/modules/user/user.module.ts
+SIZE: 644 B | LINES: 24
 ================================================================================
 
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { User, Session, SecurityEvent } from "@repo/database";
+import { UserController } from "./user.controller";
+import { UserService } from "./user.service";
+
+/**
+ * User Module
+ *
+ * Handles user management functionality:
+ * - User profile management
+ * - Password changes
+ * - Session management
+ * - Security event tracking
+ * - Account deletion
+ */
+@Module({
+  imports: [TypeOrmModule.forFeature([User, Session, SecurityEvent])],
+  controllers: [UserController],
+  providers: [UserService],
+  exports: [UserService],
+})
+export class UserModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/user/user.service.ts
+SIZE: 10.22 KB | LINES: 432
+================================================================================
+
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, MoreThan } from "typeorm";
+import { User, Session, SecurityEvent } from "@repo/database";
+import { PasswordService } from "@repo/security";
+
+/**
+ * User Service
+ *
+ * Handles all user management business logic:
+ * - User CRUD operations
+ * - Password management
+ * - Session management
+ * - Security event tracking
+ */
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+  ) {}
+
+  /**
+   * Find user by ID
+   */
+  async findById(id: string): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ["tenant"],
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    return user;
+  }
+
+  /**
+   * Find user by email
+   */
+  async findByEmail(email: string, tenantId?: string): Promise<User | null> {
+    const where: any = { email };
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
+
+    return this.userRepository.findOne({
+      where,
+      relations: ["tenant", "mfaSettings"],
+    });
+  }
+
+  /**
+   * Update user profile
+   */
+  async update(
+    userId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      phone?: string;
+      avatarUrl?: string;
+      timezone?: string;
+      language?: string;
+    },
+  ) {
+    const user = await this.findById(userId);
+
+    Object.assign(user, data);
+    await this.userRepository.save(user);
+
+    // Log profile update
+    await this.logSecurityEvent({
+      userId,
+      tenantId: user.tenantId,
+      eventType: "USER_UPDATED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+      metadata: { fields: Object.keys(data) },
+    });
+
+    return user;
+  }
+
+  /**
+   * Change password
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    // Get user with password hash
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash")
+      .addSelect("user.passwordHistory")
+      .where("user.id = :id", { id: userId })
+      .getOne();
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Verify current password
+    const isValid = await PasswordService.verify(
+      user.passwordHash,
+      currentPassword,
+    );
+
+    if (!isValid) {
+      await this.logSecurityEvent({
+        userId,
+        tenantId: user.tenantId,
+        eventType: "PASSWORD_CHANGE_FAILED",
+        severity: "warning",
+        ipAddress: "0.0.0.0",
+        userAgent: "system",
+        metadata: { reason: "invalid_current_password" },
+      });
+
+      throw new UnauthorizedException("Current password is incorrect");
+    }
+
+    // Validate new password strength
+    const validation = PasswordService.validateStrength(newPassword);
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "New password does not meet security requirements",
+        errors: validation.errors,
+        score: validation.score,
+      });
+    }
+
+    // Check password history
+    const passwordHistory = user.passwordHistory || [];
+    for (const oldHash of passwordHistory) {
+      const isReused = await PasswordService.verify(oldHash, newPassword);
+      if (isReused) {
+        throw new BadRequestException(
+          "Password has been used recently. Please choose a different password.",
+        );
+      }
+    }
+
+    // Hash new password
+    const newHash = await PasswordService.hash(newPassword);
+
+    // Update password and history
+    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+
+    await this.userRepository.update(userId, {
+      passwordHash: newHash,
+      passwordHistory: updatedHistory,
+      passwordChangedAt: new Date(),
+      forcePasswordChange: false,
+    });
+
+    // Log password change
+    await this.logSecurityEvent({
+      userId,
+      tenantId: user.tenantId,
+      eventType: "PASSWORD_CHANGED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+
+    // Revoke all sessions except current (force re-login on other devices)
+    await this.sessionRepository.update(
+      { userId, isActive: true },
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: "password_changed",
+      },
+    );
+  }
+
+  /**
+   * Get active sessions for user
+   */
+  async getActiveSessions(userId: string) {
+    const sessions = await this.sessionRepository.find({
+      where: {
+        userId,
+        isActive: true,
+        expiresAt: MoreThan(new Date()),
+      },
+      order: {
+        lastActivity: "DESC",
+      },
+    });
+
+    return sessions.map((session) => ({
+      id: session.id,
+      deviceInfo: session.deviceInfo,
+      ipAddress: session.ipAddress,
+      location: session.location,
+      lastActivity: session.lastActivity,
+      createdAt: session.createdAt,
+    }));
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  async revokeSession(userId: string, sessionId: string) {
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId, userId },
+    });
+
+    if (!session) {
+      throw new NotFoundException("Session not found");
+    }
+
+    await this.sessionRepository.update(sessionId, {
+      isActive: false,
+      revokedAt: new Date(),
+      revokedReason: "manual_revocation",
+    });
+
+    await this.logSecurityEvent({
+      userId,
+      eventType: "SESSION_REVOKED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+      metadata: { sessionId },
+    });
+  }
+
+  /**
+   * Revoke all sessions for user
+   */
+  async revokeAllSessions(userId: string) {
+    await this.sessionRepository.update(
+      { userId, isActive: true },
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: "user_request",
+      },
+    );
+
+    await this.logSecurityEvent({
+      userId,
+      eventType: "ALL_SESSIONS_REVOKED",
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+  }
+
+  /**
+   * Get security events for user
+   */
+  async getSecurityEvents(userId: string, limit: number = 50) {
+    const events = await this.securityEventRepository.find({
+      where: { userId },
+      order: { createdAt: "DESC" },
+      take: limit,
+    });
+
+    return events.map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      severity: event.severity,
+      ipAddress: event.ipAddress,
+      location: event.location,
+      metadata: event.metadata,
+      createdAt: event.createdAt,
+    }));
+  }
+
+  /**
+   * Delete account (soft delete)
+   */
+  async deleteAccount(userId: string, password: string) {
+    // Get user with password hash
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash")
+      .where("user.id = :id", { id: userId })
+      .getOne();
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Verify password
+    const isValid = await PasswordService.verify(user.passwordHash, password);
+
+    if (!isValid) {
+      await this.logSecurityEvent({
+        userId,
+        tenantId: user.tenantId,
+        eventType: "ACCOUNT_DELETION_FAILED",
+        severity: "warning",
+        ipAddress: "0.0.0.0",
+        userAgent: "system",
+        metadata: { reason: "invalid_password" },
+      });
+
+      throw new UnauthorizedException("Password is incorrect");
+    }
+
+    // Soft delete user
+    await this.userRepository.softDelete(userId);
+
+    // Revoke all sessions
+    await this.sessionRepository.update(
+      { userId, isActive: true },
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: "account_deleted",
+      },
+    );
+
+    // Log account deletion
+    await this.logSecurityEvent({
+      userId,
+      tenantId: user.tenantId,
+      eventType: "ACCOUNT_DELETED",
+      severity: "critical",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+  }
+
+  /**
+   * Check if account is locked
+   */
+  async isAccountLocked(userId: string): Promise<boolean> {
+    const user = await this.findById(userId);
+
+    if (!user.lockedUntil) {
+      return false;
+    }
+
+    return user.lockedUntil > new Date();
+  }
+
+  /**
+   * Increment failed login attempts
+   */
+  async incrementFailedAttempts(userId: string) {
+    const user = await this.findById(userId);
+
+    const newAttempts = user.failedLoginAttempts + 1;
+
+    const update: any = {
+      failedLoginAttempts: newAttempts,
+    };
+
+    // Lock account after 5 failed attempts
+    if (newAttempts >= 5) {
+      update.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      await this.logSecurityEvent({
+        userId,
+        tenantId: user.tenantId,
+        eventType: "ACCOUNT_LOCKED",
+        severity: "critical",
+        ipAddress: "0.0.0.0",
+        userAgent: "system",
+        metadata: { attempts: newAttempts },
+      });
+    }
+
+    await this.userRepository.update(userId, update);
+  }
+
+  /**
+   * Reset failed login attempts
+   */
+  async resetFailedAttempts(userId: string) {
+    await this.userRepository.update(userId, {
+      failedLoginAttempts: 0,
+      lockedUntil: undefined,
+    });
+  }
+
+  /**
+   * Update last login timestamp
+   */
+  async updateLastLogin(userId: string, ip: string) {
+    await this.userRepository.update(userId, {
+      lastLoginAt: new Date(),
+      lastLoginIp: ip,
+      failedLoginAttempts: 0,
+      lockedUntil: undefined,
+    });
+  }
+
+  /**
+   * Log security event
+   */
+  private async logSecurityEvent(data: {
+    userId?: string;
+    tenantId?: string;
+    eventType: string;
+    severity: "info" | "warning" | "critical";
+    ipAddress: string;
+    userAgent: string;
+    metadata?: Record<string, any>;
+  }) {
+    await this.securityEventRepository.save({
+      userId: data.userId,
+      tenantId: data.tenantId,
+      eventType: data.eventType,
+      severity: data.severity,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      metadata: data.metadata || {},
+    });
+  }
+}
 
 
 
@@ -6183,7 +7721,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 580 B | LINES: 30
+SIZE: 606 B | LINES: 31
 ================================================================================
 
 {
@@ -6212,10 +7750,2035 @@ SIZE: 580 B | LINES: 30
   "dependencies": {
     "argon2": "^0.44.0",
     "next": "^16.0.1",
-    "react": "^19.2.0"
+    "react": "^19.2.0",
+    "typeorm": "^0.3.28"
   }
 }
 
+
+
+================================================================================
+FILE: packages/database/index.ts
+SIZE: 1004 B | LINES: 32
+================================================================================
+
+/**
+ * Fort Knox Database Entities
+ *
+ * All TypeORM entities for the authentication system
+ */
+
+// Base
+export * from "./src/entities/base.entity";
+
+// Core Entities
+export * from "./src/entities/tenant.entity";
+export * from "./src/entities/user.entity";
+export * from "./src/entities/session.entity";
+
+// Security
+export * from "./src/entities/mfa-settings.entity";
+export * from "./src/entities/security-event.entity";
+
+// RBAC
+export * from "./src/entities/role.entity";
+export * from "./src/entities/permission.entity";
+export * from "./src/data-source";
+
+// Re-export for convenience
+export { Tenant } from "./src/entities/tenant.entity";
+export { User } from "./src/entities/user.entity";
+export { Session } from "./src/entities/session.entity";
+export { MfaSettings } from "./src/entities/mfa-settings.entity";
+export { SecurityEvent } from "./src/entities/security-event.entity";
+export { Role } from "./src/entities/role.entity";
+export { Permission } from "./src/entities/permission.entity";
+
+
+
+================================================================================
+FILE: packages/database/package.json
+SIZE: 1.16 KB | LINES: 34
+================================================================================
+
+{
+  "name": "@repo/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeORM entities and migrations for Fort Knox authentication system",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "npm run typeorm -- migration:generate -d ./src/data-source.ts",
+    "migration:create": "npm run typeorm -- migration:create",
+    "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/data-source.ts",
+    "schema:sync": "npm run typeorm -- schema:sync -d src/data-source.ts",
+    "schema:drop": "npm run typeorm -- schema:drop -d src/data-source.ts"
+  },
+  "dependencies": {
+    "@repo/shared": "*",
+    "pg": "^8.13.1",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/database/src/README.md
+SIZE: 10.41 KB | LINES: 494
+================================================================================
+
+# @repo/database
+
+**Fort Knox Database Package** - TypeORM entities and migrations for the authentication system.
+
+## 📦 What's Included
+
+### Entities (7 Core Tables)
+
+1. **Tenant** - Multi-tenant organizations
+2. **User** - User accounts with comprehensive security
+3. **Session** - Active sessions with device tracking
+4. **MfaSettings** - Multi-factor authentication settings
+5. **SecurityEvent** - Security audit log
+6. **Role** - RBAC roles
+7. **Permission** - RBAC permissions
+
+### Features
+
+✅ **Multi-Tenancy** - Complete tenant isolation  
+✅ **Soft Deletes** - All entities support soft deletion  
+✅ **Timestamps** - Auto-managed created/updated dates  
+✅ **UUID Primary Keys** - Better for distributed systems  
+✅ **JSONB Fields** - Flexible metadata storage  
+✅ **Comprehensive Indexes** - Optimized for performance  
+✅ **Foreign Key Constraints** - Data integrity  
+✅ **Database Comments** - Self-documenting schema
+
+---
+
+## 🚀 Quick Start
+
+### 1. Installation
+
+```bash
+cd packages/database
+npm install
+```
+
+### 2. Environment Variables
+
+Create `.env` file in your auth-service:
+
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=fortknox
+DATABASE_PASSWORD=fortknox_dev_password
+DATABASE_NAME=fortknox_auth
+DATABASE_LOGGING=true
+DATABASE_POOL_MAX=20
+DATABASE_POOL_MIN=2
+```
+
+### 3. Run Migration
+
+```bash
+# Build the package first
+npm run build
+
+# Run migration
+npm run migration:run
+```
+
+---
+
+## 📚 Usage
+
+### In Your NestJS Application
+
+#### app.module.ts
+
+```typescript
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { dataSourceOptions } from '@repo/database';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot(dataSourceOptions),
+    // ... other modules
+  ],
+})
+export class AppModule {}
+```
+
+#### Using Entities in Modules
+
+```typescript
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User, Tenant } from '@repo/database';
+import { UserService } from './user.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([User, Tenant]),
+  ],
+  providers: [UserService],
+  exports: [UserService],
+})
+export class UserModule {}
+```
+
+#### Using in Services
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '@repo/database';
+
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  async findByEmail(email: string, tenantId: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { email, tenantId },
+      relations: ['tenant', 'mfaSettings'],
+    });
+  }
+
+  async create(userData: Partial<User>): Promise<User> {
+    const user = this.userRepository.create(userData);
+    return this.userRepository.save(user);
+  }
+
+  async updateLastLogin(userId: string, ip: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      lastLoginAt: new Date(),
+      lastLoginIp: ip,
+      failedLoginAttempts: 0,
+    });
+  }
+}
+```
+
+---
+
+## 🗄️ Database Schema
+
+### Entity Relationships
+
+```
+Tenant (1) ──── (M) User
+                  │
+                  ├─── (1) MfaSettings
+                  ├─── (M) Session
+                  └─── (M) SecurityEvent
+
+Tenant (1) ──── (M) Role ──── (M) Permission
+```
+
+### Key Tables
+
+#### Tenants
+
+```sql
+tenants (
+  id uuid PRIMARY KEY,
+  name varchar(255),
+  subdomain varchar(100) UNIQUE,
+  custom_domain varchar(255),
+  status enum('active', 'trial', 'suspended', 'cancelled'),
+  plan enum('free', 'starter', 'professional', 'enterprise'),
+  settings jsonb,
+  ...
+)
+```
+
+#### Users
+
+```sql
+users (
+  id uuid PRIMARY KEY,
+  tenant_id uuid REFERENCES tenants(id),
+  email varchar(255),
+  password_hash varchar(255),
+  email_verified boolean,
+  status enum('active', 'inactive', 'suspended', 'deleted'),
+  password_history jsonb,
+  failed_login_attempts int,
+  locked_until timestamp,
+  ...
+)
+```
+
+#### Sessions
+
+```sql
+sessions (
+  id uuid PRIMARY KEY,
+  user_id uuid REFERENCES users(id),
+  token_hash varchar(255) UNIQUE,
+  device_info jsonb,
+  ip_address varchar(45),
+  expires_at timestamp,
+  ...
+)
+```
+
+---
+
+## 🔄 Migration Commands
+
+```bash
+# Generate a new migration (after entity changes)
+npm run migration:generate -- src/migrations/MyMigration
+
+# Create an empty migration
+npm run migration:create -- src/migrations/MyMigration
+
+# Run pending migrations
+npm run migration:run
+
+# Revert last migration
+npm run migration:revert
+
+# Show migration status
+npm run migration:show
+
+# Sync schema (DEVELOPMENT ONLY!)
+npm run schema:sync
+
+# Drop all tables (DANGER!)
+npm run schema:drop
+```
+
+---
+
+## 🎯 Common Queries
+
+### Find User with Relations
+
+```typescript
+const user = await userRepository.findOne({
+  where: { id: userId },
+  relations: ['tenant', 'mfaSettings', 'sessions'],
+});
+```
+
+### Create User with MFA Settings
+
+```typescript
+const user = userRepository.create({
+  email: 'user@example.com',
+  passwordHash: hashedPassword,
+  tenantId: tenant.id,
+  mfaSettings: {
+    totpEnabled: false,
+    backupCodes: [],
+  },
+});
+await userRepository.save(user);
+```
+
+### Get Active Sessions for User
+
+```typescript
+const activeSessions = await sessionRepository.find({
+  where: {
+    userId,
+    isActive: true,
+    expiresAt: MoreThan(new Date()),
+  },
+  order: {
+    lastActivity: 'DESC',
+  },
+});
+```
+
+### Log Security Event
+
+```typescript
+await securityEventRepository.save({
+  userId,
+  tenantId,
+  eventType: 'LOGIN_SUCCESS',
+  severity: 'info',
+  ipAddress: req.ip,
+  userAgent: req.headers['user-agent'],
+  metadata: { method: 'password' },
+});
+```
+
+### Get User's Permissions
+
+```typescript
+const user = await userRepository.findOne({
+  where: { id: userId },
+  relations: ['roles', 'roles.permissions'],
+});
+
+const permissions = user.roles
+  .flatMap((role) => role.permissions)
+  .map((perm) => `${perm.resource}:${perm.action}`);
+```
+
+---
+
+## 🔒 Security Features
+
+### Password History
+
+The `password_history` JSONB field stores the last 5 password hashes to prevent reuse:
+
+```typescript
+// Check password history
+const isReused = await Promise.all(
+  user.passwordHistory.map((oldHash) => 
+    PasswordService.verify(oldHash, newPassword)
+  )
+).then((results) => results.some((r) => r));
+
+if (isReused) {
+  throw new Error('Password has been used recently');
+}
+
+// Update password with history
+user.passwordHistory = [
+  user.passwordHash,
+  ...user.passwordHistory,
+].slice(0, 5);
+user.passwordHash = newHash;
+```
+
+### Account Lockout
+
+```typescript
+// Increment failed attempts
+user.failedLoginAttempts += 1;
+
+if (user.failedLoginAttempts >= 5) {
+  // Lock for 15 minutes
+  user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+}
+
+await userRepository.save(user);
+```
+
+### Session Expiration
+
+Sessions automatically expire based on `expires_at`:
+
+```typescript
+// Check if session is valid
+const isValid = 
+  session.isActive && 
+  !session.revokedAt && 
+  session.expiresAt > new Date();
+```
+
+---
+
+## 📊 Performance Tips
+
+### Indexes
+
+All critical fields are indexed:
+- User email + tenantId (unique)
+- Session tokenHash (unique)
+- All foreign keys
+- Frequently queried fields (status, email_verified, etc.)
+
+### Query Optimization
+
+```typescript
+// ✅ Good - Select only needed fields
+const user = await userRepository.findOne({
+  where: { id: userId },
+  select: ['id', 'email', 'status'],
+});
+
+// ✅ Good - Use query builder for complex queries
+const users = await userRepository
+  .createQueryBuilder('user')
+  .where('user.tenant_id = :tenantId', { tenantId })
+  .andWhere('user.status = :status', { status: 'active' })
+  .andWhere('user.last_login_at > :date', { 
+    date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) 
+  })
+  .getMany();
+
+// ❌ Bad - Loading all relations unnecessarily
+const user = await userRepository.findOne({
+  where: { id: userId },
+  relations: ['tenant', 'sessions', 'mfaSettings', 'securityEvents'],
+});
+```
+
+---
+
+## 🧪 Testing
+
+### Example Test Setup
+
+```typescript
+import { Test } from '@nestjs/testing';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User, dataSourceOptions } from '@repo/database';
+
+describe('UserService', () => {
+  let userRepository: Repository<User>;
+
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({
+      imports: [
+        TypeOrmModule.forRoot({
+          ...dataSourceOptions,
+          database: 'fortknox_test',
+          synchronize: true, // OK for tests
+        }),
+        TypeOrmModule.forFeature([User]),
+      ],
+    }).compile();
+
+    userRepository = module.get('UserRepository');
+  });
+
+  it('should create user', async () => {
+    const user = await userRepository.save({
+      email: 'test@example.com',
+      passwordHash: 'hashed',
+      tenantId: 'tenant-id',
+    });
+
+    expect(user.id).toBeDefined();
+    expect(user.email).toBe('test@example.com');
+  });
+});
+```
+
+---
+
+## 🚨 Important Notes
+
+### DO NOT Use in Production:
+- ❌ `synchronize: true`
+- ❌ `dropSchema: true`
+- ❌ Hardcoded credentials
+
+### ALWAYS Use:
+- ✅ Migrations for schema changes
+- ✅ Environment variables for config
+- ✅ Connection pooling
+- ✅ Query parameter binding (prevents SQL injection)
+
+---
+
+## 📝 Entity Field Reference
+
+### User Entity
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | varchar(255) | User email (unique per tenant) |
+| `passwordHash` | varchar(255) | Argon2id password hash |
+| `passwordHistory` | jsonb | Last 5 password hashes |
+| `status` | enum | active, inactive, suspended, deleted |
+| `emailVerified` | boolean | Email verification status |
+| `failedLoginAttempts` | int | Failed login counter |
+| `lockedUntil` | timestamp | Account lockout expiration |
+| `lastLoginAt` | timestamp | Last successful login |
+| `metadata` | jsonb | Additional user data |
+
+### Session Entity
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tokenHash` | varchar(255) | Hashed session token (unique) |
+| `deviceInfo` | jsonb | Browser, OS, device fingerprint |
+| `ipAddress` | varchar(45) | IP address |
+| `expiresAt` | timestamp | Session expiration |
+| `lastActivity` | timestamp | Last activity timestamp |
+| `revokedAt` | timestamp | Manual revocation time |
+
+---
+
+## 🤝 Contributing
+
+When adding new entities:
+
+1. Create entity in `src/entities/`
+2. Export from `src/entities/index.ts`
+3. Generate migration: `npm run migration:generate`
+4. Test migration: `npm run migration:run`
+5. Update this README
+
+---
+
+**Built with 🔒 for Fort Knox Security**
+
+
+================================================================================
+FILE: packages/database/src/data-source.ts
+SIZE: 2.21 KB | LINES: 82
+================================================================================
+
+import "reflect-metadata";
+import { DataSource, DataSourceOptions } from "typeorm";
+import * as path from "path";
+
+// Import all entities explicitly
+import { Tenant } from "./entities/tenant.entity";
+import { User } from "./entities/user.entity";
+import { Session } from "./entities/session.entity";
+import { MfaSettings } from "./entities/mfa-settings.entity";
+import { SecurityEvent } from "./entities/security-event.entity";
+import { Role } from "./entities/role.entity";
+import { Permission } from "./entities/permission.entity";
+
+/**
+ * TypeORM DataSource Configuration
+ *
+ * This file is used by TypeORM CLI for migrations
+ * and can also be imported by the NestJS application
+ */
+
+const isProduction = process.env.NODE_ENV === "production";
+const useSSL = process.env.DB_SSL === "true";
+
+console.log(process.env);
+
+export const dataSourceOptions: DataSourceOptions = {
+  type: "postgres",
+  host: process.env.DATABASE_HOST || "localhost",
+  port: parseInt(process.env.DATABASE_PORT || "5432", 10),
+  username: process.env.DATABASE_USER || "postgres",
+  password: process.env.DATABASE_PASSWORD || "",
+  database: process.env.DATABASE_NAME || "postgres",
+
+  // Entities - explicit import for reliability
+  entities: [
+    Tenant,
+    User,
+    Session,
+    MfaSettings,
+    SecurityEvent,
+    Role,
+    Permission,
+  ],
+
+  // Migrations
+  migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
+
+  // Migration settings
+  migrationsTableName: "migrations",
+  migrationsRun: false, // Don't auto-run migrations
+
+  // Logging
+  logging: process.env.DATABASE_LOGGING === "true",
+  logger: "advanced-console",
+
+  // Connection pool
+  extra: {
+    max: parseInt(process.env.DATABASE_POOL_MAX || "20", 10),
+    min: parseInt(process.env.DATABASE_POOL_MIN || "2", 10),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  },
+
+  // SSL (for production or cloud databases like Supabase)
+  ssl: useSSL
+    ? {
+        rejectUnauthorized: false, // Supabase requires this
+      }
+    : false,
+
+  // Schema
+  schema: process.env.DATABASE_SCHEMA || "public",
+
+  // Synchronize (NEVER use in production!)
+  synchronize: false,
+};
+
+// Create and export DataSource
+const AppDataSource = new DataSource(dataSourceOptions);
+
+export default AppDataSource;
+
+
+
+================================================================================
+FILE: packages/database/src/entities/base.entity.ts
+SIZE: 835 B | LINES: 41
+================================================================================
+
+import {
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  BaseEntity as TypeORMBaseEntity,
+} from "typeorm";
+
+/**
+ * Base Entity
+ *
+ * All entities extend this to get common fields:
+ * - id (UUID primary key)
+ * - createdAt (auto-generated timestamp)
+ * - updatedAt (auto-updated timestamp)
+ * - deletedAt (soft delete timestamp)
+ */
+export abstract class BaseEntity extends TypeORMBaseEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id!: string;
+
+  @CreateDateColumn({
+    type: "timestamp with time zone",
+    name: "created_at",
+  })
+  createdAt!: Date;
+
+  @UpdateDateColumn({
+    type: "timestamp with time zone",
+    name: "updated_at",
+  })
+  updatedAt!: Date;
+
+  @DeleteDateColumn({
+    type: "timestamp with time zone",
+    name: "deleted_at",
+    nullable: true,
+  })
+  deletedAt?: Date;
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/mfa-settings.entity.ts
+SIZE: 2.94 KB | LINES: 153
+================================================================================
+
+import { Entity, Column, OneToOne, JoinColumn } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { User } from "./user.entity";
+
+/**
+ * MFA Settings Entity
+ *
+ * Manages multi-factor authentication settings for users:
+ * - TOTP (Google Authenticator)
+ * - SMS OTP
+ * - Email OTP
+ * - WebAuthn/FIDO2
+ * - Backup codes
+ */
+@Entity("mfa_settings")
+export class MfaSettings extends BaseEntity {
+  @Column({ type: "uuid", name: "user_id", unique: true })
+  userId!: string;
+
+  @OneToOne(() => User, (user) => user.mfaSettings, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: User;
+
+  // TOTP Settings
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "totp_enabled",
+  })
+  totpEnabled!: boolean;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    name: "totp_secret",
+    select: false,
+    comment: "Encrypted TOTP secret",
+  })
+  totpSecret?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "totp_verified_at",
+  })
+  totpVerifiedAt?: Date;
+
+  // SMS Settings
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "sms_enabled",
+  })
+  smsEnabled!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    nullable: true,
+    name: "sms_phone",
+  })
+  smsPhone?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "sms_verified_at",
+  })
+  smsVerifiedAt?: Date;
+
+  // Email Settings
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "email_enabled",
+  })
+  emailEnabled!: boolean;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "email_verified_at",
+  })
+  emailVerifiedAt?: Date;
+
+  // WebAuthn Settings
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "webauthn_enabled",
+  })
+  webauthnEnabled!: boolean;
+
+  @Column({
+    type: "jsonb",
+    default: [],
+    name: "webauthn_credentials",
+    comment: "Registered WebAuthn/FIDO2 credentials",
+  })
+  webauthnCredentials!: Array<{
+    id: string;
+    publicKey: string;
+    counter: number;
+    deviceName?: string;
+    createdAt: Date;
+  }>;
+
+  // Backup Codes
+  @Column({
+    type: "jsonb",
+    default: [],
+    name: "backup_codes",
+    select: false,
+    comment: "Hashed backup codes",
+  })
+  backupCodes!: string[];
+
+  @Column({
+    type: "jsonb",
+    default: [],
+    name: "backup_codes_used",
+    comment: "Used backup codes (hashed)",
+  })
+  backupCodesUsed!: string[];
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "backup_codes_generated_at",
+  })
+  backupCodesGeneratedAt?: Date;
+
+  // MFA Enforcement
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "mfa_required",
+    comment: "Whether MFA is required for this user",
+  })
+  mfaRequired!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    nullable: true,
+    name: "preferred_method",
+    comment: "Preferred MFA method (totp, sms, email, webauthn)",
+  })
+  preferredMethod?: "totp" | "sms" | "email" | "webauthn";
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/permission.entity.ts
+SIZE: 758 B | LINES: 28
+================================================================================
+
+import { Entity, Column, Index, ManyToMany } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Role } from "./role.entity";
+
+/**
+ * Permission Entity
+ *
+ * Defines granular permissions in the system:
+ * - Resource-based permissions (user, tenant, role, etc.)
+ * - Action-based permissions (create, read, update, delete)
+ */
+@Entity("permissions")
+@Index(["resource", "action"], { unique: true })
+@Index(["resource"])
+export class Permission extends BaseEntity {
+  @Column({ type: "varchar", length: 100 })
+  resource!: string;
+
+  @Column({ type: "varchar", length: 50 })
+  action!: string;
+
+  @Column({ type: "text", nullable: true })
+  description?: string;
+
+  @ManyToMany(() => Role, (role: any) => role.permissions)
+  roles!: Role[];
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/role.entity.ts
+SIZE: 1.62 KB | LINES: 75
+================================================================================
+
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  ManyToMany,
+  JoinColumn,
+  JoinTable,
+} from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Tenant } from "./tenant.entity";
+import { Permission } from "./permission.entity";
+
+/**
+ * Role Entity
+ *
+ * Defines roles within the RBAC system:
+ * - System roles (cannot be deleted)
+ * - Custom tenant roles
+ * - Hierarchical roles (role inheritance)
+ */
+@Entity("roles")
+@Index(["tenantId", "name"], { unique: true })
+@Index(["tenantId"])
+@Index(["isSystem"])
+export class Role extends BaseEntity {
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  @Column({ type: "varchar", length: 100 })
+  name!: string;
+
+  @Column({ type: "text", nullable: true })
+  description?: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "is_system",
+    comment: "System roles cannot be modified or deleted",
+  })
+  isSystem!: boolean;
+
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "parent_role_id",
+    comment: "Parent role for inheritance",
+  })
+  parentRoleId?: string;
+
+  @ManyToOne(() => Role, {
+    onDelete: "SET NULL",
+    nullable: true,
+  })
+  @JoinColumn({ name: "parent_role_id" })
+  parentRole?: Role;
+
+  @ManyToMany(() => Permission, (permission) => permission.roles, {
+    cascade: true,
+  })
+  @JoinTable({
+    name: "role_permissions",
+    joinColumn: { name: "role_id", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "permission_id", referencedColumnName: "id" },
+  })
+  permissions!: Permission[];
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/security-event.entity.ts
+SIZE: 1.96 KB | LINES: 101
+================================================================================
+
+import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { User } from "./user.entity";
+import { Tenant } from "./tenant.entity";
+
+/**
+ * Security Event Entity
+ *
+ * Logs all security-related events:
+ * - Login attempts (success/failure)
+ * - Password changes
+ * - MFA events
+ * - Account lockouts
+ * - Suspicious activities
+ */
+@Entity("security_events")
+@Index(["userId"])
+@Index(["tenantId"])
+@Index(["eventType"])
+@Index(["severity"])
+@Index(["createdAt"])
+@Index(["ipAddress"])
+export class SecurityEvent extends BaseEntity {
+  @Column({ type: "uuid", nullable: true, name: "user_id" })
+  userId?: string;
+
+  @ManyToOne(() => User, {
+    onDelete: "SET NULL",
+    nullable: true,
+  })
+  @JoinColumn({ name: "user_id" })
+  user?: User;
+
+  @Column({ type: "uuid", nullable: true, name: "tenant_id" })
+  tenantId?: string;
+
+  @ManyToOne(() => Tenant, {
+    onDelete: "CASCADE",
+    nullable: true,
+  })
+  @JoinColumn({ name: "tenant_id" })
+  tenant?: Tenant;
+
+  @Column({
+    type: "varchar",
+    length: 100,
+    name: "event_type",
+  })
+  eventType!: string;
+
+  @Column({
+    type: "enum",
+    enum: ["info", "warning", "critical"],
+    default: "info",
+  })
+  severity!: "info" | "warning" | "critical";
+
+  @Column({
+    type: "varchar",
+    length: 45,
+    name: "ip_address",
+  })
+  ipAddress!: string;
+
+  @Column({
+    type: "text",
+    name: "user_agent",
+  })
+  userAgent!: string;
+
+  @Column({
+    type: "jsonb",
+    nullable: true,
+    name: "device_info",
+  })
+  deviceInfo?: Record<string, any>;
+
+  @Column({
+    type: "jsonb",
+    default: {},
+    comment: "Additional event metadata",
+  })
+  metadata!: Record<string, any>;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    comment: "Geographic location",
+  })
+  location?: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "is_anomaly",
+    comment: "Whether this event was flagged as anomalous",
+  })
+  isAnomaly!: boolean;
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/session.entity.ts
+SIZE: 2.11 KB | LINES: 114
+================================================================================
+
+import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { User } from "./user.entity";
+
+/**
+ * Session Entity
+ *
+ * Tracks active user sessions with:
+ * - Device fingerprinting
+ * - IP and location tracking
+ * - Activity monitoring
+ * - Automatic expiration
+ */
+@Entity("sessions")
+@Index(["userId"])
+@Index(["tokenHash"], { unique: true })
+@Index(["expiresAt"])
+export class Session extends BaseEntity {
+  @Column({ type: "uuid", name: "user_id" })
+  userId!: string;
+
+  @ManyToOne(() => User, (user) => user.sessions, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: User;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    unique: true,
+    name: "token_hash",
+    comment: "Hashed session token",
+  })
+  tokenHash!: string;
+
+  @Column({
+    type: "jsonb",
+    name: "device_info",
+    comment: "Device information (browser, OS, etc.)",
+  })
+  deviceInfo!: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    fingerprint: string;
+  };
+
+  @Column({
+    type: "varchar",
+    length: 45,
+    name: "ip_address",
+  })
+  ipAddress!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    comment: "Geographic location (city, country)",
+  })
+  location?: string;
+
+  @Column({
+    type: "text",
+    name: "user_agent",
+  })
+  userAgent!: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    name: "last_activity",
+    default: () => "CURRENT_TIMESTAMP",
+  })
+  lastActivity!: Date;
+
+  @Column({
+    type: "timestamp with time zone",
+    name: "expires_at",
+  })
+  expiresAt!: Date;
+
+  @Column({
+    type: "boolean",
+    default: true,
+    name: "is_active",
+  })
+  isActive!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "refresh_token_hash",
+    comment: "Hashed refresh token",
+  })
+  refreshTokenHash?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "revoked_at",
+  })
+  revokedAt?: Date;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "revoked_reason",
+  })
+  revokedReason?: string;
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/tenant.entity.ts
+SIZE: 2.44 KB | LINES: 120
+================================================================================
+
+import { Entity, Column, Index, OneToMany } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { User } from "./user.entity";
+
+/**
+ * Tenant Entity
+ *
+ * Represents an organization/tenant in the multi-tenant system.
+ * Each tenant is isolated and has its own users, settings, and configuration.
+ */
+@Entity("tenants")
+@Index(["subdomain"], { unique: true })
+@Index(["customDomain"], { unique: true, where: "custom_domain IS NOT NULL" })
+export class Tenant extends BaseEntity {
+  @Column({ type: "varchar", length: 255 })
+  name!: string;
+
+  @Column({
+    type: "varchar",
+    length: 100,
+    unique: true,
+    name: "subdomain",
+  })
+  subdomain!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "custom_domain",
+  })
+  customDomain?: string;
+
+  @Column({
+    type: "enum",
+    enum: ["active", "trial", "suspended", "cancelled"],
+    default: "trial",
+  })
+  status!: "active" | "trial" | "suspended" | "cancelled";
+
+  @Column({
+    type: "enum",
+    enum: ["free", "starter", "professional", "enterprise"],
+    default: "free",
+  })
+  plan!: "free" | "starter" | "professional" | "enterprise";
+
+  @Column({
+    type: "jsonb",
+    default: {},
+    comment: "Tenant-specific configuration and settings",
+  })
+  settings!: Record<string, any>;
+
+  @Column({
+    type: "jsonb",
+    default: {},
+    comment: "Tenant branding configuration (logo, colors, etc.)",
+  })
+  branding?: Record<string, any>;
+
+  @Column({
+    type: "boolean",
+    default: true,
+    name: "is_active",
+  })
+  isActive!: boolean;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "trial_ends_at",
+  })
+  trialEndsAt?: Date;
+
+  @Column({
+    type: "int",
+    default: 0,
+    name: "user_limit",
+    comment: "Maximum number of users allowed (0 = unlimited)",
+  })
+  userLimit!: number;
+
+  @Column({
+    type: "int",
+    default: 0,
+    name: "user_count",
+    comment: "Current number of users in tenant",
+  })
+  userCount!: number;
+
+  @Column({
+    type: "jsonb",
+    default: {},
+    name: "feature_flags",
+    comment: "Feature flags for this tenant",
+  })
+  featureFlags!: Record<string, boolean>;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "contact_email",
+  })
+  contactEmail?: string;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    nullable: true,
+    name: "contact_phone",
+  })
+  contactPhone?: string;
+
+  // Relations
+  @OneToMany(() => User, (user) => user.tenant)
+  users!: User[];
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/user.entity.ts
+SIZE: 4.34 KB | LINES: 234
+================================================================================
+
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  OneToOne,
+  OneToMany,
+  JoinColumn,
+} from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Tenant } from "./tenant.entity";
+import { MfaSettings } from "./mfa-settings.entity";
+import { Session } from "./session.entity";
+
+/**
+ * User Entity
+ *
+ * Core user entity with comprehensive security features:
+ * - Argon2id password hashing
+ * - Email/phone verification
+ * - Password history
+ * - Account lockout
+ * - Multi-tenant support
+ */
+@Entity("users")
+@Index(["email", "tenantId"], { unique: true })
+@Index(["tenantId"])
+@Index(["status"])
+@Index(["emailVerified"])
+@Index(["lastLoginAt"])
+export class User extends BaseEntity {
+  // Tenant relation
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, (tenant) => tenant.users, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  // Basic Information
+  @Column({ type: "varchar", length: 255 })
+  email!: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "email_verified",
+  })
+  emailVerified!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    nullable: true,
+  })
+  phone?: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "phone_verified",
+  })
+  phoneVerified!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "first_name",
+  })
+  firstName?: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "last_name",
+  })
+  lastName?: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "display_name",
+  })
+  displayName?: string;
+
+  @Column({
+    type: "varchar",
+    length: 500,
+    nullable: true,
+    name: "avatar_url",
+  })
+  avatarUrl?: string;
+
+  // Password & Security
+  @Column({
+    type: "varchar",
+    length: 255,
+    name: "password_hash",
+    select: false, // Don't select by default
+  })
+  passwordHash!: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "password_changed_at",
+  })
+  passwordChangedAt?: Date;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "force_password_change",
+  })
+  forcePasswordChange!: boolean;
+
+  @Column({
+    type: "jsonb",
+    default: [],
+    name: "password_history",
+    comment: "Last 5 password hashes to prevent reuse",
+  })
+  passwordHistory!: string[];
+
+  // Account Status
+  @Column({
+    type: "enum",
+    enum: ["active", "inactive", "suspended", "deleted"],
+    default: "active",
+  })
+  status!: "active" | "inactive" | "suspended" | "deleted";
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_login_at",
+  })
+  lastLoginAt?: Date;
+
+  @Column({
+    type: "varchar",
+    length: 45,
+    nullable: true,
+    name: "last_login_ip",
+  })
+  lastLoginIp?: string;
+
+  // Account Lockout
+  @Column({
+    type: "int",
+    default: 0,
+    name: "failed_login_attempts",
+  })
+  failedLoginAttempts!: number;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "locked_until",
+  })
+  lockedUntil?: Date;
+
+  // Verification Tokens
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "email_verification_token",
+    select: false,
+  })
+  emailVerificationToken?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "email_verification_expires_at",
+  })
+  emailVerificationExpiresAt?: Date;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "password_reset_token",
+    select: false,
+  })
+  passwordResetToken?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "password_reset_expires_at",
+  })
+  passwordResetExpiresAt?: Date;
+
+  // Metadata
+  @Column({
+    type: "jsonb",
+    default: {},
+    comment: "Additional user metadata",
+  })
+  metadata?: Record<string, any>;
+
+  @Column({
+    type: "varchar",
+    length: 10,
+    nullable: true,
+    comment: "User timezone (e.g., America/New_York)",
+  })
+  timezone?: string;
+
+  @Column({
+    type: "varchar",
+    length: 10,
+    default: "en",
+    comment: "User preferred language",
+  })
+  language!: string;
+
+  // Relations
+  @OneToOne(() => MfaSettings, (mfa) => mfa.user, {
+    cascade: true,
+  })
+  mfaSettings?: MfaSettings;
+
+  @OneToMany(() => Session, (session) => session.user)
+  sessions!: Session[];
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1735289000000 initialmigration.ts
+SIZE: 16.69 KB | LINES: 396
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+/**
+ * Initial Migration - Fort Knox Database Schema
+ *
+ * Creates all core tables for the authentication system:
+ * - Tenants (multi-tenancy)
+ * - Users (with comprehensive security features)
+ * - Sessions (device tracking)
+ * - MFA Settings
+ * - Security Events
+ * - Roles & Permissions (RBAC)
+ *
+ * Generated: 2025-12-27
+ */
+export class InitialMigration1735289000000 implements MigrationInterface {
+  name = "InitialMigration1735289000000";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Enable UUID extension
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+
+    // =======================================================================
+    // TENANTS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "tenants" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "name" character varying(255) NOT NULL,
+        "subdomain" character varying(100) NOT NULL,
+        "custom_domain" character varying(255),
+        "status" character varying CHECK("status" IN ('active', 'trial', 'suspended', 'cancelled')) NOT NULL DEFAULT 'trial',
+        "plan" character varying CHECK("plan" IN ('free', 'starter', 'professional', 'enterprise')) NOT NULL DEFAULT 'free',
+        "settings" jsonb NOT NULL DEFAULT '{}',
+        "branding" jsonb DEFAULT '{}',
+        "is_active" boolean NOT NULL DEFAULT true,
+        "trial_ends_at" TIMESTAMP WITH TIME ZONE,
+        "user_limit" integer NOT NULL DEFAULT '0',
+        "user_count" integer NOT NULL DEFAULT '0',
+        "feature_flags" jsonb NOT NULL DEFAULT '{}',
+        "contact_email" character varying(255),
+        "contact_phone" character varying(50),
+        CONSTRAINT "PK_tenants" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_tenants_subdomain" UNIQUE ("subdomain")
+      )
+    `);
+
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX "IDX_tenants_custom_domain" 
+      ON "tenants" ("custom_domain") 
+      WHERE "custom_domain" IS NOT NULL
+    `);
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "tenants" IS 'Multi-tenant organizations'`,
+    );
+
+    // =======================================================================
+    // USERS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "users" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "tenant_id" uuid NOT NULL,
+        "email" character varying(255) NOT NULL,
+        "email_verified" boolean NOT NULL DEFAULT false,
+        "phone" character varying(50),
+        "phone_verified" boolean NOT NULL DEFAULT false,
+        "first_name" character varying(255),
+        "last_name" character varying(255),
+        "display_name" character varying(255),
+        "avatar_url" character varying(500),
+        "password_hash" character varying(255) NOT NULL,
+        "password_changed_at" TIMESTAMP WITH TIME ZONE,
+        "force_password_change" boolean NOT NULL DEFAULT false,
+        "password_history" jsonb NOT NULL DEFAULT '[]',
+        "status" character varying CHECK("status" IN ('active', 'inactive', 'suspended', 'deleted')) NOT NULL DEFAULT 'active',
+        "last_login_at" TIMESTAMP WITH TIME ZONE,
+        "last_login_ip" character varying(45),
+        "failed_login_attempts" integer NOT NULL DEFAULT '0',
+        "locked_until" TIMESTAMP WITH TIME ZONE,
+        "email_verification_token" character varying(255),
+        "email_verification_expires_at" TIMESTAMP WITH TIME ZONE,
+        "password_reset_token" character varying(255),
+        "password_reset_expires_at" TIMESTAMP WITH TIME ZONE,
+        "metadata" jsonb DEFAULT '{}',
+        "timezone" character varying(10),
+        "language" character varying(10) NOT NULL DEFAULT 'en',
+        CONSTRAINT "PK_users" PRIMARY KEY ("id"),
+        CONSTRAINT "FK_users_tenant" FOREIGN KEY ("tenant_id") 
+          REFERENCES "tenants"("id") ON DELETE CASCADE
+      )
+    `);
+
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX "IDX_users_email_tenant" 
+      ON "users" ("email", "tenant_id")
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_users_tenant_id" ON "users" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_users_status" ON "users" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_users_email_verified" ON "users" ("email_verified")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_users_last_login" ON "users" ("last_login_at" DESC)`,
+    );
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "users" IS 'User accounts with comprehensive security features'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "users"."password_history" IS 'Last 5 password hashes to prevent reuse'`,
+    );
+
+    // =======================================================================
+    // MFA SETTINGS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "mfa_settings" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "user_id" uuid NOT NULL,
+        "totp_enabled" boolean NOT NULL DEFAULT false,
+        "totp_secret" text,
+        "totp_verified_at" TIMESTAMP WITH TIME ZONE,
+        "sms_enabled" boolean NOT NULL DEFAULT false,
+        "sms_phone" character varying(50),
+        "sms_verified_at" TIMESTAMP WITH TIME ZONE,
+        "email_enabled" boolean NOT NULL DEFAULT false,
+        "email_verified_at" TIMESTAMP WITH TIME ZONE,
+        "webauthn_enabled" boolean NOT NULL DEFAULT false,
+        "webauthn_credentials" jsonb NOT NULL DEFAULT '[]',
+        "backup_codes" jsonb NOT NULL DEFAULT '[]',
+        "backup_codes_used" jsonb NOT NULL DEFAULT '[]',
+        "backup_codes_generated_at" TIMESTAMP WITH TIME ZONE,
+        "mfa_required" boolean NOT NULL DEFAULT false,
+        "preferred_method" character varying(50),
+        CONSTRAINT "PK_mfa_settings" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_mfa_settings_user" UNIQUE ("user_id"),
+        CONSTRAINT "FK_mfa_settings_user" FOREIGN KEY ("user_id") 
+          REFERENCES "users"("id") ON DELETE CASCADE
+      )
+    `);
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "mfa_settings" IS 'Multi-factor authentication settings'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "mfa_settings"."totp_secret" IS 'Encrypted TOTP secret'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "mfa_settings"."backup_codes" IS 'Hashed backup codes'`,
+    );
+
+    // =======================================================================
+    // SESSIONS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "sessions" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "user_id" uuid NOT NULL,
+        "token_hash" character varying(255) NOT NULL,
+        "device_info" jsonb NOT NULL,
+        "ip_address" character varying(45) NOT NULL,
+        "location" character varying(255),
+        "user_agent" text NOT NULL,
+        "last_activity" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+        "is_active" boolean NOT NULL DEFAULT true,
+        "refresh_token_hash" character varying(255),
+        "revoked_at" TIMESTAMP WITH TIME ZONE,
+        "revoked_reason" character varying(255),
+        CONSTRAINT "PK_sessions" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_sessions_token" UNIQUE ("token_hash"),
+        CONSTRAINT "FK_sessions_user" FOREIGN KEY ("user_id") 
+          REFERENCES "users"("id") ON DELETE CASCADE
+      )
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_sessions_user_id" ON "sessions" ("user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_sessions_token_hash" ON "sessions" ("token_hash")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_sessions_expires_at" ON "sessions" ("expires_at")`,
+    );
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "sessions" IS 'Active user sessions with device tracking'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "sessions"."token_hash" IS 'Hashed session token'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "sessions"."device_info" IS 'Device information (browser, OS, etc.)'`,
+    );
+
+    // =======================================================================
+    // SECURITY EVENTS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "security_events" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "user_id" uuid,
+        "tenant_id" uuid,
+        "event_type" character varying(100) NOT NULL,
+        "severity" character varying CHECK("severity" IN ('info', 'warning', 'critical')) NOT NULL DEFAULT 'info',
+        "ip_address" character varying(45) NOT NULL,
+        "user_agent" text NOT NULL,
+        "device_info" jsonb,
+        "metadata" jsonb NOT NULL DEFAULT '{}',
+        "location" character varying(255),
+        "is_anomaly" boolean NOT NULL DEFAULT false,
+        CONSTRAINT "PK_security_events" PRIMARY KEY ("id"),
+        CONSTRAINT "FK_security_events_user" FOREIGN KEY ("user_id") 
+          REFERENCES "users"("id") ON DELETE SET NULL,
+        CONSTRAINT "FK_security_events_tenant" FOREIGN KEY ("tenant_id") 
+          REFERENCES "tenants"("id") ON DELETE CASCADE
+      )
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_user_id" ON "security_events" ("user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_tenant_id" ON "security_events" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_type" ON "security_events" ("event_type")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_severity" ON "security_events" ("severity")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_created_at" ON "security_events" ("created_at" DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip_address")`,
+    );
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "security_events" IS 'Security event audit log'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "security_events"."is_anomaly" IS 'Whether this event was flagged as anomalous'`,
+    );
+
+    // =======================================================================
+    // PERMISSIONS TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "permissions" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "resource" character varying(100) NOT NULL,
+        "action" character varying(50) NOT NULL,
+        "description" text,
+        CONSTRAINT "PK_permissions" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_permissions_resource_action" UNIQUE ("resource", "action")
+      )
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_permissions_resource" ON "permissions" ("resource")`,
+    );
+    await queryRunner.query(
+      `COMMENT ON TABLE "permissions" IS 'System permissions for RBAC'`,
+    );
+
+    // =======================================================================
+    // ROLES TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "roles" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "deleted_at" TIMESTAMP WITH TIME ZONE,
+        "tenant_id" uuid NOT NULL,
+        "name" character varying(100) NOT NULL,
+        "description" text,
+        "is_system" boolean NOT NULL DEFAULT false,
+        "parent_role_id" uuid,
+        CONSTRAINT "PK_roles" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_roles_tenant_name" UNIQUE ("tenant_id", "name"),
+        CONSTRAINT "FK_roles_tenant" FOREIGN KEY ("tenant_id") 
+          REFERENCES "tenants"("id") ON DELETE CASCADE,
+        CONSTRAINT "FK_roles_parent" FOREIGN KEY ("parent_role_id") 
+          REFERENCES "roles"("id") ON DELETE SET NULL
+      )
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_roles_tenant_id" ON "roles" ("tenant_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_roles_is_system" ON "roles" ("is_system")`,
+    );
+
+    await queryRunner.query(
+      `COMMENT ON TABLE "roles" IS 'User roles for RBAC'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "roles"."is_system" IS 'System roles cannot be modified or deleted'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "roles"."parent_role_id" IS 'Parent role for inheritance'`,
+    );
+
+    // =======================================================================
+    // ROLE_PERMISSIONS JUNCTION TABLE
+    // =======================================================================
+    await queryRunner.query(`
+      CREATE TABLE "role_permissions" (
+        "role_id" uuid NOT NULL,
+        "permission_id" uuid NOT NULL,
+        CONSTRAINT "PK_role_permissions" PRIMARY KEY ("role_id", "permission_id"),
+        CONSTRAINT "FK_role_permissions_role" FOREIGN KEY ("role_id") 
+          REFERENCES "roles"("id") ON DELETE CASCADE,
+        CONSTRAINT "FK_role_permissions_permission" FOREIGN KEY ("permission_id") 
+          REFERENCES "permissions"("id") ON DELETE CASCADE
+      )
+    `);
+
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_permissions_role_id" ON "role_permissions" ("role_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_role_permissions_permission_id" ON "role_permissions" ("permission_id")`,
+    );
+
+    // =======================================================================
+    // SEED DEFAULT PERMISSIONS
+    // =======================================================================
+    await queryRunner.query(`
+      INSERT INTO "permissions" ("resource", "action", "description") VALUES
+        ('user', 'create', 'Create users'),
+        ('user', 'read', 'Read user information'),
+        ('user', 'update', 'Update user information'),
+        ('user', 'delete', 'Delete users'),
+        ('user', 'impersonate', 'Impersonate users'),
+        ('tenant', 'create', 'Create tenants'),
+        ('tenant', 'read', 'Read tenant information'),
+        ('tenant', 'update', 'Update tenant information'),
+        ('tenant', 'delete', 'Delete tenants'),
+        ('role', 'create', 'Create roles'),
+        ('role', 'read', 'Read role information'),
+        ('role', 'update', 'Update roles'),
+        ('role', 'delete', 'Delete roles'),
+        ('role', 'assign', 'Assign roles to users'),
+        ('settings', 'read', 'Read settings'),
+        ('settings', 'update', 'Update settings'),
+        ('audit', 'read', 'Read audit logs')
+    `);
+
+    console.log("✅ Initial migration completed successfully");
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Drop tables in reverse order (respecting foreign keys)
+    await queryRunner.query(`DROP TABLE IF EXISTS "role_permissions" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "roles" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "permissions" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "security_events" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "sessions" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "mfa_settings" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "users" CASCADE`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "tenants" CASCADE`);
+
+    console.log("✅ Migration reverted successfully");
+  }
+}
+
+
+
+================================================================================
+FILE: packages/database/tsconfig.json
+SIZE: 588 B | LINES: 22
+================================================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*", "index.ts"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
+}
 
 
 ================================================================================
@@ -6433,30 +9996,25 @@ export * from "./src/encryption.service";
 
 ================================================================================
 FILE: packages/security/package.json
-SIZE: 359 B | LINES: 23
+SIZE: 319 B | LINES: 18
 ================================================================================
 
 {
   "name": "@repo/security",
-  "version": "0.0.0",
-  "private": true,
-  "exports": {
-    ".": "./src/index.ts"
-  },
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "lint": "eslint . --max-warnings 0",
-    "check-types": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@repo/eslint-config": "*",
-    "@repo/typescript-config": "*"
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-
+    "argon2": "^0.44.0"
   },
-  "sideEffects": [
-
-  ]
+  "devDependencies": {
+    "@repo/typescript-config": "*"
+  }
 }
 
 
@@ -6894,7 +10452,7 @@ export class PasswordService {
 
 ================================================================================
 FILE: packages/security/src/rate-limiter.service.ts
-SIZE: 7.06 KB | LINES: 282
+SIZE: 7.08 KB | LINES: 282
 ================================================================================
 
 import { Redis } from "ioredis";
@@ -6962,7 +10520,7 @@ export class SlidingWindowRateLimiter {
     }
 
     // Get count from the second command (zcard)
-    const count = (results[1][1] as number) || 0;
+    const count = ((results[1] as any)[1] as number) || 0;
 
     const allowed = count < config.maxRequests;
     const remaining = Math.max(0, config.maxRequests - count - 1);
@@ -6972,7 +10530,7 @@ export class SlidingWindowRateLimiter {
       // Get the oldest request timestamp
       const oldest = await this.redis.zrange(key, 0, 0, "WITHSCORES");
       if (oldest.length >= 2) {
-        const oldestTimestamp = parseInt(oldest[1]);
+        const oldestTimestamp = parseInt(oldest[1] as string);
         const resetTime = oldestTimestamp + config.windowMs;
         retryAfter = Math.ceil((resetTime - now) / 1000);
       }
@@ -7741,19 +11299,27 @@ runTests()
 
 ================================================================================
 FILE: packages/security/tsconfig.json
-SIZE: 301 B | LINES: 12
+SIZE: 517 B | LINES: 20
 ================================================================================
 
 {
-  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
+    "rootDir": "./",
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "index.ts"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }
 
@@ -7778,7 +11344,7 @@ export * from "./src/dtos";
 
 ================================================================================
 FILE: packages/shared/package.json
-SIZE: 357 B | LINES: 23
+SIZE: 327 B | LINES: 18
 ================================================================================
 
 {
@@ -7796,12 +11362,7 @@ SIZE: 357 B | LINES: 23
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*"
   },
-  "dependencies": {
-
-  },
-  "sideEffects": [
-
-  ]
+  "sideEffects": []
 }
 
 
@@ -15105,8 +18666,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 165
-Total Lines: 13,943
-Files Skipped: 33
+Files Processed: 189
+Total Lines: 17,336
+Files Skipped: 37
 Errors: 0
-Generated: 2025-12-27T09:36:20.302Z
+Generated: 2025-12-27T11:11:25.933Z

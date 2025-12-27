@@ -2,14 +2,26 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { User, Session, SecurityEvent } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEvent,
+  Tenant,
+  MfaSettings,
+} from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Session, SecurityEvent]),
+    TypeOrmModule.forFeature([
+      User,
+      Session,
+      SecurityEvent,
+      Tenant,
+      MfaSettings,
+    ]),
     UserModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

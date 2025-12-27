@@ -21,8 +21,6 @@ import { Permission } from "./entities/permission.entity";
 const isProduction = process.env.NODE_ENV === "production";
 const useSSL = process.env.DB_SSL === "true";
 
-console.log(process.env);
-
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
   host: process.env.DATABASE_HOST || "localhost",
