@@ -20,10 +20,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
-    "db:migrate:create": "npm run typeorm -- migration:create src/database/migrations/Init",
-    "db:migrate:generate": "npm run typeorm -- -d src/database/data-source.ts migration:generate src/database/migrations/Auto -p",
-    "db:migrate:run": "npm run typeorm -- -d src/database/data-source.ts migration:run",
-    "db:migrate:revert": "npm run typeorm -- -d src/database/data-source.ts migration:revert"
+    "db:migrate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:run -d ../../packages/database/src/data-source.ts",
+    "db:migrate:revert": "dotenv -e .env -- typeorm-ts-node-commonjs migration:revert -d ../../packages/database/src/data-source.ts",
+    "db:migrate:show": "dotenv -e .env -- typeorm-ts-node-commonjs migration:show -d ../../packages/database/src/data-source.ts",
+    "db:migrate:generate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:generate -d ../../packages/database/src/data-source.ts",
+    "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -69,6 +70,8 @@
     "@types/passport-jwt": "^4",
     "@types/pg": "^8",
     "@types/supertest": "^6.0.2",
+    "dotenv": "^17.2.3",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
