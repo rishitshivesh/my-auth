@@ -1,7 +1,7 @@
 "use client"
 
 import { Menu } from "lucide-react"
-import { Sidebar } from "@/components/layout/sidebar"
+import { Sidebar } from "./sidebar"
 import { useRouter } from "next/navigation"
 
 // Imports from @repo/ui
