@@ -1,0 +1,508 @@
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { User, Role, Permission, UserRole } from "@repo/database";
+import { RoleService } from "./role.service";
+import { PermissionService } from "./permission.service";
+
+export interface AssignRoleDto {
+  userId: string;
+  roleId: string;
+  tenantId: string;
+  assignedBy?: string;
+  expiresAt?: Date;
+  reason?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface AssignRolesByNameDto {
+  userId: string;
+  roleNames: string[];
+  tenantId: string;
+  assignedBy?: string;
+  expiresAt?: Date;
+  reason?: string;
+}
+
+@Injectable()
+export class RbacService {
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @InjectRepository(UserRole)
+    private userRoleRepository: Repository<UserRole>,
+    private roleService: RoleService,
+    private permissionService: PermissionService,
+  ) {}
+
+  // ============================================================
+  // USER-ROLE ASSIGNMENTS
+  // ============================================================
+
+  /**
+   * Assign role to user
+   */
+  async assignRole(data: AssignRoleDto): Promise<UserRole> {
+    // Verify user exists
+    const user = await this.userRepository.findOne({
+      where: { id: data.userId, tenantId: data.tenantId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Verify role exists
+    const role = await this.roleService.getRole(data.roleId, data.tenantId);
+
+    // Check if already assigned
+    const existing = await this.userRoleRepository.findOne({
+      where: {
+        userId: data.userId,
+        roleId: data.roleId,
+        tenantId: data.tenantId,
+      },
+    });
+
+    if (existing) {
+      // Update expiry if provided
+      if (data.expiresAt) {
+        existing.expiresAt = data.expiresAt;
+        existing.reason = data.reason;
+        existing.metadata = data.metadata;
+        await this.userRoleRepository.save(existing);
+        console.log(
+          `✅ Updated role assignment: ${role.name} for user ${user.email}`,
+        );
+        return existing;
+      }
+
+      throw new ConflictException("Role already assigned to user");
+    }
+
+    // Create assignment
+    const userRole = await this.userRoleRepository.save({
+      tenantId: data.tenantId,
+      userId: data.userId,
+      roleId: data.roleId,
+      assignedBy: data.assignedBy,
+      assignedAt: new Date(),
+      expiresAt: data.expiresAt,
+      reason: data.reason,
+      metadata: data.metadata,
+    });
+
+    console.log(`✅ Assigned role ${role.name} to user ${user.email}`);
+
+    return userRole;
+  }
+
+  /**
+   * Assign multiple roles to user by role names
+   */
+  async assignRolesByNames(data: AssignRolesByNameDto): Promise<UserRole[]> {
+    // Get roles by names
+    const roles = await this.roleService.listRoles(data.tenantId);
+    const roleMap = new Map(roles.map((r) => [r.name, r]));
+
+    const assignments: UserRole[] = [];
+
+    for (const roleName of data.roleNames) {
+      const role = roleMap.get(roleName);
+      if (!role) {
+        throw new NotFoundException(`Role not found: ${roleName}`);
+      }
+
+      try {
+        const userRole = await this.assignRole({
+          userId: data.userId,
+          roleId: role.id,
+          tenantId: data.tenantId,
+          assignedBy: data.assignedBy,
+          expiresAt: data.expiresAt,
+          reason: data.reason,
+        });
+        assignments.push(userRole);
+      } catch (error) {
+        // Skip if already assigned
+        if (!(error instanceof ConflictException)) {
+          throw error;
+        }
+      }
+    }
+
+    return assignments;
+  }
+
+  /**
+   * Remove role from user
+   */
+  async removeRole(
+    userId: string,
+    roleId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const userRole = await this.userRoleRepository.findOne({
+      where: { userId, roleId, tenantId },
+    });
+
+    if (!userRole) {
+      throw new NotFoundException("Role assignment not found");
+    }
+
+    await this.userRoleRepository.remove(userRole);
+
+    console.log(`🗑️  Removed role assignment for user ${userId}`);
+  }
+
+  /**
+   * Remove role from user by role name
+   */
+  async removeRoleByName(
+    userId: string,
+    roleName: string,
+    tenantId: string,
+  ): Promise<void> {
+    const role = await this.roleService.getRoleByName(roleName, tenantId);
+
+    if (!role) {
+      throw new NotFoundException(`Role not found: ${roleName}`);
+    }
+
+    await this.removeRole(userId, role.id, tenantId);
+  }
+
+  /**
+   * Set exact roles for user (replace all)
+   */
+  async setUserRoles(
+    userId: string,
+    roleNames: string[],
+    tenantId: string,
+    assignedBy?: string,
+  ): Promise<UserRole[]> {
+    // Remove all existing roles
+    await this.userRoleRepository.delete({
+      userId,
+      tenantId,
+    });
+
+    // Assign new roles
+    if (roleNames.length > 0) {
+      return this.assignRolesByNames({
+        userId,
+        roleNames,
+        tenantId,
+        assignedBy,
+      });
+    }
+
+    return [];
+  }
+
+  /**
+   * Get user roles
+   */
+  async getUserRoles(userId: string, tenantId: string): Promise<Role[]> {
+    const userRoles = await this.userRoleRepository.find({
+      where: { userId, tenantId },
+      relations: [
+        "role",
+        "role.rolePermissions",
+        "role.rolePermissions.permission",
+      ],
+    });
+
+    // Filter out expired roles
+    return userRoles.filter((ur) => !ur.isExpired).map((ur) => ur.role);
+  }
+
+  /**
+   * Get user with roles and permissions loaded
+   */
+  async getUserWithRoles(userId: string, tenantId: string): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+      relations: [
+        "userRoles",
+        "userRoles.role",
+        "userRoles.role.rolePermissions",
+        "userRoles.role.rolePermissions.permission",
+      ],
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Filter out expired role assignments
+    user.userRoles = user.userRoles.filter((ur) => !ur.isExpired);
+
+    return user;
+  }
+
+  /**
+   * Get all permissions for user (aggregated from all roles)
+   */
+  async getUserPermissions(
+    userId: string,
+    tenantId: string,
+  ): Promise<Permission[]> {
+    const roles = await this.getUserRoles(userId, tenantId);
+
+    const permissionMap = new Map<string, Permission>();
+
+    for (const role of roles) {
+      if (role.rolePermissions) {
+        for (const rp of role.rolePermissions) {
+          if (rp.permission) {
+            permissionMap.set(rp.permission.id, rp.permission);
+          }
+        }
+      }
+    }
+
+    return Array.from(permissionMap.values());
+  }
+
+  // ============================================================
+  // PERMISSION CHECKS
+  // ============================================================
+
+  /**
+   * Check if user has specific permission
+   */
+  async userHasPermission(
+    userId: string,
+    tenantId: string,
+    permissionName: string,
+  ): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.hasPermission(permissionName);
+  }
+
+  /**
+   * Check if user has any of the permissions
+   */
+  async userHasAnyPermission(
+    userId: string,
+    tenantId: string,
+    permissionNames: string[],
+  ): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.hasAnyPermission(permissionNames);
+  }
+
+  /**
+   * Check if user has all permissions
+   */
+  async userHasAllPermissions(
+    userId: string,
+    tenantId: string,
+    permissionNames: string[],
+  ): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.hasAllPermissions(permissionNames);
+  }
+
+  /**
+   * Check if user has specific role
+   */
+  async userHasRole(
+    userId: string,
+    tenantId: string,
+    roleName: string,
+  ): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.hasRole(roleName);
+  }
+
+  /**
+   * Check if user has any of the roles
+   */
+  async userHasAnyRole(
+    userId: string,
+    tenantId: string,
+    roleNames: string[],
+  ): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.hasAnyRole(roleNames);
+  }
+
+  /**
+   * Check if user is admin
+   */
+  async userIsAdmin(userId: string, tenantId: string): Promise<boolean> {
+    const user = await this.getUserWithRoles(userId, tenantId);
+    return user.isAdmin;
+  }
+
+  // ============================================================
+  // BULK OPERATIONS
+  // ============================================================
+
+  /**
+   * Assign default role to new user
+   */
+  async assignDefaultRole(userId: string, tenantId: string): Promise<void> {
+    // Get default roles
+    const defaultRoles = await this.roleService.listRoles(tenantId, {
+      isDefault: true,
+      isActive: true,
+    });
+
+    if (defaultRoles.length === 0) {
+      console.log("⚠️  No default roles found for tenant");
+      return;
+    }
+
+    // Assign all default roles
+    for (const role of defaultRoles) {
+      try {
+        await this.assignRole({
+          userId,
+          roleId: role.id,
+          tenantId,
+          reason: "Auto-assigned default role",
+        });
+      } catch (error) {
+        // Skip if already assigned
+        if (!(error instanceof ConflictException)) {
+          throw error;
+        }
+      }
+    }
+
+    console.log(
+      `✅ Assigned ${defaultRoles.length} default role(s) to user ${userId}`,
+    );
+  }
+
+  /**
+   * Remove expired role assignments
+   */
+  async cleanupExpiredRoles(tenantId: string): Promise<number> {
+    const expiredAssignments = await this.userRoleRepository
+      .createQueryBuilder("userRole")
+      .where("userRole.tenantId = :tenantId", { tenantId })
+      .andWhere("userRole.expiresAt < :now", { now: new Date() })
+      .andWhere("userRole.expiresAt IS NOT NULL")
+      .getMany();
+
+    if (expiredAssignments.length > 0) {
+      await this.userRoleRepository.remove(expiredAssignments);
+      console.log(
+        `🗑️  Removed ${expiredAssignments.length} expired role assignments`,
+      );
+    }
+
+    return expiredAssignments.length;
+  }
+
+  /**
+   * Get users by role
+   */
+  async getUsersByRole(roleId: string, tenantId: string): Promise<User[]> {
+    const userRoles = await this.userRoleRepository.find({
+      where: { roleId, tenantId },
+      relations: ["user"],
+    });
+
+    return userRoles.filter((ur) => !ur.isExpired).map((ur) => ur.user);
+  }
+
+  /**
+   * Get users by role name
+   */
+  async getUsersByRoleName(
+    roleName: string,
+    tenantId: string,
+  ): Promise<User[]> {
+    const role = await this.roleService.getRoleByName(roleName, tenantId);
+
+    if (!role) {
+      throw new NotFoundException(`Role not found: ${roleName}`);
+    }
+
+    return this.getUsersByRole(role.id, tenantId);
+  }
+
+  /**
+   * Get role statistics
+   */
+  async getRoleStats(
+    roleId: string,
+    tenantId: string,
+  ): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    expiredAssignments: number;
+  }> {
+    const userRoles = await this.userRoleRepository.find({
+      where: { roleId, tenantId },
+    });
+
+    const active = userRoles.filter((ur) => !ur.isExpired);
+    const expired = userRoles.filter((ur) => ur.isExpired);
+
+    return {
+      totalUsers: userRoles.length,
+      activeUsers: active.length,
+      expiredAssignments: expired.length,
+    };
+  }
+
+  // ============================================================
+  // SEEDING & INITIALIZATION
+  // ============================================================
+
+  /**
+   * Initialize RBAC for tenant (create default permissions and roles)
+   */
+  async initializeTenant(tenantId: string, createdBy?: string): Promise<void> {
+    console.log(`🔧 Initializing RBAC for tenant ${tenantId}...`);
+
+    // 1. Create default permissions
+    const permissions =
+      await this.permissionService.seedDefaultPermissions(tenantId);
+    console.log(`✅ Created ${permissions.length} default permissions`);
+
+    // 2. Create default roles
+    const roles = await this.roleService.seedDefaultRoles(tenantId, createdBy);
+    console.log(`✅ Created ${roles.length} default roles`);
+
+    console.log(`🎉 RBAC initialization complete for tenant ${tenantId}`);
+  }
+
+  /**
+   * Assign admin role to user (convenience method)
+   */
+  async makeUserAdmin(
+    userId: string,
+    tenantId: string,
+    assignedBy?: string,
+  ): Promise<void> {
+    await this.assignRolesByNames({
+      userId,
+      roleNames: ["admin"],
+      tenantId,
+      assignedBy,
+      reason: "Admin access granted",
+    });
+
+    console.log(`✅ User ${userId} is now an admin`);
+  }
+
+  /**
+   * Remove admin role from user
+   */
+  async removeAdminAccess(userId: string, tenantId: string): Promise<void> {
+    await this.removeRoleByName(userId, "admin", tenantId);
+    console.log(`🗑️  Removed admin access from user ${userId}`);
+  }
+}

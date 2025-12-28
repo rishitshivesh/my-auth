@@ -20,6 +20,9 @@ import { UserRole } from "./user-role.entity";
 @Index(["tenantId", "email"], { unique: true })
 @Index(["email"])
 @Index(["tenantId"])
+@Index(["status"])
+@Index(["emailVerified"])
+@Index(["lastLoginAt"])
 export class User extends BaseEntity {
   // Tenant relation
   @Column({ type: "uuid", name: "tenant_id" })
@@ -168,9 +171,9 @@ export class User extends BaseEntity {
   @Column({
     type: "timestamp with time zone",
     nullable: true,
-    name: "email_verification_expires",
+    name: "email_verification_expires_at",
   })
-  emailVerificationExpires?: Date;
+  emailVerificationExpiresAt?: Date;
 
   @Column({
     type: "varchar",
@@ -186,7 +189,22 @@ export class User extends BaseEntity {
     nullable: true,
     name: "password_reset_expires",
   })
-  passwordResetExpires?: Date;
+  passwordResetExpiresAt?: Date;
+
+  @Column({
+    type: "jsonb",
+    default: {},
+    comment: "Additional user metadata",
+  })
+  metadata?: Record<string, any>;
+
+  @Column({
+    type: "varchar",
+    length: 10,
+    nullable: true,
+    comment: "User timezone (e.g., America/New_York)",
+  })
+  timezone?: string;
 
   @Column({
     type: "boolean",

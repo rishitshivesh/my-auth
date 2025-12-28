@@ -20,6 +20,8 @@ export * from "./src/entities/security-event.entity";
 export * from "./src/entities/role.entity";
 export * from "./src/entities/permission.entity";
 export * from "./src/data-source";
+export * from "./src/entities/user-role.entity";
+export * from "./src/entities/role-permission.entity";
 
 // OAuth
 export * from "./src/entities/oauth-client.entity";

@@ -1098,6 +1098,765 @@
           "OAuth2/OIDC"
         ]
       }
+    },
+    "/rbac/permissions": {
+      "get": {
+        "operationId": "RbacController_listPermissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Permissions retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all permissions",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "post": {
+        "operationId": "RbacController_createPermission",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Permission created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create permission",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/permissions/{id}": {
+      "get": {
+        "operationId": "RbacController_getPermission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get permission by ID",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updatePermission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update permission",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deletePermission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete permission",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/roles": {
+      "get": {
+        "operationId": "RbacController_listRoles",
+        "parameters": [
+          {
+            "name": "loadPermissions",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all roles",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "post": {
+        "operationId": "RbacController_createRole",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/roles/{id}": {
+      "get": {
+        "operationId": "RbacController_getRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "loadPermissions",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get role by ID",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updateRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update role",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deleteRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/roles/{id}/permissions": {
+      "post": {
+        "operationId": "RbacController_assignPermissionsToRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign permissions to role",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_removePermissionsFromRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemovePermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove permissions from role",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "get": {
+        "operationId": "RbacController_getRolePermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get role permissions",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/users/{userId}/roles": {
+      "get": {
+        "operationId": "RbacController_getUserRoles",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user roles",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "post": {
+        "operationId": "RbacController_assignRolesToUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRolesByNameDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign roles to user",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_setUserRoles",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserRolesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set user roles (replace all)",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/users/{userId}/roles/{roleName}": {
+      "delete": {
+        "operationId": "RbacController_removeRoleFromUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove role from user",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/users/{userId}/permissions": {
+      "get": {
+        "operationId": "RbacController_getUserPermissions",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user permissions (aggregated from all roles)",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/users/{userId}/check-permission": {
+      "post": {
+        "operationId": "RbacController_checkPermission",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckPermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check if user has permission",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/users/{userId}/check-role": {
+      "post": {
+        "operationId": "RbacController_checkRole",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check if user has role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/me/roles": {
+      "get": {
+        "operationId": "RbacController_getMyRoles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get my roles",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/me/permissions": {
+      "get": {
+        "operationId": "RbacController_getMyPermissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get my permissions",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/me/check-permission": {
+      "post": {
+        "operationId": "RbacController_checkMyPermission",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckPermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check if I have permission",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/initialize": {
+      "post": {
+        "operationId": "RbacController_initializeTenant",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Initialize RBAC for tenant (create default permissions & roles)",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/cleanup-expired": {
+      "post": {
+        "operationId": "RbacController_cleanupExpiredRoles",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove expired role assignments",
+        "tags": [
+          "RBAC"
+        ]
+      }
     }
   },
   "info": {
@@ -1994,6 +2753,211 @@
           "redirectUris",
           "isActive",
           "createdAt"
+        ]
+      },
+      "CreatePermissionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "users:write"
+          },
+          "resource": {
+            "type": "string",
+            "example": "users"
+          },
+          "action": {
+            "type": "string",
+            "example": "write"
+          },
+          "description": {
+            "type": "string",
+            "example": "Create and update users"
+          },
+          "scope": {
+            "type": "string",
+            "example": "tenant"
+          }
+        },
+        "required": [
+          "name",
+          "resource",
+          "action"
+        ]
+      },
+      "UpdatePermissionDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          }
+        }
+      },
+      "CreateRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "developer"
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Developer"
+          },
+          "description": {
+            "type": "string",
+            "example": "Role for developers"
+          },
+          "permissionNames": {
+            "example": [
+              "users:read",
+              "clients:*"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": false
+          },
+          "priority": {
+            "type": "number",
+            "example": 500
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateRoleDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "example": "Senior Developer"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "isDefault": {
+            "type": "boolean",
+            "example": false
+          },
+          "priority": {
+            "type": "number",
+            "example": 600
+          }
+        }
+      },
+      "AssignPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissionNames": {
+            "example": [
+              "users:read",
+              "users:write"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "permissionNames"
+        ]
+      },
+      "RemovePermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissionNames": {
+            "example": [
+              "users:delete"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "permissionNames"
+        ]
+      },
+      "AssignRolesByNameDto": {
+        "type": "object",
+        "properties": {
+          "roleNames": {
+            "example": [
+              "developer",
+              "user"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "example": "2025-12-31T23:59:59Z"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Granted access for project"
+          }
+        },
+        "required": [
+          "roleNames"
+        ]
+      },
+      "SetUserRolesDto": {
+        "type": "object",
+        "properties": {
+          "roleNames": {
+            "example": [
+              "admin",
+              "developer"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "roleNames"
+        ]
+      },
+      "CheckPermissionDto": {
+        "type": "object",
+        "properties": {
+          "permission": {
+            "type": "string",
+            "example": "users:write"
+          }
+        },
+        "required": [
+          "permission"
+        ]
+      },
+      "CheckRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "example": "admin"
+          }
+        },
+        "required": [
+          "role"
         ]
       }
     }
