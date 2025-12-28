@@ -23,7 +23,7 @@
     "db:migrate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:run -d ../../packages/database/src/data-source.ts",
     "db:migrate:revert": "dotenv -e .env -- typeorm-ts-node-commonjs migration:revert -d ../../packages/database/src/data-source.ts",
     "db:migrate:show": "dotenv -e .env -- typeorm-ts-node-commonjs migration:show -d ../../packages/database/src/data-source.ts",
-    "db:migrate:generate": "dotenv -e .env -- typeorm-ts-node-commonjs migration:generate -d ../../packages/database/src/data-source.ts",
+    "db:migrate:generate": "sh -c 'dotenv -e .env -- typeorm-ts-node-commonjs migration:generate -d ../../packages/database/src/data-source.ts ../../packages/database/src/migrations/$0'",
     "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts"
   },
   "dependencies": {

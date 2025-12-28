@@ -15,6 +15,8 @@ import { OAuthAuthorizationCode } from "./entities/oauth-authorization-code.enti
 import { OAuthAccessToken } from "./entities/oauth-access-token.entity";
 import { OAuthRefreshToken } from "./entities/oauth-refresh-token.entity";
 import { OAuthConsent } from "./entities/oauth-consent.entity";
+import { RolePermission } from "./entities/role-permission.entity";
+import { UserRole } from "./entities/user-role.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -48,6 +50,8 @@ export const dataSourceOptions: DataSourceOptions = {
     OAuthAccessToken,
     OAuthRefreshToken,
     OAuthConsent,
+    RolePermission,
+    UserRole,
   ],
 
   // Migrations
