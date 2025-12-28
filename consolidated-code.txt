@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-27T18:51:53.040Z
+Generated: 2025-12-28T15:13:32.305Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 17.69 KB | LINES: 804
+SIZE: 18.47 KB | LINES: 838
 ================================================================================
 
 {
@@ -1211,6 +1211,40 @@ SIZE: 17.69 KB | LINES: 804
           "Authentication"
         ]
       }
+    },
+    "/email/test": {
+      "get": {
+        "operationId": "EmailController_testEmail",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Email type to test",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Recipient email",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Test email sending (development only)",
+        "tags": [
+          "Email (Development)"
+        ]
+      }
     }
   },
   "info": {
@@ -1780,7 +1814,7 @@ SIZE: 171 B | LINES: 9
 
 ================================================================================
 FILE: apps/auth-service/package.json
-SIZE: 3.51 KB | LINES: 109
+SIZE: 3.64 KB | LINES: 113
 ================================================================================
 
 {
@@ -1812,6 +1846,7 @@ SIZE: 3.51 KB | LINES: 109
     "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.696.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -1830,8 +1865,10 @@ SIZE: 3.51 KB | LINES: 109
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
     "express-session": "^1.18.2",
+    "handlebars": "^4.7.8",
     "ioredis": "^5.8.0",
     "joi": "^18.0.1",
+    "nodemailer": "^6.9.16",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
@@ -1852,6 +1889,7 @@ SIZE: 3.51 KB | LINES: 109
     "@types/express-session": "^1",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^6.4.17",
     "@types/passport": "^0",
     "@types/passport-jwt": "^4",
     "@types/pg": "^8",
@@ -4329,7 +4367,7 @@ export * from "./jwt-auth-guard";
 
 ================================================================================
 FILE: apps/auth-service/src/common/guards/jwt-auth-guard.ts
-SIZE: 648 B | LINES: 29
+SIZE: 911 B | LINES: 38
 ================================================================================
 
 import {
@@ -4347,16 +4385,25 @@ import { Observable } from "rxjs";
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
-    return super.canActivate(context);
-  }
-
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     if (err || !user) {
       throw err || new UnauthorizedException("Invalid or expired token");
     }
+
+    const req = context.switchToHttp().getRequest();
+
+    // 1️⃣ Tenant binding
+    const tokenTenant = user.tenantId;
+    const requestTenant = req.tenant?.id;
+
+    if (!tokenTenant || !requestTenant) {
+      throw new UnauthorizedException("Tenant missing");
+    }
+
+    if (tokenTenant !== requestTenant) {
+      throw new UnauthorizedException("Cross-tenant token");
+    }
+
     return user;
   }
 }
@@ -4365,7 +4412,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
 ================================================================================
 FILE: apps/auth-service/src/common/guards/jwt.strategy.ts
-SIZE: 860 B | LINES: 34
+SIZE: 849 B | LINES: 33
 ================================================================================
 
 import { Injectable, UnauthorizedException } from "@nestjs/common";
@@ -4381,11 +4428,10 @@ import { ConfigService } from "@nestjs/config";
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private configService: ConfigService) {
-    // @ts-ignore
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get("JWT_SECRET"),
+      secretOrKey: configService.getOrThrow("JWT_SECRET"),
     });
   }
 
@@ -4791,16 +4837,16 @@ FILE: apps/auth-service/src/core/app.module.ts
 SIZE: 1.9 KB | LINES: 61
 ================================================================================
 
-import { Module, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { AppApiModule } from './modules/app-module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { logger } from 'src/common/logger';
-import { ResponseInterceptor } from 'src/common/interceptors/response.interceptors';
-import { saveApiDoc } from './services/utility/utility.service';
-import { ALLOWED_URLS } from '../common/constants';
-import cookieParser from 'cookie-parser';
-import session from 'express-session';
+import { Module, ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { AppApiModule } from "./modules/app-module";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { logger } from "src/common/logger";
+import { ResponseInterceptor } from "src/common/interceptors/response.interceptors";
+import { saveApiDoc } from "./services/utility/utility.service";
+import { ALLOWED_URLS } from "../common/constants";
+import cookieParser from "cookie-parser";
+import session from "express-session";
 
 @Module({
   imports: [],
@@ -4810,7 +4856,7 @@ export class AppModule {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
     app.enableCors({
       origin: ALLOWED_URLS,
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
       optionsSuccessStatus: 200,
       credentials: true,
     });
@@ -4822,27 +4868,27 @@ export class AppModule {
     );
 
     const config = new DocumentBuilder()
-      .setTitle('identity-server')
-      .setDescription('API for Identity Server')
-      .setVersion('1.0')
-      .setExternalDoc('Sample', 'https://id.sample.com')
+      .setTitle("identity-server")
+      .setDescription("API for Identity Server")
+      .setVersion("1.0")
+      .setExternalDoc("Sample", "https://id.sample.com")
       .addBearerAuth()
       .build();
 
     const documentForGeneralApis = SwaggerModule.createDocument(app, config);
 
-    SwaggerModule.setup('api-docs', app, documentForGeneralApis);
-    saveApiDoc('api-docs', documentForGeneralApis, 'nest-be');
+    SwaggerModule.setup("api-docs", app, documentForGeneralApis);
+    saveApiDoc("api-docs", documentForGeneralApis, "nest-be");
 
     if (app) {
-      logger.info('Application started successfully');
+      logger.info("Application started successfully");
       logger.info(`Application is running on: ${process.env.PORT}`);
       app.useGlobalInterceptors(new ResponseInterceptor());
       app.use(cookieParser());
       // app.setGlobalPrefix('api');
       app.use(
         session({
-          secret: 'nest-session-secret',
+          secret: "nest-session-secret",
           resave: false,
           saveUninitialized: false,
         }),
@@ -5385,15 +5431,15 @@ SIZE: 0 B | LINES: 1
 
 ================================================================================
 FILE: apps/auth-service/src/database/seeders/run-seeds.ts
-SIZE: 293 B | LINES: 12
+SIZE: 266 B | LINES: 12
 ================================================================================
 
 import AppDataSource from "@repo/database/src/data-source";
-import { seedTenants } from "./tenants.seed";
+import { seed } from "./tenants.seed";
 
 async function runSeeds() {
   await AppDataSource.initialize();
-  await seedTenants(AppDataSource);
+  await seed();
   await AppDataSource.destroy();
   console.log("✅ Seeds completed");
 }
@@ -5404,46 +5450,324 @@ runSeeds();
 
 ================================================================================
 FILE: apps/auth-service/src/database/seeders/tenants.seed.ts
-SIZE: 920 B | LINES: 38
+SIZE: 8.53 KB | LINES: 316
 ================================================================================
 
-// Create seed script: apps/auth-service/src/database/seeds/tenants.seed.ts
 import { DataSource } from "typeorm";
-import { Tenant } from "@repo/database";
+import { Tenant, Role, Permission } from "@repo/database";
+import * as crypto from "crypto";
 
-export async function seedTenants(dataSource: DataSource) {
-  const tenantRepo = dataSource.getRepository(Tenant);
+export async function seed() {
+  // Connect to database
+  const dataSource = new DataSource({
+    type: "postgres",
+    url: process.env.DATABASE_URL,
+    entities: [Tenant, Role, Permission],
+    ssl:
+      process.env.DATABASE_SSL === "true"
+        ? { rejectUnauthorized: false }
+        : false,
+  });
 
-  // Create test tenants
-  const tenants = [
-    {
-      slug: "acme",
-      name: "Acme Corporation",
-      environment: "production",
-      active: true,
-    },
-    {
-      slug: "startup",
-      name: "Startup Inc",
-      environment: "production",
-      active: true,
-    },
-    {
-      slug: "test",
-      name: "Test Tenant",
-      environment: "development",
-      active: true,
-    },
-  ];
+  await dataSource.initialize();
+  console.log("🔌 Connected to database");
 
-  for (const data of tenants) {
-    const exists = await tenantRepo.findOne({ where: { slug: data.slug } });
-    if (!exists) {
-      await tenantRepo.save(tenantRepo.create(data));
-      console.log(`✅ Created tenant: ${data.slug}`);
+  try {
+    // ==================================================
+    // 1. Seed Tenants
+    // ==================================================
+    console.log("🏢 Seeding tenants...");
+
+    const tenants = [
+      {
+        name: "Default Organization",
+        slug: "default",
+        subdomain: "default",
+        status: "active",
+        plan: "free",
+        settings: {},
+        featureFlags: {
+          mfaRequired: false,
+          passwordlessEnabled: true,
+          socialProvidersEnabled: true,
+        },
+        isActive: true,
+        environment: "production",
+      },
+      {
+        name: "Acme Corporation",
+        slug: "acme",
+        subdomain: "acme",
+        customDomain: "auth.acme.com",
+        customDomainVerified: false,
+        status: "active",
+        plan: "professional",
+        settings: {
+          branding: {
+            logo: "https://acme.com/logo.png",
+            primaryColor: "#FF6B35",
+          },
+        },
+        featureFlags: {
+          mfaRequired: true,
+          passwordlessEnabled: true,
+          socialProvidersEnabled: true,
+          samlEnabled: true,
+        },
+        isActive: true,
+        environment: "production",
+      },
+      {
+        name: "Startup Inc",
+        slug: "startup",
+        subdomain: "startup",
+        status: "trial",
+        plan: "starter",
+        settings: {
+          allowSignup: true,
+          requireEmailVerification: true,
+          mfaRequired: true,
+        },
+        featureFlags: {
+          mfaRequired: false,
+          passwordlessEnabled: false,
+          socialProvidersEnabled: true,
+        },
+        isActive: true,
+        environment: "production",
+        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
+      },
+    ];
+
+    const tenantRepo = dataSource.getRepository(Tenant);
+
+    for (const tenantData of tenants) {
+      const existing = await tenantRepo.findOne({
+        where: { slug: tenantData.slug },
+      });
+      if (!existing) {
+        const tenant = tenantRepo.create(tenantData);
+        await tenantRepo.save(tenant);
+        console.log(`  ✅ Created tenant: ${tenant.name} (${tenant.slug})`);
+      } else {
+        console.log(`  ⏭️  Tenant exists: ${existing.name}`);
+      }
     }
+
+    // ==================================================
+    // 2. Seed Roles (per tenant)
+    // ==================================================
+    console.log("👥 Seeding roles...");
+
+    const allTenants = await tenantRepo.find();
+    const roleRepo = dataSource.getRepository(Role);
+
+    const systemRoles = [
+      {
+        name: "Owner",
+        description: "Full access to everything in the organization",
+        isSystem: true,
+      },
+      {
+        name: "Admin",
+        description: "Administrative access with some limitations",
+        isSystem: true,
+      },
+      {
+        name: "Member",
+        description: "Basic member access",
+        isSystem: true,
+      },
+      {
+        name: "Developer",
+        description: "Access to API keys and developer tools",
+        isSystem: false,
+      },
+      {
+        name: "Viewer",
+        description: "Read-only access",
+        isSystem: false,
+      },
+    ];
+
+    for (const tenant of allTenants) {
+      for (const roleData of systemRoles) {
+        const existing = await roleRepo.findOne({
+          where: { name: roleData.name, tenantId: tenant.id },
+        });
+
+        if (!existing) {
+          const role = roleRepo.create({
+            ...roleData,
+            tenantId: tenant.id,
+          });
+          await roleRepo.save(role);
+          console.log(`  ✅ Created role: ${tenant.slug}/${role.name}`);
+        }
+      }
+    }
+
+    // ==================================================
+    // 3. Seed Permissions (per tenant)
+    // ==================================================
+    console.log("🔐 Seeding permissions...");
+
+    const permissionRepo = dataSource.getRepository(Permission);
+
+    const basePermissions = [
+      // User management
+      { resource: "user", action: "create", description: "Create users" },
+      { resource: "user", action: "read", description: "View users" },
+      { resource: "user", action: "update", description: "Update users" },
+      { resource: "user", action: "delete", description: "Delete users" },
+      {
+        resource: "user",
+        action: "impersonate",
+        description: "Impersonate users",
+      },
+
+      // Role management
+      { resource: "role", action: "create", description: "Create roles" },
+      { resource: "role", action: "read", description: "View roles" },
+      { resource: "role", action: "update", description: "Update roles" },
+      { resource: "role", action: "delete", description: "Delete roles" },
+      {
+        resource: "role",
+        action: "assign",
+        description: "Assign roles to users",
+      },
+
+      // Permission management
+      {
+        resource: "permission",
+        action: "read",
+        description: "View permissions",
+      },
+      {
+        resource: "permission",
+        action: "assign",
+        description: "Assign permissions to roles",
+      },
+
+      // Tenant management
+      {
+        resource: "tenant",
+        action: "read",
+        description: "View tenant settings",
+      },
+      {
+        resource: "tenant",
+        action: "update",
+        description: "Update tenant settings",
+      },
+      { resource: "tenant", action: "delete", description: "Delete tenant" },
+
+      // OAuth client management
+      {
+        resource: "oauth_client",
+        action: "create",
+        description: "Create OAuth clients",
+      },
+      {
+        resource: "oauth_client",
+        action: "read",
+        description: "View OAuth clients",
+      },
+      {
+        resource: "oauth_client",
+        action: "update",
+        description: "Update OAuth clients",
+      },
+      {
+        resource: "oauth_client",
+        action: "delete",
+        description: "Delete OAuth clients",
+      },
+
+      // Provider management
+      {
+        resource: "provider",
+        action: "create",
+        description: "Add identity providers",
+      },
+      {
+        resource: "provider",
+        action: "read",
+        description: "View identity providers",
+      },
+      {
+        resource: "provider",
+        action: "update",
+        description: "Update identity providers",
+      },
+      {
+        resource: "provider",
+        action: "delete",
+        description: "Remove identity providers",
+      },
+
+      // Audit logs
+      { resource: "audit", action: "read", description: "View audit logs" },
+      { resource: "audit", action: "export", description: "Export audit logs" },
+
+      // Settings
+      { resource: "settings", action: "read", description: "View settings" },
+      {
+        resource: "settings",
+        action: "update",
+        description: "Update settings",
+      },
+    ];
+
+    for (const tenant of allTenants) {
+      for (const permData of basePermissions) {
+        const existing = await permissionRepo.findOne({
+          where: {
+            tenantId: tenant.id,
+            resource: permData.resource,
+            action: permData.action,
+          },
+        });
+
+        if (!existing) {
+          const permission = permissionRepo.create({
+            ...permData,
+            tenantId: tenant.id,
+          });
+          await permissionRepo.save(permission);
+          console.log(
+            `  ✅ Created permission: ${tenant.slug}/${permission.resource}:${permission.action}`,
+          );
+        }
+      }
+    }
+
+    console.log("");
+    console.log("✅ Seeding complete!");
+    console.log("");
+    console.log("📊 Summary:");
+    console.log(`   Tenants: ${allTenants.length}`);
+    console.log(`   Roles per tenant: ${systemRoles.length}`);
+    console.log(`   Permissions per tenant: ${basePermissions.length}`);
+    console.log("");
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    throw error;
+  } finally {
+    await dataSource.destroy();
   }
 }
+
+// Run seed
+seed()
+  .then(() => {
+    console.log("✅ Done");
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error("❌ Error:", error);
+    process.exit(1);
+  });
 
 
 
@@ -5471,7 +5795,7 @@ bootstrap();
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
-SIZE: 5.73 KB | LINES: 216
+SIZE: 5.75 KB | LINES: 217
 ================================================================================
 
 import {
@@ -5686,6 +6010,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "User info retrieved" })
   async getMe(@Req() req: Request) {
     const tenantId = req.tenantId!;
+    console.log(req.user);
     return this.authService.getCurrentUser(tenantId, req.user.sub);
   }
 }
@@ -5802,7 +6127,7 @@ export class VerifyEmailDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 1.07 KB | LINES: 43
+SIZE: 1.36 KB | LINES: 49
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -5817,9 +6142,13 @@ import {
   MfaSettings,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
+import { EmailModule } from "../email/email.module";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PasswordService } from "@repo/security";
+import { PassportModule } from "@nestjs/passport";
+import { JwtStrategy } from "@/common/guards/jwt.strategy";
+import { JwtAuthGuard } from "@/common/guards";
 
 @Module({
   imports: [
@@ -5831,6 +6160,8 @@ import { PasswordService } from "@repo/security";
       MfaSettings,
     ]),
     UserModule,
+    EmailModule,
+    PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -5843,7 +6174,7 @@ import { PasswordService } from "@repo/security";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService],
+  providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}
@@ -5852,7 +6183,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 18.94 KB | LINES: 702
+SIZE: 21.25 KB | LINES: 790
 ================================================================================
 
 import {
@@ -5868,8 +6199,9 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { User, Session, SecurityEvent, Tenant } from "@repo/database";
 import { PasswordService } from "@repo/security";
+import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
-
+import { v4 as uuidv4 } from "uuid";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -5895,6 +6227,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -5983,8 +6316,8 @@ export class AuthService {
       metadata: { email: savedUser.email },
     });
 
-    // TODO: Send verification email
-    // await this.emailService.sendVerificationEmail(savedUser.email, emailVerificationToken);
+    // Send welcome and verification email
+    await this.emailService.sendWelcomeEmail(savedUser, emailVerificationToken);
 
     return {
       id: savedUser.id,
@@ -6000,104 +6333,118 @@ export class AuthService {
    * Login with email and password (TENANT REQUIRED)
    */
   async login(data: {
-    tenantId: string; // ← Now REQUIRED!
+    tenantId: string;
     email: string;
     password: string;
     ip: string;
     userAgent: string;
-  }) {
-    // Find user IN THIS TENANT with password hash
-    const user = await this.userRepository
-      .createQueryBuilder("user")
-      .addSelect("user.passwordHash")
-      .where("user.email = :email", { email: data.email })
-      .andWhere("user.tenantId = :tenantId", { tenantId: data.tenantId }) // ← Tenant filter
-      .getOne();
+  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+    const { tenantId, email, password, ip, userAgent } = data;
 
-    if (!user) {
-      // Log failed login (tenant-scoped)
-      await this.logSecurityEvent({
-        tenantId: data.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "user_not_found", email: data.email },
-      });
-
-      throw new UnauthorizedException("Invalid email or password");
-    }
-
-    // Check if account is locked
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const minutesLeft = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / 1000 / 60,
-      );
-
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "account_locked", minutesLeft },
-      });
-
-      throw new UnauthorizedException(
-        `Account is locked. Please try again in ${minutesLeft} minute(s).`,
-      );
-    }
-
-    // Verify password
-    const isPasswordValid = await PasswordService.verify(
-      user.passwordHash,
-      data.password,
-    );
-
-    if (!isPasswordValid) {
-      // Increment failed attempts
-      await this.incrementFailedAttempts(data.tenantId, user.id);
-
-      await this.logSecurityEvent({
-        userId: user.id,
-        tenantId: user.tenantId,
-        eventType: "LOGIN_FAILED",
-        severity: "warning",
-        ipAddress: data.ip,
-        userAgent: data.userAgent,
-        metadata: { reason: "invalid_password" },
-      });
-
-      throw new UnauthorizedException("Invalid email or password");
-    }
-
-    // Reset failed attempts
-    await this.userRepository.update(
-      { id: user.id, tenantId: data.tenantId }, // ← Tenant-scoped update
-      {
-        failedLoginAttempts: 0,
-        lockedUntil: undefined,
-        lastLoginAt: new Date(),
-        lastLoginIp: data.ip,
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+      relations: ["tenant"],
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true, // ← Force select this hidden field
+        firstName: true,
+        lastName: true,
+        emailVerified: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
       },
-    );
-
-    // Create session (tenant-scoped)
-    const session = await this.createSession({
-      tenantId: data.tenantId,
-      userId: user.id,
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
     });
 
-    // Generate JWT tokens (include tenantId in payload)
+    console.log("🔍 Login attempt:", { email, tenantId, userFound: !!user }); // ← ADD
+
+    if (!user) {
+      await this.logSecurityEvent({
+        tenantId,
+        eventType: "login_failed",
+        severity: "critical",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "user_not_found" },
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    console.log("🔍 User found:", {
+      userId: user.id,
+      user,
+      hasPassword: !!user.passwordHash,
+      passwordHashStart: user.passwordHash?.substring(0, 20),
+    }); // ← ADD
+
+    // Verify password
+    const isValid = await PasswordService.verify(user.passwordHash, password);
+
+    console.log("🔍 Password check:", { isValid }); // ← ADD
+
+    if (!isValid) {
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "login_failed",
+        severity: "critical",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "invalid_password" },
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
+    // Check if email verified (if required)
+    if (
+      !user.emailVerified &&
+      user.tenant.featureFlags?.emailVerificationRequired
+    ) {
+      throw new UnauthorizedException("Please verify your email first");
+    }
+
+    // Check if account is active
+    if (
+      !user.emailVerified &&
+      user.tenant.featureFlags?.emailVerificationRequired
+    ) {
+      throw new UnauthorizedException("Please verify your email first");
+    }
+    // === REFRESH TOKEN ROTATION LOGIC ===
+
+    // 1. Generate new family ID
+    const familyId = uuidv4();
+
+    // 2. Generate refresh token (opaque random string)
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+
+    // 3. Hash it before storing
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    // 4. Create session with family
+    const session = await this.sessionRepository.save({
+      userId: user.id,
+      tenantId,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent,
+      lastActivity: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+
+    // 5. Generate access token
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
-        tenantId: user.tenantId,
-        sessionId: session.id, // ← Include session ID
+        tenantId,
+        sessionId: session.id,
       },
       {
         secret: this.configService.get("JWT_SECRET"),
@@ -6105,39 +6452,31 @@ export class AuthService {
       },
     );
 
-    const refreshToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        tenantId: user.tenantId,
-        sessionId: session.id,
-        type: "refresh",
-      },
-      {
-        secret: this.configService.get("JWT_REFRESH_SECRET"),
-        expiresIn: "7d", // 7 days
-      },
-    );
-
-    // Log successful login (tenant-scoped)
+    // Log successful login
     await this.logSecurityEvent({
+      tenantId,
       userId: user.id,
-      tenantId: user.tenantId,
-      eventType: "LOGIN_SUCCESS",
+      eventType: "login_success",
       severity: "info",
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
-      metadata: { sessionId: session.id },
+      ipAddress: ip,
+      userAgent,
+      metadata: { sessionId: session.id, familyId },
     });
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken, // ← Return plaintext token to user
       user: {
-        id: user.id,
+        // id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         emailVerified: user.emailVerified,
+        // tenant: {
+        //   id: user.tenant.id,
+        //   name: user.tenant.name,
+        //   slug: user.tenant.slug,
+        // },
       },
     };
   }
@@ -6145,14 +6484,18 @@ export class AuthService {
   /**
    * Logout - revoke current session (TENANT SCOPED)
    */
-  async logout(tenantId: string, userId: string, sessionId?: string) {
+  async logout(
+    tenantId: string,
+    userId: string,
+    sessionId?: string,
+  ): Promise<void> {
     if (sessionId) {
-      // Revoke specific session
+      // Logout specific session
       await this.sessionRepository.update(
         {
           id: sessionId,
           userId,
-          tenantId, // ← Tenant filter
+          tenantId,
         },
         {
           revokedAt: new Date(),
@@ -6160,28 +6503,27 @@ export class AuthService {
         },
       );
     } else {
-      // Revoke all active sessions for this user IN THIS TENANT
+      // Logout all active sessions for user
       await this.sessionRepository.update(
         {
           userId,
-          tenantId, // ← Tenant filter
-          revokedAt: IsNull(), // Only active sessions
+          tenantId,
+          revokedAt: IsNull(),
         },
         {
           revokedAt: new Date(),
-          revokedReason: "user_logout",
+          revokedReason: "user_logout_all",
         },
       );
     }
 
     await this.logSecurityEvent({
-      userId,
       tenantId,
-      eventType: "LOGOUT",
+      userId,
+      eventType: "logout",
       severity: "info",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
-    });
+      metadata: { sessionId },
+    } as any);
   }
 
   /**
@@ -6225,8 +6567,8 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // TODO: Send password reset email
-    // await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    // Send password reset email
+    await this.emailService.sendPasswordResetEmail(user, resetToken);
 
     console.log("Password reset token:", resetToken); // For development
   }
@@ -6296,6 +6638,9 @@ export class AuthService {
       ipAddress: "0.0.0.0",
       userAgent: "system",
     });
+
+    // Send password changed confirmation email
+    await this.emailService.sendPasswordChangedEmail(user);
 
     // Revoke all sessions IN THIS TENANT (force re-login)
     await this.sessionRepository.update(
@@ -6377,8 +6722,8 @@ export class AuthService {
       },
     );
 
-    // TODO: Send verification email
-    // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
+    // Send verification email
+    await this.emailService.sendVerificationEmail(user, emailVerificationToken);
 
     console.log("Verification token:", emailVerificationToken); // For development
   }
@@ -6386,64 +6731,119 @@ export class AuthService {
   /**
    * Refresh access token (TENANT SCOPED)
    */
-  async refreshToken(tenantId: string, refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get("JWT_REFRESH_SECRET"),
-      });
+  async refreshToken(
+    tenantId: string,
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    // 1. Hash the incoming token
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
 
-      if (payload.type !== "refresh") {
-        throw new UnauthorizedException("Invalid refresh token");
-      }
+    // 2. Find session by hash
+    const session = await this.sessionRepository.findOne({
+      where: {
+        tenantId,
+        refreshTokenHash: tokenHash,
+        revokedAt: IsNull(),
+      },
+      relations: ["user"],
+    });
 
-      // Verify tenant matches
-      if (payload.tenantId !== tenantId) {
-        throw new UnauthorizedException("Invalid tenant for this token");
-      }
-
-      const user = await this.userRepository.findOne({
-        where: {
-          id: payload.sub,
-          tenantId, // ← Tenant filter
-        },
-      });
-
-      if (!user) {
-        throw new UnauthorizedException("User not found");
-      }
-
-      // Verify session is still active
-      const session = await this.sessionRepository.findOne({
-        where: {
-          id: payload.sessionId,
-          userId: user.id,
-          tenantId, // ← Tenant filter
-          revokedAt: IsNull(),
-        },
-      });
-
-      if (!session) {
-        throw new UnauthorizedException("Session has been revoked");
-      }
-
-      // Generate new access token
-      const accessToken = this.jwtService.sign(
-        {
-          sub: user.id,
-          email: user.email,
-          tenantId: user.tenantId,
-          sessionId: session.id,
-        },
-        {
-          secret: this.configService.get("JWT_SECRET"),
-          expiresIn: "15m",
-        },
-      );
-
-      return { accessToken };
-    } catch (error) {
-      throw new UnauthorizedException("Invalid or expired refresh token");
+    if (!session) {
+      throw new UnauthorizedException("Invalid refresh token");
     }
+
+    // 3. Check if session expired
+    if (session.expiresAt && session.expiresAt < new Date()) {
+      await this.sessionRepository.update(session.id, {
+        revokedAt: new Date(),
+        revokedReason: "expired",
+      });
+      throw new UnauthorizedException("Session expired");
+    }
+
+    // === REUSE DETECTION ===
+    // 4. Check if this token was already used
+    if (session.lastRefreshAt) {
+      // TOKEN REUSE DETECTED!
+      // This token was already exchanged for a new one
+      // Someone is replaying an old token → security breach
+
+      console.error("🚨 REFRESH TOKEN REUSE DETECTED", {
+        sessionId: session.id,
+        familyId: session.refreshTokenFamilyId,
+        userId: session.userId,
+        tenantId: session.tenantId,
+      });
+
+      // Revoke entire family
+      await this.revokeSessionFamily(session.refreshTokenFamilyId!);
+
+      // Log critical security event
+      await this.logSecurityEvent({
+        tenantId,
+        userId: session.userId,
+        eventType: "refresh_token_reuse_detected",
+        severity: "critical",
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        metadata: {
+          sessionId: session.id,
+          familyId: session.refreshTokenFamilyId,
+        },
+      });
+
+      throw new UnauthorizedException(
+        "Token reuse detected - all sessions revoked",
+      );
+    }
+
+    // === ROTATION ===
+    // 5. Generate NEW refresh token
+    const newRefreshToken = crypto.randomBytes(32).toString("hex");
+    const newRefreshTokenHash = crypto
+      .createHash("sha256")
+      .update(newRefreshToken)
+      .digest("hex");
+
+    // 6. Update session (rotate token, mark as used)
+    await this.sessionRepository.update(session.id, {
+      refreshTokenHash: newRefreshTokenHash,
+      lastRefreshAt: new Date(), // ← Mark this token as used
+      lastActivity: new Date(),
+    });
+
+    // 7. Generate new access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: session.userId,
+        email: session.user.email,
+        tenantId: session.tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log token refresh
+    await this.logSecurityEvent({
+      tenantId,
+      userId: session.userId,
+      eventType: "token_refreshed",
+      severity: "info",
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      metadata: { sessionId: session.id },
+    });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken, // ← Return NEW token
+    };
   }
 
   /**
@@ -6534,6 +6934,25 @@ export class AuthService {
   }
 
   /**
+   * Revoke all sessions in a token family
+   * Used when token reuse is detected
+   */
+  private async revokeSessionFamily(familyId: string): Promise<void> {
+    await this.sessionRepository.update(
+      {
+        refreshTokenFamilyId: familyId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+        revokedReason: "token_reuse_detected",
+      },
+    );
+
+    console.log(`🔒 Revoked all sessions in family: ${familyId}`);
+  }
+
+  /**
    * Log security event (TENANT SCOPED) - PRIVATE METHOD
    */
   private async logSecurityEvent(data: {
@@ -6554,6 +6973,899 @@ export class AuthService {
       userAgent: data.userAgent,
       metadata: data.metadata || {},
     });
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/email.controller.ts
+SIZE: 2.97 KB | LINES: 112
+================================================================================
+
+/**
+ * Email Controller
+ *
+ * Test endpoint for development/testing email functionality.
+ * Only works in development mode.
+ */
+
+import { Controller, Get, Query, BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
+import { EmailService } from "./email.service";
+
+@ApiTags("Email (Development)")
+@Controller("email")
+export class EmailController {
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Test email sending (development only)
+   */
+  @Get("test")
+  @ApiOperation({ summary: "Test email sending (development only)" })
+  @ApiQuery({ name: "type", required: true, description: "Email type to test" })
+  @ApiQuery({ name: "to", required: true, description: "Recipient email" })
+  async testEmail(
+    @Query("type") type: string,
+    @Query("to") to: string,
+  ): Promise<any> {
+    // Only allow in development
+    const nodeEnv = this.configService.get<string>("NODE_ENV");
+    if (nodeEnv === "production") {
+      throw new BadRequestException(
+        "Email testing is not available in production",
+      );
+    }
+
+    // Mock user data for testing
+    const mockUser = {
+      id: "test-user-id",
+      tenantId: "test-tenant-id",
+      email: to,
+      firstName: "Test",
+      lastName: "User",
+      emailVerified: false,
+      passwordHash: "",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any;
+
+    let result: boolean;
+
+    switch (type) {
+      case "welcome":
+        result = await this.emailService.sendWelcomeEmail(
+          mockUser,
+          "test-verification-token-123",
+        );
+        break;
+
+      case "verification":
+        result = await this.emailService.sendVerificationEmail(
+          mockUser,
+          "test-verification-token-123",
+        );
+        break;
+
+      case "password-reset":
+        result = await this.emailService.sendPasswordResetEmail(
+          mockUser,
+          "test-reset-token-123",
+        );
+        break;
+
+      case "password-changed":
+        result = await this.emailService.sendPasswordChangedEmail(mockUser);
+        break;
+
+      case "magic-link":
+        result = await this.emailService.sendMagicLinkEmail(
+          mockUser,
+          "test-magic-link-token-123",
+        );
+        break;
+
+      case "otp":
+        result = await this.emailService.sendOTPEmail(mockUser, "123456");
+        break;
+
+      case "account-deleted":
+        result = await this.emailService.sendAccountDeletedEmail(mockUser);
+        break;
+
+      default:
+        throw new BadRequestException(
+          `Invalid email type. Valid types: welcome, verification, password-reset, password-changed, magic-link, otp, account-deleted`,
+        );
+    }
+
+    return {
+      success: result,
+      type,
+      recipient: to,
+      message: result
+        ? "Email sent successfully (check console if in development mode)"
+        : "Email failed to send",
+    };
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/email.module.ts
+SIZE: 820 B | LINES: 27
+================================================================================
+
+/**
+ * Email Module
+ *
+ * Provides email functionality for the auth service.
+ * Auto-configures providers based on environment variables.
+ */
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ConfigModule } from "@nestjs/config";
+import { SecurityEvent, Tenant } from "@repo/database";
+import { EmailService } from "./email.service";
+import { EmailController } from "./email.controller";
+import { NodeMailerProvider } from "./providers/nodemailer.provider";
+import { SESProvider } from "./providers/ses.provider";
+
+@Module({
+  imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([SecurityEvent, Tenant]),
+  ],
+  controllers: [EmailController],
+  providers: [EmailService, NodeMailerProvider, SESProvider],
+  exports: [EmailService],
+})
+export class EmailModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/email.service.ts
+SIZE: 11.45 KB | LINES: 422
+================================================================================
+
+/**
+ * Email Service
+ *
+ * Main email service that:
+ * - Auto-detects which provider to use (SES > SMTP > Console)
+ * - Handles email templating with Handlebars
+ * - Logs all email attempts to security_events
+ * - Supports multi-tenant branding
+ */
+
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User, Tenant, SecurityEvent } from "@repo/database";
+import * as Handlebars from "handlebars";
+import * as fs from "fs";
+import * as path from "path";
+import { EmailProvider } from "./providers/email-provider.interface";
+import { NodeMailerProvider } from "./providers/nodemailer.provider";
+import { SESProvider } from "./providers/ses.provider";
+
+@Injectable()
+export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+  private provider: EmailProvider | null = null;
+  private templateCache: Map<string, HandlebarsTemplateDelegate> = new Map();
+
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
+  ) {
+    this.initializeProvider();
+  }
+
+  /**
+   * Auto-detect and initialize email provider
+   * Priority: SES > SMTP > Console (development)
+   */
+  private initializeProvider(): void {
+    const awsSesAccessKey = this.configService.get<string>(
+      "AWS_SES_ACCESS_KEY_ID",
+    );
+    const awsSesSecretKey = this.configService.get<string>(
+      "AWS_SES_SECRET_ACCESS_KEY",
+    );
+    const smtpHost = this.configService.get<string>("SMTP_HOST");
+
+    if (awsSesAccessKey && awsSesSecretKey) {
+      // Use SES
+      this.provider = new SESProvider(this.configService);
+      this.logger.log("📧 Email provider: AWS SES");
+    } else if (smtpHost) {
+      // Use SMTP (NodeMailer)
+      this.provider = new NodeMailerProvider(this.configService);
+      this.logger.log("📧 Email provider: SMTP (NodeMailer)");
+    } else {
+      // Development mode - log to console
+      this.provider = null;
+      this.logger.warn(
+        "📧 Email provider: CONSOLE (Development) - No email provider configured",
+      );
+    }
+  }
+
+  /**
+   * Send email using the configured provider
+   */
+  async sendEmail(options: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+    tenantId: string;
+    userId?: string;
+    emailType: string;
+  }): Promise<boolean> {
+    const startTime = Date.now();
+    let success = false;
+
+    console.log(this.provider);
+
+    try {
+      if (this.provider) {
+        // Use configured provider (SES or SMTP)
+        await this.provider.sendEmail({
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        });
+        success = true;
+        this.logger.log(
+          `✅ Email sent to ${options.to} via ${this.provider.getProviderName()}`,
+        );
+      } else {
+        // Development mode - log to console
+        console.log("\n========== EMAIL (DEVELOPMENT MODE) ==========");
+        console.log(`To: ${options.to}`);
+        console.log(`Subject: ${options.subject}`);
+        console.log(`Type: ${options.emailType}`);
+        console.log(`HTML Length: ${options.html.length} chars`);
+        console.log("==============================================\n");
+        success = true;
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `❌ Failed to send email to ${options.to}: ${error.message}`,
+        error.stack,
+      );
+      success = false;
+    }
+
+    // Log to security events
+    await this.logEmailEvent({
+      tenantId: options.tenantId,
+      userId: options.userId,
+      emailType: options.emailType,
+      recipient: options.to,
+      provider: this.provider?.getProviderName() || "console",
+      success,
+      duration: Date.now() - startTime,
+    });
+
+    return success;
+  }
+
+  /**
+   * Load and compile template
+   */
+  private async loadTemplate(
+    templateName: string,
+  ): Promise<HandlebarsTemplateDelegate> {
+    // Check cache first
+    if (this.templateCache.has(templateName)) {
+      return this.templateCache.get(templateName)!;
+    }
+
+    const templatePath = path.join(
+      __dirname,
+      "../../../",
+      "templates",
+      `${templateName}.html`,
+    );
+
+    try {
+      const templateContent = fs.readFileSync(templatePath, "utf-8");
+      const compiledTemplate = Handlebars.compile(templateContent);
+      this.templateCache.set(templateName, compiledTemplate);
+      return compiledTemplate;
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to load template ${templateName}: ${error.message}`,
+      );
+      throw new Error(`Template ${templateName} not found`);
+    }
+  }
+
+  /**
+   * Render template with data
+   */
+  private async renderTemplate(
+    templateName: string,
+    data: Record<string, any>,
+  ): Promise<string> {
+    const template = await this.loadTemplate(templateName);
+    return template({
+      ...data,
+      currentYear: new Date().getFullYear(),
+    });
+  }
+
+  /**
+   * Get tenant branding information
+   */
+  private async getTenantBranding(tenantId: string): Promise<{
+    tenantName: string;
+    tenantLogo: string;
+  }> {
+    try {
+      const tenant = await this.tenantRepository.findOne({
+        where: { id: tenantId },
+      });
+
+      return {
+        tenantName: tenant?.name || "Fort Knox",
+        tenantLogo:
+          // TODO Tenant Logo URL
+          // tenant?.metadata?.logoUrl ||
+          "https://via.placeholder.com/150x50?text=Fort+Knox",
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load tenant branding for ${tenantId}, using defaults`,
+      );
+      return {
+        tenantName: "Fort Knox",
+        tenantLogo: "https://via.placeholder.com/150x50?text=Fort+Knox",
+      };
+    }
+  }
+
+  /**
+   * Send welcome email after registration
+   */
+  async sendWelcomeEmail(
+    user: User,
+    verificationToken: string,
+  ): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+    const verificationUrl = `${this.configService.get<string>("FRONTEND_URL")}/verify-email?token=${verificationToken}`;
+
+    const html = await this.renderTemplate("welcome", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      actionUrl: verificationUrl,
+      expiresIn: "24 hours",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: `Welcome to ${branding.tenantName}!`,
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "welcome",
+    });
+  }
+
+  /**
+   * Send email verification
+   */
+  async sendVerificationEmail(
+    user: User,
+    verificationToken: string,
+  ): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+    const verificationUrl = `${this.configService.get<string>("FRONTEND_URL")}/verify-email?token=${verificationToken}`;
+
+    const html = await this.renderTemplate("verify-email", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      actionUrl: verificationUrl,
+      expiresIn: "24 hours",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Verify your email address",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "verification",
+    });
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(
+    user: User,
+    resetToken: string,
+  ): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+    const resetUrl = `${this.configService.get<string>("FRONTEND_URL")}/reset-password?token=${resetToken}`;
+
+    const html = await this.renderTemplate("password-reset", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      actionUrl: resetUrl,
+      expiresIn: "1 hour",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Reset your password",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "password_reset",
+    });
+  }
+
+  /**
+   * Send password changed confirmation
+   */
+  async sendPasswordChangedEmail(user: User): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+
+    const html = await this.renderTemplate("password-changed", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Your password has been changed",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "password_changed",
+    });
+  }
+
+  /**
+   * Send magic link email
+   */
+  async sendMagicLinkEmail(
+    user: User,
+    magicLinkToken: string,
+  ): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+    const magicLinkUrl = `${this.configService.get<string>("FRONTEND_URL")}/auth/magic-link?token=${magicLinkToken}`;
+
+    const html = await this.renderTemplate("magic-link", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      actionUrl: magicLinkUrl,
+      expiresIn: "15 minutes",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Your magic link to sign in",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "magic_link",
+    });
+  }
+
+  /**
+   * Send OTP code email
+   */
+  async sendOTPEmail(user: User, otpCode: string): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+
+    const html = await this.renderTemplate("otp", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      code: otpCode,
+      expiresIn: "10 minutes",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Your verification code",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "otp",
+    });
+  }
+
+  /**
+   * Send account deleted confirmation
+   */
+  async sendAccountDeletedEmail(user: User): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+
+    const html = await this.renderTemplate("account-deleted", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Your account has been deleted",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "account_deleted",
+    });
+  }
+
+  /**
+   * Log email event to security_events table
+   */
+  private async logEmailEvent(data: {
+    tenantId: string;
+    userId?: string;
+    emailType: string;
+    recipient: string;
+    provider: string;
+    success: boolean;
+    duration: number;
+  }): Promise<void> {
+    try {
+      await this.securityEventRepository.save({
+        tenantId: data.tenantId,
+        userId: data.userId,
+        eventType: "email_sent",
+        severity: data.success ? "info" : "warning",
+        ipAddress: "0.0.0.0",
+        userAgent: "email-service",
+        metadata: {
+          emailType: data.emailType,
+          recipient: data.recipient,
+          provider: data.provider,
+          success: data.success,
+          duration: data.duration,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to log email event: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/providers/email-provider.interface.ts
+SIZE: 966 B | LINES: 44
+================================================================================
+
+/**
+ * Email Provider Interface
+ *
+ * Abstract interface that all email providers must implement.
+ * This allows easy switching between NodeMailer, SES, or other providers.
+ */
+
+export interface EmailOptions {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+  from?: string;
+  replyTo?: string;
+  cc?: string | string[];
+  bcc?: string | string[];
+  attachments?: Array<{
+    filename: string;
+    content?: string | Buffer;
+    path?: string;
+  }>;
+}
+
+export interface EmailProvider {
+  /**
+   * Send an email
+   * @param options Email options
+   * @returns Promise that resolves when email is sent
+   */
+  sendEmail(options: EmailOptions): Promise<void>;
+
+  /**
+   * Verify connection/credentials
+   * @returns Promise that resolves to true if connection is valid
+   */
+  verify(): Promise<boolean>;
+
+  /**
+   * Get provider name
+   * @returns Name of the provider (e.g., "smtp", "ses", "console")
+   */
+  getProviderName(): string;
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/providers/nodemailer.provider.ts
+SIZE: 2.93 KB | LINES: 102
+================================================================================
+
+/**
+ * NodeMailer Email Provider
+ *
+ * SMTP-based email provider using NodeMailer.
+ * Supports any SMTP server (Gmail, Outlook, custom servers, etc.)
+ */
+
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as nodemailer from "nodemailer";
+import { Transporter } from "nodemailer";
+import { EmailProvider, EmailOptions } from "./email-provider.interface";
+
+@Injectable()
+export class NodeMailerProvider implements EmailProvider {
+  private readonly logger = new Logger(NodeMailerProvider.name);
+  private transporter: Transporter;
+
+  constructor(private readonly configService: ConfigService) {
+    this.initializeTransporter();
+  }
+
+  private initializeTransporter(): void {
+    const smtpHost = this.configService.get<string>("SMTP_HOST");
+    const smtpPort = this.configService.get<number>("SMTP_PORT", 587);
+    const smtpSecure = this.configService.get<string>("SMTP_SECURE") === "true";
+    const smtpUser = this.configService.get<string>("SMTP_USER");
+    const smtpPass = this.configService.get<string>("SMTP_PASS");
+
+    this.transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      pool: true, // Use connection pooling
+      maxConnections: 5,
+      maxMessages: 100,
+    });
+
+    this.logger.log(
+      `NodeMailer initialized with SMTP server: ${smtpHost}:${smtpPort}`,
+    );
+  }
+
+  async sendEmail(options: EmailOptions): Promise<void> {
+    const from =
+      options.from ||
+      `"${this.configService.get<string>("EMAIL_FROM_NAME")}" <${this.configService.get<string>("EMAIL_FROM")}>`;
+
+    const replyTo =
+      options.replyTo || this.configService.get<string>("EMAIL_REPLY_TO");
+
+    try {
+      const info = await this.transporter.sendMail({
+        from,
+        to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        replyTo,
+        cc: options.cc
+          ? Array.isArray(options.cc)
+            ? options.cc.join(", ")
+            : options.cc
+          : undefined,
+        bcc: options.bcc
+          ? Array.isArray(options.bcc)
+            ? options.bcc.join(", ")
+            : options.bcc
+          : undefined,
+        attachments: options.attachments,
+      });
+
+      this.logger.log(`Email sent successfully via SMTP: ${info.messageId}`);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send email via SMTP: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async verify(): Promise<boolean> {
+    try {
+      await this.transporter.verify();
+      this.logger.log("SMTP connection verified successfully");
+      return true;
+    } catch (error: any) {
+      this.logger.error(`SMTP verification failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  getProviderName(): string {
+    return "smtp";
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/email/providers/ses.provider.ts
+SIZE: 3.92 KB | LINES: 144
+================================================================================
+
+/**
+ * AWS SES Email Provider
+ *
+ * Uses AWS Simple Email Service for sending emails.
+ * More reliable and scalable than SMTP for production use.
+ */
+
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  SESClient,
+  SendEmailCommand,
+  VerifyEmailIdentityCommand,
+} from "@aws-sdk/client-ses";
+import { EmailProvider, EmailOptions } from "./email-provider.interface";
+
+@Injectable()
+export class SESProvider implements EmailProvider {
+  private readonly logger = new Logger(SESProvider.name);
+  private sesClient: SESClient;
+
+  constructor(private readonly configService: ConfigService) {
+    this.initializeSESClient();
+  }
+
+  private initializeSESClient(): void {
+    const region = this.configService.get<string>(
+      "AWS_SES_REGION",
+      "us-east-1",
+    );
+    const accessKeyId = this.configService.get<string>("AWS_SES_ACCESS_KEY_ID");
+    const secretAccessKey = this.configService.get<string>(
+      "AWS_SES_SECRET_ACCESS_KEY",
+    );
+
+    this.sesClient = new SESClient({
+      region,
+      credentials: {
+        accessKeyId: accessKeyId!,
+        secretAccessKey: secretAccessKey!,
+      },
+    });
+
+    this.logger.log(`AWS SES initialized with region: ${region}`);
+  }
+
+  async sendEmail(options: EmailOptions): Promise<void> {
+    const from =
+      options.from ||
+      `"${this.configService.get<string>("EMAIL_FROM_NAME")}" <${this.configService.get<string>("EMAIL_FROM")}>`;
+
+    const replyTo =
+      options.replyTo || this.configService.get<string>("EMAIL_REPLY_TO");
+
+    try {
+      const command = new SendEmailCommand({
+        Source: from,
+        Destination: {
+          ToAddresses: Array.isArray(options.to) ? options.to : [options.to],
+          CcAddresses: options.cc
+            ? Array.isArray(options.cc)
+              ? options.cc
+              : [options.cc]
+            : undefined,
+          BccAddresses: options.bcc
+            ? Array.isArray(options.bcc)
+              ? options.bcc
+              : [options.bcc]
+            : undefined,
+        },
+        Message: {
+          Subject: {
+            Data: options.subject,
+            Charset: "UTF-8",
+          },
+          Body: {
+            Html: {
+              Data: options.html,
+              Charset: "UTF-8",
+            },
+            Text: options.text
+              ? {
+                  Data: options.text,
+                  Charset: "UTF-8",
+                }
+              : undefined,
+          },
+        },
+        ReplyToAddresses: replyTo ? [replyTo] : undefined,
+      });
+
+      const response = await this.sesClient.send(command);
+      this.logger.log(`Email sent successfully via SES: ${response.MessageId}`);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send email via SES: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async verify(): Promise<boolean> {
+    try {
+      // SES doesn't have a direct verify method like SMTP
+      // We just check if we can initialize the client
+      // In production, you'd verify email addresses/domains separately
+      this.logger.log(
+        "SES connection assumed valid (no verification endpoint)",
+      );
+      return true;
+    } catch (error: any) {
+      this.logger.error(`SES verification failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  getProviderName(): string {
+    return "ses";
+  }
+
+  /**
+   * Verify an email address with SES (must be done before sending)
+   * @param email Email address to verify
+   */
+  async verifyEmailIdentity(email: string): Promise<void> {
+    try {
+      const command = new VerifyEmailIdentityCommand({
+        EmailAddress: email,
+      });
+      await this.sesClient.send(command);
+      this.logger.log(
+        `Verification email sent to ${email}. Check inbox to confirm.`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to verify email identity: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }
 
@@ -6681,11 +7993,16 @@ export class TenantModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/tenant/tenant.service.ts
-SIZE: 4 KB | LINES: 175
+SIZE: 4.13 KB | LINES: 183
 ================================================================================
 
 // apps/auth-service/src/modules/tenant/tenant.service.ts
-import { Injectable, NotFoundException, Inject } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  Inject,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
@@ -6769,16 +8086,19 @@ export class TenantService {
     if (cached) {
       return cached;
     }
+    try {
+      const tenant = await this.tenantRepository.findOne({
+        where: { id, active: true },
+      });
 
-    const tenant = await this.tenantRepository.findOne({
-      where: { id, active: true },
-    });
+      if (tenant) {
+        await this.cacheManager.set(cacheKey, tenant, 600000);
+      }
 
-    if (tenant) {
-      await this.cacheManager.set(cacheKey, tenant, 600000);
+      return tenant;
+    } catch (e) {
+      throw new BadRequestException("Tenant Not found");
     }
-
-    return tenant;
   }
 
   /**
@@ -7598,6 +8918,727 @@ export class UserService {
 
 
 ================================================================================
+FILE: apps/auth-service/templates/account-deleted.html
+SIZE: 3.22 KB | LINES: 69
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Deleted</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .sad-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="sad-icon">👋</div>
+
+                    <h1>Account Deleted</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>This is to confirm that your account <strong>{{userEmail}}</strong> has been permanently deleted from <strong>{{tenantName}}</strong>.</p>
+
+                    <div class="alert">
+                        <strong>⚠️ Important:</strong> All your data has been removed from our systems and cannot be recovered.
+                    </div>
+
+                    <p>We're sorry to see you go. If you have any feedback about your experience, we'd love to hear from you.</p>
+
+                    <p>You're always welcome to create a new account if you change your mind.</p>
+
+                    <p>Thank you for being part of our community.</p>
+
+                    <p>Best wishes,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/base.html
+SIZE: 4.47 KB | LINES: 191
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            background-color: #f4f4f4;
+            padding: 40px 20px;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .email-header img {
+            max-width: 180px;
+            height: auto;
+        }
+
+        .email-body {
+            padding: 40px;
+        }
+
+        .email-content {
+            color: #555555;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .email-footer p {
+            color: #6c757d;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 32px;
+            margin: 24px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .code-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        .code {
+            font-family: 'Courier New', monospace;
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 8px;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 30px 0;
+        }
+
+        .text-muted {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .powered-by {
+            color: #adb5bd;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-wrapper {
+                padding: 20px 10px;
+            }
+
+            .email-body {
+                padding: 30px 20px;
+            }
+
+            .email-footer {
+                padding: 20px;
+            }
+
+            .btn {
+                display: block;
+                width: 100%;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: #e0e0e0;
+            }
+
+            .email-wrapper {
+                background-color: #1a1a1a;
+            }
+
+            .email-container {
+                background-color: #2d2d2d;
+            }
+
+            .email-content {
+                color: #e0e0e0;
+            }
+
+            .email-footer {
+                background-color: #242424;
+                border-top-color: #3a3a3a;
+            }
+
+            .code-box {
+                background-color: #242424;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    {{content}}
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/magic-link.html
+SIZE: 3.27 KB | LINES: 68
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Magic Link</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .magic-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="magic-icon">✨</div>
+
+                    <h1>Your Magic Link to Sign In</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Click the button below to instantly sign in to your <strong>{{tenantName}}</strong> account:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Sign In with Magic Link</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}. If you didn't request this magic link, please ignore this email.</p>
+
+                    <p><strong>Note:</strong> This link can only be used once and will automatically log you in.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/otp.html
+SIZE: 3.26 KB | LINES: 68
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Verification Code</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .code-box { background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; margin: 24px 0; text-align: center; }
+        .code { font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .code { font-size: 24px; letter-spacing: 4px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Your Verification Code 🔢</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Use the verification code below to complete your action on <strong>{{tenantName}}</strong>:</p>
+
+                    <div class="code-box">
+                        <div class="code">{{code}}</div>
+                    </div>
+
+                    <p class="text-muted">This code will expire in {{expiresIn}}. Do not share this code with anyone.</p>
+
+                    <p><strong>Security Tip:</strong> {{tenantName}} will never ask you for this code via email, phone, or text message.</p>
+
+                    <p>If you didn't request this code, please ignore this email.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/password-changed.html
+SIZE: 3.24 KB | LINES: 67
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Changed</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="success-icon">✅</div>
+
+                    <h1>Password Successfully Changed</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>This is a confirmation that the password for your account <strong>{{userEmail}}</strong> at <strong>{{tenantName}}</strong> has been successfully changed.</p>
+
+                    <p>If you made this change, no further action is required.</p>
+
+                    <div class="alert">
+                        <strong>🔒 Security Notice:</strong> If you did NOT change your password, please contact our support team immediately. Your account may have been compromised.
+                    </div>
+
+                    <p>For your security, all active sessions have been logged out. You'll need to sign in again with your new password.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/password-reset.html
+SIZE: 3.46 KB | LINES: 70
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your Password</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Reset Your Password 🔐</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>We received a request to reset the password for your account at <strong>{{tenantName}}</strong>.</p>
+
+                    <p>Click the button below to choose a new password:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Reset Password</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}.</p>
+
+                    <div class="alert">
+                        <strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email and ensure your account is secure. Your password will not be changed unless you click the link above.
+                    </div>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/verify-email.html
+SIZE: 3.14 KB | LINES: 65
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Verify Your Email Address 📧</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Please verify your email address to complete your registration with <strong>{{tenantName}}</strong>.</p>
+
+                    <p>Click the button below to verify <strong>{{userEmail}}</strong>:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Verify Email</a>
+                    </center>
+
+                    <p class="text-muted">This verification link will expire in {{expiresIn}}. If you didn't request this verification, please ignore this email.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/welcome.html
+SIZE: 3.31 KB | LINES: 67
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{tenantName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Welcome, {{userName}}! 👋</h1>
+
+                    <p>Thank you for joining <strong>{{tenantName}}</strong>! We're excited to have you on board.</p>
+
+                    <p>Your account has been successfully created with the email address: <strong>{{userEmail}}</strong></p>
+
+                    <p>To get started and verify your email address, please click the button below:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Verify Email Address</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}. If you didn't create this account, please ignore this email.</p>
+
+                    <p>If you have any questions, feel free to reach out to our support team.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
 FILE: apps/auth-service/test/app.e2e-spec.ts
 SIZE: 669 B | LINES: 26
 ================================================================================
@@ -7661,7 +9702,7 @@ SIZE: 97 B | LINES: 5
 
 ================================================================================
 FILE: apps/auth-service/tsconfig.json
-SIZE: 748 B | LINES: 30
+SIZE: 749 B | LINES: 30
 ================================================================================
 
 {
@@ -7691,7 +9732,7 @@ SIZE: 748 B | LINES: 30
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
 }
 
 
@@ -10259,7 +12300,7 @@ export class SecurityEvent extends BaseEntity {
 
 ================================================================================
 FILE: packages/database/src/entities/session.entity.ts
-SIZE: 2.64 KB | LINES: 127
+SIZE: 2.86 KB | LINES: 137
 ================================================================================
 
 import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
@@ -10275,6 +12316,7 @@ import { User } from "./user.entity";
 @Index(["tenantId", "revokedAt"]) // ← Add tenant index
 @Index(["tokenHash"], { unique: true })
 @Index(["expiresAt"])
+@Index(["refreshTokenFamilyId"]) // ← Add this index
 export class Session extends BaseEntity {
   // ✅ ADD THIS - Tenant ID (denormalized for performance)
   @Column({ type: "uuid", name: "tenant_id" })
@@ -10295,6 +12337,7 @@ export class Session extends BaseEntity {
     unique: true,
     name: "token_hash",
     comment: "Hashed session token",
+    nullable: true,
   })
   tokenHash!: string;
 
@@ -10331,6 +12374,7 @@ export class Session extends BaseEntity {
     type: "jsonb",
     name: "device_info",
     comment: "Device information (browser, OS, etc.)",
+    nullable: true,
   })
   deviceInfo!: {
     browser?: string;
@@ -10366,6 +12410,13 @@ export class Session extends BaseEntity {
     default: () => "CURRENT_TIMESTAMP",
   })
   lastActivity!: Date;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_refresh_at",
+  })
+  lastRefreshAt?: Date;
 
   @Column({
     type: "timestamp with time zone",
@@ -11722,6 +13773,359 @@ export class UpdateTenantForMultiTenant1735300000000
       DROP COLUMN IF EXISTS active;
     `);
   }
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1735500000000-add-last-refresh-at.ts
+SIZE: 941 B | LINES: 28
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class AddLastRefreshAt1735500000000 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add last_refresh_at column
+    await queryRunner.query(`
+      ALTER TABLE sessions 
+      ADD COLUMN IF NOT EXISTS last_refresh_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    // Add index on refresh_token_family_id for faster family revocation
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_family_id 
+      ON sessions(refresh_token_family_id) 
+      WHERE revoked_at IS NULL;
+    `);
+
+    console.log("✅ Added last_refresh_at column and family index");
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_sessions_family_id;`);
+    await queryRunner.query(
+      `ALTER TABLE sessions DROP COLUMN IF EXISTS last_refresh_at;`,
+    );
+  }
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1766867595610-RemoveTokenHash.ts
+SIZE: 30.18 KB | LINES: 289
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class RemoveTokenHash1766867595610 implements MigrationInterface {
+    name = 'RemoveTokenHash1766867595610'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "mfa_settings" DROP CONSTRAINT "FK_mfa_settings_user"`);
+        await queryRunner.query(`ALTER TABLE "sessions" DROP CONSTRAINT "FK_sessions_user"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_users_tenant"`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP CONSTRAINT "FK_security_events_tenant"`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP CONSTRAINT "FK_security_events_user"`);
+        await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "FK_roles_parent"`);
+        await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "FK_roles_tenant"`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_role_permissions_permission"`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_role_permissions_role"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_mfa_settings_tenant_user"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_sessions_user_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_sessions_token_hash"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_sessions_expires_at"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sessions_tenant_user"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sessions_tenant_refresh"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sessions_tenant_revoked"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_sessions_family_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_email_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_tenant_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_email_verified"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_users_last_login"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_tenants_slug"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_tenants_custom_domain"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_user_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_tenant_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_type"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_severity"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_created_at"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_security_events_ip"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_security_events_tenant_type"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_security_events_tenant_user_date"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_security_events_tenant_severity"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_permissions_resource"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_permissions_tenant"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_permissions_tenant_resource"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_roles_tenant_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_roles_is_system"`);
+        await queryRunner.query(`DROP INDEX "public"."idx_roles_tenant_name"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_role_permissions_role_id"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_role_permissions_permission_id"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "users_status_check"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP CONSTRAINT "tenants_status_check"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP CONSTRAINT "tenants_plan_check"`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP CONSTRAINT "security_events_severity_check"`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" DROP CONSTRAINT "uq_mfa_settings_tenant_user"`);
+        await queryRunner.query(`ALTER TABLE "permissions" DROP CONSTRAINT "uq_permissions_tenant_resource_action"`);
+        await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "UQ_roles_tenant_name"`);
+        await queryRunner.query(`COMMENT ON TABLE "mfa_settings" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "sessions" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "users" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "tenants" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "security_events" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "permissions" IS NULL`);
+        await queryRunner.query(`COMMENT ON TABLE "roles" IS NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP CONSTRAINT "UQ_tenants_subdomain"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "subdomain"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "status"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "plan"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "branding"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "is_active"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "trial_ends_at"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "user_limit"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "user_count"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "contact_email"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP COLUMN "contact_phone"`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" ADD CONSTRAINT "UQ_5992954664e06b0969be40cee9a" UNIQUE ("user_id")`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."webauthn_credentials" IS 'Registered WebAuthn/FIDO2 credentials'`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."backup_codes_used" IS 'Used backup codes (hashed)'`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."mfa_required" IS 'Whether MFA is required for this user'`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."preferred_method" IS 'Preferred MFA method (totp, sms, email, webauthn)'`);
+        await queryRunner.query(`ALTER TABLE "sessions" ALTER COLUMN "token_hash" DROP NOT NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."refresh_token_hash" IS 'Hashed refresh token'`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."refresh_token_family_id" IS 'Token family for rotation tracking'`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."device_id" IS 'Unique device identifier'`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."location" IS 'Geographic location (city, country)'`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "status"`);
+        await queryRunner.query(`ALTER TABLE "users" ADD "status" character varying(50) NOT NULL DEFAULT 'active'`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."status" IS 'User account status'`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "last_login_ip"`);
+        await queryRunner.query(`ALTER TABLE "users" ADD "last_login_ip" inet`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "metadata" SET NOT NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."metadata" IS 'Additional user metadata'`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."timezone" IS 'User timezone (e.g., America/New_York)'`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."language" IS 'User preferred language'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD CONSTRAINT "UQ_2310ecc5cb8be427097154b18fc" UNIQUE ("slug")`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD CONSTRAINT "UQ_c985fa3986f7383dff567479e5d" UNIQUE ("custom_domain")`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "custom_domain_verified" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "environment" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "feature_flags" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "feature_flags" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "settings" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "settings" DROP DEFAULT`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "active" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP COLUMN "severity"`);
+        await queryRunner.query(`CREATE TYPE "public"."security_events_severity_enum" AS ENUM('info', 'warning', 'critical')`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD "severity" "public"."security_events_severity_enum" NOT NULL DEFAULT 'info'`);
+        await queryRunner.query(`COMMENT ON COLUMN "security_events"."metadata" IS 'Additional event metadata'`);
+        await queryRunner.query(`COMMENT ON COLUMN "security_events"."location" IS 'Geographic location'`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_0a8c4ff4d7be1082704d16ae74" ON "mfa_settings" ("tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_f95bbf451f162b3627c02b602d" ON "sessions" ("refresh_token_family_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_9cfe37d28c3b229a350e086d94" ON "sessions" ("expires_at") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_abaa9e068cdd390bc5210f7988" ON "sessions" ("token_hash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_2240b714c75df45df811d67a0f" ON "sessions" ("tenant_id", "revoked_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_5fc618d4c2fa418b6425a2e124" ON "sessions" ("tenant_id", "refresh_token_hash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_32a6ac85a3a94e9d0ff397ab91" ON "sessions" ("tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_40ec4dea118345e4d95fb836ad" ON "users" ("last_login_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_cf96ca0dc9c97fdc2ae06831d8" ON "users" ("email_verified") `);
+        await queryRunner.query(`CREATE INDEX "IDX_3676155292d72c67cd4e090514" ON "users" ("status") `);
+        await queryRunner.query(`CREATE INDEX "IDX_109638590074998bb72a2f2cf0" ON "users" ("tenant_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_e9f4c2efab52114c4e99e28efb" ON "users" ("email", "tenant_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_0821dff7f23fcbd8f1a034889c" ON "tenants" ("custom_domain") WHERE custom_domain IS NOT NULL`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_2310ecc5cb8be427097154b18f" ON "tenants" ("slug") `);
+        await queryRunner.query(`CREATE INDEX "IDX_87c998073af994bb49340be58c" ON "security_events" ("ip_address") `);
+        await queryRunner.query(`CREATE INDEX "IDX_d86aa84090327c9a94aee62e18" ON "security_events" ("created_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_c0dfddafd5d9d49593930be293" ON "security_events" ("severity") `);
+        await queryRunner.query(`CREATE INDEX "IDX_ac0419c594360d319a6a453591" ON "security_events" ("event_type") `);
+        await queryRunner.query(`CREATE INDEX "IDX_63fea9549fcb8977a3c0abd783" ON "security_events" ("tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_d1891b273f5c77638d2149a9f0" ON "security_events" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_89456a09b598ce8915c702c528" ON "permissions" ("resource") `);
+        await queryRunner.query(`CREATE INDEX "IDX_c9d5c0d09e27afdb707a2a8837" ON "permissions" ("tenant_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_97e8245c6892a1bf6b088b8c86" ON "permissions" ("tenant_id", "resource", "action") `);
+        await queryRunner.query(`CREATE INDEX "IDX_2a3edd7bc16920c3287331ea42" ON "roles" ("is_system") `);
+        await queryRunner.query(`CREATE INDEX "IDX_e59a01f4fe46ebbece575d9a0f" ON "roles" ("tenant_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_c555146b304b5f51a7de6e18de" ON "roles" ("tenant_id", "name") `);
+        await queryRunner.query(`CREATE INDEX "IDX_178199805b901ccd220ab7740e" ON "role_permissions" ("role_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_17022daf3f885f7d35423e9971" ON "role_permissions" ("permission_id") `);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" ADD CONSTRAINT "FK_b8a0e2da4676dda7174d93c6738" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" ADD CONSTRAINT "FK_5992954664e06b0969be40cee9a" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "sessions" ADD CONSTRAINT "FK_085d540d9f418cfbdc7bd55bb19" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_109638590074998bb72a2f2cf08" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD CONSTRAINT "FK_d1891b273f5c77638d2149a9f0d" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD CONSTRAINT "FK_63fea9549fcb8977a3c0abd7833" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "permissions" ADD CONSTRAINT "FK_c9d5c0d09e27afdb707a2a8837b" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "roles" ADD CONSTRAINT "FK_e59a01f4fe46ebbece575d9a0fc" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "roles" ADD CONSTRAINT "FK_2c6e71b96bff7b9230de9dda83b" FOREIGN KEY ("parent_role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" ADD CONSTRAINT "FK_178199805b901ccd220ab7740ec" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" ADD CONSTRAINT "FK_17022daf3f885f7d35423e9971e" FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_17022daf3f885f7d35423e9971e"`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_178199805b901ccd220ab7740ec"`);
+        await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "FK_2c6e71b96bff7b9230de9dda83b"`);
+        await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "FK_e59a01f4fe46ebbece575d9a0fc"`);
+        await queryRunner.query(`ALTER TABLE "permissions" DROP CONSTRAINT "FK_c9d5c0d09e27afdb707a2a8837b"`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP CONSTRAINT "FK_63fea9549fcb8977a3c0abd7833"`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP CONSTRAINT "FK_d1891b273f5c77638d2149a9f0d"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_109638590074998bb72a2f2cf08"`);
+        await queryRunner.query(`ALTER TABLE "sessions" DROP CONSTRAINT "FK_085d540d9f418cfbdc7bd55bb19"`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" DROP CONSTRAINT "FK_5992954664e06b0969be40cee9a"`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" DROP CONSTRAINT "FK_b8a0e2da4676dda7174d93c6738"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_17022daf3f885f7d35423e9971"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_178199805b901ccd220ab7740e"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_c555146b304b5f51a7de6e18de"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_e59a01f4fe46ebbece575d9a0f"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_2a3edd7bc16920c3287331ea42"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_97e8245c6892a1bf6b088b8c86"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_c9d5c0d09e27afdb707a2a8837"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_89456a09b598ce8915c702c528"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_d1891b273f5c77638d2149a9f0"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_63fea9549fcb8977a3c0abd783"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_ac0419c594360d319a6a453591"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_c0dfddafd5d9d49593930be293"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_d86aa84090327c9a94aee62e18"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_87c998073af994bb49340be58c"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_2310ecc5cb8be427097154b18f"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_0821dff7f23fcbd8f1a034889c"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_e9f4c2efab52114c4e99e28efb"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_109638590074998bb72a2f2cf0"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_3676155292d72c67cd4e090514"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_cf96ca0dc9c97fdc2ae06831d8"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_40ec4dea118345e4d95fb836ad"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_32a6ac85a3a94e9d0ff397ab91"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_5fc618d4c2fa418b6425a2e124"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_2240b714c75df45df811d67a0f"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_abaa9e068cdd390bc5210f7988"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_9cfe37d28c3b229a350e086d94"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_f95bbf451f162b3627c02b602d"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_0a8c4ff4d7be1082704d16ae74"`);
+        await queryRunner.query(`COMMENT ON COLUMN "security_events"."location" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "security_events"."metadata" IS NULL`);
+        await queryRunner.query(`ALTER TABLE "security_events" DROP COLUMN "severity"`);
+        await queryRunner.query(`DROP TYPE "public"."security_events_severity_enum"`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD "severity" character varying NOT NULL DEFAULT 'info'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "active" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "settings" SET DEFAULT '{}'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "settings" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "feature_flags" SET DEFAULT '{}'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "feature_flags" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "environment" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ALTER COLUMN "custom_domain_verified" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP CONSTRAINT "UQ_c985fa3986f7383dff567479e5d"`);
+        await queryRunner.query(`ALTER TABLE "tenants" DROP CONSTRAINT "UQ_2310ecc5cb8be427097154b18fc"`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."language" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."timezone" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."metadata" IS NULL`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "metadata" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "last_login_ip"`);
+        await queryRunner.query(`ALTER TABLE "users" ADD "last_login_ip" character varying(45)`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."status" IS 'User account status'`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "status"`);
+        await queryRunner.query(`ALTER TABLE "users" ADD "status" character varying NOT NULL DEFAULT 'active'`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."location" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."device_id" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."refresh_token_family_id" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "sessions"."refresh_token_hash" IS NULL`);
+        await queryRunner.query(`ALTER TABLE "sessions" ALTER COLUMN "token_hash" SET NOT NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."preferred_method" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."mfa_required" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."backup_codes_used" IS NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "mfa_settings"."webauthn_credentials" IS NULL`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" DROP CONSTRAINT "UQ_5992954664e06b0969be40cee9a"`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "contact_phone" character varying(50)`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "contact_email" character varying(255)`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "user_count" integer NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "user_limit" integer NOT NULL DEFAULT '0'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "trial_ends_at" TIMESTAMP WITH TIME ZONE`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "is_active" boolean NOT NULL DEFAULT true`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "branding" jsonb DEFAULT '{}'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "plan" character varying NOT NULL DEFAULT 'free'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "status" character varying NOT NULL DEFAULT 'trial'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "subdomain" character varying(100) NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD CONSTRAINT "UQ_tenants_subdomain" UNIQUE ("subdomain")`);
+        await queryRunner.query(`COMMENT ON TABLE "roles" IS 'User roles for RBAC'`);
+        await queryRunner.query(`COMMENT ON TABLE "permissions" IS 'System permissions for RBAC'`);
+        await queryRunner.query(`COMMENT ON TABLE "security_events" IS 'Security event audit log'`);
+        await queryRunner.query(`COMMENT ON TABLE "tenants" IS 'Multi-tenant organizations'`);
+        await queryRunner.query(`COMMENT ON TABLE "users" IS 'User accounts with comprehensive security features'`);
+        await queryRunner.query(`COMMENT ON TABLE "sessions" IS 'Active user sessions with device tracking'`);
+        await queryRunner.query(`COMMENT ON TABLE "mfa_settings" IS 'Multi-factor authentication settings'`);
+        await queryRunner.query(`ALTER TABLE "roles" ADD CONSTRAINT "UQ_roles_tenant_name" UNIQUE ("tenant_id", "name")`);
+        await queryRunner.query(`ALTER TABLE "permissions" ADD CONSTRAINT "uq_permissions_tenant_resource_action" UNIQUE ("resource", "action", "tenant_id")`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" ADD CONSTRAINT "uq_mfa_settings_tenant_user" UNIQUE ("user_id", "tenant_id")`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD CONSTRAINT "security_events_severity_check" CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])))`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD CONSTRAINT "tenants_plan_check" CHECK (((plan)::text = ANY ((ARRAY['free'::character varying, 'starter'::character varying, 'professional'::character varying, 'enterprise'::character varying])::text[])))`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD CONSTRAINT "tenants_status_check" CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'trial'::character varying, 'suspended'::character varying, 'cancelled'::character varying])::text[])))`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "users_status_check" CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'inactive'::character varying, 'suspended'::character varying, 'deleted'::character varying])::text[])))`);
+        await queryRunner.query(`CREATE INDEX "IDX_role_permissions_permission_id" ON "role_permissions" ("permission_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_role_permissions_role_id" ON "role_permissions" ("role_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_roles_tenant_name" ON "roles" ("name", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_roles_is_system" ON "roles" ("is_system") `);
+        await queryRunner.query(`CREATE INDEX "IDX_roles_tenant_id" ON "roles" ("tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_permissions_tenant_resource" ON "permissions" ("resource", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_permissions_tenant" ON "permissions" ("tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_permissions_resource" ON "permissions" ("resource") `);
+        await queryRunner.query(`CREATE INDEX "idx_security_events_tenant_severity" ON "security_events" ("severity", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_security_events_tenant_user_date" ON "security_events" ("created_at", "tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_security_events_tenant_type" ON "security_events" ("event_type", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_ip" ON "security_events" ("ip_address") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_created_at" ON "security_events" ("created_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_severity" ON "security_events" ("severity") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_type" ON "security_events" ("event_type") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_tenant_id" ON "security_events" ("tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_security_events_user_id" ON "security_events" ("user_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_tenants_custom_domain" ON "tenants" ("custom_domain") WHERE (custom_domain IS NOT NULL)`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_tenants_slug" ON "tenants" ("slug") `);
+        await queryRunner.query(`CREATE INDEX "IDX_users_last_login" ON "users" ("last_login_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_users_email_verified" ON "users" ("email_verified") `);
+        await queryRunner.query(`CREATE INDEX "IDX_users_status" ON "users" ("status") `);
+        await queryRunner.query(`CREATE INDEX "IDX_users_tenant_id" ON "users" ("tenant_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_users_email_tenant" ON "users" ("email", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_sessions_family_id" ON "sessions" ("refresh_token_family_id") WHERE (revoked_at IS NULL)`);
+        await queryRunner.query(`CREATE INDEX "idx_sessions_tenant_revoked" ON "sessions" ("revoked_at", "tenant_id") WHERE (revoked_at IS NULL)`);
+        await queryRunner.query(`CREATE INDEX "idx_sessions_tenant_refresh" ON "sessions" ("refresh_token_hash", "tenant_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_sessions_tenant_user" ON "sessions" ("tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_sessions_expires_at" ON "sessions" ("expires_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_sessions_token_hash" ON "sessions" ("token_hash") `);
+        await queryRunner.query(`CREATE INDEX "IDX_sessions_user_id" ON "sessions" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_mfa_settings_tenant_user" ON "mfa_settings" ("tenant_id", "user_id") `);
+        await queryRunner.query(`ALTER TABLE "role_permissions" ADD CONSTRAINT "FK_role_permissions_role" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "role_permissions" ADD CONSTRAINT "FK_role_permissions_permission" FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "roles" ADD CONSTRAINT "FK_roles_tenant" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "roles" ADD CONSTRAINT "FK_roles_parent" FOREIGN KEY ("parent_role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD CONSTRAINT "FK_security_events_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "security_events" ADD CONSTRAINT "FK_security_events_tenant" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_users_tenant" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "sessions" ADD CONSTRAINT "FK_sessions_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "mfa_settings" ADD CONSTRAINT "FK_mfa_settings_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1766867844260-RemoveDeviceInfo.ts
+SIZE: 522 B | LINES: 15
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class RemoveDeviceInfo1766867844260 implements MigrationInterface {
+    name = 'RemoveDeviceInfo1766867844260'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "sessions" ALTER COLUMN "device_info" DROP NOT NULL`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "sessions" ALTER COLUMN "device_info" SET NOT NULL`);
+    }
+
 }
 
 
@@ -20640,8 +23044,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 198
-Total Lines: 19,247
-Files Skipped: 37
+Files Processed: 215
+Total Lines: 21,532
+Files Skipped: 38
 Errors: 0
-Generated: 2025-12-27T18:51:53.040Z
+Generated: 2025-12-28T15:13:32.305Z

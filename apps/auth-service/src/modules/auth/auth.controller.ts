@@ -101,11 +101,11 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
-  async logout(@Req() req: any) {
+  async logout(@Req() req: any, @Ip() ip: string) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
     const sessionId = req.user.sessionId;
-    await this.authService.logout(tenantId, userId, sessionId);
+    await this.authService.logout(tenantId, userId, sessionId, ip);
     return { message: "Logged out successfully" };
   }
 

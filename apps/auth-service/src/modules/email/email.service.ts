@@ -81,6 +81,8 @@ export class EmailService {
     const startTime = Date.now();
     let success = false;
 
+    console.log(this.provider);
+
     try {
       if (this.provider) {
         // Use configured provider (SES or SMTP)
@@ -104,7 +106,7 @@ export class EmailService {
         console.log("==============================================\n");
         success = true;
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `❌ Failed to send email to ${options.to}: ${error.message}`,
         error.stack,
@@ -129,7 +131,9 @@ export class EmailService {
   /**
    * Load and compile template
    */
-  private async loadTemplate(templateName: string): Promise<HandlebarsTemplateDelegate> {
+  private async loadTemplate(
+    templateName: string,
+  ): Promise<HandlebarsTemplateDelegate> {
     // Check cache first
     if (this.templateCache.has(templateName)) {
       return this.templateCache.get(templateName)!;
@@ -137,6 +141,7 @@ export class EmailService {
 
     const templatePath = path.join(
       __dirname,
+      "../../../",
       "templates",
       `${templateName}.html`,
     );
@@ -146,7 +151,7 @@ export class EmailService {
       const compiledTemplate = Handlebars.compile(templateContent);
       this.templateCache.set(templateName, compiledTemplate);
       return compiledTemplate;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to load template ${templateName}: ${error.message}`,
       );
@@ -183,7 +188,8 @@ export class EmailService {
       return {
         tenantName: tenant?.name || "Fort Knox",
         tenantLogo:
-          tenant?.metadata?.logoUrl ||
+          // TODO Tenant Logo URL
+          // tenant?.metadata?.logoUrl ||
           "https://via.placeholder.com/150x50?text=Fort+Knox",
       };
     } catch (error) {
@@ -200,7 +206,10 @@ export class EmailService {
   /**
    * Send welcome email after registration
    */
-  async sendWelcomeEmail(user: User, verificationToken: string): Promise<boolean> {
+  async sendWelcomeEmail(
+    user: User,
+    verificationToken: string,
+  ): Promise<boolean> {
     const branding = await this.getTenantBranding(user.tenantId);
     const verificationUrl = `${this.configService.get<string>("FRONTEND_URL")}/verify-email?token=${verificationToken}`;
 
@@ -253,7 +262,10 @@ export class EmailService {
   /**
    * Send password reset email
    */
-  async sendPasswordResetEmail(user: User, resetToken: string): Promise<boolean> {
+  async sendPasswordResetEmail(
+    user: User,
+    resetToken: string,
+  ): Promise<boolean> {
     const branding = await this.getTenantBranding(user.tenantId);
     const resetUrl = `${this.configService.get<string>("FRONTEND_URL")}/reset-password?token=${resetToken}`;
 
@@ -300,7 +312,10 @@ export class EmailService {
   /**
    * Send magic link email
    */
-  async sendMagicLinkEmail(user: User, magicLinkToken: string): Promise<boolean> {
+  async sendMagicLinkEmail(
+    user: User,
+    magicLinkToken: string,
+  ): Promise<boolean> {
     const branding = await this.getTenantBranding(user.tenantId);
     const magicLinkUrl = `${this.configService.get<string>("FRONTEND_URL")}/auth/magic-link?token=${magicLinkToken}`;
 
@@ -396,7 +411,7 @@ export class EmailService {
           duration: data.duration,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to log email event: ${error.message}`,
         error.stack,

@@ -75,8 +75,11 @@ export class NodeMailerProvider implements EmailProvider {
       });
 
       this.logger.log(`Email sent successfully via SMTP: ${info.messageId}`);
-    } catch (error) {
-      this.logger.error(`Failed to send email via SMTP: ${error.message}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send email via SMTP: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -86,7 +89,7 @@ export class NodeMailerProvider implements EmailProvider {
       await this.transporter.verify();
       this.logger.log("SMTP connection verified successfully");
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SMTP verification failed: ${error.message}`);
       return false;
     }

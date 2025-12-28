@@ -639,6 +639,40 @@
           "Authentication"
         ]
       }
+    },
+    "/email/test": {
+      "get": {
+        "operationId": "EmailController_testEmail",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Email type to test",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Recipient email",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Test email sending (development only)",
+        "tags": [
+          "Email (Development)"
+        ]
+      }
     }
   },
   "info": {

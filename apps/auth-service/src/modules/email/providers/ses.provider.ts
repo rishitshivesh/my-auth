@@ -24,7 +24,10 @@ export class SESProvider implements EmailProvider {
   }
 
   private initializeSESClient(): void {
-    const region = this.configService.get<string>("AWS_SES_REGION", "us-east-1");
+    const region = this.configService.get<string>(
+      "AWS_SES_REGION",
+      "us-east-1",
+    );
     const accessKeyId = this.configService.get<string>("AWS_SES_ACCESS_KEY_ID");
     const secretAccessKey = this.configService.get<string>(
       "AWS_SES_SECRET_ACCESS_KEY",
@@ -88,8 +91,11 @@ export class SESProvider implements EmailProvider {
 
       const response = await this.sesClient.send(command);
       this.logger.log(`Email sent successfully via SES: ${response.MessageId}`);
-    } catch (error) {
-      this.logger.error(`Failed to send email via SES: ${error.message}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send email via SES: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -99,9 +105,11 @@ export class SESProvider implements EmailProvider {
       // SES doesn't have a direct verify method like SMTP
       // We just check if we can initialize the client
       // In production, you'd verify email addresses/domains separately
-      this.logger.log("SES connection assumed valid (no verification endpoint)");
+      this.logger.log(
+        "SES connection assumed valid (no verification endpoint)",
+      );
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SES verification failed: ${error.message}`);
       return false;
     }
@@ -124,7 +132,7 @@ export class SESProvider implements EmailProvider {
       this.logger.log(
         `Verification email sent to ${email}. Check inbox to confirm.`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to verify email identity: ${error.message}`,
         error.stack,

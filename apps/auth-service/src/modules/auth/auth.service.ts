@@ -14,6 +14,7 @@ import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import { SessionService } from "@/common/service/session.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -40,6 +41,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
     private readonly emailService: EmailService,
+    private readonly sessionService: SessionService,
   ) {}
 
   /**
@@ -150,6 +152,7 @@ export class AuthService {
     password: string;
     ip: string;
     userAgent: string;
+    deviceId?: string;
   }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
     const { tenantId, email, password, ip, userAgent } = data;
 
@@ -239,15 +242,15 @@ export class AuthService {
       .digest("hex");
 
     // 4. Create session with family
-    const session = await this.sessionRepository.save({
+    const session = await this.sessionService.createSession({
       userId: user.id,
       tenantId,
+      email: user.email,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
-      ipAddress: ip,
-      userAgent,
-      lastActivity: new Date(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      deviceId: data.deviceId,
     });
 
     // 5. Generate access token
@@ -260,7 +263,7 @@ export class AuthService {
       },
       {
         secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m", // 15 minutes
+        expiresIn: "15m",
       },
     );
 
@@ -300,38 +303,17 @@ export class AuthService {
     tenantId: string,
     userId: string,
     sessionId?: string,
+    ip?: string,
   ): Promise<void> {
     if (sessionId) {
-      // Logout specific session
-      await this.sessionRepository.update(
-        {
-          id: sessionId,
-          userId,
-          tenantId,
-        },
-        {
-          revokedAt: new Date(),
-          revokedReason: "user_logout",
-        },
-      );
+      await this.sessionService.revokeSession(tenantId, sessionId);
     } else {
-      // Logout all active sessions for user
-      await this.sessionRepository.update(
-        {
-          userId,
-          tenantId,
-          revokedAt: IsNull(),
-        },
-        {
-          revokedAt: new Date(),
-          revokedReason: "user_logout_all",
-        },
-      );
+      await this.sessionService.revokeAllUserSessions(tenantId, userId);
     }
-
     await this.logSecurityEvent({
       tenantId,
       userId,
+      ip,
       eventType: "logout",
       severity: "info",
       metadata: { sessionId },
@@ -620,12 +602,11 @@ export class AuthService {
       .update(newRefreshToken)
       .digest("hex");
 
-    // 6. Update session (rotate token, mark as used)
-    await this.sessionRepository.update(session.id, {
-      refreshTokenHash: newRefreshTokenHash,
-      lastRefreshAt: new Date(), // ← Mark this token as used
-      lastActivity: new Date(),
-    });
+    await this.sessionService.updateRefreshToken(
+      tenantId,
+      session.id,
+      newRefreshTokenHash,
+    );
 
     // 7. Generate new access token
     const accessToken = this.jwtService.sign(

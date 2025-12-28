@@ -17,6 +17,8 @@ import { PasswordService } from "@repo/security";
 import { PassportModule } from "@nestjs/passport";
 import { JwtStrategy } from "@/common/guards/jwt.strategy";
 import { JwtAuthGuard } from "@/common/guards";
+import { SessionService } from "@/common/service/session.service";
+import { RedisService } from "@/common/service/redis.service";
 
 @Module({
   imports: [
@@ -42,7 +44,14 @@ import { JwtAuthGuard } from "@/common/guards";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    PasswordService,
+    JwtStrategy,
+    JwtAuthGuard,
+    SessionService,
+    RedisService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}
