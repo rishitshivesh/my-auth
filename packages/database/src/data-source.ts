@@ -10,6 +10,11 @@ import { MfaSettings } from "./entities/mfa-settings.entity";
 import { SecurityEvent } from "./entities/security-event.entity";
 import { Role } from "./entities/role.entity";
 import { Permission } from "./entities/permission.entity";
+import { OAuthClient } from "./entities/oauth-client.entity";
+import { OAuthAuthorizationCode } from "./entities/oauth-authorization-code.entity";
+import { OAuthAccessToken } from "./entities/oauth-access-token.entity";
+import { OAuthRefreshToken } from "./entities/oauth-refresh-token.entity";
+import { OAuthConsent } from "./entities/oauth-consent.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -38,6 +43,11 @@ export const dataSourceOptions: DataSourceOptions = {
     SecurityEvent,
     Role,
     Permission,
+    OAuthClient,
+    OAuthAuthorizationCode,
+    OAuthAccessToken,
+    OAuthRefreshToken,
+    OAuthConsent,
   ],
 
   // Migrations

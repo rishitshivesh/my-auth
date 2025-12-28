@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-28T15:13:32.305Z
+Generated: 2025-12-28T16:15:30.885Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -4412,13 +4412,14 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
 ================================================================================
 FILE: apps/auth-service/src/common/guards/jwt.strategy.ts
-SIZE: 849 B | LINES: 33
+SIZE: 1.64 KB | LINES: 65
 ================================================================================
 
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { ConfigService } from "@nestjs/config";
+import { SessionService } from "@/common/service/session.service";
 
 /**
  * JWT Strategy
@@ -4427,7 +4428,10 @@ import { ConfigService } from "@nestjs/config";
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private sessionService: SessionService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -4436,14 +4440,42 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    if (!payload.sub) {
-      throw new UnauthorizedException("Invalid token payload");
+    // if (!payload.sub) {
+    //   throw new UnauthorizedException("Invalid token payload");
+    // }
+    //
+    // return {
+    //   sub: payload.sub,
+    //   email: payload.email,
+    //   tenantId: payload.tenantId,
+    // };
+
+    const session = await this.sessionService.validateSession(
+      payload.tenantId,
+      payload.sessionId,
+    );
+
+    if (!session) {
+      throw new UnauthorizedException("Session invalid or expired");
     }
 
+    // Verify tenant matches
+    if (session.tenantId !== payload.tenantId) {
+      throw new UnauthorizedException("Tenant mismatch");
+    }
+
+    // Verify user matches
+    if (session.userId !== payload.sub) {
+      throw new UnauthorizedException("User mismatch");
+    }
+
+    // Return user context
     return {
       sub: payload.sub,
-      email: payload.email,
-      tenantId: payload.tenantId,
+      userId: session.userId,
+      email: session.email,
+      tenantId: session.tenantId,
+      sessionId: session.id,
     };
   }
 }
@@ -4720,6 +4752,477 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const publicPaths = ["/health", "/metrics", "/.well-known", "/favicon.ico"];
 
     return publicPaths.some((publicPath) => path.startsWith(publicPath));
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/service/redis.service.ts
+SIZE: 3.52 KB | LINES: 155
+================================================================================
+
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import Redis from "ioredis";
+
+@Injectable()
+export class RedisService implements OnModuleInit, OnModuleDestroy {
+  private client: Redis;
+  private keyPrefix: string;
+
+  constructor(private configService: ConfigService) {
+    this.keyPrefix =
+      this.configService.get("REDIS_KEY_PREFIX", "fortknox") + ":";
+  }
+
+  async onModuleInit() {
+    this.client = new Redis({
+      host: this.configService.get("REDIS_HOST", "localhost"),
+      port: this.configService.get("REDIS_PORT", 6379),
+      password: this.configService.get("REDIS_PASSWORD") || undefined,
+      db: this.configService.get("REDIS_DB", 0),
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      maxRetriesPerRequest: 3,
+    });
+
+    this.client.on("connect", () => {
+      console.log("✅ Redis connected");
+    });
+
+    this.client.on("error", (err) => {
+      console.error("❌ Redis error:", err);
+    });
+  }
+
+  async onModuleDestroy() {
+    await this.client.quit();
+  }
+
+  /**
+   * Build tenant-scoped key
+   * Format: fortknox:t:{tenantId}:{resource}:{identifier}
+   */
+  private buildKey(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): string {
+    return `${this.keyPrefix}t:${tenantId}:${resource}:${identifier}`;
+  }
+
+  /**
+   * Set value with optional TTL
+   */
+  async set(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+    value: any,
+    ttl?: number,
+  ): Promise<void> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    const serialized = JSON.stringify(value);
+
+    if (ttl) {
+      await this.client.setex(key, ttl, serialized);
+    } else {
+      await this.client.set(key, serialized);
+    }
+  }
+
+  /**
+   * Get value
+   */
+  async get<T>(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<T | null> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    const value = await this.client.get(key);
+
+    if (!value) return null;
+
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return value as any;
+    }
+  }
+
+  /**
+   * Delete value
+   */
+  async delete(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<void> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    await this.client.del(key);
+  }
+
+  /**
+   * Delete multiple keys by pattern
+   */
+  async deletePattern(tenantId: string, pattern: string): Promise<number> {
+    const fullPattern = `${this.keyPrefix}t:${tenantId}:${pattern}`;
+    const keys = await this.client.keys(fullPattern);
+
+    if (keys.length === 0) return 0;
+
+    return await this.client.del(...keys);
+  }
+
+  /**
+   * Check if key exists
+   */
+  async exists(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<boolean> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    const result = await this.client.exists(key);
+    return result === 1;
+  }
+
+  /**
+   * Get TTL (time to live) in seconds
+   */
+  async getTTL(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<number> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    return await this.client.ttl(key);
+  }
+
+  /**
+   * Extend TTL
+   */
+  async extendTTL(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+    ttl: number,
+  ): Promise<void> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    await this.client.expire(key, ttl);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/service/session.service.ts
+SIZE: 7.18 KB | LINES: 302
+================================================================================
+
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull } from "typeorm";
+import { Session } from "@repo/database";
+import { RedisService } from "./redis.service";
+import { ConfigService } from "@nestjs/config";
+
+export interface SessionData {
+  id: string;
+  userId: string;
+  tenantId: string;
+  email: string;
+  refreshTokenFamilyId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceId?: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+@Injectable()
+export class SessionService {
+  private sessionTTL: number;
+
+  constructor(
+    @InjectRepository(Session)
+    private sessionRepository: Repository<Session>,
+    private redisService: RedisService,
+    private configService: ConfigService,
+  ) {
+    this.sessionTTL = this.configService.get("SESSION_TTL", 604800); // 7 days
+  }
+
+  /**
+   * Create session (PostgreSQL + Redis)
+   */
+  async createSession(data: {
+    userId: string;
+    tenantId: string;
+    email: string;
+    refreshTokenFamilyId: string;
+    refreshTokenHash: string;
+    ipAddress?: string;
+    userAgent?: string;
+    deviceId?: string;
+  }): Promise<Session> {
+    // 1. Create in PostgreSQL (permanent record)
+    const session = await this.sessionRepository.save({
+      userId: data.userId,
+      tenantId: data.tenantId,
+      refreshTokenFamilyId: data.refreshTokenFamilyId,
+      refreshTokenHash: data.refreshTokenHash,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      deviceId: data.deviceId,
+      lastActivity: new Date(),
+      expiresAt: new Date(Date.now() + this.sessionTTL * 1000),
+    });
+
+    // 2. Store in Redis (fast lookup)
+    const sessionData: SessionData = {
+      id: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      email: data.email,
+      refreshTokenFamilyId: session.refreshTokenFamilyId!,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      deviceId: session.deviceId,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt!,
+    };
+
+    await this.redisService.set(
+      data.tenantId,
+      "session",
+      session.id,
+      sessionData,
+      this.sessionTTL,
+    );
+
+    console.log(`✅ Session created: ${session.id} (PostgreSQL + Redis)`);
+
+    return session;
+  }
+
+  /**
+   * Validate session (Redis first, PostgreSQL fallback)
+   */
+  async validateSession(
+    tenantId: string,
+    sessionId: string,
+  ): Promise<SessionData | null> {
+    // 1. Try Redis first (fast path)
+    const cached = await this.redisService.get<SessionData>(
+      tenantId,
+      "session",
+      sessionId,
+    );
+
+    if (cached) {
+      // Check expiry
+      if (new Date(cached.expiresAt) < new Date()) {
+        // Expired - remove from Redis
+        await this.redisService.delete(tenantId, "session", sessionId);
+        return null;
+      }
+
+      // Extend activity (update TTL)
+      await this.redisService.extendTTL(
+        tenantId,
+        "session",
+        sessionId,
+        this.sessionTTL,
+      );
+
+      return cached;
+    }
+
+    // 2. Fallback to PostgreSQL (cache miss)
+    const session = await this.sessionRepository.findOne({
+      where: {
+        id: sessionId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+      relations: ["user"],
+    });
+
+    if (!session) {
+      return null;
+    }
+
+    // Check expiry
+    if (session.expiresAt && session.expiresAt < new Date()) {
+      return null;
+    }
+
+    // Rebuild cache
+    const sessionData: SessionData = {
+      id: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      email: session.user.email,
+      refreshTokenFamilyId: session.refreshTokenFamilyId!,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      deviceId: session.deviceId,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt!,
+    };
+
+    // Cache it
+    await this.redisService.set(
+      tenantId,
+      "session",
+      sessionId,
+      sessionData,
+      this.sessionTTL,
+    );
+
+    // Update last activity in DB (async, don't wait)
+    this.sessionRepository
+      .update(sessionId, { lastActivity: new Date() })
+      .catch(console.error);
+
+    return sessionData;
+  }
+
+  /**
+   * Revoke session (PostgreSQL + Redis)
+   */
+  async revokeSession(
+    tenantId: string,
+    sessionId: string,
+    reason: string = "user_logout",
+  ): Promise<void> {
+    // 1. Update PostgreSQL
+    await this.sessionRepository.update(
+      { id: sessionId, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    // 2. Remove from Redis
+    await this.redisService.delete(tenantId, "session", sessionId);
+
+    console.log(`🔒 Session revoked: ${sessionId} (${reason})`);
+  }
+
+  /**
+   * Revoke all user sessions (PostgreSQL + Redis)
+   */
+  async revokeAllUserSessions(
+    tenantId: string,
+    userId: string,
+    reason: string = "user_logout_all",
+  ): Promise<void> {
+    // 1. Get all active sessions
+    const sessions = await this.sessionRepository.find({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    // 2. Revoke in PostgreSQL
+    await this.sessionRepository.update(
+      { userId, tenantId, revokedAt: IsNull() },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    // 3. Remove from Redis
+    for (const session of sessions) {
+      await this.redisService.delete(tenantId, "session", session.id);
+    }
+
+    console.log(`🔒 All sessions revoked for user: ${userId}`);
+  }
+
+  /**
+   * Revoke session family (token reuse detected)
+   */
+  async revokeSessionFamily(tenantId: string, familyId: string): Promise<void> {
+    // 1. Get all sessions in family
+    const sessions = await this.sessionRepository.find({
+      where: {
+        refreshTokenFamilyId: familyId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    // 2. Revoke in PostgreSQL
+    await this.sessionRepository.update(
+      { refreshTokenFamilyId: familyId, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: "token_reuse_detected",
+      },
+    );
+
+    // 3. Remove from Redis
+    for (const session of sessions) {
+      await this.redisService.delete(tenantId, "session", session.id);
+    }
+
+    console.log(`🚨 Session family revoked: ${familyId}`);
+  }
+
+  /**
+   * Update refresh token (rotation)
+   */
+  async updateRefreshToken(
+    tenantId: string,
+    sessionId: string,
+    newRefreshTokenHash: string,
+  ): Promise<void> {
+    // 1. Update PostgreSQL
+    await this.sessionRepository.update(
+      { id: sessionId, tenantId },
+      {
+        refreshTokenHash: newRefreshTokenHash,
+        lastRefreshAt: new Date(),
+        lastActivity: new Date(),
+      },
+    );
+
+    // 2. Extend Redis TTL (session is being used)
+    await this.redisService.extendTTL(
+      tenantId,
+      "session",
+      sessionId,
+      this.sessionTTL,
+    );
+
+    console.log(`🔄 Refresh token rotated: ${sessionId}`);
+  }
+
+  /**
+   * Get active sessions for user
+   */
+  async getUserSessions(tenantId: string, userId: string): Promise<Session[]> {
+    return this.sessionRepository.find({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+      order: {
+        lastActivity: "DESC",
+      },
+    });
   }
 }
 
@@ -5795,7 +6298,7 @@ bootstrap();
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
-SIZE: 5.75 KB | LINES: 217
+SIZE: 5.78 KB | LINES: 217
 ================================================================================
 
 import {
@@ -5901,11 +6404,11 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
-  async logout(@Req() req: any) {
+  async logout(@Req() req: any, @Ip() ip: string) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
     const sessionId = req.user.sessionId;
-    await this.authService.logout(tenantId, userId, sessionId);
+    await this.authService.logout(tenantId, userId, sessionId, ip);
     return { message: "Logged out successfully" };
   }
 
@@ -6127,7 +6630,7 @@ export class VerifyEmailDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 1.36 KB | LINES: 49
+SIZE: 1.55 KB | LINES: 58
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -6149,6 +6652,8 @@ import { PasswordService } from "@repo/security";
 import { PassportModule } from "@nestjs/passport";
 import { JwtStrategy } from "@/common/guards/jwt.strategy";
 import { JwtAuthGuard } from "@/common/guards";
+import { SessionService } from "@/common/service/session.service";
+import { RedisService } from "@/common/service/redis.service";
 
 @Module({
   imports: [
@@ -6174,7 +6679,14 @@ import { JwtAuthGuard } from "@/common/guards";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    PasswordService,
+    JwtStrategy,
+    JwtAuthGuard,
+    SessionService,
+    RedisService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}
@@ -6183,7 +6695,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 21.25 KB | LINES: 790
+SIZE: 20.85 KB | LINES: 771
 ================================================================================
 
 import {
@@ -6202,6 +6714,7 @@ import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import { SessionService } from "@/common/service/session.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -6228,6 +6741,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
     private readonly emailService: EmailService,
+    private readonly sessionService: SessionService,
   ) {}
 
   /**
@@ -6338,6 +6852,7 @@ export class AuthService {
     password: string;
     ip: string;
     userAgent: string;
+    deviceId?: string;
   }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
     const { tenantId, email, password, ip, userAgent } = data;
 
@@ -6427,15 +6942,15 @@ export class AuthService {
       .digest("hex");
 
     // 4. Create session with family
-    const session = await this.sessionRepository.save({
+    const session = await this.sessionService.createSession({
       userId: user.id,
       tenantId,
+      email: user.email,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
-      ipAddress: ip,
-      userAgent,
-      lastActivity: new Date(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      deviceId: data.deviceId,
     });
 
     // 5. Generate access token
@@ -6448,7 +6963,7 @@ export class AuthService {
       },
       {
         secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m", // 15 minutes
+        expiresIn: "15m",
       },
     );
 
@@ -6488,38 +7003,17 @@ export class AuthService {
     tenantId: string,
     userId: string,
     sessionId?: string,
+    ip?: string,
   ): Promise<void> {
     if (sessionId) {
-      // Logout specific session
-      await this.sessionRepository.update(
-        {
-          id: sessionId,
-          userId,
-          tenantId,
-        },
-        {
-          revokedAt: new Date(),
-          revokedReason: "user_logout",
-        },
-      );
+      await this.sessionService.revokeSession(tenantId, sessionId);
     } else {
-      // Logout all active sessions for user
-      await this.sessionRepository.update(
-        {
-          userId,
-          tenantId,
-          revokedAt: IsNull(),
-        },
-        {
-          revokedAt: new Date(),
-          revokedReason: "user_logout_all",
-        },
-      );
+      await this.sessionService.revokeAllUserSessions(tenantId, userId);
     }
-
     await this.logSecurityEvent({
       tenantId,
       userId,
+      ip,
       eventType: "logout",
       severity: "info",
       metadata: { sessionId },
@@ -6808,12 +7302,11 @@ export class AuthService {
       .update(newRefreshToken)
       .digest("hex");
 
-    // 6. Update session (rotate token, mark as used)
-    await this.sessionRepository.update(session.id, {
-      refreshTokenHash: newRefreshTokenHash,
-      lastRefreshAt: new Date(), // ← Mark this token as used
-      lastActivity: new Date(),
-    });
+    await this.sessionService.updateRefreshToken(
+      tenantId,
+      session.id,
+      newRefreshTokenHash,
+    );
 
     // 7. Generate new access token
     const accessToken = this.jwtService.sign(
@@ -11129,7 +11622,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 714 B | LINES: 34
+SIZE: 771 B | LINES: 36
 ================================================================================
 
 {
@@ -11144,6 +11637,7 @@ SIZE: 714 B | LINES: 34
   },
   "devDependencies": {
     "@types/cache-manager": "^5.0.0",
+    "@types/ioredis": "^5.0.0",
     "prettier": "^3.6.2",
     "turbo": "^2.6.1",
     "typescript": "5.9.2"
@@ -11160,6 +11654,7 @@ SIZE: 714 B | LINES: 34
     "@nestjs/cache-manager": "^3.1.0",
     "argon2": "^0.44.0",
     "cache-manager": "^7.2.7",
+    "ioredis": "^5.8.2",
     "next": "^16.0.1",
     "react": "^19.2.0",
     "typeorm": "^0.3.28"
@@ -23044,8 +23539,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 215
-Total Lines: 21,532
+Files Processed: 217
+Total Lines: 22,013
 Files Skipped: 38
 Errors: 0
-Generated: 2025-12-28T15:13:32.305Z
+Generated: 2025-12-28T16:15:30.885Z

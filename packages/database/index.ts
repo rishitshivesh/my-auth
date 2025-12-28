@@ -21,6 +21,13 @@ export * from "./src/entities/role.entity";
 export * from "./src/entities/permission.entity";
 export * from "./src/data-source";
 
+// OAuth
+export * from "./src/entities/oauth-client.entity";
+export * from "./src/entities/oauth-authorization-code.entity";
+export * from "./src/entities/oauth-access-token.entity";
+export * from "./src/entities/oauth-refresh-token.entity";
+export * from "./src/entities/oauth-consent.entity";
+
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";
 export { User } from "./src/entities/user.entity";
