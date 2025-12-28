@@ -8,12 +8,17 @@ import {
   OAuthRefreshToken,
   OAuthConsent,
   User,
+  Role,
+  Permission,
+  UserRole,
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { OAuthController } from "./oauth.controller";
 import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { RbacModule } from "@/modules/rbac/rbac.module";
 
 @Module({
   imports: [
@@ -24,8 +29,12 @@ import { OAuthConsentService } from "./services/oauth-consent.service";
       OAuthRefreshToken,
       OAuthConsent,
       User,
+      Role,
+      Permission,
+      UserRole,
     ]),
     JwtModule.register({}), // Config provided in service
+    RbacModule,
   ],
   controllers: [OAuthController],
   providers: [
@@ -33,6 +42,7 @@ import { OAuthConsentService } from "./services/oauth-consent.service";
     OAuthTokenService,
     OAuthConsentService,
     PasswordService,
+    RbacService,
   ],
   exports: [OAuthClientService, OAuthTokenService, OAuthConsentService],
 })

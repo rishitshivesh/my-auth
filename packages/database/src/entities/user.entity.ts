@@ -140,9 +140,16 @@ export class User extends BaseEntity {
   @Column({
     type: "timestamp with time zone",
     nullable: true,
+    name: "last_failed_login",
+  })
+  lastFailedLogin?: Date | null;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
     name: "locked_until",
   })
-  lockedUntil?: Date;
+  lockedUntil?: Date | null;
 
   @Column({
     type: "timestamp with time zone",

@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull } from "typeorm";
+import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { User, Session, SecurityEvent } from "@repo/database";
 import { PasswordService } from "@repo/security";
 
@@ -411,6 +411,312 @@ export class UserService {
     });
   }
 
+  // ============================================================
+  // ADD THIS METHOD TO UserService CLASS
+  // ============================================================
+
+  /**
+   * List users with pagination, filtering, and search
+   *
+   * @param tenantId - Tenant ID to filter users
+   * @param options - Pagination and filtering options
+   * @returns Paginated list of users
+   *
+   * @example
+   * // Simple pagination
+   * const result = await userService.listUsers(tenantId, { page: 1, limit: 20 });
+   *
+   * @example
+   * // With search
+   * const result = await userService.listUsers(tenantId, {
+   *   page: 1,
+   *   limit: 20,
+   *   search: 'john',
+   * });
+   *
+   * @example
+   * // With filters
+   * const result = await userService.listUsers(tenantId, {
+   *   page: 1,
+   *   limit: 20,
+   *   emailVerified: true,
+   *   isActive: true,
+   *   sortBy: 'createdAt',
+   *   sortOrder: 'DESC',
+   * });
+   */
+  async listUsers(
+    tenantId: string,
+    options: ListUsersOptions = {},
+  ): Promise<PaginatedUsersResponse> {
+    // Default values
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20)); // Max 100 per page
+    const sortBy = options.sortBy || "createdAt";
+    const sortOrder = options.sortOrder || "DESC";
+    const skip = (page - 1) * limit;
+
+    // Validate sortBy field
+    const allowedSortFields = [
+      "createdAt",
+      "updatedAt",
+      "email",
+      "firstName",
+      "lastName",
+      "lastLoginAt",
+    ];
+
+    if (!allowedSortFields.includes(sortBy)) {
+      throw new BadRequestException(
+        `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}`,
+      );
+    }
+
+    // Build query
+    const queryBuilder = this.userRepository
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.tenant", "tenant")
+      .where("user.tenantId = :tenantId", { tenantId });
+
+    // Apply search filter
+    if (options.search) {
+      const searchTerm = `%${options.search}%`;
+      queryBuilder.andWhere(
+        "(user.email ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.displayName ILIKE :search)",
+        { search: searchTerm },
+      );
+    }
+
+    // Apply isActive filter
+    if (options.isActive !== undefined) {
+      queryBuilder.andWhere("user.isActive = :isActive", {
+        isActive: options.isActive,
+      });
+    }
+
+    // Apply emailVerified filter
+    if (options.emailVerified !== undefined) {
+      queryBuilder.andWhere("user.emailVerified = :emailVerified", {
+        emailVerified: options.emailVerified,
+      });
+    }
+
+    // Apply date range filters
+    if (options.createdAfter) {
+      queryBuilder.andWhere("user.createdAt >= :createdAfter", {
+        createdAfter: options.createdAfter,
+      });
+    }
+
+    if (options.createdBefore) {
+      queryBuilder.andWhere("user.createdAt <= :createdBefore", {
+        createdBefore: options.createdBefore,
+      });
+    }
+
+    if (options.role) {
+      queryBuilder
+        .leftJoin("user.userRoles", "userRole")
+        .leftJoin("userRole.role", "role")
+        .andWhere("role.name = :role", { role: options.role });
+    }
+
+    // Apply sorting
+    queryBuilder.orderBy(`user.${sortBy}`, sortOrder);
+
+    // Get total count
+    const total = await queryBuilder.getCount();
+
+    // Get paginated results
+    const users = await queryBuilder.skip(skip).take(limit).getMany();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+
+    // Format response
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenant: user.tenant
+        ? {
+            id: user.tenant.id,
+            name: user.tenant.name,
+            slug: user.tenant.slug,
+          }
+        : undefined,
+    }));
+
+    return {
+      users: formattedUsers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      },
+    };
+  }
+
+  /**
+   * Get user statistics for admin dashboard
+   */
+  async getUserStats(tenantId: string): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    verified: number;
+    unverified: number;
+    recentLogins: number; // Last 7 days
+  }> {
+    const total = await this.userRepository.count({
+      where: { tenantId },
+    });
+
+    const active = await this.userRepository.count({
+      where: { tenantId, isActive: true },
+    });
+
+    const verified = await this.userRepository.count({
+      where: { tenantId, emailVerified: true },
+    });
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentLogins = await this.userRepository.count({
+      where: {
+        tenantId,
+        lastLoginAt: MoreThan(sevenDaysAgo),
+      },
+    });
+
+    return {
+      total,
+      active,
+      inactive: total - active,
+      verified,
+      unverified: total - verified,
+      recentLogins,
+    };
+  }
+
+  /**
+   * Bulk activate/deactivate users
+   */
+  async bulkUpdateActiveStatus(
+    tenantId: string,
+    userIds: string[],
+    isActive: boolean,
+    adminUserId: string,
+  ): Promise<{ updated: number }> {
+    if (userIds.length === 0) {
+      return { updated: 0 };
+    }
+
+    // Verify all users belong to tenant
+    const users = await this.userRepository.find({
+      where: {
+        id: In(userIds),
+        tenantId,
+      },
+    });
+
+    if (users.length !== userIds.length) {
+      throw new BadRequestException(
+        "Some users not found or belong to different tenant",
+      );
+    }
+
+    // Update all users
+    const result = await this.userRepository.update(
+      {
+        id: In(userIds),
+        tenantId,
+      },
+      { isActive },
+    );
+
+    // Log security event for each user
+    for (const user of users) {
+      await this.logSecurityEvent({
+        userId: user.id,
+        tenantId,
+        eventType: isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+        severity: "info",
+        ipAddress: "0.0.0.0",
+        userAgent: "system",
+        metadata: { performedBy: adminUserId },
+      });
+    }
+
+    console.log(
+      `✅ Bulk ${isActive ? "activated" : "deactivated"} ${users.length} users`,
+    );
+
+    return { updated: result.affected || 0 };
+  }
+
+  /**
+   * Export users to CSV format
+   */
+  async exportUsers(
+    tenantId: string,
+    options: ListUsersOptions = {},
+  ): Promise<string> {
+    // Get all users (no pagination)
+    const result = await this.listUsers(tenantId, {
+      ...options,
+      limit: 10000, // Max export limit
+    });
+
+    // Generate CSV
+    const headers = [
+      "ID",
+      "Email",
+      "First Name",
+      "Last Name",
+      "Display Name",
+      "Email Verified",
+      "Active",
+      "Last Login",
+      "Created At",
+    ];
+
+    const rows = result.users.map((user) => [
+      user.id,
+      user.email,
+      user.firstName || "",
+      user.lastName || "",
+      user.displayName || "",
+      user.emailVerified ? "Yes" : "No",
+      user.isActive ? "Yes" : "No",
+      user.lastLoginAt ? user.lastLoginAt.toISOString() : "Never",
+      user.createdAt.toISOString(),
+    ]);
+
+    // CSV format
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      ),
+    ].join("\n");
+
+    return csv;
+  }
+
   /**
    * Log security event
    */
@@ -433,4 +739,51 @@ export class UserService {
       metadata: data.metadata || {},
     });
   }
+}
+
+/**
+ * Pagination options for listing users
+ */
+export interface ListUsersOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+  search?: string;
+  isActive?: boolean;
+  emailVerified?: boolean;
+  role?: string;
+  createdAfter?: Date;
+  createdBefore?: Date;
+}
+
+/**
+ * Paginated response for listing users
+ */
+export interface PaginatedUsersResponse {
+  users: Array<{
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    emailVerified: boolean;
+    isActive: boolean;
+    lastLoginAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+    tenant?: {
+      id: string;
+      name: string;
+      slug: string;
+    };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
