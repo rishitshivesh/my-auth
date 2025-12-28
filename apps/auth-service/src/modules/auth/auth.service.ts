@@ -15,6 +15,8 @@ import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
+import { BruteForceService } from "@/modules/auth/brute-force.service";
+import { MfaService } from "@/modules/mfa/mfa.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -42,6 +44,8 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
+    private readonly bruteForceService: BruteForceService,
+    private readonly mfaService: MfaService,
   ) {}
 
   /**
@@ -153,7 +157,10 @@ export class AuthService {
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+  }): Promise<
+    | { accessToken: string; refreshToken: string; user: any }
+    | { mfaRequired: boolean; tempToken: string; message: string }
+  > {
     const { tenantId, email, password, ip, userAgent } = data;
 
     // Find user
@@ -187,11 +194,12 @@ export class AuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    await this.bruteForceService.checkAccountLock(user);
+
     console.log("🔍 User found:", {
       userId: user.id,
       user,
       hasPassword: !!user.passwordHash,
-      passwordHashStart: user.passwordHash?.substring(0, 20),
     }); // ← ADD
 
     // Verify password
@@ -200,6 +208,7 @@ export class AuthService {
     console.log("🔍 Password check:", { isValid }); // ← ADD
 
     if (!isValid) {
+      await this.bruteForceService.recordFailedAttempt(user, tenantId, ip);
       await this.logSecurityEvent({
         tenantId,
         userId: user.id,
@@ -207,10 +216,12 @@ export class AuthService {
         severity: "critical",
         ipAddress: ip,
         userAgent,
-        metadata: { email, reason: "invalid_password" },
+        metadata: { email, reason: "invalid_password", password },
       });
       throw new UnauthorizedException("Invalid email or password");
     }
+
+    await this.bruteForceService.resetFailedAttempts(user);
 
     // Check if email verified (if required)
     if (
@@ -227,6 +238,43 @@ export class AuthService {
     ) {
       throw new UnauthorizedException("Please verify your email first");
     }
+
+    const mfaEnabled = await this.mfaService.isMfaEnabled(user.id, tenantId);
+
+    if (mfaEnabled) {
+      // Generate temporary token for MFA verification
+      const tempToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          tenantId,
+          type: "mfa_pending",
+        },
+        {
+          secret: this.configService.get("JWT_SECRET"),
+          expiresIn: "5m", // Short-lived
+        },
+      );
+
+      console.log(`🔐 MFA required for user ${user.email}`);
+
+      // Log MFA challenge
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "mfa_challenge_sent",
+        severity: "info",
+        ipAddress: ip,
+        userAgent,
+      });
+
+      return {
+        mfaRequired: true,
+        tempToken,
+        message: "MFA verification required",
+      };
+    }
+
     // === REFRESH TOKEN ROTATION LOGIC ===
 
     // 1. Generate new family ID

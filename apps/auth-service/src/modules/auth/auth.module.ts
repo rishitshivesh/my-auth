@@ -19,6 +19,8 @@ import { JwtStrategy } from "@/common/guards/jwt.strategy";
 import { JwtAuthGuard } from "@/common/guards";
 import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
+import { BruteForceService } from "@/modules/auth/brute-force.service";
+import { MfaService } from "@/modules/mfa/mfa.service";
 
 @Module({
   imports: [
@@ -51,6 +53,8 @@ import { RedisService } from "@/common/service/redis.service";
     JwtAuthGuard,
     SessionService,
     RedisService,
+    BruteForceService,
+    MfaService,
   ],
   exports: [AuthService],
 })
