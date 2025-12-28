@@ -673,6 +673,431 @@
           "Email (Development)"
         ]
       }
+    },
+    "/oauth/authorize": {
+      "get": {
+        "description": "Initiate OAuth2 authorization code flow. User must be logged in.",
+        "operationId": "OAuthController_authorize",
+        "parameters": [
+          {
+            "name": "client_id",
+            "required": true,
+            "in": "query",
+            "description": "OAuth2 client ID",
+            "schema": {
+              "example": "client_abc123",
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "required": true,
+            "in": "query",
+            "description": "OAuth2 redirect URI",
+            "schema": {
+              "example": "https://app.example.com/callback",
+              "type": "string"
+            }
+          },
+          {
+            "name": "response_type",
+            "required": true,
+            "in": "query",
+            "description": "OAuth2 response type",
+            "schema": {
+              "enum": [
+                "code"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": true,
+            "in": "query",
+            "description": "Space-separated list of scopes",
+            "schema": {
+              "example": "openid profile email",
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "OAuth2 state parameter for CSRF protection",
+            "schema": {
+              "example": "random_state_xyz",
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "required": false,
+            "in": "query",
+            "description": "OIDC nonce parameter for replay protection",
+            "schema": {
+              "example": "random_nonce_abc",
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "required": false,
+            "in": "query",
+            "description": "PKCE code challenge",
+            "schema": {
+              "example": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "required": false,
+            "in": "query",
+            "description": "PKCE code challenge method",
+            "schema": {
+              "enum": [
+                "S256",
+                "plain"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to redirect_uri with code and state"
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          }
+        },
+        "summary": "OAuth2 Authorization Endpoint",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "description": "Exchange authorization code or refresh token for access token",
+        "operationId": "OAuthController_token",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "OAuth2 Token Endpoint",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/userinfo": {
+      "get": {
+        "description": "Get authenticated user information",
+        "operationId": "OAuthController_userInfo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "OIDC UserInfo Endpoint",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/revoke": {
+      "post": {
+        "description": "Revoke an access or refresh token",
+        "operationId": "OAuthController_revoke",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token revoked (always returns 200 even if token invalid)"
+          }
+        },
+        "summary": "OAuth2 Token Revocation",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/introspect": {
+      "post": {
+        "description": "Get token metadata",
+        "operationId": "OAuthController_introspect",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntrospectTokenRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntrospectTokenResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "OAuth2 Token Introspection",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/.well-known/openid-configuration": {
+      "get": {
+        "description": "Get OpenID Connect configuration",
+        "operationId": "OAuthController_getOpenIDConfiguration",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OpenID configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenIDConfigurationDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "OpenID Connect Discovery",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/jwks": {
+      "get": {
+        "description": "Get public keys for JWT verification",
+        "operationId": "OAuthController_getJWKS",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "JWKS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JWKSResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "JSON Web Key Set",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/clients": {
+      "post": {
+        "description": "Register a new OAuth2 client application",
+        "operationId": "OAuthController_createClient",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOAuthClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Client created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateClientResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create OAuth Client",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      },
+      "get": {
+        "description": "Get all OAuth2 clients for current tenant",
+        "operationId": "OAuthController_listClients",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OAuthClientResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List OAuth Clients",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/clients/{clientId}": {
+      "get": {
+        "description": "Get OAuth2 client details",
+        "operationId": "OAuthController_getClient",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Client details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get OAuth Client",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
     }
   },
   "info": {
@@ -827,6 +1252,748 @@
         "required": [
           "token",
           "password"
+        ]
+      },
+      "TokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "description": "OAuth2 grant type",
+            "enum": [
+              "authorization_code",
+              "refresh_token",
+              "client_credentials"
+            ],
+            "example": "authorization_code"
+          },
+          "code": {
+            "type": "string",
+            "description": "Authorization code (for authorization_code grant)",
+            "example": "auth_code_abc123"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "description": "Redirect URI (must match authorization request)",
+            "example": "https://app.example.com/callback"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token (for refresh_token grant)",
+            "example": "refresh_token_xyz789"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "OAuth2 client ID",
+            "example": "client_abc123"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "OAuth2 client secret (for confidential clients)",
+            "example": "secret_xyz789"
+          },
+          "code_verifier": {
+            "type": "string",
+            "description": "PKCE code verifier (for public clients)",
+            "example": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Requested scopes (for client_credentials grant)",
+            "example": "api:read api:write"
+          }
+        },
+        "required": [
+          "grant_type",
+          "client_id"
+        ]
+      },
+      "TokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Access token (JWT)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type",
+            "example": "Bearer"
+          },
+          "expires_in": {
+            "type": "number",
+            "description": "Expiration time in seconds",
+            "example": 900
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token (opaque)",
+            "example": "refresh_token_xyz789"
+          },
+          "id_token": {
+            "type": "string",
+            "description": "ID token (JWT, OIDC only)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Granted scopes",
+            "example": "openid profile email"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ]
+      },
+      "TokenErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error code",
+            "enum": [
+              "invalid_request",
+              "invalid_client",
+              "invalid_grant",
+              "unauthorized_client",
+              "unsupported_grant_type",
+              "invalid_scope"
+            ],
+            "example": "invalid_grant"
+          },
+          "error_description": {
+            "type": "string",
+            "description": "Human-readable error description",
+            "example": "The provided authorization code is invalid"
+          },
+          "error_uri": {
+            "type": "string",
+            "description": "URI with error information",
+            "example": "https://docs.fortknox.io/errors/invalid_grant"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "UserInfoResponseDto": {
+        "type": "object",
+        "properties": {
+          "sub": {
+            "type": "string",
+            "description": "Subject (user ID)",
+            "example": "user_abc123"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address",
+            "example": "user@example.com"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "description": "Email verified",
+            "example": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name",
+            "example": "John Doe"
+          },
+          "given_name": {
+            "type": "string",
+            "description": "Given name",
+            "example": "John"
+          },
+          "family_name": {
+            "type": "string",
+            "description": "Family name",
+            "example": "Doe"
+          },
+          "picture": {
+            "type": "string",
+            "description": "Profile picture URL",
+            "example": "https://example.com/avatar.jpg"
+          },
+          "updated_at": {
+            "type": "number",
+            "description": "Last updated timestamp",
+            "example": 1234567890
+          }
+        },
+        "required": [
+          "sub",
+          "email",
+          "email_verified"
+        ]
+      },
+      "RevokeTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token to revoke",
+            "example": "token_to_revoke"
+          },
+          "token_type_hint": {
+            "type": "string",
+            "description": "Token type hint",
+            "enum": [
+              "access_token",
+              "refresh_token"
+            ],
+            "example": "access_token"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "IntrospectTokenRequestDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token to introspect",
+            "example": "token_to_check"
+          },
+          "token_type_hint": {
+            "type": "string",
+            "description": "Token type hint",
+            "enum": [
+              "access_token",
+              "refresh_token"
+            ],
+            "example": "access_token"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "IntrospectTokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Whether token is active",
+            "example": true
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope",
+            "example": "openid profile email"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "Client ID",
+            "example": "client_abc123"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "user@example.com"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type",
+            "example": "Bearer"
+          },
+          "exp": {
+            "type": "number",
+            "description": "Expiration timestamp",
+            "example": 1234567890
+          },
+          "iat": {
+            "type": "number",
+            "description": "Issued at timestamp",
+            "example": 1234567000
+          },
+          "sub": {
+            "type": "string",
+            "description": "Subject",
+            "example": "user_abc123"
+          },
+          "aud": {
+            "type": "string",
+            "description": "Audience",
+            "example": "client_abc123"
+          }
+        },
+        "required": [
+          "active"
+        ]
+      },
+      "OpenIDConfigurationDto": {
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "Issuer URL",
+            "example": "https://auth.fortknox.io"
+          },
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "Authorization endpoint",
+            "example": "https://auth.fortknox.io/oauth/authorize"
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "Token endpoint",
+            "example": "https://auth.fortknox.io/oauth/token"
+          },
+          "userinfo_endpoint": {
+            "type": "string",
+            "description": "UserInfo endpoint",
+            "example": "https://auth.fortknox.io/oauth/userinfo"
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "JWKS URI",
+            "example": "https://auth.fortknox.io/oauth/jwks"
+          },
+          "revocation_endpoint": {
+            "type": "string",
+            "description": "Revocation endpoint",
+            "example": "https://auth.fortknox.io/oauth/revoke"
+          },
+          "introspection_endpoint": {
+            "type": "string",
+            "description": "Introspection endpoint",
+            "example": "https://auth.fortknox.io/oauth/introspect"
+          },
+          "response_types_supported": {
+            "description": "Supported response types",
+            "example": [
+              "code"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "grant_types_supported": {
+            "description": "Supported grant types",
+            "example": [
+              "authorization_code",
+              "refresh_token",
+              "client_credentials"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "scopes_supported": {
+            "description": "Supported scopes",
+            "example": [
+              "openid",
+              "profile",
+              "email",
+              "offline_access"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "subject_types_supported": {
+            "description": "Supported subject types",
+            "example": [
+              "public"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "id_token_signing_alg_values_supported": {
+            "description": "Supported ID token signing algorithms",
+            "example": [
+              "RS256"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "token_endpoint_auth_methods_supported": {
+            "description": "Supported token endpoint auth methods",
+            "example": [
+              "client_secret_basic",
+              "client_secret_post",
+              "none"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "code_challenge_methods_supported": {
+            "description": "Supported code challenge methods",
+            "example": [
+              "S256",
+              "plain"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "claims_supported": {
+            "description": "Supported claims",
+            "example": [
+              "sub",
+              "email",
+              "email_verified",
+              "name",
+              "given_name",
+              "family_name",
+              "picture"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          }
+        },
+        "required": [
+          "issuer",
+          "authorization_endpoint",
+          "token_endpoint",
+          "userinfo_endpoint",
+          "jwks_uri",
+          "response_types_supported",
+          "grant_types_supported",
+          "scopes_supported",
+          "subject_types_supported",
+          "id_token_signing_alg_values_supported",
+          "token_endpoint_auth_methods_supported",
+          "code_challenge_methods_supported",
+          "claims_supported"
+        ]
+      },
+      "JWKSResponseDto": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "description": "Array of JSON Web Keys",
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          }
+        },
+        "required": [
+          "keys"
+        ]
+      },
+      "CreateOAuthClientDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Client name",
+            "example": "My Application"
+          },
+          "description": {
+            "type": "string",
+            "description": "Client description",
+            "example": "A sample OAuth2 client"
+          },
+          "clientType": {
+            "type": "string",
+            "description": "Client type",
+            "enum": [
+              "confidential",
+              "public"
+            ],
+            "example": "public"
+          },
+          "grantTypes": {
+            "description": "Allowed grant types",
+            "example": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "redirectUris": {
+            "description": "Redirect URIs",
+            "example": [
+              "https://app.example.com/callback"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "postLogoutRedirectUris": {
+            "description": "Post logout redirect URIs",
+            "example": [
+              "https://app.example.com/logout"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "allowedOrigins": {
+            "description": "Allowed CORS origins",
+            "example": [
+              "https://app.example.com"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "Logo URL",
+            "example": "https://app.example.com/logo.png"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "Website URL",
+            "example": "https://app.example.com"
+          },
+          "privacyPolicyUrl": {
+            "type": "string",
+            "description": "Privacy policy URL",
+            "example": "https://app.example.com/privacy"
+          },
+          "termsOfServiceUrl": {
+            "type": "string",
+            "description": "Terms of service URL",
+            "example": "https://app.example.com/terms"
+          },
+          "allowedScopes": {
+            "description": "Allowed scopes",
+            "example": [
+              "openid",
+              "profile",
+              "email"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "defaultScopes": {
+            "description": "Default scopes",
+            "example": [
+              "openid",
+              "profile"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "requirePkce": {
+            "type": "boolean",
+            "description": "Require PKCE",
+            "example": true
+          },
+          "requireConsent": {
+            "type": "boolean",
+            "description": "Require consent screen",
+            "example": true
+          },
+          "accessTokenTtl": {
+            "type": "number",
+            "description": "Access token TTL in seconds",
+            "example": 900
+          },
+          "refreshTokenTtl": {
+            "type": "number",
+            "description": "Refresh token TTL in seconds",
+            "example": 604800
+          },
+          "idTokenTtl": {
+            "type": "number",
+            "description": "ID token TTL in seconds",
+            "example": 3600
+          }
+        },
+        "required": [
+          "name",
+          "clientType",
+          "grantTypes",
+          "redirectUris"
+        ]
+      },
+      "CreateClientResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Client ID",
+            "example": "client_abc123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Client ID (public)",
+            "example": "client_abc123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Client name",
+            "example": "My Application"
+          },
+          "description": {
+            "type": "string",
+            "description": "Client description",
+            "example": "A sample OAuth2 client"
+          },
+          "clientType": {
+            "type": "string",
+            "description": "Client type",
+            "enum": [
+              "confidential",
+              "public"
+            ],
+            "example": "public"
+          },
+          "grantTypes": {
+            "description": "Grant types",
+            "example": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "redirectUris": {
+            "description": "Redirect URIs",
+            "example": [
+              "https://app.example.com/callback"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "Logo URL",
+            "example": "https://app.example.com/logo.png"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Is active",
+            "example": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Created at",
+            "example": "2024-01-01T00:00:00Z"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Client secret (only returned once on creation)",
+            "example": "secret_xyz789_DO_NOT_SHARE"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "name",
+          "clientType",
+          "grantTypes",
+          "redirectUris",
+          "isActive",
+          "createdAt"
+        ]
+      },
+      "OAuthClientResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Client ID",
+            "example": "client_abc123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Client ID (public)",
+            "example": "client_abc123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Client name",
+            "example": "My Application"
+          },
+          "description": {
+            "type": "string",
+            "description": "Client description",
+            "example": "A sample OAuth2 client"
+          },
+          "clientType": {
+            "type": "string",
+            "description": "Client type",
+            "enum": [
+              "confidential",
+              "public"
+            ],
+            "example": "public"
+          },
+          "grantTypes": {
+            "description": "Grant types",
+            "example": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "redirectUris": {
+            "description": "Redirect URIs",
+            "example": [
+              "https://app.example.com/callback"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "Logo URL",
+            "example": "https://app.example.com/logo.png"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Is active",
+            "example": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Created at",
+            "example": "2024-01-01T00:00:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "clientId",
+          "name",
+          "clientType",
+          "grantTypes",
+          "redirectUris",
+          "isActive",
+          "createdAt"
         ]
       }
     }
