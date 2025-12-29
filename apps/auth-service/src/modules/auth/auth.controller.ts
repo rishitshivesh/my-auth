@@ -29,6 +29,7 @@ import {
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
 import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { Protected } from "@/common/decorators/protected.decorator";
 
 /**
  * Authentication Controller
@@ -101,8 +102,7 @@ export class AuthController {
    */
   @Post("logout")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Protected()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
   async logout(
@@ -202,10 +202,12 @@ export class AuthController {
   async refresh(
     @Req() req: Request,
     @Body("refreshToken") refreshToken: string,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
 
-    return this.authService.refreshToken(tenantId, refreshToken);
+    return this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
   }
 
   /**
@@ -223,7 +225,7 @@ export class AuthController {
    * - Permissions/roles (if loaded)
    */
   @Get("me")
-  @UseGuards(FortKnoxProtectedGuard)
+  @Protected()
   @ApiOperation({
     summary: "Get current authenticated user",
     description:

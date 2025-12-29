@@ -192,6 +192,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get current user profile",
@@ -223,6 +226,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Update current user profile",
@@ -241,6 +247,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Delete user account",
@@ -274,6 +283,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Change user password",
@@ -294,6 +306,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get all active sessions",
@@ -312,6 +327,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Revoke all sessions except current",
@@ -344,6 +362,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Revoke a specific session",
@@ -373,6 +394,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get security event history",
@@ -512,6 +536,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "List all users (Admin)",
@@ -543,6 +570,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get user statistics (Admin)",
@@ -683,6 +713,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Export users to CSV (Admin)",
@@ -717,6 +750,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Bulk update user status (Admin)",
@@ -752,6 +788,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get user by ID (Admin)",
@@ -795,6 +834,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Update user by ID (Admin)",
@@ -828,6 +870,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Delete user by ID (Admin)",
@@ -860,6 +905,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Force user to reset password (Admin)",
@@ -892,6 +940,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Lock user account (Admin)",
@@ -924,6 +975,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Unlock user account (Admin)",
@@ -1033,6 +1087,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Logout and revoke session",
@@ -1133,7 +1190,16 @@
     "/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Token refreshed successfully"
@@ -1241,6 +1307,14 @@
             "description": "Forbidden - Tenant mismatch"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
         "summary": "Get current authenticated user",
         "tags": [
           "Authentication"

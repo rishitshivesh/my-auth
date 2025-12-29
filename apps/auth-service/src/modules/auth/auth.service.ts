@@ -24,6 +24,7 @@ import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -56,6 +57,7 @@ export class AuthService {
     private readonly bruteForceService: BruteForceService,
     private readonly mfaService: MfaService,
     private readonly webauthnService: WebAuthnService,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
   ) {}
 
   /**
@@ -295,6 +297,7 @@ export class AuthService {
 
     // === REFRESH TOKEN ROTATION LOGIC ===
 
+    // Step 1: Create session
     const session = await this.sessionService.createSession({
       userId: user.id,
       tenantId: data.tenantId,
@@ -304,41 +307,29 @@ export class AuthService {
       deviceId: data.deviceId,
     });
 
-    console.log("Session Created: ", session.id);
+    console.log("✅ Session created:", session.id);
 
-    // 1. Generate new family ID
-    const familyId = uuidv4();
+    // Step 2: Create refresh token using OAuthRefreshTokenService
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId: data.tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        clientId: undefined, // No client for password login
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        deviceId: data.deviceId,
+        expiresInDays: 30,
+      });
 
-    // 2. Generate refresh token (opaque random string)
-    const refreshToken = crypto.randomBytes(32).toString("hex");
+    console.log("✅ Refresh token created");
 
-    // 3. Hash it before storing
-    const refreshTokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
-    // Step 4: Store refresh token separately
-    // await this.oauthRefreshTokenRepository.save({
-    //   tenantId: data.tenantId,
-    //   userId: user.id,
-    //   sessionId: session.id,
-    //   familyId,
-    //   expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-    // });
-
-    // Step 5: Update session with family ID
-    await this.sessionRepository.update(session.id, {
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
-    });
-
-    // 6. Generate access token
+    // Step 3: Generate access token (NOW we have sessionId!)
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
-        tenantId,
+        tenantId: data.tenantId,
         sessionId: session.id,
       },
       {
@@ -347,31 +338,30 @@ export class AuthService {
       },
     );
 
-    // Log successful login
+    console.log("✅ Access token generated");
+
+    // Step 4: Log successful login
     await this.logSecurityEvent({
-      tenantId,
+      tenantId: data.tenantId,
       userId: user.id,
       eventType: "login_success",
       severity: "info",
-      ipAddress: ip,
-      userAgent,
-      metadata: { sessionId: session.id, familyId },
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: {
+        sessionId: session.id,
+        authMethod: "password",
+      },
     });
 
     return {
       accessToken,
-      refreshToken, // ← Return plaintext token to user
+      refreshToken,
       user: {
-        // id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         emailVerified: user.emailVerified,
-        // tenant: {
-        //   id: user.tenant.id,
-        //   name: user.tenant.name,
-        //   slug: user.tenant.slug,
-        // },
       },
     };
   }
@@ -382,24 +372,36 @@ export class AuthService {
   async logout(
     tenantId: string,
     userId: string,
-    sessionId?: string,
-    userAgent?: string,
-    ip?: string,
+    sessionId: string,
+    userAgent: string,
+    ip: string,
   ): Promise<void> {
-    if (sessionId) {
-      await this.sessionService.revokeSession(tenantId, sessionId);
-    } else {
-      await this.sessionService.revokeAllUserSessions(tenantId, userId);
-    }
+    // Revoke session
+    await this.sessionRepository.update(
+      { id: sessionId, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: "user_logout",
+      },
+    );
+
+    // Revoke all refresh tokens for this session
+    await this.oauthRefreshTokenService.revokeSessionTokens(
+      sessionId,
+      tenantId,
+      "user_logout",
+    );
+
+    // Log logout
     await this.logSecurityEvent({
       tenantId,
       userId,
-      ip,
       userAgent,
       eventType: "logout",
       severity: "info",
+      ipAddress: ip,
       metadata: { sessionId },
-    } as any);
+    });
   }
 
   /**
@@ -610,114 +612,45 @@ export class AuthService {
   async refreshToken(
     tenantId: string,
     refreshToken: string,
+    ip: string,
+    userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    // 1. Hash the incoming token
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
-    // 2. Find session by hash
-    const session = await this.sessionRepository.findOne({
-      where: {
+    // Use OAuthRefreshTokenService for rotation
+    const { accessTokenPayload, newToken } =
+      await this.oauthRefreshTokenService.rotateRefreshToken({
         tenantId,
-        refreshTokenHash: tokenHash,
-        revokedAt: IsNull(),
-      },
-      relations: ["user"],
+        token: refreshToken,
+        ipAddress: ip,
+        userAgent,
+      });
+
+    // Generate new access token
+    const accessToken = this.jwtService.sign(accessTokenPayload, {
+      secret: this.configService.get("JWT_SECRET"),
+      expiresIn: "15m",
     });
-
-    if (!session) {
-      throw new UnauthorizedException("Invalid refresh token");
-    }
-
-    // 3. Check if session expired
-    if (session.expiresAt && session.expiresAt < new Date()) {
-      await this.sessionRepository.update(session.id, {
-        revokedAt: new Date(),
-        revokedReason: "expired",
-      });
-      throw new UnauthorizedException("Session expired");
-    }
-
-    // === REUSE DETECTION ===
-    // 4. Check if this token was already used
-    if (session.lastRefreshAt) {
-      // TOKEN REUSE DETECTED!
-      // This token was already exchanged for a new one
-      // Someone is replaying an old token → security breach
-
-      console.error("🚨 REFRESH TOKEN REUSE DETECTED", {
-        sessionId: session.id,
-        familyId: session.refreshTokenFamilyId,
-        userId: session.userId,
-        tenantId: session.tenantId,
-      });
-
-      // Revoke entire family
-      await this.revokeSessionFamily(session.refreshTokenFamilyId!);
-
-      // Log critical security event
-      await this.logSecurityEvent({
-        tenantId,
-        userId: session.userId,
-        eventType: "refresh_token_reuse_detected",
-        severity: "critical",
-        ipAddress: session.ipAddress,
-        userAgent: session.userAgent,
-        metadata: {
-          sessionId: session.id,
-          familyId: session.refreshTokenFamilyId,
-        },
-      });
-
-      throw new UnauthorizedException(
-        "Token reuse detected - all sessions revoked",
-      );
-    }
-
-    // === ROTATION ===
-    // 5. Generate NEW refresh token
-    const newRefreshToken = crypto.randomBytes(32).toString("hex");
-    const newRefreshTokenHash = crypto
-      .createHash("sha256")
-      .update(newRefreshToken)
-      .digest("hex");
-
-    await this.sessionService.updateRefreshToken(
-      tenantId,
-      session.id,
-      newRefreshTokenHash,
-    );
-
-    // 7. Generate new access token
-    const accessToken = this.jwtService.sign(
-      {
-        sub: session.userId,
-        email: session.user.email,
-        tenantId: session.tenantId,
-        sessionId: session.id,
-      },
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
-    );
 
     // Log token refresh
     await this.logSecurityEvent({
       tenantId,
-      userId: session.userId,
+      userId: accessTokenPayload.sub,
       eventType: "token_refreshed",
       severity: "info",
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-      metadata: { sessionId: session.id },
+      ipAddress: ip,
+      userAgent,
+      metadata: {
+        sessionId: accessTokenPayload.sessionId,
+      },
+    });
+
+    console.log("Token refresh successful", {
+      userId: accessTokenPayload.sub,
+      sessionId: accessTokenPayload.sessionId,
     });
 
     return {
       accessToken,
-      refreshToken: newRefreshToken, // ← Return NEW token
+      refreshToken: newToken, // NEW token to client
     };
   }
 

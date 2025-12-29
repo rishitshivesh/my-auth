@@ -34,11 +34,11 @@ import {
 } from "./user.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Protected } from "@/common/decorators/protected.decorator";
 
 @ApiTags("Users")
 @Controller("users")
-@UseGuards(JwtAuthGuard) // All endpoints require authentication
-@ApiBearerAuth()
+@Protected()
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

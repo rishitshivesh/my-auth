@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-28T23:59:29.706Z
+Generated: 2025-12-29T14:42:03.664Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 89.25 KB | LINES: 3723
+SIZE: 111.75 KB | LINES: 4623
 ================================================================================
 
 {
@@ -764,6 +764,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get current user profile",
@@ -795,6 +798,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Update current user profile",
@@ -813,6 +819,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Delete user account",
@@ -846,6 +855,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Change user password",
@@ -866,6 +878,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get all active sessions",
@@ -884,6 +899,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Revoke all sessions except current",
@@ -916,6 +934,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Revoke a specific session",
@@ -945,6 +966,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get security event history",
@@ -1084,6 +1108,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "List all users (Admin)",
@@ -1115,6 +1142,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get user statistics (Admin)",
@@ -1255,6 +1285,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Export users to CSV (Admin)",
@@ -1289,6 +1322,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Bulk update user status (Admin)",
@@ -1324,6 +1360,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get user by ID (Admin)",
@@ -1367,6 +1406,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Update user by ID (Admin)",
@@ -1400,6 +1442,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Delete user by ID (Admin)",
@@ -1432,6 +1477,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Force user to reset password (Admin)",
@@ -1464,6 +1512,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Lock user account (Admin)",
@@ -1496,6 +1547,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Unlock user account (Admin)",
@@ -1587,7 +1641,16 @@ SIZE: 89.25 KB | LINES: 3723
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Logout successful"
@@ -1596,6 +1659,9 @@ SIZE: 89.25 KB | LINES: 3723
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Logout and revoke session",
@@ -1713,19 +1779,376 @@ SIZE: 89.25 KB | LINES: 3723
     },
     "/auth/me": {
       "get": {
-        "operationId": "AuthController_getMe",
+        "description": "Returns complete authentication context for debugging and user info display",
+        "operationId": "AuthController_getCurrentUser",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "User info retrieved"
+            "description": "Current user context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "tenant": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "lastActivity": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        },
+                        "ipAddress": {
+                          "type": "string"
+                        },
+                        "userAgent": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "auth": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string"
+                        },
+                        "issuedAt": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid token or session"
+          },
+          "403": {
+            "description": "Forbidden - Tenant mismatch"
           }
         },
         "security": [
           {
             "bearer": []
+          },
+          {
+            "cookie": []
           }
         ],
         "summary": "Get current authenticated user",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/mfa/verify": {
+      "post": {
+        "description": "After receiving mfaRequired=true from login, use this endpoint to verify the TOTP code",
+        "operationId": "AuthController_verifyMfa",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tempToken": {
+                    "type": "string",
+                    "description": "Temporary token from login response"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "6-digit TOTP code from authenticator app",
+                    "pattern": "^\\d{6}$",
+                    "example": "123456"
+                  }
+                },
+                "required": [
+                  "tempToken",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MFA verified successfully, tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid MFA code or expired token"
+          }
+        },
+        "summary": "Verify MFA code and complete login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/mfa/verify-backup": {
+      "post": {
+        "description": "Use a backup code when authenticator app is unavailable",
+        "operationId": "AuthController_verifyMfaBackup",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tempToken": {
+                    "type": "string",
+                    "description": "Temporary token from login response"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Backup code in format XXXX-XXXX",
+                    "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$",
+                    "example": "ABCD-1234"
+                  }
+                },
+                "required": [
+                  "tempToken",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup code verified, tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "description": "Warning about remaining backup codes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid backup code"
+          }
+        },
+        "summary": "Verify MFA using backup code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/webauthn/login/start": {
+      "post": {
+        "description": "Initiate WebAuthn authentication flow",
+        "operationId": "AuthController_startWebAuthnLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WebAuthn authentication options"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "Start passwordless WebAuthn login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/webauthn/login/finish": {
+      "post": {
+        "description": "Verify WebAuthn response and issue authentication tokens",
+        "operationId": "AuthController_finishWebAuthnLogin",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "response": {
+                    "type": "object",
+                    "description": "WebAuthn authentication response from browser"
+                  }
+                },
+                "required": [
+                  "email",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "emailVerified": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          }
+        },
+        "summary": "Complete WebAuthn login",
         "tags": [
           "Authentication"
         ]
@@ -3068,6 +3491,362 @@ SIZE: 89.25 KB | LINES: 3723
           "RBAC"
         ]
       }
+    },
+    "/mfa/setup/totp": {
+      "post": {
+        "description": "Generate QR code and backup codes for TOTP setup",
+        "operationId": "MfaController_setupTotp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP setup data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupTotpResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Setup TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify/totp": {
+      "post": {
+        "description": "Verify TOTP code and enable MFA",
+        "operationId": "MfaController_verifyAndEnableTotp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP enabled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnabledResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "TOTP not setup or already enabled"
+          },
+          "401": {
+            "description": "Invalid TOTP code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify and enable TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/totp": {
+      "delete": {
+        "description": "Turn off TOTP-based MFA",
+        "operationId": "MfaController_disableTotp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/backup-codes/regenerate": {
+      "post": {
+        "description": "Generate new backup codes (invalidates old ones)",
+        "operationId": "MfaController_regenerateBackupCodes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "New backup codes generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupCodesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "MFA must be enabled first"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerate backup codes",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify/backup-code": {
+      "post": {
+        "description": "Test a backup code (consumes it if valid)",
+        "operationId": "MfaController_verifyBackupCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyBackupCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup code verified"
+          },
+          "401": {
+            "description": "Invalid backup code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify backup code",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/status": {
+      "get": {
+        "description": "Check which MFA methods are enabled",
+        "operationId": "MfaController_getMfaStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "MFA status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get MFA status",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/all": {
+      "delete": {
+        "description": "Turn off all MFA methods",
+        "operationId": "MfaController_disableAllMfa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All MFA disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable all MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/request-email-otp": {
+      "post": {
+        "description": "Send a 6-digit code to user email for MFA",
+        "operationId": "MfaController_requestEmailOtp",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request OTP code via email",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify-email-otp": {
+      "post": {
+        "description": "Verify the 6-digit code received via email",
+        "operationId": "MfaController_verifyEmailOtp",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify email OTP code",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/register/start": {
+      "post": {
+        "operationId": "MfaController_startWebAuthnRegistration",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start WebAuthn credential registration",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/register/finish": {
+      "post": {
+        "operationId": "MfaController_finishWebAuthnRegistration",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Finish WebAuthn credential registration",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/credentials": {
+      "get": {
+        "operationId": "MfaController_listWebAuthnCredentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List user WebAuthn credentials",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/credentials/{credentialId}": {
+      "delete": {
+        "operationId": "MfaController_deleteWebAuthnCredential",
+        "parameters": [
+          {
+            "name": "credentialId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete WebAuthn credential",
+        "tags": [
+          "MFA"
+        ]
+      }
     }
   },
   "info": {
@@ -4285,6 +5064,127 @@ SIZE: 89.25 KB | LINES: 3723
         "required": [
           "role"
         ]
+      },
+      "SetupTotpResponseDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "TOTP secret (base32 encoded)"
+          },
+          "qrCode": {
+            "type": "string",
+            "description": "QR code as data URL"
+          },
+          "backupCodes": {
+            "description": "Backup codes (save these!)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "secret",
+          "qrCode",
+          "backupCodes"
+        ]
+      },
+      "VerifyTotpDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit TOTP code"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "MfaEnabledResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          },
+          "backupCodes": {
+            "description": "Backup codes (save these!)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "message",
+          "backupCodes"
+        ]
+      },
+      "BackupCodesResponseDto": {
+        "type": "object",
+        "properties": {
+          "backupCodes": {
+            "description": "New backup codes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "number",
+            "description": "Number of codes generated"
+          }
+        },
+        "required": [
+          "backupCodes",
+          "count"
+        ]
+      },
+      "VerifyBackupCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ABCD-1234",
+            "description": "Backup code"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "MfaStatusDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether MFA is enabled"
+          },
+          "methods": {
+            "description": "Enabled MFA methods",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preferredMethod": {
+            "type": "string",
+            "description": "Preferred MFA method"
+          },
+          "backupCodesRemaining": {
+            "type": "number",
+            "description": "Number of backup codes remaining"
+          }
+        },
+        "required": [
+          "enabled",
+          "methods",
+          "preferredMethod",
+          "backupCodesRemaining"
+        ]
       }
     }
   },
@@ -4699,7 +5599,7 @@ SIZE: 171 B | LINES: 9
 
 ================================================================================
 FILE: apps/auth-service/package.json
-SIZE: 3.69 KB | LINES: 113
+SIZE: 3.81 KB | LINES: 116
 ================================================================================
 
 {
@@ -4744,6 +5644,9 @@ SIZE: 3.69 KB | LINES: 113
     "@repo/database": "*",
     "@repo/security": "*",
     "@repo/shared": "*",
+    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/server": "^13.2.2",
+    "@simplewebauthn/types": "^12.0.0",
     "axios": "^1.12.2",
     "cache-manager-redis-store": "^3.0.1",
     "class-transformer": "^0.5.1",
@@ -7141,14 +8044,92 @@ export function PaginationMetadataUsers(): MethodDecorator {
 
 ================================================================================
 FILE: apps/auth-service/src/common/decorators/permission.decorator.ts
-SIZE: 195 B | LINES: 6
+SIZE: 322 B | LINES: 10
 ================================================================================
 
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const PERMISSIONS_KEY = 'permissions';
-export const Permissions = (...permissions: string[]) =>
+export const PERMISSIONS_KEY = "permissions";
+export const RequirePermissions = (...permissions: string[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+export const ROLES_KEY = "roles";
+export const RequireRoles = (...roles: string[]) =>
+  SetMetadata(ROLES_KEY, roles);
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/decorators/protected.decorator.ts
+SIZE: 1.8 KB | LINES: 67
+================================================================================
+
+import { applyDecorators, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiCookieAuth } from "@nestjs/swagger";
+import { TenantBindingGuard } from "../guards/tenant-binding.guard";
+import { SessionGuard } from "../guards/session.guard";
+import { JwtAuthGuard } from "@/common/guards";
+import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
+import {
+  RequirePermissions,
+  RequireRoles,
+} from "@/modules/rbac/decorators/rbac.decorator";
+import { RolesGuard } from "@/modules/rbac/guards/roles.guard";
+
+/**
+ * Standard protection for authenticated routes
+ *
+ * Applies in order:
+ * 1. JwtAuthGuard - validates JWT signature
+ * 2. TenantBindingGuard - ensures token tenant == request tenant
+ * 3. SessionGuard - validates session active
+ *
+ * Usage:
+ * @Protected()
+ * @Get('profile')
+ * async getProfile(@Req() req) { ... }
+ */
+export function Protected() {
+  return applyDecorators(
+    UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard),
+    ApiBearerAuth(),
+    ApiCookieAuth(),
+  );
+}
+
+/**
+ * Protected with permissions check
+ *
+ * Usage:
+ * @ProtectedWithPermissions('users:read', 'users:write')
+ * @Get('users')
+ * async listUsers() { ... }
+ */
+export function ProtectedWithPermissions(...permissions: string[]) {
+  return applyDecorators(
+    UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard, PermissionsGuard),
+    RequirePermissions(...permissions),
+    ApiBearerAuth(),
+    ApiCookieAuth(),
+  );
+}
+
+/**
+ * Protected with roles check
+ *
+ * Usage:
+ * @ProtectedWithRoles('admin', 'owner')
+ * @Delete('users/:id')
+ * async deleteUser() { ... }
+ */
+export function ProtectedWithRoles(...roles: string[]) {
+  return applyDecorators(
+    UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard, RolesGuard),
+    RequireRoles(...roles),
+    ApiBearerAuth(),
+    ApiCookieAuth(),
+  );
+}
 
 
 
@@ -7241,6 +8222,171 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 
 ================================================================================
+FILE: apps/auth-service/src/common/guards/fortknox-protected-route.guard.ts
+SIZE: 2.31 KB | LINES: 78
+================================================================================
+
+// apps/auth-service/src/common/guards/fortknox-protected.guard.ts
+
+import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { TenantBindingGuard } from "./tenant-binding.guard";
+import { JwtAuthGuard } from "@/common/guards/jwt-auth-guard";
+import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
+import { SessionGuard } from "@/common/guards/session.guard";
+
+/**
+ * FortKnoxProtectedGuard
+ *
+ * Composite guard that enforces complete auth boundary:
+ * 1. JWT validation (token is valid)
+ * 2. Tenant binding (token tenant == request tenant)
+ * 3. Session validity (session exists, not revoked, not expired)
+ * 4. Permissions (optional, only if @RequirePermissions decorator present)
+ *
+ * This is the "one guard to rule them all" approach.
+ *
+ * Usage:
+ * @UseGuards(FortKnoxProtectedGuard)
+ * @RequirePermissions('users:read') // Optional
+ * async myProtectedRoute() { ... }
+ *
+ * Benefits:
+ * - Single decorator
+ * - Guaranteed correct order
+ * - Easier to maintain
+ * - Less error-prone
+ */
+@Injectable()
+export class FortKnoxProtectedGuard implements CanActivate {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly jwtAuthGuard: JwtAuthGuard,
+    private readonly tenantBindingGuard: TenantBindingGuard,
+    private readonly sessionGuard: SessionGuard,
+    private readonly permissionsGuard: PermissionsGuard,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Step 1: JWT Authentication
+    const jwtResult = await this.jwtAuthGuard.canActivate(context);
+    if (!jwtResult) {
+      return false;
+    }
+
+    // Step 2: Tenant Binding
+    const tenantResult = this.tenantBindingGuard.canActivate(context);
+    if (!tenantResult) {
+      return false;
+    }
+
+    // Step 3: Session Validation
+    const sessionResult = await this.sessionGuard.canActivate(context);
+    if (!sessionResult) {
+      return false;
+    }
+
+    // Step 4: Permissions (only if decorator present)
+    const permissions = this.reflector.get<string[]>(
+      "permissions",
+      context.getHandler(),
+    );
+
+    if (permissions && permissions.length > 0) {
+      const permissionsResult =
+        await this.permissionsGuard.canActivate(context);
+      if (!permissionsResult) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/guards/guards.module.ts
+SIZE: 1.88 KB | LINES: 73
+================================================================================
+
+import { Module, Global } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import {
+  Permission,
+  Role,
+  RolePermission,
+  Session,
+  User,
+  UserRole,
+} from "@repo/database";
+import { JwtAuthGuard } from "./jwt-auth-guard";
+import { TenantBindingGuard } from "./tenant-binding.guard";
+import { SessionGuard } from "./session.guard";
+import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
+import { RolesGuard } from "@/modules/rbac/guards/roles.guard";
+import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { RoleService } from "@/modules/rbac/services/role.service";
+import { PermissionService } from "@/modules/rbac/services/permission.service";
+
+/**
+ * GuardsModule
+ *
+ * Centralizes all authentication and authorization guards.
+ * Marked as @Global so guards are available everywhere without importing.
+ *
+ * Guards included:
+ * - JwtAuthGuard: JWT token validation
+ * - TenantBindingGuard: Tenant isolation enforcement
+ * - SessionGuard: Session validity checks
+ * - PermissionsGuard: RBAC permission checks
+ * - RolesGuard: RBAC role checks
+ * - FortKnoxProtectedGuard: Composite guard (all of the above)
+ */
+@Global()
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Session,
+      User,
+      UserRole,
+      Role,
+      RolePermission,
+      Permission,
+    ]),
+  ],
+  providers: [
+    JwtAuthGuard,
+    TenantBindingGuard,
+    SessionGuard,
+    PermissionsGuard,
+    RolesGuard,
+    FortKnoxProtectedGuard,
+    RbacService,
+    RoleService,
+    PermissionService,
+    RolePermission,
+  ],
+  exports: [
+    JwtAuthGuard,
+    TenantBindingGuard,
+    SessionGuard,
+    PermissionsGuard,
+    RolesGuard,
+    FortKnoxProtectedGuard,
+    RbacService,
+    RoleService,
+    PermissionService,
+    RolePermission,
+  ],
+})
+export class GuardsModule {}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/common/guards/index.ts
 SIZE: 78 B | LINES: 3
 ================================================================================
@@ -7297,70 +8443,71 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
 ================================================================================
 FILE: apps/auth-service/src/common/guards/jwt.strategy.ts
-SIZE: 1.64 KB | LINES: 65
+SIZE: 1.79 KB | LINES: 66
 ================================================================================
 
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { ConfigService } from "@nestjs/config";
-import { SessionService } from "@/common/service/session.service";
+import { Request } from "express";
 
 /**
- * JWT Strategy
+ * Cookie extractor for browser clients
+ */
+const cookieExtractor = (req: Request): string | null => {
+  if (req && req.cookies) {
+    return req.cookies["access_token"] || null;
+  }
+  return null;
+};
+
+/**
+ * JWT Strategy - ONLY validates token signature and expiry
  *
- * Validates JWT tokens and extracts user payload
+ * Does NOT validate:
+ * - Session (SessionGuard does this)
+ * - Tenant (TenantBindingGuard does this)
+ * - Permissions (PermissionsGuard does this)
+ *
+ * Supports:
+ * - Bearer token (Authorization: Bearer <token>)
+ * - HttpOnly cookie (access_token)
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(
-    private configService: ConfigService,
-    private sessionService: SessionService,
-  ) {
+  constructor(private configService: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(), // Bearer token first
+        cookieExtractor, // Cookie fallback
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow("JWT_SECRET"),
     });
   }
 
+  /**
+   * Validate JWT payload
+   *
+   * This runs AFTER signature verification
+   * ONLY checks payload structure, NOT business logic
+   */
   async validate(payload: any) {
-    // if (!payload.sub) {
-    //   throw new UnauthorizedException("Invalid token payload");
-    // }
-    //
-    // return {
-    //   sub: payload.sub,
-    //   email: payload.email,
-    //   tenantId: payload.tenantId,
-    // };
-
-    const session = await this.sessionService.validateSession(
-      payload.tenantId,
-      payload.sessionId,
-    );
-
-    if (!session) {
-      throw new UnauthorizedException("Session invalid or expired");
+    // Basic payload validation
+    if (!payload.sub || !payload.tenantId) {
+      throw new UnauthorizedException("Invalid token payload");
     }
 
-    // Verify tenant matches
-    if (session.tenantId !== payload.tenantId) {
-      throw new UnauthorizedException("Tenant mismatch");
-    }
-
-    // Verify user matches
-    if (session.userId !== payload.sub) {
-      throw new UnauthorizedException("User mismatch");
-    }
-
-    // Return user context
+    // Return payload to be attached to request.user
+    // Other guards will do additional validation
     return {
       sub: payload.sub,
-      userId: session.userId,
-      email: session.email,
-      tenantId: session.tenantId,
-      sessionId: session.id,
+      email: payload.email,
+      tenantId: payload.tenantId,
+      sessionId: payload.sessionId,
+      iat: payload.iat,
+      exp: payload.exp,
     };
   }
 }
@@ -7368,14 +8515,236 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
 
 ================================================================================
-FILE: apps/auth-service/src/common/guards/token-verification.guard.ts
-SIZE: 1.93 KB | LINES: 72
+FILE: apps/auth-service/src/common/guards/session.guard.ts
+SIZE: 2.79 KB | LINES: 108
 ================================================================================
 
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { logger } from '../logger';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  Logger,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Session } from "@repo/database";
 
+/**
+ * SessionGuard
+ *
+ * ONLY validates session (no tenant checks - TenantBindingGuard does that)
+ *
+ * Runs AFTER:
+ * - JwtAuthGuard (sets req.user)
+ * - TenantBindingGuard (validates tenant match)
+ */
+@Injectable()
+export class SessionGuard implements CanActivate {
+  private readonly logger = new Logger(SessionGuard.name);
+
+  constructor(
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+    const sessionId = user?.sessionId;
+
+    if (!sessionId) {
+      this.logger.error("SessionGuard: No sessionId in token payload");
+      throw new UnauthorizedException(
+        "Invalid token: missing session reference",
+      );
+    }
+
+    // Fetch session from database
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        userId: true,
+        tenantId: true,
+        revokedAt: true,
+        expiresAt: true,
+        lastActivity: true,
+        ipAddress: true,
+        userAgent: true,
+        deviceId: true,
+        createdAt: true,
+      },
+    });
+
+    if (!session) {
+      this.logger.warn("SessionGuard: Session not found", { sessionId });
+      throw new UnauthorizedException("Session not found. Please login again.");
+    }
+
+    // Check if session is revoked
+    if (session.revokedAt) {
+      this.logger.warn("SessionGuard: Session revoked", {
+        sessionId,
+        revokedAt: session.revokedAt,
+      });
+      throw new UnauthorizedException(
+        "Session has been revoked. Please login again.",
+      );
+    }
+
+    // Check if session is expired
+    if (session.expiresAt && session.expiresAt < new Date()) {
+      this.logger.warn("SessionGuard: Session expired", {
+        sessionId,
+        expiresAt: session.expiresAt,
+      });
+      throw new UnauthorizedException(
+        "Session has expired. Please login again.",
+      );
+    }
+
+    // Attach session to request
+    request.fortknoxSession = session;
+
+    // Update last activity (non-blocking)
+    this.updateLastActivity(sessionId).catch((err) => {
+      this.logger.error("Failed to update last activity", {
+        sessionId,
+        error: err.message,
+      });
+    });
+
+    this.logger.debug("Session validated", { sessionId });
+
+    return true;
+  }
+
+  private async updateLastActivity(sessionId: string): Promise<void> {
+    await this.sessionRepository.update(sessionId, {
+      lastActivity: new Date(),
+    });
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/guards/tenant-binding.guard.ts
+SIZE: 2.46 KB | LINES: 86
+================================================================================
+
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+  Logger,
+} from "@nestjs/common";
+
+/**
+ * TenantBindingGuard
+ *
+ * Enforces that the tenant in the JWT token matches the tenant resolved from the request.
+ * This prevents token reuse across tenants (critical for multi-tenant security).
+ *
+ * MUST run AFTER:
+ * - TenantResolverMiddleware (sets req.tenantId)
+ * - JwtAuthGuard (validates JWT and sets req.user)
+ *
+ * Usage:
+ * @UseGuards(JwtAuthGuard, TenantBindingGuard)
+ */
+@Injectable()
+export class TenantBindingGuard implements CanActivate {
+  private readonly logger = new Logger(TenantBindingGuard.name);
+
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+
+    // Step 1: Verify prerequisites
+    const requestTenantId = request.tenantId;
+    const user = request.user;
+
+    if (!requestTenantId) {
+      // This means TenantResolverMiddleware didn't run or failed
+      this.logger.error("TenantBindingGuard: No tenantId on request");
+      throw new ForbiddenException(
+        "Tenant context not found. This route requires tenant resolution.",
+      );
+    }
+
+    if (!user) {
+      // This means JwtAuthGuard didn't run or token is invalid
+      this.logger.error("TenantBindingGuard: No user on request");
+      throw new UnauthorizedException("Authentication required");
+    }
+
+    // Step 2: Extract tenant from token payload
+    const tokenTenantId = user.tenantId;
+
+    if (!tokenTenantId) {
+      // Token doesn't have tenantId (shouldn't happen with proper token generation)
+      this.logger.error("TenantBindingGuard: Token missing tenantId", {
+        userId: user.sub,
+        email: user.email,
+      });
+      throw new ForbiddenException("Invalid token: missing tenant context");
+    }
+
+    // Step 3: Enforce tenant binding
+    if (tokenTenantId !== requestTenantId) {
+      this.logger.warn("Tenant binding violation detected", {
+        userId: user.sub,
+        email: user.email,
+        tokenTenant: tokenTenantId,
+        requestTenant: requestTenantId,
+        ip: request.ip,
+        path: request.path,
+      });
+
+      throw new ForbiddenException(
+        "Token is not valid for this tenant. Please authenticate with the correct tenant.",
+      );
+    }
+
+    // Step 4: Success - tenant binding is valid
+    this.logger.debug("Tenant binding verified", {
+      userId: user.sub,
+      tenantId: tokenTenantId,
+      path: request.path,
+    });
+
+    return true;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/common/guards/token-verification.guard.ts
+SIZE: 2.33 KB | LINES: 86
+================================================================================
+
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { logger } from "../logger";
+
+/**
+ * TokenVerificationGuard
+ *
+ * ⚠️ WARNING: DO NOT USE FOR PROTECTED ROUTES!
+ *
+ * This guard is ONLY for "optional auth" scenarios where:
+ * - Route can work without auth
+ * - If token present, validate it
+ * - If token missing/invalid, continue without user
+ *
+ * For PROTECTED routes, use: @UseGuards(FortKnoxProtectedGuard)
+ *
+ * @deprecated Use FortKnoxProtectedGuard for protected routes
+ */
 @Injectable()
 export class TokenVerificationGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
@@ -7384,8 +8753,8 @@ export class TokenVerificationGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token =
       request.cookies.accessToken ??
-      request.headers['x-authorization'] ??
-      request.headers['authorization'];
+      request.headers["x-authorization"] ??
+      request.headers["authorization"];
 
     if (!token) {
       return false;
@@ -7423,8 +8792,8 @@ export class RequestUserGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token =
       request.cookies.accessToken ??
-      request.headers['x-authorization'] ??
-      request.headers['authorization'];
+      request.headers["x-authorization"] ??
+      request.headers["authorization"];
 
     try {
       if (token) {
@@ -7436,7 +8805,7 @@ export class RequestUserGuard implements CanActivate {
       return true;
     } catch (error) {
       logger.error({
-        message: 'Failed to verify token',
+        message: "Failed to verify token",
         error,
       });
       return true;
@@ -7849,8 +9218,8 @@ export class SessionService {
     userId: string;
     tenantId: string;
     email: string;
-    refreshTokenFamilyId: string;
-    refreshTokenHash: string;
+    refreshTokenFamilyId?: string;
+    refreshTokenHash?: string;
     ipAddress?: string;
     userAgent?: string;
     deviceId?: string;
@@ -9731,7 +11100,7 @@ bootstrap();
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
-SIZE: 5.78 KB | LINES: 217
+SIZE: 14.87 KB | LINES: 590
 ================================================================================
 
 import {
@@ -9745,12 +11114,14 @@ import {
   Get,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
 } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import {
@@ -9758,9 +11129,12 @@ import {
   LoginDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  VerifyMfaDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
+import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { Protected } from "@/common/decorators/protected.decorator";
 
 /**
  * Authentication Controller
@@ -9833,15 +11207,18 @@ export class AuthController {
    */
   @Post("logout")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Protected()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
-  async logout(@Req() req: any, @Ip() ip: string) {
+  async logout(
+    @Req() req: any,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
     const sessionId = req.user.sessionId;
-    await this.authService.logout(tenantId, userId, sessionId, ip);
+    await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
     return { message: "Logged out successfully" };
   }
 
@@ -9937,17 +11314,382 @@ export class AuthController {
   }
 
   /**
-   * Get current user info (for testing JWT)
+   * Get current authenticated user context
+   *
+   * This endpoint is critical for:
+   * 1. Testing auth boundary works correctly
+   * 2. Debugging token/session issues
+   * 3. Frontend to get current user info
+   *
+   * Returns complete auth context:
+   * - User info from JWT
+   * - Tenant info
+   * - Session info
+   * - Permissions/roles (if loaded)
    */
   @Get("me")
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get current authenticated user" })
-  @ApiResponse({ status: 200, description: "User info retrieved" })
-  async getMe(@Req() req: Request) {
+  @Protected()
+  @ApiOperation({
+    summary: "Get current authenticated user",
+    description:
+      "Returns complete authentication context for debugging and user info display",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Current user context",
+    schema: {
+      type: "object",
+      properties: {
+        user: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            email: { type: "string" },
+            firstName: { type: "string" },
+            lastName: { type: "string" },
+          },
+        },
+        tenant: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            slug: { type: "string" },
+          },
+        },
+        session: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            createdAt: { type: "string" },
+            lastActivity: { type: "string" },
+            expiresAt: { type: "string" },
+            ipAddress: { type: "string" },
+            userAgent: { type: "string" },
+          },
+        },
+        auth: {
+          type: "object",
+          properties: {
+            method: { type: "string" },
+            issuedAt: { type: "string" },
+            expiresAt: { type: "string" },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token or session",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Forbidden - Tenant mismatch",
+  })
+  async getCurrentUser(@Req() req: any) {
+    const user = req.user; // From JWT payload
+    const session = req.fortknoxSession;
+    const tenant = req.tenant; // From TenantResolverMiddleware
+
+    // Fetch full user details
+    const fullUser = await this.authService.getCurrentUser(
+      tenant?.id!,
+      user.sub,
+    );
+
+    if (!fullUser) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    return {
+      user: {
+        id: fullUser.id,
+        email: fullUser.email,
+        firstName: fullUser.firstName,
+        lastName: fullUser.lastName,
+        emailVerified: fullUser.emailVerified,
+        lastLoginAt: fullUser.lastLoginAt,
+        lastLoginIp: fullUser.lastLoginIp,
+      },
+      tenant: {
+        id: tenant?.id,
+        name: tenant?.name,
+        slug: tenant?.slug,
+        customDomain: tenant?.customDomain,
+      },
+      session: {
+        id: session.id,
+        createdAt: session.createdAt,
+        lastActivity: session.lastActivity,
+        expiresAt: session.expiresAt,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        deviceId: session.deviceId,
+      },
+      auth: {
+        method: "jwt",
+        // issuedAt: new Date(user.iat * 1000).toISOString(),
+        // expiresAt: new Date(user.exp * 1000).toISOString(),
+        tokenTenant: user.tenantId,
+        requestTenant: req.tenantId,
+        tenantMatch: user.tenantId === req.tenantId,
+      },
+      debug: {
+        guards: {
+          jwtAuth: true,
+          tenantBinding: true,
+          session: true,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Verify MFA code and complete login
+   */
+  @Post("mfa/verify")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify MFA code and complete login",
+    description:
+      "After receiving mfaRequired=true from login, use this endpoint to verify the TOTP code",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        tempToken: {
+          type: "string",
+          description: "Temporary token from login response",
+        },
+        code: {
+          type: "string",
+          description: "6-digit TOTP code from authenticator app",
+          pattern: "^\\d{6}$",
+          example: "123456",
+        },
+      },
+      required: ["tempToken", "code"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "MFA verified successfully, tokens issued",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        message: { type: "string" },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid MFA code or expired token",
+  })
+  async verifyMfa(
+    @Req() req: Request,
+    @Body() dto: VerifyMfaDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
     const tenantId = req.tenantId!;
-    console.log(req.user);
-    return this.authService.getCurrentUser(tenantId, req.user.sub);
+
+    try {
+      return await this.authService.verifyMfa(
+        tenantId,
+        dto.tempToken,
+        dto.code,
+        ip,
+        userAgent,
+      );
+    } catch (error: any) {
+      console.error("❌ MFA verification failed:", error.message);
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+  }
+
+  /**
+   * Verify MFA using backup code
+   */
+  @Post("mfa/verify-backup")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify MFA using backup code",
+    description: "Use a backup code when authenticator app is unavailable",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        tempToken: {
+          type: "string",
+          description: "Temporary token from login response",
+        },
+        code: {
+          type: "string",
+          description: "Backup code in format XXXX-XXXX",
+          pattern: "^[A-Z0-9]{4}-[A-Z0-9]{4}$",
+          example: "ABCD-1234",
+        },
+      },
+      required: ["tempToken", "code"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Backup code verified, tokens issued",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        message: { type: "string" },
+        warning: {
+          type: "string",
+          description: "Warning about remaining backup codes",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid backup code",
+  })
+  async verifyMfaBackup(
+    @Req() req: Request,
+    @Body() dto: VerifyMfaDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    try {
+      return await this.authService.verifyMfaBackup(
+        tenantId,
+        dto.tempToken,
+        dto.code,
+        ip,
+        userAgent,
+      );
+    } catch (error: any) {
+      console.error("❌ Backup code verification failed:", error.message);
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException("Invalid backup code");
+    }
+  }
+
+  // apps/auth-service/src/modules/auth/auth.controller.ts
+  // CLEAN CONTROLLER - ONLY ROUTING
+
+  /**
+   * Start WebAuthn authentication (passwordless login)
+   */
+  @Post("webauthn/login/start")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Start passwordless WebAuthn login",
+    description: "Initiate WebAuthn authentication flow",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        email: { type: "string", format: "email" },
+      },
+      required: ["email"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "WebAuthn authentication options",
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid credentials",
+  })
+  async startWebAuthnLogin(
+    @Req() req: Request,
+    @Body() dto: { email: string },
+  ) {
+    const tenantId = req.tenantId!;
+
+    return this.authService.startWebAuthnLogin(tenantId, dto.email);
+  }
+
+  /**
+   * Finish WebAuthn authentication and get tokens
+   */
+  @Post("webauthn/login/finish")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Complete WebAuthn login",
+    description: "Verify WebAuthn response and issue authentication tokens",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        email: { type: "string", format: "email" },
+        response: {
+          type: "object",
+          description: "WebAuthn authentication response from browser",
+        },
+      },
+      required: ["email", "response"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Authentication successful",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        user: {
+          type: "object",
+          properties: {
+            email: { type: "string" },
+            firstName: { type: "string" },
+            lastName: { type: "string" },
+            emailVerified: { type: "boolean" },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Authentication failed",
+  })
+  async finishWebAuthnLogin(
+    @Req() req: Request,
+    @Body() dto: { email: string; response: any },
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    return this.authService.finishWebAuthnLogin({
+      tenantId,
+      email: dto.email,
+      webauthnResponse: dto.response,
+      ip,
+      userAgent,
+    });
   }
 }
 
@@ -9955,7 +11697,7 @@ export class AuthController {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.dto.ts
-SIZE: 1.96 KB | LINES: 101
+SIZE: 2.16 KB | LINES: 111
 ================================================================================
 
 import {
@@ -10059,11 +11801,21 @@ export class VerifyEmailDto {
   token!: string;
 }
 
+export class VerifyMfaDto {
+  @ApiProperty({ example: "verification-token-here" })
+  @IsString()
+  tempToken!: string;
+
+  @ApiProperty({ example: "verification-code-here" })
+  @IsString()
+  code!: string;
+}
+
 
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 1.71 KB | LINES: 62
+SIZE: 2.03 KB | LINES: 72
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -10076,6 +11828,8 @@ import {
   SecurityEvent,
   Tenant,
   MfaSettings,
+  OAuthRefreshToken,
+  UserRole,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -10089,6 +11843,9 @@ import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { GuardsModule } from "@/common/guards/guards.module";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
 
 @Module({
   imports: [
@@ -10098,9 +11855,12 @@ import { MfaService } from "@/modules/mfa/mfa.service";
       SecurityEvent,
       Tenant,
       MfaSettings,
+      OAuthRefreshToken,
+      UserRole,
     ]),
     UserModule,
     EmailModule,
+    GuardsModule,
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -10123,6 +11883,8 @@ import { MfaService } from "@/modules/mfa/mfa.service";
     RedisService,
     BruteForceService,
     MfaService,
+    WebAuthnService,
+    RbacService,
   ],
   exports: [AuthService],
 })
@@ -10132,7 +11894,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 22.14 KB | LINES: 819
+SIZE: 30.19 KB | LINES: 1146
 ================================================================================
 
 import {
@@ -10146,7 +11908,13 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { User, Session, SecurityEvent, Tenant } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEvent,
+  Tenant,
+  OAuthRefreshToken,
+} from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
@@ -10154,6 +11922,7 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -10176,6 +11945,8 @@ export class AuthService {
     private readonly securityEventRepository: Repository<SecurityEvent>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(OAuthRefreshToken)
+    private readonly oauthRefreshTokenRepository: Repository<OAuthRefreshToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -10183,6 +11954,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
     private readonly bruteForceService: BruteForceService,
     private readonly mfaService: MfaService,
+    private readonly webauthnService: WebAuthnService,
   ) {}
 
   /**
@@ -10296,7 +12068,13 @@ export class AuthService {
     deviceId?: string;
   }): Promise<
     | { accessToken: string; refreshToken: string; user: any }
-    | { mfaRequired: boolean; tempToken: string; message: string }
+    | {
+        mfaRequired: boolean;
+        tempToken: string;
+        message: string;
+        availableMethods: string[];
+        preferredMethod: string;
+      }
   > {
     const { tenantId, email, password, ip, userAgent } = data;
 
@@ -10376,9 +12154,9 @@ export class AuthService {
       throw new UnauthorizedException("Please verify your email first");
     }
 
-    const mfaEnabled = await this.mfaService.isMfaEnabled(user.id, tenantId);
+    const mfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
 
-    if (mfaEnabled) {
+    if (mfaStatus.enabled) {
       // Generate temporary token for MFA verification
       const tempToken = this.jwtService.sign(
         {
@@ -10408,11 +12186,24 @@ export class AuthService {
       return {
         mfaRequired: true,
         tempToken,
+        availableMethods: mfaStatus.methods,
+        preferredMethod: mfaStatus.preferredMethod || "totp",
         message: "MFA verification required",
       };
     }
 
     // === REFRESH TOKEN ROTATION LOGIC ===
+
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId: data.tenantId,
+      email: user.email,
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      deviceId: data.deviceId,
+    });
+
+    console.log("Session Created: ", session.id);
 
     // 1. Generate new family ID
     const familyId = uuidv4();
@@ -10426,19 +12217,22 @@ export class AuthService {
       .update(refreshToken)
       .digest("hex");
 
-    // 4. Create session with family
-    const session = await this.sessionService.createSession({
-      userId: user.id,
-      tenantId,
-      email: user.email,
+    // Step 4: Store refresh token separately
+    // await this.oauthRefreshTokenRepository.save({
+    //   tenantId: data.tenantId,
+    //   userId: user.id,
+    //   sessionId: session.id,
+    //   familyId,
+    //   expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    // });
+
+    // Step 5: Update session with family ID
+    await this.sessionRepository.update(session.id, {
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
-      deviceId: data.deviceId,
     });
 
-    // 5. Generate access token
+    // 6. Generate access token
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
@@ -10488,6 +12282,7 @@ export class AuthService {
     tenantId: string,
     userId: string,
     sessionId?: string,
+    userAgent?: string,
     ip?: string,
   ): Promise<void> {
     if (sessionId) {
@@ -10499,6 +12294,7 @@ export class AuthService {
       tenantId,
       userId,
       ip,
+      userAgent,
       eventType: "logout",
       severity: "info",
       metadata: { sessionId },
@@ -10848,6 +12644,8 @@ export class AuthService {
       displayName: user.displayName,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
+      lastLoginAt: user.lastLoginAt,
+      lastLoginIp: user.lastLoginIp,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
@@ -10931,6 +12729,296 @@ export class AuthService {
   }
 
   /**
+   * Verify MFA code and complete login
+   */
+  async verifyMfa(
+    tenantId: string,
+    tempToken: string,
+    code: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    // Step 1: Verify temporary token
+    const payload = this.jwtService.verify(tempToken, {
+      secret: this.configService.get("JWT_SECRET"),
+    });
+
+    if (payload.type !== "mfa_pending") {
+      throw new UnauthorizedException("Invalid token type");
+    }
+
+    console.log(`🔐 Verifying MFA for user ${payload.email}`);
+
+    // Step 2: Verify TOTP code
+    const verified = await this.mfaService.verifyTotp(
+      payload.sub,
+      tenantId,
+      code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid MFA code");
+    }
+
+    // Step 3: Generate real session and tokens
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: payload.sub,
+      tenantId,
+      email: payload.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: payload.sub,
+        email: payload.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    console.log(`✅ MFA verified successfully for ${payload.email}`);
+
+    return {
+      accessToken,
+      refreshToken,
+      message: "MFA verified successfully",
+    };
+  }
+
+  /**
+   * Verify MFA using backup code
+   */
+  async verifyMfaBackup(
+    tenantId: string,
+    tempToken: string,
+    code: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    // Step 1: Verify temporary token
+    const payload = this.jwtService.verify(tempToken, {
+      secret: this.configService.get("JWT_SECRET"),
+    });
+
+    if (payload.type !== "mfa_pending") {
+      throw new UnauthorizedException("Invalid token type");
+    }
+
+    console.log(`🔐 Verifying backup code for user ${payload.email}`);
+
+    // Step 2: Verify backup code
+    const verified = await this.mfaService.verifyBackupCode(
+      payload.sub,
+      tenantId,
+      code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid backup code");
+    }
+
+    // Step 3: Generate real session and tokens
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: payload.sub,
+      tenantId,
+      email: payload.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: payload.sub,
+        email: payload.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    console.log(`✅ Backup code verified for ${payload.email}`);
+
+    // Check remaining backup codes
+    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub, tenantId);
+    const remaining = mfaStatus.backupCodesRemaining as number;
+
+    return {
+      accessToken,
+      refreshToken,
+      message: "Backup code verified successfully",
+      warning:
+        remaining <= 2
+          ? `⚠️ Only ${remaining} backup codes remaining. Please regenerate new codes.`
+          : undefined,
+    };
+  }
+
+  // apps/auth-service/src/modules/auth/auth.service.ts
+  // ADD THESE METHODS TO AuthService
+
+  /**
+   * Start WebAuthn authentication (passwordless login)
+   */
+  async startWebAuthnLogin(tenantId: string, email: string): Promise<any> {
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    // Generate authentication options via WebAuthnService
+    const options = await this.webauthnService.startAuthentication(
+      user.id,
+      tenantId,
+    );
+
+    console.log(`🔑 WebAuthn login started for ${email}`);
+
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn authentication and create session
+   */
+  async finishWebAuthnLogin(data: {
+    tenantId: string;
+    email: string;
+    webauthnResponse: any;
+    ip: string;
+    userAgent: string;
+    deviceId?: string;
+  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+    const { tenantId, email, webauthnResponse, ip, userAgent, deviceId } = data;
+
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+      relations: ["tenant"],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    // Verify WebAuthn response
+    const verified = await this.webauthnService.finishAuthentication(
+      user.id,
+      tenantId,
+      webauthnResponse,
+    );
+
+    if (!verified) {
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "login_failed",
+        severity: "warning",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "webauthn_verification_failed" },
+      });
+
+      throw new UnauthorizedException("WebAuthn verification failed");
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      throw new UnauthorizedException("Account is disabled");
+    }
+
+    // Generate tokens (same as normal login)
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId,
+      email: user.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent,
+      deviceId,
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log successful login
+    await this.logSecurityEvent({
+      tenantId,
+      userId: user.id,
+      eventType: "login_success",
+      severity: "info",
+      ipAddress: ip,
+      userAgent,
+      metadata: {
+        sessionId: session.id,
+        familyId,
+        authMethod: "webauthn",
+      },
+    });
+
+    console.log(`✅ WebAuthn login successful for ${user.email}`);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
    * Log security event (TENANT SCOPED) - PRIVATE METHOD
    */
   private async logSecurityEvent(data: {
@@ -10939,6 +13027,7 @@ export class AuthService {
     eventType: string;
     severity: "info" | "warning" | "critical";
     ipAddress: string;
+    ip?: string;
     userAgent: string;
     metadata?: Record<string, any>;
   }) {
@@ -10947,7 +13036,7 @@ export class AuthService {
       userId: data.userId,
       eventType: data.eventType,
       severity: data.severity,
-      ipAddress: data.ipAddress,
+      ipAddress: data.ipAddress || data.ip,
       userAgent: data.userAgent,
       metadata: data.metadata || {},
     });
@@ -12045,7 +14134,7 @@ export class SESProvider implements EmailProvider {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/index.ts
-SIZE: 457 B | LINES: 12
+SIZE: 551 B | LINES: 20
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -12054,9 +14143,17 @@ import { AuthModule } from "@/modules/auth/auth.module";
 import { TenantModule } from "@/modules/tenant/tenant.module";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { RbacModule } from "@/modules/rbac/rbac.module";
+import { MfaModule } from "@/modules/mfa/mfa.module";
 
 @Module({
-  imports: [UserModule, AuthModule, TenantModule, OAuthModule, RbacModule],
+  imports: [
+    UserModule,
+    AuthModule,
+    TenantModule,
+    OAuthModule,
+    RbacModule,
+    MfaModule,
+  ],
 })
 export class CombinedModules {}
 
@@ -12175,8 +14272,146 @@ export class BackupCodesResponseDto {
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/mfa/email-otp.service.ts
+SIZE: 3.09 KB | LINES: 131
+================================================================================
+
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import * as crypto from "crypto";
+import { EmailService } from "@/modules/email/email.service";
+import { UserService } from "@/modules/user/user.service";
+
+interface OtpEntry {
+  code: string;
+  expiresAt: Date;
+  attempts: number;
+}
+
+@Injectable()
+export class EmailOtpService {
+  // In-memory store (replace with Redis in production)
+  private otpStore = new Map<string, OtpEntry>();
+
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly userService: UserService,
+  ) {
+    // Cleanup expired OTPs every 5 minutes
+    setInterval(() => this.cleanupExpiredOtps(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Generate and send OTP via email
+   */
+  async sendOtp(userId: string, tenantId: string): Promise<void> {
+    // Generate 6-digit OTP
+    const code = this.generateOtpCode();
+    const user = await this.userService.findById(tenantId, userId);
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Store OTP (expires in 10 minutes)
+    const key = `${userId}:${tenantId}`;
+    this.otpStore.set(key, {
+      code: await this.hashCode(code),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
+    });
+
+    await this.emailService.sendOTPEmail(user, code);
+
+    console.log(`📧 OTP sent to ${user.email} (expires in 10 minutes)`);
+  }
+
+  /**
+   * Verify OTP code
+   */
+  async verifyOtp(
+    userId: string,
+    tenantId: string,
+    code: string,
+  ): Promise<boolean> {
+    const key = `${userId}:${tenantId}`;
+    const entry = this.otpStore.get(key);
+
+    if (!entry) {
+      console.log("❌ No OTP found for user");
+      return false;
+    }
+
+    // Check expiration
+    if (entry.expiresAt < new Date()) {
+      console.log("❌ OTP expired");
+      this.otpStore.delete(key);
+      return false;
+    }
+
+    // Check attempts (max 5)
+    if (entry.attempts >= 5) {
+      console.log("❌ Too many attempts");
+      this.otpStore.delete(key);
+      return false;
+    }
+
+    // Increment attempts
+    entry.attempts++;
+
+    // Verify code
+    const hashedCode = await this.hashCode(code);
+    if (hashedCode !== entry.code) {
+      console.log("❌ Invalid OTP code");
+      return false;
+    }
+
+    // Valid! Delete OTP (one-time use)
+    this.otpStore.delete(key);
+    console.log("✅ OTP verified");
+    return true;
+  }
+
+  /**
+   * Generate 6-digit OTP
+   */
+  private generateOtpCode(): string {
+    return crypto.randomInt(100000, 999999).toString();
+  }
+
+  /**
+   * Hash OTP code for storage
+   */
+  private async hashCode(code: string): Promise<string> {
+    return crypto.createHash("sha256").update(code).digest("hex");
+  }
+
+  /**
+   * Cleanup expired OTPs
+   */
+  private cleanupExpiredOtps(): void {
+    const now = new Date();
+    let cleaned = 0;
+
+    for (const [key, entry] of this.otpStore.entries()) {
+      if (entry.expiresAt < now) {
+        this.otpStore.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} expired OTPs`);
+    }
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/mfa/mfa.controller.ts
-SIZE: 5.49 KB | LINES: 230
+SIZE: 13.24 KB | LINES: 522
 ================================================================================
 
 import {
@@ -12189,6 +14424,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
+  Param,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -12206,13 +14443,19 @@ import {
   BackupCodesResponseDto,
 } from "./dto/mfa.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { EmailOtpService } from "@/modules/mfa/email-otp.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 
 @ApiTags("MFA")
 @Controller("mfa")
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class MfaController {
-  constructor(private readonly mfaService: MfaService) {}
+  constructor(
+    private readonly mfaService: MfaService,
+    private readonly emailOtpService: EmailOtpService,
+    private readonly webauthnService: WebAuthnService,
+  ) {}
 
   // ============================================================
   // TOTP SETUP & MANAGEMENT
@@ -12407,13 +14650,355 @@ export class MfaController {
 
     return { message: "All MFA methods disabled successfully" };
   }
+
+  /**
+   * Request email OTP
+   */
+  @Post("request-email-otp")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Request OTP code via email",
+    description: "Send a 6-digit code to user email for MFA",
+  })
+  async requestEmailOtp(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    // Send OTP
+    await this.emailOtpService.sendOtp(userId, tenantId);
+
+    return {
+      message: "OTP code sent to your email",
+      expiresIn: "10 minutes",
+    };
+  }
+
+  /**
+   * Verify email OTP
+   */
+  @Post("verify-email-otp")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Verify email OTP code",
+    description: "Verify the 6-digit code received via email",
+  })
+  async verifyEmailOtp(@Request() req: any, @Body() dto: { code: string }) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const verified = await this.emailOtpService.verifyOtp(
+      userId,
+      tenantId,
+      dto.code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid or expired OTP code");
+    }
+
+    return { message: "Email OTP verified" };
+  }
+
+  /**
+   * Start WebAuthn registration
+   */
+  @Post("webauthn/register/start")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Start WebAuthn credential registration" })
+  async startWebAuthnRegistration(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const options = await this.webauthnService.startRegistration(
+      userId,
+      tenantId,
+    );
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn registration
+   */
+  @Post("webauthn/register/finish")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Finish WebAuthn credential registration" })
+  async finishWebAuthnRegistration(
+    @Request() req: any,
+    @Body() body: { response: any; deviceName?: string },
+  ) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const result = await this.webauthnService.finishRegistration(
+      userId,
+      tenantId,
+      body.response,
+      body.deviceName,
+    );
+
+    return {
+      success: true,
+      credentialId: result.credentialId,
+      message: "Passkey registered successfully",
+    };
+  }
+
+  /**
+   * List WebAuthn credentials
+   */
+  @Get("webauthn/credentials")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "List user WebAuthn credentials" })
+  async listWebAuthnCredentials(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const credentials = await this.webauthnService.listCredentials(
+      userId,
+      tenantId,
+    );
+    return { credentials };
+  }
+
+  /**
+   * Delete WebAuthn credential
+   */
+  @Delete("webauthn/credentials/:credentialId")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Delete WebAuthn credential" })
+  async deleteWebAuthnCredential(
+    @Request() req: any,
+    @Param("credentialId") credentialId: string,
+  ) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    await this.webauthnService.deleteCredential(userId, tenantId, credentialId);
+
+    return {
+      success: true,
+      message: "Passkey deleted successfully",
+    };
+  }
+  //
+  // /**
+  //  * Unified MFA verification endpoint
+  //  * Supports: TOTP, Email OTP, SMS OTP, Backup Codes
+  //  */
+  // @Post('mfa/verify')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOperation({
+  //   summary: 'Verify MFA using any enabled method',
+  //   description: 'Universal MFA verification endpoint'
+  // })
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       tempToken: { type: 'string', description: 'Temporary token from login' },
+  //       method: {
+  //         type: 'string',
+  //         enum: ['totp', 'email', 'sms', 'backup_code'],
+  //         description: 'MFA method to use'
+  //       },
+  //       code: {
+  //         type: 'string',
+  //         description: '6-digit code or backup code',
+  //         example: '123456'
+  //       },
+  //     },
+  //     required: ['tempToken', 'method', 'code'],
+  //   },
+  // })
+  // async verifyMfaUnified(
+  //   @Req() req: Request,
+  //   @Body() dto: {
+  //     tempToken: string;
+  //     method: 'totp' | 'email' | 'sms' | 'backup_code';
+  //     code: string;
+  //   },
+  //   @Ip() ip: string,
+  //   @Headers('user-agent') userAgent: string,
+  // ) {
+  //   const tenantId = req.tenantId!;
+  //
+  //   try {
+  //     // Step 1: Verify temporary token
+  //     const payload = this.jwtService.verify(dto.tempToken, {
+  //       secret: this.configService.get('JWT_SECRET'),
+  //     });
+  //
+  //     if (payload.type !== 'mfa_pending') {
+  //       throw new UnauthorizedException('Invalid token type');
+  //     }
+  //
+  //     console.log(`🔐 Verifying MFA using method: ${dto.method}`);
+  //
+  //     // Step 2: Verify based on method
+  //     let verified = false;
+  //
+  //     switch (dto.method) {
+  //       case 'totp':
+  //         verified = await this.mfaService.verifyTotp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'email':
+  //         verified = await this.emailOtpService.verifyOtp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'sms':
+  //         // TODO: Implement SMS OTP verification
+  //         verified = await this.smsOtpService.verifyOtp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'backup_code':
+  //         verified = await this.mfaService.verifyBackupCode(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       default:
+  //         throw new BadRequestException('Invalid MFA method');
+  //     }
+  //
+  //     if (!verified) {
+  //       throw new UnauthorizedException(`Invalid ${dto.method} code`);
+  //     }
+  //
+  //     // Step 3: Generate real session and tokens
+  //     const familyId = uuidv4();
+  //     const refreshToken = crypto.randomBytes(32).toString('hex');
+  //     const refreshTokenHash = crypto
+  //       .createHash('sha256')
+  //       .update(refreshToken)
+  //       .digest('hex');
+  //
+  //     const session = await this.sessionService.createSession({
+  //       userId: payload.sub,
+  //       tenantId,
+  //       email: payload.email,
+  //       refreshTokenFamilyId: familyId,
+  //       refreshTokenHash,
+  //       ipAddress: ip,
+  //       userAgent: userAgent || 'unknown',
+  //     });
+  //
+  //     const accessToken = this.jwtService.sign(
+  //       {
+  //         sub: payload.sub,
+  //         email: payload.email,
+  //         tenantId,
+  //         sessionId: session.id,
+  //       },
+  //       {
+  //         secret: this.configService.get('JWT_SECRET'),
+  //         expiresIn: '15m',
+  //       },
+  //     );
+  //
+  //     console.log(`✅ MFA verified via ${dto.method} for ${payload.email}`);
+  //
+  //     return {
+  //       accessToken,
+  //       refreshToken,
+  //       message: 'MFA verified successfully',
+  //       method: dto.method,
+  //     };
+  //   } catch (error) {
+  //     console.error('❌ MFA verification failed:', error.message);
+  //
+  //     if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+  //       throw error;
+  //     }
+  //
+  //     throw new UnauthorizedException('Invalid or expired token');
+  //   }
+  // }
 }
 
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/mfa/mfa.module.ts
+SIZE: 1.22 KB | LINES: 51
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import {
+  MfaSettings,
+  SecurityEvent,
+  Session,
+  Tenant,
+  User,
+} from "@repo/database";
+import { MfaController } from "./mfa.controller";
+import { MfaService } from "./mfa.service";
+import { EmailOtpService } from "@/modules/mfa/email-otp.service";
+import { EmailService } from "@/modules/email/email.service";
+import { UserService } from "@/modules/user/user.service";
+import { EmailModule } from "@/modules/email/email.module";
+import { UserModule } from "@/modules/user/user.module";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+
+/**
+ * MFA Module
+ *
+ * Handles Multi-Factor Authentication:
+ * - TOTP (Google Authenticator, Authy, etc.)
+ * - Backup codes
+ * - MFA status management
+ * - Future: SMS, Email, WebAuthn
+ */
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      MfaSettings,
+      User,
+      SecurityEvent,
+      Tenant,
+      Session,
+    ]),
+    EmailModule,
+    UserModule,
+  ],
+  controllers: [MfaController],
+  providers: [
+    MfaService,
+    EmailOtpService,
+    EmailService,
+    UserService,
+    WebAuthnService,
+  ],
+  exports: [MfaService], // Export for use in AuthService
+})
+export class MfaModule {}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/mfa/mfa.service.ts
-SIZE: 9.59 KB | LINES: 390
+SIZE: 9.61 KB | LINES: 390
 ================================================================================
 
 // apps/auth-service/src/modules/mfa/mfa.service.ts
@@ -12756,7 +15341,7 @@ export class MfaService {
     return {
       enabled: methods.length > 0,
       methods,
-      preferredMethod: mfaSettings.preferredMethod,
+      preferredMethod: mfaSettings.preferredMethod || methods[0],
       backupCodesRemaining: mfaSettings.backupCodes?.length || 0,
     };
   }
@@ -12803,6 +15388,421 @@ export class MfaService {
     }
 
     return result;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/mfa/webauthn.service.ts
+SIZE: 11.12 KB | LINES: 408
+================================================================================
+
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { MfaSettings, User } from "@repo/database";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+  VerifiedRegistrationResponse,
+  VerifiedAuthenticationResponse,
+} from "@simplewebauthn/server";
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/server";
+import { ConfigService } from "@nestjs/config";
+import { type AuthenticatorTransportFuture } from "@simplewebauthn/server";
+
+// Store challenges temporarily (use Redis in production!)
+interface ChallengeEntry {
+  challenge: string;
+  expiresAt: Date;
+}
+
+const encoder = new TextEncoder();
+
+@Injectable()
+export class WebAuthnService {
+  // In-memory store for challenges (replace with Redis!)
+  private challenges = new Map<string, ChallengeEntry>();
+
+  // WebAuthn configuration
+  private readonly rpName = "Fort Knox";
+  private readonly rpID: string;
+  private readonly origin: string;
+
+  constructor(
+    @InjectRepository(MfaSettings)
+    private mfaRepository: Repository<MfaSettings>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private configService: ConfigService,
+  ) {
+    // Get from environment
+    this.rpID = this.configService.get("WEBAUTHN_RP_ID") || "localhost";
+    this.origin =
+      this.configService.get("WEBAUTHN_ORIGIN") || "http://localhost:3000";
+
+    // Cleanup expired challenges every 5 minutes
+    setInterval(() => this.cleanupExpiredChallenges(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Start WebAuthn registration (generate options)
+   */
+  async startRegistration(userId: string, tenantId: string): Promise<any> {
+    // Get user
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Get or create MFA settings
+    let mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      mfaSettings = this.mfaRepository.create({
+        userId,
+        tenantId,
+        webauthnCredentials: [],
+      });
+      await this.mfaRepository.save(mfaSettings);
+    }
+
+    // Get existing credentials (to exclude them)
+    const existingCredentials = mfaSettings.webauthnCredentials.map((cred) => ({
+      id: cred.id,
+      type: "public-key" as const,
+    }));
+
+    // Generate registration options
+    const options = await generateRegistrationOptions({
+      rpName: this.rpName,
+      rpID: this.rpID,
+      userID: encoder.encode(userId),
+      userName: user.email,
+      userDisplayName: `${user.firstName} ${user.lastName}`,
+
+      // Don't prompt for password
+      attestationType: "none",
+
+      // Exclude existing credentials
+      excludeCredentials: existingCredentials,
+
+      // Authenticator selection
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "preferred",
+        authenticatorAttachment: "platform", // Prefer platform authenticators (Face ID, Touch ID)
+      },
+    });
+
+    // Store challenge (expires in 5 minutes)
+    const key = `${userId}:${tenantId}:register`;
+    this.challenges.set(key, {
+      challenge: options.challenge,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    console.log("🔐 WebAuthn registration started for", user.email);
+
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn registration (verify response)
+   */
+  async finishRegistration(
+    userId: string,
+    tenantId: string,
+    response: RegistrationResponseJSON,
+    deviceName?: string,
+  ): Promise<{ credentialId: string }> {
+    // Get stored challenge
+    const key = `${userId}:${tenantId}:register`;
+    const challengeEntry = this.challenges.get(key);
+
+    if (!challengeEntry) {
+      throw new BadRequestException("No registration in progress");
+    }
+
+    if (challengeEntry.expiresAt < new Date()) {
+      this.challenges.delete(key);
+      throw new BadRequestException("Registration challenge expired");
+    }
+
+    // Verify registration response
+    let verification: VerifiedRegistrationResponse;
+
+    try {
+      verification = await verifyRegistrationResponse({
+        response,
+        expectedChallenge: challengeEntry.challenge,
+        expectedOrigin: this.origin,
+        expectedRPID: this.rpID,
+      });
+    } catch (error) {
+      console.error("❌ WebAuthn registration verification failed:", error);
+      throw new BadRequestException("Registration verification failed");
+    }
+
+    if (!verification.verified || !verification.registrationInfo) {
+      throw new BadRequestException("Registration verification failed");
+    }
+
+    // Delete used challenge
+    this.challenges.delete(key);
+
+    // Get MFA settings
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      throw new NotFoundException("MFA settings not found");
+    }
+
+    // Store credential
+    const { credential } = verification.registrationInfo;
+
+    const {
+      publicKey: credentialPublicKey,
+      id: credentialID,
+      counter,
+    } = credential;
+
+    const newCredential = {
+      id: Buffer.from(credentialID).toString("base64url"),
+      publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
+      counter,
+      deviceName: deviceName || "Unnamed Device",
+      createdAt: new Date(),
+      lastUsedAt: new Date(),
+      transports: response.response.transports || [],
+    };
+
+    mfaSettings.webauthnCredentials.push(newCredential);
+    mfaSettings.webauthnEnabled = true;
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log("✅ WebAuthn credential registered:", newCredential.id);
+
+    return { credentialId: newCredential.id };
+  }
+
+  /**
+   * Start WebAuthn authentication (generate options)
+   */
+  async startAuthentication(userId: string, tenantId: string): Promise<any> {
+    // Get MFA settings
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId, webauthnEnabled: true },
+    });
+
+    if (!mfaSettings || mfaSettings.webauthnCredentials.length === 0) {
+      throw new BadRequestException("WebAuthn not enabled for this user");
+    }
+
+    // Get user's credentials
+    const allowCredentials = mfaSettings.webauthnCredentials.map((cred) => ({
+      id: cred.id,
+      type: "public-key" as const,
+      transports: cred.transports as AuthenticatorTransportFuture[] | undefined,
+    }));
+
+    // Generate authentication options
+    const options = await generateAuthenticationOptions({
+      rpID: this.rpID,
+      allowCredentials,
+      userVerification: "preferred",
+    });
+
+    // Store challenge (expires in 5 minutes)
+    const key = `${userId}:${tenantId}:authenticate`;
+    this.challenges.set(key, {
+      challenge: options.challenge,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    console.log("🔐 WebAuthn authentication started for user:", userId);
+
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn authentication (verify response)
+   */
+  async finishAuthentication(
+    userId: string,
+    tenantId: string,
+    response: AuthenticationResponseJSON,
+  ): Promise<boolean> {
+    // Get stored challenge
+    const key = `${userId}:${tenantId}:authenticate`;
+    const challengeEntry = this.challenges.get(key);
+
+    if (!challengeEntry) {
+      throw new BadRequestException("No authentication in progress");
+    }
+
+    if (challengeEntry.expiresAt < new Date()) {
+      this.challenges.delete(key);
+      throw new BadRequestException("Authentication challenge expired");
+    }
+
+    // Get MFA settings
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId, webauthnEnabled: true },
+    });
+
+    if (!mfaSettings) {
+      throw new BadRequestException("WebAuthn not enabled");
+    }
+
+    // Find the credential
+    const credentialId = Buffer.from(response.rawId, "base64url").toString(
+      "base64url",
+    );
+    const credential = mfaSettings.webauthnCredentials.find(
+      (cred) => cred.id === credentialId,
+    );
+
+    if (!credential) {
+      throw new BadRequestException("Credential not found");
+    }
+
+    // Verify authentication response
+    let verification: VerifiedAuthenticationResponse;
+
+    try {
+      verification = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge: challengeEntry.challenge,
+        expectedOrigin: this.origin,
+        expectedRPID: this.rpID,
+        credential: {
+          id: credential.id,
+          publicKey: Buffer.from(credential.publicKey, "base64url"),
+          counter: credential.counter,
+        },
+      });
+    } catch (error) {
+      console.error("❌ WebAuthn authentication verification failed:", error);
+      throw new BadRequestException("Authentication verification failed");
+    }
+
+    if (!verification.verified) {
+      throw new BadRequestException("Authentication verification failed");
+    }
+
+    // Delete used challenge
+    this.challenges.delete(key);
+
+    // Update credential counter and last used
+    credential.counter = verification.authenticationInfo.newCounter;
+    credential.lastUsedAt = new Date();
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log("✅ WebAuthn authentication verified:", credential.id);
+
+    return true;
+  }
+
+  /**
+   * List user's WebAuthn credentials
+   */
+  async listCredentials(
+    userId: string,
+    tenantId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      deviceName: string;
+      createdAt: Date;
+      lastUsedAt?: Date;
+      transports: string[];
+    }>
+  > {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      return [];
+    }
+
+    return mfaSettings.webauthnCredentials.map((cred) => ({
+      id: cred.id,
+      deviceName: cred.deviceName || "Unnamed Device",
+      createdAt: cred.createdAt,
+      lastUsedAt: cred.lastUsedAt,
+      transports: cred.transports || [],
+    }));
+  }
+
+  /**
+   * Delete a WebAuthn credential
+   */
+  async deleteCredential(
+    userId: string,
+    tenantId: string,
+    credentialId: string,
+  ): Promise<void> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      throw new NotFoundException("MFA settings not found");
+    }
+
+    // Remove credential
+    mfaSettings.webauthnCredentials = mfaSettings.webauthnCredentials.filter(
+      (cred) => cred.id !== credentialId,
+    );
+
+    // Disable WebAuthn if no credentials left
+    if (mfaSettings.webauthnCredentials.length === 0) {
+      mfaSettings.webauthnEnabled = false;
+    }
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log("🗑️ WebAuthn credential deleted:", credentialId);
+  }
+
+  /**
+   * Cleanup expired challenges
+   */
+  private cleanupExpiredChallenges(): void {
+    const now = new Date();
+    let cleaned = 0;
+
+    for (const [key, entry] of this.challenges.entries()) {
+      if (entry.expiresAt < now) {
+        this.challenges.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} expired WebAuthn challenges`);
+    }
   }
 }
 
@@ -16584,7 +19584,7 @@ export class CheckRolesDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/rbac/guards/permissions.guard.ts
-SIZE: 1.8 KB | LINES: 70
+SIZE: 2.38 KB | LINES: 84
 ================================================================================
 
 // apps/auth-service/src/modules/rbac/guards/permissions.guard.ts
@@ -16597,6 +19597,9 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { RbacService } from "../services/rbac.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { User } from "@repo/database";
+import { Repository } from "typeorm";
 
 export const PERMISSIONS_KEY = "permissions";
 
@@ -16612,7 +19615,7 @@ export const PERMISSIONS_KEY = "permissions";
 export class PermissionsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private rbacService: RbacService,
+    @InjectRepository(User) private userRepository: Repository<User>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -16622,32 +19625,43 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // If no permissions required, allow access
     if (!requiredPermissions || requiredPermissions.length === 0) {
-      return true;
+      return true; // No permissions required
     }
 
-    // Get request and user
     const request = context.switchToHttp().getRequest();
-    const user = request.user; // From JwtGuard
-    const tenantId = request.tenantId; // From TenantMiddleware
+    const user = request.user;
+    const tenantId = request.tenantId;
 
-    if (!user || !user.sub) {
-      throw new ForbiddenException("User not authenticated");
+    // Fetch user permissions (TENANT-SCOPED)
+    const userWithPermissions = await this.userRepository.findOne({
+      where: { id: user.sub, tenantId }, // ✅ ALWAYS tenant-scoped
+      relations: [
+        "userRoles",
+        "userRoles.role",
+        "userRoles.role.rolePermissions",
+        "userRoles.role.rolePermissions.permission",
+      ],
+    });
+
+    if (!userWithPermissions) {
+      throw new ForbiddenException("User not found");
     }
 
-    if (!tenantId) {
-      throw new ForbiddenException("Tenant context not found");
+    // Extract user's permissions
+    const userPermissions = new Set<string>();
+    for (const userRole of userWithPermissions.userRoles) {
+      for (const rolePermission of userRole.role.rolePermissions) {
+        userPermissions.add(rolePermission.permission.name);
+      }
     }
 
-    // Check if user has ALL required permissions
-    const hasPermissions = await this.rbacService.userHasAllPermissions(
-      user.sub,
-      tenantId,
-      requiredPermissions,
+    // Check if user has all required permissions
+    const hasAllPermissions = requiredPermissions.every((permission) =>
+      userPermissions.has(permission),
     );
 
-    if (!hasPermissions) {
+    if (!hasAllPermissions) {
       throw new ForbiddenException(
         `Missing required permissions: ${requiredPermissions.join(", ")}`,
       );
@@ -18885,11 +21899,11 @@ import {
 } from "./user.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Protected } from "@/common/decorators/protected.decorator";
 
 @ApiTags("Users")
 @Controller("users")
-@UseGuards(JwtAuthGuard) // All endpoints require authentication
-@ApiBearerAuth()
+@Protected()
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -21172,6 +24186,361 @@ SIZE: 183 B | LINES: 10
 
 
 ================================================================================
+FILE: apps/auth-service/test/scripts/mfa.test.sh
+SIZE: 9.25 KB | LINES: 348
+================================================================================
+
+#!/bin/bash
+# test-mfa-complete.sh
+# Complete MFA integration test script
+
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Configuration
+API_URL="http://localhost:4000"
+TENANT_ID="d9717e9f-64d1-4f7a-8baa-31d2a91d45a7"
+EMAIL="test2@example.com"
+PASSWORD="SecureP@ssw0rd123!"
+
+echo -e "${BLUE}🔐 Fort Knox MFA Integration Test${NC}"
+echo "====================================="
+echo ""
+
+# Variables to store between steps
+ACCESS_TOKEN=""
+TEMP_TOKEN=""
+MFA_CODE=""
+BACKUP_CODE=""
+
+# ============================================================
+# TEST 1: Register User (if needed)
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 1: Register User${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/register" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d "{
+    \"email\": \"$EMAIL\",
+    \"password\": \"$PASSWORD\",
+    \"firstName\": \"Test\",
+    \"lastName\": \"User\"
+  }")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 201 ] || [ "$http_code" -eq 409 ]; then
+  echo -e "${GREEN}✅ User exists or created successfully${NC}"
+else
+  echo -e "${RED}❌ Failed to create user (HTTP $http_code)${NC}"
+  echo "$body"
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 2: Login (No MFA yet)
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 2: Login without MFA${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d "{
+    \"email\": \"$EMAIL\",
+    \"password\": \"$PASSWORD\"
+  }")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+echo $response
+
+
+if [ "$http_code" -eq 200 ]; then
+  ACCESS_TOKEN=$(echo "$body" | jq -r '.data.accessToken')
+  echo -e "${GREEN}✅ Login successful (no MFA)${NC}"
+  echo "Access Token: ${ACCESS_TOKEN:0:20}..."
+else
+  echo -e "${RED}❌ Login failed (HTTP $http_code)${NC}"
+  echo "$body"
+  exit 1
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 3: Setup TOTP
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 3: Setup TOTP (MFA)${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/mfa/setup/totp" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-Tenant-ID: $TENANT_ID")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 201 ]; then
+  SECRET=$(echo "$body" | jq -r '.data.secret')
+  QR_CODE=$(echo "$body" | jq -r '.data.qrCode')
+  BACKUP_CODES=$(echo "$body" | jq -r '.backupCodes[]' | head -1)
+
+  echo -e "${GREEN}✅ TOTP setup successful${NC}"
+  echo "Secret: $SECRET"
+  echo "Backup Code (first): $BACKUP_CODES"
+  echo ""
+  echo -e "${BLUE}📱 SCAN THIS QR CODE WITH GOOGLE AUTHENTICATOR:${NC}"
+  echo "Open the QR code in your browser:"
+  echo "$QR_CODE"
+  echo ""
+
+  BACKUP_CODE=$BACKUP_CODES
+
+  echo -e "${YELLOW}Enter the 6-digit code from your authenticator app:${NC}"
+  read -p "MFA Code: " MFA_CODE
+else
+  echo -e "${RED}❌ TOTP setup failed (HTTP $http_code)${NC}"
+  echo "$body"
+  exit 1
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 4: Verify and Enable TOTP
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 4: Verify and Enable TOTP${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/mfa/verify/totp" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"token\": \"$MFA_CODE\"
+  }")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 200 ]; then
+  echo -e "${GREEN}✅ TOTP verified and enabled!${NC}"
+  echo "Backup codes saved from previous step"
+else
+  echo -e "${RED}❌ TOTP verification failed (HTTP $http_code)${NC}"
+  echo "$body"
+  exit 1
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 5: Logout
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 5: Logout${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/logout" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-Tenant-ID: $TENANT_ID")
+
+http_code=$(echo "$response" | tail -n 1)
+
+if [ "$http_code" -eq 200 ]; then
+  echo -e "${GREEN}✅ Logged out successfully${NC}"
+else
+  echo -e "${RED}❌ Logout failed (HTTP $http_code)${NC}"
+fi
+
+echo ""
+sleep 2
+
+# ============================================================
+# TEST 6: Login with MFA Required
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 6: Login (MFA Required)${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d "{
+    \"email\": \"$EMAIL\",
+    \"password\": \"$PASSWORD\"
+  }")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 200 ]; then
+  MFA_REQUIRED=$(echo "$body" | jq -r '.data.mfaRequired')
+
+  if [ "$MFA_REQUIRED" = "true" ]; then
+    TEMP_TOKEN=$(echo "$body" | jq -r '.data.tempToken')
+    echo -e "${GREEN}✅ MFA required (as expected)${NC}"
+    echo "Temp Token: ${TEMP_TOKEN:0:20}..."
+  else
+    echo -e "${RED}❌ MFA not required (unexpected)${NC}"
+    exit 1
+  fi
+else
+  echo -e "${RED}❌ Login failed (HTTP $http_code)${NC}"
+  echo "$body"
+  exit 1
+fi
+
+echo ""
+echo -e "${YELLOW}Enter the 6-digit code from your authenticator app:${NC}"
+read -p "MFA Code: " MFA_CODE
+echo ""
+
+# ============================================================
+# TEST 7: Verify MFA Code
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 7: Verify MFA Code${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/mfa/verify" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d "{
+    \"tempToken\": \"$TEMP_TOKEN\",
+    \"code\": \"$MFA_CODE\"
+  }")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 200 ]; then
+  NEW_ACCESS_TOKEN=$(echo "$body" | jq -r '.data.accessToken')
+  NEW_REFRESH_TOKEN=$(echo "$body" | jq -r '.data.refreshToken')
+
+  echo -e "${GREEN}✅ MFA verified successfully!${NC}"
+  echo "New Access Token: ${NEW_ACCESS_TOKEN:0:20}..."
+  echo "New Refresh Token: ${NEW_REFRESH_TOKEN:0:20}..."
+
+  ACCESS_TOKEN=$NEW_ACCESS_TOKEN
+else
+  echo -e "${RED}❌ MFA verification failed (HTTP $http_code)${NC}"
+  echo "$body"
+  exit 1
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 8: Check MFA Status
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 8: Check MFA Status${NC}"
+echo "---"
+
+response=$(curl -s -w "\n%{http_code}" -X GET "$API_URL/mfa/status" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "X-Tenant-ID: $TENANT_ID")
+
+http_code=$(echo "$response" | tail -n 1)
+body=$(echo "$response" | sed '$d')
+
+if [ "$http_code" -eq 200 ]; then
+  echo -e "${GREEN}✅ MFA status retrieved${NC}"
+  echo "$body" | jq '.'
+else
+  echo -e "${RED}❌ Failed to get MFA status (HTTP $http_code)${NC}"
+fi
+
+echo ""
+sleep 1
+
+# ============================================================
+# TEST 9: Test Backup Code (Optional)
+# ============================================================
+
+echo -e "${YELLOW}📋 Test 9: Test Backup Code (Optional)${NC}"
+echo "---"
+read -p "Do you want to test backup code? (y/n): " TEST_BACKUP
+
+if [ "$TEST_BACKUP" = "y" ]; then
+  # Logout first
+  curl -s -X POST "$API_URL/auth/logout" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -H "X-Tenant-ID: $TENANT_ID" > /dev/null
+
+  # Login to get temp token
+  response=$(curl -s -X POST "$API_URL/auth/login" \
+    -H "Content-Type: application/json" \
+    -H "X-Tenant-ID: $TENANT_ID" \
+    -d "{
+      \"email\": \"$EMAIL\",
+      \"password\": \"$PASSWORD\"
+    }")
+
+  TEMP_TOKEN=$(echo "$response" | jq -r '.data.tempToken')
+
+  # Verify with backup code
+  response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/auth/mfa/verify-backup" \
+    -H "Content-Type: application/json" \
+    -H "X-Tenant-ID: $TENANT_ID" \
+    -d "{
+      \"tempToken\": \"$TEMP_TOKEN\",
+      \"code\": \"$BACKUP_CODE\"
+    }")
+
+  http_code=$(echo "$response" | tail -n 1)
+  body=$(echo "$response" | sed '$d')
+
+  if [ "$http_code" -eq 200 ]; then
+    echo -e "${GREEN}✅ Backup code verified successfully!${NC}"
+    echo "$body" | jq '.'
+  else
+    echo -e "${RED}❌ Backup code verification failed (HTTP $http_code)${NC}"
+    echo "$body"
+  fi
+else
+  echo "Skipped backup code test"
+fi
+
+echo ""
+echo "====================================="
+echo -e "${GREEN}🎉 All MFA Tests Completed!${NC}"
+echo "====================================="
+echo ""
+echo "Summary:"
+echo "✅ User registration/login"
+echo "✅ TOTP setup with QR code"
+echo "✅ TOTP verification and enablement"
+echo "✅ Login with MFA required"
+echo "✅ MFA code verification"
+echo "✅ MFA status check"
+if [ "$TEST_BACKUP" = "y" ]; then
+  echo "✅ Backup code verification"
+fi
+echo ""
+echo -e "${BLUE}Your MFA is now fully functional!${NC}"
+
+
+================================================================================
 FILE: apps/auth-service/tsconfig.build.json
 SIZE: 97 B | LINES: 5
 ================================================================================
@@ -23398,7 +26767,7 @@ export abstract class BaseEntity extends TypeORMBaseEntity {
 
 ================================================================================
 FILE: packages/database/src/entities/mfa-settings.entity.ts
-SIZE: 3.23 KB | LINES: 167
+SIZE: 3.27 KB | LINES: 169
 ================================================================================
 
 import {
@@ -23521,6 +26890,8 @@ export class MfaSettings extends BaseEntity {
     publicKey: string;
     counter: number;
     deviceName?: string;
+    transports?: string[];
+    lastUsedAt: Date;
     createdAt: Date;
   }>;
 
@@ -37095,8 +40466,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 252
-Total Lines: 35,324
+Files Processed: 261
+Total Lines: 38,632
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-28T23:59:29.706Z
+Generated: 2025-12-29T14:42:03.664Z

@@ -4,6 +4,7 @@ import { Tenant } from "./tenant.entity";
 import { OAuthClient } from "./oauth-client.entity";
 import { User } from "./user.entity";
 import { OAuthAccessToken } from "./oauth-access-token.entity";
+import { Session } from "./session.entity";
 
 /**
  * OAuth2 Refresh Token
@@ -34,7 +35,7 @@ export class OAuthRefreshToken extends BaseEntity {
   @JoinColumn({ name: "tenant_id" })
   tenant!: Tenant;
 
-  @Column({ type: "uuid", name: "client_id" })
+  @Column({ type: "uuid", nullable: true, name: "client_id" })
   clientId!: string;
 
   @ManyToOne(() => OAuthClient, (client) => client.refreshTokens, {
@@ -45,6 +46,13 @@ export class OAuthRefreshToken extends BaseEntity {
 
   @Column({ type: "uuid", name: "user_id" })
   userId!: string;
+
+  @Column({ type: "uuid", nullable: true, name: "session_id" })
+  sessionId?: string;
+
+  @ManyToOne(() => Session, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "session_id" })
+  session?: Session;
 
   @ManyToOne(() => User, {
     onDelete: "CASCADE",

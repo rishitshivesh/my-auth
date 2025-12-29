@@ -1,7 +1,21 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { logger } from '../logger';
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { logger } from "../logger";
 
+/**
+ * TokenVerificationGuard
+ *
+ * ⚠️ WARNING: DO NOT USE FOR PROTECTED ROUTES!
+ *
+ * This guard is ONLY for "optional auth" scenarios where:
+ * - Route can work without auth
+ * - If token present, validate it
+ * - If token missing/invalid, continue without user
+ *
+ * For PROTECTED routes, use: @UseGuards(FortKnoxProtectedGuard)
+ *
+ * @deprecated Use FortKnoxProtectedGuard for protected routes
+ */
 @Injectable()
 export class TokenVerificationGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
@@ -10,8 +24,8 @@ export class TokenVerificationGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token =
       request.cookies.accessToken ??
-      request.headers['x-authorization'] ??
-      request.headers['authorization'];
+      request.headers["x-authorization"] ??
+      request.headers["authorization"];
 
     if (!token) {
       return false;
@@ -49,8 +63,8 @@ export class RequestUserGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const token =
       request.cookies.accessToken ??
-      request.headers['x-authorization'] ??
-      request.headers['authorization'];
+      request.headers["x-authorization"] ??
+      request.headers["authorization"];
 
     try {
       if (token) {
@@ -62,7 +76,7 @@ export class RequestUserGuard implements CanActivate {
       return true;
     } catch (error) {
       logger.error({
-        message: 'Failed to verify token',
+        message: "Failed to verify token",
         error,
       });
       return true;

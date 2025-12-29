@@ -8,6 +8,9 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { RbacService } from "../services/rbac.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { User } from "@repo/database";
+import { Repository } from "typeorm";
 
 export const PERMISSIONS_KEY = "permissions";
 
@@ -23,7 +26,7 @@ export const PERMISSIONS_KEY = "permissions";
 export class PermissionsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private rbacService: RbacService,
+    @InjectRepository(User) private userRepository: Repository<User>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,32 +36,43 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // If no permissions required, allow access
     if (!requiredPermissions || requiredPermissions.length === 0) {
-      return true;
+      return true; // No permissions required
     }
 
-    // Get request and user
     const request = context.switchToHttp().getRequest();
-    const user = request.user; // From JwtGuard
-    const tenantId = request.tenantId; // From TenantMiddleware
+    const user = request.user;
+    const tenantId = request.tenantId;
 
-    if (!user || !user.sub) {
-      throw new ForbiddenException("User not authenticated");
+    // Fetch user permissions (TENANT-SCOPED)
+    const userWithPermissions = await this.userRepository.findOne({
+      where: { id: user.sub, tenantId }, // ✅ ALWAYS tenant-scoped
+      relations: [
+        "userRoles",
+        "userRoles.role",
+        "userRoles.role.rolePermissions",
+        "userRoles.role.rolePermissions.permission",
+      ],
+    });
+
+    if (!userWithPermissions) {
+      throw new ForbiddenException("User not found");
     }
 
-    if (!tenantId) {
-      throw new ForbiddenException("Tenant context not found");
+    // Extract user's permissions
+    const userPermissions = new Set<string>();
+    for (const userRole of userWithPermissions.userRoles) {
+      for (const rolePermission of userRole.role.rolePermissions) {
+        userPermissions.add(rolePermission.permission.name);
+      }
     }
 
-    // Check if user has ALL required permissions
-    const hasPermissions = await this.rbacService.userHasAllPermissions(
-      user.sub,
-      tenantId,
-      requiredPermissions,
+    // Check if user has all required permissions
+    const hasAllPermissions = requiredPermissions.every((permission) =>
+      userPermissions.has(permission),
     );
 
-    if (!hasPermissions) {
+    if (!hasAllPermissions) {
       throw new ForbiddenException(
         `Missing required permissions: ${requiredPermissions.join(", ")}`,
       );

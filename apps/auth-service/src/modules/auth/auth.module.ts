@@ -26,6 +26,7 @@ import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 
 @Module({
   imports: [
@@ -65,7 +66,8 @@ import { RbacService } from "@/modules/rbac/services/rbac.service";
     MfaService,
     WebAuthnService,
     RbacService,
+    OAuthRefreshTokenService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, OAuthRefreshTokenService],
 })
 export class AuthModule {}
