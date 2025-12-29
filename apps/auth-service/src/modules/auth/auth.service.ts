@@ -319,14 +319,13 @@ export class AuthService {
       .digest("hex");
 
     // Step 4: Store refresh token separately
-    await this.oauthRefreshTokenRepository.save({
-      tenantId: data.tenantId,
-      userId: user.id,
-      sessionId: session.id,
-      tokenHash: refreshTokenHash,
-      familyId,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-    });
+    // await this.oauthRefreshTokenRepository.save({
+    //   tenantId: data.tenantId,
+    //   userId: user.id,
+    //   sessionId: session.id,
+    //   familyId,
+    //   expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    // });
 
     // Step 5: Update session with family ID
     await this.sessionRepository.update(session.id, {
