@@ -10,6 +10,8 @@ import {
   MfaSettings,
   OAuthRefreshToken,
   UserRole,
+  UserSocialConnection,
+  TenantSocialProvider,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -40,6 +42,8 @@ import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
       MfaSettings,
       OAuthRefreshToken,
       UserRole,
+      UserSocialConnection,
+      TenantSocialProvider,
     ]),
     UserModule,
     EmailModule,

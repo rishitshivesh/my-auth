@@ -1,0 +1,654 @@
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import {
+  User,
+  UserSocialConnection,
+  TenantSocialProvider,
+  SocialLinkRequest,
+  Session,
+  SecurityEvent,
+} from "@repo/database";
+import { TokenEncryptionService } from "../auth/oauth-token-encryption.service";
+import * as crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
+import { SessionService } from "@/common/service/session.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+export interface SocialProfile {
+  provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
+  providerId: string;
+  email: string;
+  emailVerified?: boolean;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  scopes?: string;
+  raw?: any; // Raw provider response
+}
+
+/**
+ * SocialAuthService
+ *
+ * Main service for social authentication
+ *
+ * Features:
+ * - Login with Google/GitHub/Microsoft/etc.
+ * - Auto-create users on first login
+ * - Account linking (explicit with verification)
+ * - Token storage (encrypted)
+ * - Multi-tenant support
+ */
+@Injectable()
+export class SocialAuthService {
+  private readonly logger = new Logger(SocialAuthService.name);
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(UserSocialConnection)
+    private readonly socialConnectionRepository: Repository<UserSocialConnection>,
+    @InjectRepository(TenantSocialProvider)
+    private readonly tenantProviderRepository: Repository<TenantSocialProvider>,
+    @InjectRepository(SocialLinkRequest)
+    private readonly linkRequestRepository: Repository<SocialLinkRequest>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+    private readonly tokenEncryptionService: TokenEncryptionService,
+    private readonly sessionService: SessionService,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Handle social login callback
+   *
+   * This is called after user approves OAuth at provider
+   *
+   * Flow:
+   * 1. Check if social connection exists
+   * 2. If YES: Login user
+   * 3. If NO: Check if email exists
+   *    a. If email exists: Initiate account linking
+   *    b. If email doesn't exist: Create new user
+   */
+  async handleCallback(params: {
+    tenantId: string;
+    profile: SocialProfile;
+    ipAddress: string;
+    userAgent: string;
+  }): Promise<
+    | { type: "success"; accessToken: string; refreshToken: string; user: any }
+    | {
+        type: "link_required";
+        email: string;
+        provider: string;
+        message: string;
+      }
+  > {
+    const { tenantId, profile, ipAddress, userAgent } = params;
+
+    this.logger.log("Handling social login callback", {
+      tenantId,
+      provider: profile.provider,
+      email: profile.email,
+    });
+
+    // Step 1: Check if social connection exists
+    const existingConnection = await this.socialConnectionRepository.findOne({
+      where: {
+        tenantId,
+        provider: profile.provider,
+        providerId: profile.providerId,
+      },
+      relations: ["user"],
+    });
+
+    if (existingConnection) {
+      // User exists, login
+      return this.loginWithSocialConnection(
+        existingConnection,
+        profile,
+        ipAddress,
+        userAgent,
+      );
+    }
+
+    // Step 2: Check if user with this email exists
+    const existingUser = await this.userRepository.findOne({
+      where: {
+        tenantId,
+        email: profile.email,
+      },
+    });
+
+    if (existingUser) {
+      // Email exists, require account linking
+      this.logger.log("User exists with email, requiring account linking", {
+        userId: existingUser.id,
+        email: profile.email,
+        provider: profile.provider,
+      });
+
+      // Create link request (user needs to confirm via email)
+      await this.createLinkRequest(existingUser, profile, ipAddress, userAgent);
+
+      return {
+        type: "link_required",
+        email: profile.email,
+        provider: profile.provider,
+        message:
+          "An account with this email already exists. Please check your email to link accounts.",
+      };
+    }
+
+    // Step 3: No existing user, create new account
+    return this.createUserWithSocialConnection(
+      tenantId,
+      profile,
+      ipAddress,
+      userAgent,
+    );
+  }
+
+  /**
+   * Login user with existing social connection
+   */
+  private async loginWithSocialConnection(
+    connection: UserSocialConnection,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<{
+    type: "success";
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    const user = connection.user;
+
+    this.logger.log("Logging in user with social connection", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    // Update connection tokens
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    await this.socialConnectionRepository.update(connection.id, {
+      accessToken: encryptedTokens.accessToken,
+      refreshToken: encryptedTokens.refreshToken,
+      tokenExpiresAt: profile.expiresIn
+        ? new Date(Date.now() + profile.expiresIn * 1000)
+        : undefined,
+      lastUsedAt: new Date(),
+      // Update profile data
+      email: profile.email,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+    });
+
+    // Create session
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId: connection.tenantId,
+      email: user.email,
+      ipAddress,
+      userAgent,
+    });
+
+    // Create refresh token
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId: connection.tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        ipAddress,
+        userAgent,
+      });
+
+    // Generate access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId: connection.tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Update user last login
+    await this.userRepository.update(user.id, {
+      lastLoginAt: new Date(),
+      lastLoginIp: ipAddress,
+    });
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId: connection.tenantId,
+      userId: user.id,
+      eventType: "social_login_success",
+      severity: "info",
+      ipAddress,
+      userAgent,
+      metadata: {
+        provider: profile.provider,
+        sessionId: session.id,
+      },
+    });
+
+    this.logger.log("Social login successful", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    return {
+      type: "success",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl || profile.avatarUrl,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
+   * Create new user with social connection
+   */
+  private async createUserWithSocialConnection(
+    tenantId: string,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<{
+    type: "success";
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    this.logger.log("Creating new user with social connection", {
+      tenantId,
+      provider: profile.provider,
+      email: profile.email,
+    });
+
+    // Create user
+    const user = await this.userRepository.save({
+      tenantId,
+      email: profile.email,
+      emailVerified: profile.emailVerified ?? true, // Trust provider verification
+      firstName: profile.firstName || profile.displayName?.split(" ")[0],
+      lastName:
+        profile.lastName || profile.displayName?.split(" ").slice(1).join(" "),
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      primaryAuthMethod: profile.provider,
+      passwordHash: undefined, // No password for social users
+      status: "active",
+    });
+
+    // Encrypt tokens
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    // Create social connection
+    await this.socialConnectionRepository.save({
+      tenantId,
+      userId: user.id,
+      provider: profile.provider,
+      providerId: profile.providerId,
+      email: profile.email,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      accessToken: encryptedTokens.accessToken,
+      refreshToken: encryptedTokens.refreshToken,
+      tokenExpiresAt: profile.expiresIn
+        ? new Date(Date.now() + profile.expiresIn * 1000)
+        : undefined,
+      scopes: profile.scopes,
+      metadata: profile.raw,
+      primary: true,
+      lastUsedAt: new Date(),
+    });
+
+    // Create session
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId,
+      email: user.email,
+      ipAddress,
+      userAgent,
+    });
+
+    // Create refresh token
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        ipAddress,
+        userAgent,
+      });
+
+    // Generate access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId,
+      userId: user.id,
+      eventType: "user_created_social",
+      severity: "info",
+      ipAddress,
+      userAgent,
+      metadata: {
+        provider: profile.provider,
+        sessionId: session.id,
+      },
+    });
+
+    this.logger.log("New user created with social connection", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    return {
+      type: "success",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
+   * Create account linking request
+   *
+   * Sends email to user to confirm linking
+   */
+  private async createLinkRequest(
+    user: User,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<void> {
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString("hex");
+
+    // Encrypt tokens for storage
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    // Create link request
+    await this.linkRequestRepository.save({
+      tenantId: user.tenantId,
+      userId: user.id,
+      provider: profile.provider,
+      providerId: profile.providerId,
+      providerEmail: profile.email,
+      token,
+      profileData: {
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        accessToken: encryptedTokens.accessToken!,
+        refreshToken: encryptedTokens.refreshToken,
+        tokenExpiresAt: profile.expiresIn
+          ? new Date(Date.now() + profile.expiresIn * 1000)
+          : undefined,
+        scopes: profile.scopes,
+        metadata: profile.raw,
+      },
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      ipAddress,
+      userAgent,
+    });
+
+    // TODO: Send email with link
+    // await this.emailService.sendAccountLinkRequest({
+    //   to: user.email,
+    //   provider: profile.provider,
+    //   linkUrl: `https://${tenant}.auth.scrolloop.com/auth/link/confirm?token=${token}`,
+    // });
+
+    this.logger.log("Account link request created", {
+      userId: user.id,
+      provider: profile.provider,
+      token,
+    });
+  }
+
+  /**
+   * Confirm account linking
+   *
+   * User clicks link in email to confirm
+   */
+  async confirmLinking(token: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    this.logger.log("Confirming account linking", { token });
+
+    // Find link request
+    const linkRequest = await this.linkRequestRepository.findOne({
+      where: { token, completed: false },
+      relations: ["user"],
+    });
+
+    if (!linkRequest) {
+      throw new UnauthorizedException("Invalid or expired linking token");
+    }
+
+    if (linkRequest.isExpired) {
+      throw new UnauthorizedException("Linking token has expired");
+    }
+
+    // Create social connection
+    await this.socialConnectionRepository.save({
+      tenantId: linkRequest.tenantId,
+      userId: linkRequest.userId,
+      provider: linkRequest.provider,
+      providerId: linkRequest.providerId,
+      email: linkRequest.providerEmail,
+      displayName: linkRequest.profileData.displayName,
+      avatarUrl: linkRequest.profileData.avatarUrl,
+      accessToken: linkRequest.profileData.accessToken,
+      refreshToken: linkRequest.profileData.refreshToken,
+      tokenExpiresAt: linkRequest.profileData.tokenExpiresAt,
+      scopes: linkRequest.profileData.scopes,
+      metadata: linkRequest.profileData.metadata,
+      primary: false,
+      lastUsedAt: new Date(),
+    });
+
+    // Mark request as completed
+    await this.linkRequestRepository.update(linkRequest.id, {
+      completed: true,
+      completedAt: new Date(),
+    });
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId: linkRequest.tenantId,
+      userId: linkRequest.userId,
+      eventType: "social_account_linked",
+      severity: "info",
+      ipAddress: linkRequest.ipAddress,
+      userAgent: linkRequest.userAgent,
+      metadata: {
+        provider: linkRequest.provider,
+      },
+    });
+
+    this.logger.log("Account linking confirmed", {
+      userId: linkRequest.userId,
+      provider: linkRequest.provider,
+    });
+
+    return {
+      success: true,
+      message: `${linkRequest.provider} account linked successfully`,
+    };
+  }
+
+  /**
+   * Unlink social account
+   */
+  async unlinkAccount(
+    userId: string,
+    tenantId: string,
+    provider: string,
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log("Unlinking social account", {
+      userId,
+      tenantId,
+      provider,
+    });
+
+    // Find connection
+    const connection = await this.socialConnectionRepository.findOne({
+      where: {
+        userId,
+        tenantId,
+        provider: provider as any,
+      },
+    });
+
+    if (!connection) {
+      throw new UnauthorizedException("Social connection not found");
+    }
+
+    // Check if user has password or other auth method
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+      select: ["passwordHash"],
+    });
+
+    const otherConnections = await this.socialConnectionRepository.count({
+      where: {
+        userId,
+        tenantId,
+      },
+    });
+
+    if (!user?.passwordHash && otherConnections <= 1) {
+      throw new ConflictException(
+        "Cannot unlink last authentication method. Set a password first.",
+      );
+    }
+
+    // Delete connection
+    await this.socialConnectionRepository.delete(connection.id);
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId,
+      userId,
+      eventType: "social_account_unlinked",
+      severity: "info",
+      metadata: {
+        provider,
+      },
+    });
+
+    this.logger.log("Social account unlinked", {
+      userId,
+      provider,
+    });
+
+    return {
+      success: true,
+      message: `${provider} account unlinked successfully`,
+    };
+  }
+
+  /**
+   * Get user's social connections
+   */
+  async getUserConnections(
+    userId: string,
+    tenantId: string,
+  ): Promise<UserSocialConnection[]> {
+    return this.socialConnectionRepository.find({
+      where: {
+        userId,
+        tenantId,
+      },
+      select: [
+        "id",
+        "provider",
+        "email",
+        "displayName",
+        "avatarUrl",
+        "primary",
+        "lastUsedAt",
+        "createdAt",
+      ],
+      order: {
+        primary: "DESC",
+        lastUsedAt: "DESC",
+      },
+    });
+  }
+
+  /**
+   * Log security event
+   */
+  private async logSecurityEvent(params: {
+    tenantId: string;
+    userId?: string;
+    eventType: string;
+    severity: "info" | "warning" | "critical";
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: any;
+  }): Promise<void> {
+    await this.securityEventRepository.save(params);
+  }
+}

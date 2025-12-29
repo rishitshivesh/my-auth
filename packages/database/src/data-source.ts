@@ -17,7 +17,7 @@ import { OAuthRefreshToken } from "./entities/oauth-refresh-token.entity";
 import { OAuthConsent } from "./entities/oauth-consent.entity";
 import { RolePermission } from "./entities/role-permission.entity";
 import { UserRole } from "./entities/user-role.entity";
-import { SocialLinkRequestEntity } from "./entities/social-link-request.entity";
+import { SocialLinkRequest } from "./entities/social-link-request.entity";
 import { TenantSocialProvider } from "./entities/tenant-social-providers.entity";
 import { UserSocialConnection } from "./entities/user-social-connections.entity";
 
@@ -42,7 +42,6 @@ export const dataSourceOptions: DataSourceOptions = {
   // Entities - explicit import for reliability
   entities: [
     Tenant,
-    User,
     Session,
     MfaSettings,
     SecurityEvent,
@@ -54,10 +53,11 @@ export const dataSourceOptions: DataSourceOptions = {
     OAuthRefreshToken,
     OAuthConsent,
     RolePermission,
-    UserRole,
-    SocialLinkRequestEntity,
+    SocialLinkRequest,
     TenantSocialProvider,
     UserSocialConnection,
+    UserRole,
+    User,
   ],
 
   // Migrations

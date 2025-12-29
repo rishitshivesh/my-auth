@@ -220,6 +220,12 @@ export class AuthService {
       hasPassword: !!user.passwordHash,
     }); // ← ADD
 
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        "Social Provider was used to login. Please use the same or link to this account.",
+      );
+    }
+
     // Verify password
     const isValid = await PasswordService.verify(user.passwordHash, password);
 
@@ -495,7 +501,10 @@ export class AuthService {
     const newPasswordHash = await PasswordService.hash(newPassword);
 
     // Update password and history
-    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+    const updatedHistory = [
+      ...(user.passwordHash ? [user.passwordHash] : []),
+      ...passwordHistory,
+    ].slice(0, 5);
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update

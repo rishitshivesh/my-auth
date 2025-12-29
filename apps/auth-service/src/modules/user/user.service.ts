@@ -117,24 +117,26 @@ export class UserService {
       throw new NotFoundException("User not found");
     }
 
-    // Verify current password
-    const isValid = await PasswordService.verify(
-      user.passwordHash,
-      currentPassword,
-    );
+    if (user.passwordHash) {
+      // Verify current password
+      const isValid = await PasswordService.verify(
+        user.passwordHash,
+        currentPassword,
+      );
 
-    if (!isValid) {
-      await this.logSecurityEvent({
-        userId,
-        tenantId: user.tenantId,
-        eventType: "PASSWORD_CHANGE_FAILED",
-        severity: "warning",
-        ipAddress: "0.0.0.0",
-        userAgent: "system",
-        metadata: { reason: "invalid_current_password" },
-      });
+      if (!isValid) {
+        await this.logSecurityEvent({
+          userId,
+          tenantId: user.tenantId,
+          eventType: "PASSWORD_CHANGE_FAILED",
+          severity: "warning",
+          ipAddress: "0.0.0.0",
+          userAgent: "system",
+          metadata: { reason: "invalid_current_password" },
+        });
 
-      throw new UnauthorizedException("Current password is incorrect");
+        throw new UnauthorizedException("Current password is incorrect");
+      }
     }
 
     // Validate new password strength
@@ -162,7 +164,10 @@ export class UserService {
     const newHash = await PasswordService.hash(newPassword);
 
     // Update password and history
-    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+    const updatedHistory = [
+      ...(user.passwordHash ? [user.passwordHash] : []),
+      ...passwordHistory,
+    ].slice(0, 5);
 
     await this.userRepository.update(userId, {
       passwordHash: newHash,
@@ -307,7 +312,10 @@ export class UserService {
     }
 
     // Verify password
-    const isValid = await PasswordService.verify(user.passwordHash, password);
+    const isValid = await PasswordService.verify(
+      user.passwordHash ?? "",
+      password,
+    );
 
     if (!isValid) {
       await this.logSecurityEvent({

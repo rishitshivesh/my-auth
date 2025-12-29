@@ -100,7 +100,7 @@ export class User extends BaseEntity {
     select: false,
     nullable: true,
   })
-  passwordHash!: string;
+  passwordHash?: string;
 
   @Column({
     type: "varchar",
@@ -118,8 +118,10 @@ export class User extends BaseEntity {
     | "linkedin"
     | "facebook";
 
-  @OneToMany(() => UserSocialConnection, (connection) => connection.user)
-  socialConnections!: UserSocialConnection[];
+  @OneToMany(() => UserSocialConnection, (connection) => connection.user, {
+    lazy: true,
+  })
+  socialConnections!: Promise<UserSocialConnection[]>;
 
   @Column({
     type: "timestamp with time zone",

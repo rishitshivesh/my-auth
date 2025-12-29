@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-29T15:13:24.293Z
+Generated: 2025-12-29T16:10:41.552Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -12020,7 +12020,7 @@ export class VerifyMfaDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 2.36 KB | LINES: 78
+SIZE: 2.41 KB | LINES: 80
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -12035,6 +12035,7 @@ import {
   MfaSettings,
   OAuthRefreshToken,
   UserRole,
+  UserSocialConnection,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -12065,6 +12066,7 @@ import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
       MfaSettings,
       OAuthRefreshToken,
       UserRole,
+      UserSocialConnection,
     ]),
     UserModule,
     EmailModule,
@@ -27289,7 +27291,7 @@ SIZE: 1.04 KB | LINES: 46
 
 ================================================================================
 FILE: packages/database/index.ts
-SIZE: 1.37 KB | LINES: 41
+SIZE: 1.55 KB | LINES: 45
 ================================================================================
 
 /**
@@ -27323,6 +27325,10 @@ export * from "./src/entities/oauth-authorization-code.entity";
 export * from "./src/entities/oauth-access-token.entity";
 export * from "./src/entities/oauth-refresh-token.entity";
 export * from "./src/entities/oauth-consent.entity";
+
+export * from "./src/entities/user-social-connections.entity";
+export * from "./src/entities/tenant-social-providers.entity";
+export * from "./src/entities/social-link-request.entity";
 
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";
@@ -27879,7 +27885,7 @@ When adding new entities:
 
 ================================================================================
 FILE: packages/database/src/data-source.ts
-SIZE: 2.79 KB | LINES: 94
+SIZE: 3.1 KB | LINES: 100
 ================================================================================
 
 import "reflect-metadata";
@@ -27901,6 +27907,9 @@ import { OAuthRefreshToken } from "./entities/oauth-refresh-token.entity";
 import { OAuthConsent } from "./entities/oauth-consent.entity";
 import { RolePermission } from "./entities/role-permission.entity";
 import { UserRole } from "./entities/user-role.entity";
+import { SocialLinkRequest } from "./entities/social-link-request.entity";
+import { TenantSocialProvider } from "./entities/tenant-social-providers.entity";
+import { UserSocialConnection } from "./entities/user-social-connections.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -27923,7 +27932,6 @@ export const dataSourceOptions: DataSourceOptions = {
   // Entities - explicit import for reliability
   entities: [
     Tenant,
-    User,
     Session,
     MfaSettings,
     SecurityEvent,
@@ -27935,7 +27943,11 @@ export const dataSourceOptions: DataSourceOptions = {
     OAuthRefreshToken,
     OAuthConsent,
     RolePermission,
+    SocialLinkRequest,
+    TenantSocialProvider,
+    UserSocialConnection,
     UserRole,
+    User,
   ],
 
   // Migrations
@@ -30228,14 +30240,238 @@ export class Session extends BaseEntity {
 
 
 ================================================================================
+FILE: packages/database/src/entities/social-link-request.entity.ts
+SIZE: 2.64 KB | LINES: 122
+================================================================================
+
+import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Tenant } from "./tenant.entity";
+import { User } from "./user.entity";
+import { type SocialProvider } from "./user-social-connections.entity";
+
+@Entity("social_link_requests")
+@Index(["token"], { unique: true })
+@Index(["tenantId", "userId"])
+export class SocialLinkRequest extends BaseEntity {
+  // ============================================================
+  // RELATIONSHIPS
+  // ============================================================
+
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  @Column({ type: "uuid", name: "user_id" })
+  userId!: string;
+
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
+  user!: User;
+
+  // ============================================================
+  // REQUEST DATA
+  // ============================================================
+
+  @Column({
+    type: "varchar",
+    length: 50,
+  })
+  provider!: SocialProvider;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    name: "provider_id",
+  })
+  providerId!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    name: "provider_email",
+  })
+  providerEmail!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    unique: true,
+    comment: "Verification token sent via email",
+  })
+  token!: string;
+
+  @Column({
+    type: "jsonb",
+    comment: "Social profile data to be linked",
+  })
+  profileData!: {
+    displayName?: string;
+    avatarUrl?: string;
+    accessToken: string;
+    refreshToken?: string;
+    tokenExpiresAt?: Date;
+    scopes?: string;
+    metadata?: Record<string, any>;
+  };
+
+  @Column({
+    type: "timestamp with time zone",
+    name: "expires_at",
+    comment: "When this request expires",
+  })
+  expiresAt!: Date;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    comment: "Has this request been completed?",
+  })
+  completed!: boolean;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "completed_at",
+  })
+  completedAt?: Date;
+
+  @Column({
+    type: "inet",
+    nullable: true,
+    name: "ip_address",
+  })
+  ipAddress?: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    name: "user_agent",
+  })
+  userAgent?: string;
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  get isExpired(): boolean {
+    return this.expiresAt < new Date();
+  }
+
+  get isValid(): boolean {
+    return !this.completed && !this.isExpired;
+  }
+}
+
+
+
+================================================================================
+FILE: packages/database/src/entities/tenant-social-providers.entity.ts
+SIZE: 2.11 KB | LINES: 87
+================================================================================
+
+import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Tenant } from "./tenant.entity";
+import { type SocialProvider } from "./user-social-connections.entity";
+
+@Entity("tenant_social_providers")
+@Index(["tenantId", "provider"], { unique: true })
+export class TenantSocialProvider extends BaseEntity {
+  // ============================================================
+  // RELATIONSHIPS
+  // ============================================================
+
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  // ============================================================
+  // PROVIDER CONFIGURATION
+  // ============================================================
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    comment: "Social provider",
+  })
+  provider!: SocialProvider;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    comment: "Is this provider enabled for this tenant?",
+  })
+  enabled!: boolean;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "client_id",
+    comment: "OAuth client ID (tenant-specific or shared)",
+  })
+  clientId?: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    name: "client_secret",
+    comment: "Encrypted OAuth client secret",
+    select: false,
+  })
+  clientSecret?: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    comment: "Requested scopes (space-separated)",
+  })
+  scopes?: string;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    name: "use_shared_app",
+    comment: "Use Fort Knox shared OAuth app?",
+  })
+  useSharedApp!: boolean;
+
+  @Column({
+    type: "jsonb",
+    nullable: true,
+    comment: "Provider-specific configuration",
+  })
+  config?: Record<string, any>;
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  get scopesList(): string[] {
+    if (!this.scopes) return [];
+    return this.scopes.split(" ").filter(Boolean);
+  }
+}
+
+
+
+================================================================================
 FILE: packages/database/src/entities/tenant.entity.ts
-SIZE: 1.42 KB | LINES: 66
+SIZE: 1.6 KB | LINES: 70
 ================================================================================
 
 // packages/database/src/entities/tenant.entity.ts
 import { Entity, Column, OneToMany, Index } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
+import { TenantSocialProvider } from "./tenant-social-providers.entity";
 
 @Entity("tenants")
 @Index(["slug"], { unique: true })
@@ -30296,6 +30532,9 @@ export class Tenant extends BaseEntity {
 
   @OneToMany(() => User, (user) => user.tenant)
   users!: User[];
+
+  @OneToMany(() => TenantSocialProvider, (provider) => provider.tenant)
+  socialProviders!: TenantSocialProvider[];
 }
 
 
@@ -30446,8 +30685,175 @@ export class UserRole extends BaseEntity {
 
 
 ================================================================================
+FILE: packages/database/src/entities/user-social-connections.entity.ts
+SIZE: 3.63 KB | LINES: 160
+================================================================================
+
+import { Entity, Column, ManyToOne, JoinColumn, Index, Unique } from "typeorm";
+import { BaseEntity } from "./base.entity";
+import { Tenant } from "./tenant.entity";
+import { User } from "./user.entity";
+
+export type SocialProvider =
+  | "google"
+  | "github"
+  | "microsoft"
+  | "apple"
+  | "linkedin"
+  | "facebook";
+
+@Entity("user_social_connections")
+@Index(["tenantId", "userId"])
+@Index(["tenantId", "provider", "providerId"], { unique: true })
+@Index(["email"])
+export class UserSocialConnection extends BaseEntity {
+  // ============================================================
+  // RELATIONSHIPS
+  // ============================================================
+
+  @Column({ type: "uuid", name: "tenant_id" })
+  tenantId!: string;
+
+  @ManyToOne(() => Tenant, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "tenant_id" })
+  tenant!: Tenant;
+
+  @Column({ type: "uuid", name: "user_id" })
+  userId!: string;
+
+  @ManyToOne(() => User, (user) => user.socialConnections, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "user_id" })
+  user!: User;
+
+  // ============================================================
+  // PROVIDER INFORMATION
+  // ============================================================
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    comment: "Social provider (google, github, etc.)",
+  })
+  provider!: SocialProvider;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    name: "provider_id",
+    comment: "User ID at the provider",
+  })
+  providerId!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    comment: "Email from provider",
+  })
+  email!: string;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "display_name",
+    comment: "Display name from provider",
+  })
+  displayName?: string;
+
+  @Column({
+    type: "varchar",
+    length: 500,
+    nullable: true,
+    name: "avatar_url",
+    comment: "Avatar URL from provider",
+  })
+  avatarUrl?: string;
+
+  // ============================================================
+  // TOKENS (ENCRYPTED)
+  // ============================================================
+
+  @Column({
+    type: "text",
+    nullable: true,
+    name: "access_token",
+    comment: "Encrypted access token",
+    select: false,
+  })
+  accessToken?: string;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    name: "refresh_token",
+    comment: "Encrypted refresh token",
+    select: false,
+  })
+  refreshToken?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "token_expires_at",
+    comment: "When access token expires",
+  })
+  tokenExpiresAt?: Date;
+
+  @Column({
+    type: "text",
+    nullable: true,
+    comment: "Granted scopes (space-separated)",
+  })
+  scopes?: string;
+
+  // ============================================================
+  // METADATA
+  // ============================================================
+
+  @Column({
+    type: "jsonb",
+    nullable: true,
+    comment: "Provider-specific metadata",
+  })
+  metadata?: Record<string, any>;
+
+  @Column({
+    type: "boolean",
+    default: false,
+    comment: "Is this the primary auth method?",
+  })
+  primary!: boolean;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_used_at",
+    comment: "When this connection was last used to login",
+  })
+  lastUsedAt?: Date;
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  get isTokenExpired(): boolean {
+    if (!this.tokenExpiresAt) return false;
+    return this.tokenExpiresAt < new Date();
+  }
+
+  get scopesList(): string[] {
+    if (!this.scopes) return [];
+    return this.scopes.split(" ").filter(Boolean);
+  }
+}
+
+
+
+================================================================================
 FILE: packages/database/src/entities/user.entity.ts
-SIZE: 7.6 KB | LINES: 369
+SIZE: 8.13 KB | LINES: 392
 ================================================================================
 
 import {
@@ -30467,6 +30873,7 @@ import { MfaSettings } from "./mfa-settings.entity";
 import { Session } from "./session.entity";
 import { Role } from "./role.entity";
 import { UserRole } from "./user-role.entity";
+import { UserSocialConnection } from "./user-social-connections.entity";
 
 @Entity("users")
 @Index(["tenantId", "email"], { unique: true })
@@ -30549,8 +30956,30 @@ export class User extends BaseEntity {
     length: 255,
     name: "password_hash",
     select: false,
+    nullable: true,
   })
   passwordHash!: string;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: "password",
+    name: "primary_auth_method",
+    comment: "Primary authentication method",
+  })
+  primaryAuthMethod!:
+    | "password"
+    | "google"
+    | "github"
+    | "microsoft"
+    | "apple"
+    | "linkedin"
+    | "facebook";
+
+  @OneToMany(() => UserSocialConnection, (connection) => connection.user, {
+    lazy: true,
+  })
+  socialConnections!: Promise<UserSocialConnection[]>;
 
   @Column({
     type: "timestamp with time zone",
@@ -32845,6 +33274,60 @@ export class Sh1767019692496 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ALTER COLUMN "client_id" SET NOT NULL`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83" FOREIGN KEY ("client_id") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP COLUMN "session_id"`);
+    }
+
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1767021827595-added-social-provider.ts
+SIZE: 8.4 KB | LINES: 47
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class AddedSocialProvider1767021827595 implements MigrationInterface {
+    name = 'AddedSocialProvider1767021827595'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE "user_social_connections" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "tenant_id" uuid NOT NULL, "user_id" uuid NOT NULL, "provider" character varying(50) NOT NULL, "provider_id" character varying(255) NOT NULL, "email" character varying(255) NOT NULL, "display_name" character varying(255), "avatar_url" character varying(500), "access_token" text, "refresh_token" text, "token_expires_at" TIMESTAMP WITH TIME ZONE, "scopes" text, "metadata" jsonb, "primary" boolean NOT NULL DEFAULT false, "last_used_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_d7021f41e26777eeb91370d592a" PRIMARY KEY ("id")); COMMENT ON COLUMN "user_social_connections"."provider" IS 'Social provider (google, github, etc.)'; COMMENT ON COLUMN "user_social_connections"."provider_id" IS 'User ID at the provider'; COMMENT ON COLUMN "user_social_connections"."email" IS 'Email from provider'; COMMENT ON COLUMN "user_social_connections"."display_name" IS 'Display name from provider'; COMMENT ON COLUMN "user_social_connections"."avatar_url" IS 'Avatar URL from provider'; COMMENT ON COLUMN "user_social_connections"."access_token" IS 'Encrypted access token'; COMMENT ON COLUMN "user_social_connections"."refresh_token" IS 'Encrypted refresh token'; COMMENT ON COLUMN "user_social_connections"."token_expires_at" IS 'When access token expires'; COMMENT ON COLUMN "user_social_connections"."scopes" IS 'Granted scopes (space-separated)'; COMMENT ON COLUMN "user_social_connections"."metadata" IS 'Provider-specific metadata'; COMMENT ON COLUMN "user_social_connections"."primary" IS 'Is this the primary auth method?'; COMMENT ON COLUMN "user_social_connections"."last_used_at" IS 'When this connection was last used to login'`);
+        await queryRunner.query(`CREATE INDEX "IDX_cd68f461affb0e8e3232f5b7c8" ON "user_social_connections" ("email") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_fdeed009ab54540f0382ab83f2" ON "user_social_connections" ("tenant_id", "provider", "provider_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_c0a90523a682924e31433309de" ON "user_social_connections" ("tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE TABLE "tenant_social_providers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "tenant_id" uuid NOT NULL, "provider" character varying(50) NOT NULL, "enabled" boolean NOT NULL DEFAULT false, "client_id" character varying(255), "client_secret" text, "scopes" text, "use_shared_app" boolean NOT NULL DEFAULT false, "config" jsonb, CONSTRAINT "PK_526fa69451e0f896a6b8e8378d5" PRIMARY KEY ("id")); COMMENT ON COLUMN "tenant_social_providers"."provider" IS 'Social provider'; COMMENT ON COLUMN "tenant_social_providers"."enabled" IS 'Is this provider enabled for this tenant?'; COMMENT ON COLUMN "tenant_social_providers"."client_id" IS 'OAuth client ID (tenant-specific or shared)'; COMMENT ON COLUMN "tenant_social_providers"."client_secret" IS 'Encrypted OAuth client secret'; COMMENT ON COLUMN "tenant_social_providers"."scopes" IS 'Requested scopes (space-separated)'; COMMENT ON COLUMN "tenant_social_providers"."use_shared_app" IS 'Use Fort Knox shared OAuth app?'; COMMENT ON COLUMN "tenant_social_providers"."config" IS 'Provider-specific configuration'`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_88ae55aaa3284254302359d1d2" ON "tenant_social_providers" ("tenant_id", "provider") `);
+        await queryRunner.query(`CREATE TABLE "social_link_requests" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "tenant_id" uuid NOT NULL, "user_id" uuid NOT NULL, "provider" character varying(50) NOT NULL, "provider_id" character varying(255) NOT NULL, "provider_email" character varying(255) NOT NULL, "token" character varying(255) NOT NULL, "profileData" jsonb NOT NULL, "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL, "completed" boolean NOT NULL DEFAULT false, "completed_at" TIMESTAMP WITH TIME ZONE, "ip_address" inet, "user_agent" text, CONSTRAINT "UQ_329dce005a16fe212c2f8e085fa" UNIQUE ("token"), CONSTRAINT "PK_abfa46288bea6d87014395f724d" PRIMARY KEY ("id")); COMMENT ON COLUMN "social_link_requests"."token" IS 'Verification token sent via email'; COMMENT ON COLUMN "social_link_requests"."profileData" IS 'Social profile data to be linked'; COMMENT ON COLUMN "social_link_requests"."expires_at" IS 'When this request expires'; COMMENT ON COLUMN "social_link_requests"."completed" IS 'Has this request been completed?'`);
+        await queryRunner.query(`CREATE INDEX "IDX_58a440bdd91e424e499fd6ccc8" ON "social_link_requests" ("tenant_id", "user_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_329dce005a16fe212c2f8e085f" ON "social_link_requests" ("token") `);
+        await queryRunner.query(`ALTER TABLE "users" ADD "primary_auth_method" character varying(50) NOT NULL DEFAULT 'password'`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."primary_auth_method" IS 'Primary authentication method'`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "password_hash" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "user_social_connections" ADD CONSTRAINT "FK_3b82f267bfd42e63d0bd4796a7c" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "user_social_connections" ADD CONSTRAINT "FK_c1d6c9f388e3684951dbe2dc9bd" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "tenant_social_providers" ADD CONSTRAINT "FK_cb56d98f8fb5571d82e3a69f08d" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "social_link_requests" ADD CONSTRAINT "FK_f1e34369b507dc55c7a64cca182" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "social_link_requests" ADD CONSTRAINT "FK_3110c40eb496bb3547e24dbf9c7" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "social_link_requests" DROP CONSTRAINT "FK_3110c40eb496bb3547e24dbf9c7"`);
+        await queryRunner.query(`ALTER TABLE "social_link_requests" DROP CONSTRAINT "FK_f1e34369b507dc55c7a64cca182"`);
+        await queryRunner.query(`ALTER TABLE "tenant_social_providers" DROP CONSTRAINT "FK_cb56d98f8fb5571d82e3a69f08d"`);
+        await queryRunner.query(`ALTER TABLE "user_social_connections" DROP CONSTRAINT "FK_c1d6c9f388e3684951dbe2dc9bd"`);
+        await queryRunner.query(`ALTER TABLE "user_social_connections" DROP CONSTRAINT "FK_3b82f267bfd42e63d0bd4796a7c"`);
+        await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "password_hash" SET NOT NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "users"."primary_auth_method" IS 'Primary authentication method'`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "primary_auth_method"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_329dce005a16fe212c2f8e085f"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_58a440bdd91e424e499fd6ccc8"`);
+        await queryRunner.query(`DROP TABLE "social_link_requests"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_88ae55aaa3284254302359d1d2"`);
+        await queryRunner.query(`DROP TABLE "tenant_social_providers"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_c0a90523a682924e31433309de"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_fdeed009ab54540f0382ab83f2"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_cd68f461affb0e8e3232f5b7c8"`);
+        await queryRunner.query(`DROP TABLE "user_social_connections"`);
     }
 
 }
@@ -41765,8 +42248,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 268
-Total Lines: 39,882
+Files Processed: 272
+Total Lines: 40,337
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-29T15:13:24.293Z
+Generated: 2025-12-29T16:10:41.552Z

@@ -1,0 +1,55 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import {
+  User,
+  UserSocialConnection,
+  TenantSocialProvider,
+  SocialLinkRequest,
+  SecurityEvent,
+  Session,
+  OAuthRefreshToken,
+} from "@repo/database";
+import { SocialAuthController } from "./social-auth.controller";
+import { SocialAuthService } from "./social-auth.service";
+import { GoogleStrategy } from "./strategies/google.strategy";
+import { GitHubStrategy } from "./strategies/github.strategy";
+import { MicrosoftStrategy } from "./strategies/microsoft.strategy";
+import { TokenEncryptionService } from "@/modules/auth/oauth-token-encryption.service";
+import { SessionService } from "@/common/service/session.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      UserSocialConnection,
+      TenantSocialProvider,
+      SocialLinkRequest,
+      SecurityEvent,
+      Session,
+      OAuthRefreshToken,
+    ]),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>("JWT_SECRET"),
+        signOptions: { expiresIn: "15m" },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+  controllers: [SocialAuthController],
+  providers: [
+    SocialAuthService,
+    GoogleStrategy,
+    GitHubStrategy,
+    MicrosoftStrategy,
+    TokenEncryptionService,
+    SessionService,
+    OAuthRefreshTokenService,
+  ],
+  exports: [SocialAuthService],
+})
+export class SocialAuthModule {}

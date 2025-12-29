@@ -7,7 +7,7 @@ import { type SocialProvider } from "./user-social-connections.entity";
 @Entity("social_link_requests")
 @Index(["token"], { unique: true })
 @Index(["tenantId", "userId"])
-export class SocialLinkRequestEntity extends BaseEntity {
+export class SocialLinkRequest extends BaseEntity {
   // ============================================================
   // RELATIONSHIPS
   // ============================================================

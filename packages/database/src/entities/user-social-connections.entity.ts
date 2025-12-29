@@ -30,7 +30,9 @@ export class UserSocialConnection extends BaseEntity {
   @Column({ type: "uuid", name: "user_id" })
   userId!: string;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @ManyToOne(() => User, (user) => user.socialConnections, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 
