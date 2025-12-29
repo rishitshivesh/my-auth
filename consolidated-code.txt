@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-28T23:19:20.396Z
+Generated: 2025-12-28T23:59:29.706Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 70.56 KB | LINES: 2969
+SIZE: 89.25 KB | LINES: 3723
 ================================================================================
 
 {
@@ -953,6 +953,350 @@ SIZE: 70.56 KB | LINES: 2969
         ]
       }
     },
+    "/users": {
+      "get": {
+        "operationId": "UserController_listUsers",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by",
+            "schema": {
+              "example": "createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "email",
+                "firstName",
+                "lastName",
+                "lastLoginAt"
+              ]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "example": "DESC",
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search term (searches email, first name, last name, display name)",
+            "schema": {
+              "example": "john",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter by active status",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "emailVerified",
+            "required": false,
+            "in": "query",
+            "description": "Filter by email verification status",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Filter by role name",
+            "schema": {
+              "example": "admin",
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAfter",
+            "required": false,
+            "in": "query",
+            "description": "Filter users created after this date",
+            "schema": {
+              "example": "2024-01-01T00:00:00Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdBefore",
+            "required": false,
+            "in": "query",
+            "description": "Filter users created before this date",
+            "schema": {
+              "example": "2024-12-31T23:59:59Z",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users retrieved"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List all users (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/stats": {
+      "get": {
+        "description": "Get aggregate statistics about users",
+        "operationId": "UserController_getUserStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Statistics retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user statistics (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/export": {
+      "get": {
+        "description": "Download all users as CSV file",
+        "operationId": "UserController_exportUsers",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Field to sort by",
+            "schema": {
+              "example": "createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "email",
+                "firstName",
+                "lastName",
+                "lastLoginAt"
+              ]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "example": "DESC",
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search term (searches email, first name, last name, display name)",
+            "schema": {
+              "example": "john",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "description": "Filter by active status",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "emailVerified",
+            "required": false,
+            "in": "query",
+            "description": "Filter by email verification status",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Filter by role name",
+            "schema": {
+              "example": "admin",
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAfter",
+            "required": false,
+            "in": "query",
+            "description": "Filter users created after this date",
+            "schema": {
+              "example": "2024-01-01T00:00:00Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdBefore",
+            "required": false,
+            "in": "query",
+            "description": "Filter users created before this date",
+            "schema": {
+              "example": "2024-12-31T23:59:59Z",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV file"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export users to CSV (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/bulk/update-status": {
+      "post": {
+        "description": "Activate or deactivate multiple users at once",
+        "operationId": "UserController_bulkUpdateStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateUsersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Users updated"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bulk update user status (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/users/{id}": {
       "get": {
         "operationId": "UserController_getUserById",
@@ -970,6 +1314,9 @@ SIZE: 70.56 KB | LINES: 2969
           "200": {
             "description": "User retrieved"
           },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          },
           "404": {
             "description": "User not found"
           }
@@ -979,7 +1326,179 @@ SIZE: 70.56 KB | LINES: 2969
             "bearer": []
           }
         ],
-        "summary": "Get user by ID",
+        "summary": "Get user by ID (Admin)",
+        "tags": [
+          "Users"
+        ]
+      },
+      "put": {
+        "operationId": "UserController_updateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user by ID (Admin)",
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_deleteUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User deleted successfully"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete user by ID (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/force-password-reset": {
+      "post": {
+        "operationId": "UserController_forcePasswordReset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password reset forced"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Force user to reset password (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/lock": {
+      "post": {
+        "operationId": "UserController_lockUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User account locked"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lock user account (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/unlock": {
+      "post": {
+        "operationId": "UserController_unlockUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User account unlocked"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unlock user account (Admin)",
         "tags": [
           "Users"
         ]
@@ -1592,6 +2111,9 @@ SIZE: 70.56 KB | LINES: 2969
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
           }
         },
         "security": [
@@ -1599,7 +2121,7 @@ SIZE: 70.56 KB | LINES: 2969
             "bearer": []
           }
         ],
-        "summary": "Create OAuth Client",
+        "summary": "Create OAuth Client (Requires: clients:write)",
         "tags": [
           "OAuth2/OIDC"
         ]
@@ -1621,6 +2143,9 @@ SIZE: 70.56 KB | LINES: 2969
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
           }
         },
         "security": [
@@ -1628,7 +2153,7 @@ SIZE: 70.56 KB | LINES: 2969
             "bearer": []
           }
         ],
-        "summary": "List OAuth Clients",
+        "summary": "List OAuth Clients (Requires: clients:read)",
         "tags": [
           "OAuth2/OIDC"
         ]
@@ -1658,6 +2183,9 @@ SIZE: 70.56 KB | LINES: 2969
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
           }
         },
         "security": [
@@ -1665,7 +2193,118 @@ SIZE: 70.56 KB | LINES: 2969
             "bearer": []
           }
         ],
-        "summary": "Get OAuth Client",
+        "summary": "Get OAuth Client (Requires: clients:read)",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      },
+      "put": {
+        "description": "Update OAuth2 client configuration",
+        "operationId": "OAuthController_updateClient",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOAuthClientDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client updated"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          },
+          "404": {
+            "description": "Client not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update OAuth Client (Requires: clients:write)",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      },
+      "delete": {
+        "description": "Delete an OAuth2 client",
+        "operationId": "OAuthController_deleteClient",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Client deleted"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          },
+          "404": {
+            "description": "Client not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete OAuth Client (Requires: clients:delete)",
+        "tags": [
+          "OAuth2/OIDC"
+        ]
+      }
+    },
+    "/oauth/clients/{clientId}/rotate-secret": {
+      "post": {
+        "description": "Generate a new client secret",
+        "operationId": "OAuthController_rotateClientSecret",
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret rotated"
+          },
+          "403": {
+            "description": "Forbidden - missing permissions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rotate Client Secret (Requires: clients:write)",
         "tags": [
           "OAuth2/OIDC"
         ]
@@ -2506,6 +3145,74 @@ SIZE: 70.56 KB | LINES: 2969
           "newPassword"
         ]
       },
+      "UserStatsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "example": 150,
+            "description": "Total users"
+          },
+          "active": {
+            "type": "number",
+            "example": 145,
+            "description": "Active users"
+          },
+          "inactive": {
+            "type": "number",
+            "example": 5,
+            "description": "Inactive users"
+          },
+          "verified": {
+            "type": "number",
+            "example": 140,
+            "description": "Email verified users"
+          },
+          "unverified": {
+            "type": "number",
+            "example": 10,
+            "description": "Email unverified users"
+          },
+          "recentLogins": {
+            "type": "number",
+            "example": 45,
+            "description": "Users logged in last 7 days"
+          }
+        },
+        "required": [
+          "total",
+          "active",
+          "inactive",
+          "verified",
+          "unverified",
+          "recentLogins"
+        ]
+      },
+      "BulkUpdateUsersDto": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "example": [
+              "user-id-1",
+              "user-id-2"
+            ],
+            "description": "User IDs to update",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "description": "Set active status"
+          }
+        },
+        "required": [
+          "userIds",
+          "isActive"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -3326,6 +4033,53 @@ SIZE: 70.56 KB | LINES: 2969
           "isActive",
           "createdAt"
         ]
+      },
+      "UpdateOAuthClientDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Client name",
+            "example": "My Updated Application"
+          },
+          "description": {
+            "type": "string",
+            "description": "Client description",
+            "example": "Updated description"
+          },
+          "redirectUris": {
+            "description": "Redirect URIs",
+            "example": [
+              "https://app.example.com/callback"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "Logo URL",
+            "example": "https://app.example.com/new-logo.png"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Is active",
+            "example": true
+          },
+          "allowedScopes": {
+            "description": "Allowed scopes",
+            "example": [
+              "openid",
+              "profile",
+              "email"
+            ],
+            "type": "array",
+            "items": {
+              "type": "array"
+            }
+          }
+        }
       },
       "CreatePermissionDto": {
         "type": "object",
@@ -9309,7 +10063,7 @@ export class VerifyEmailDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 1.55 KB | LINES: 58
+SIZE: 1.71 KB | LINES: 62
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -9333,6 +10087,8 @@ import { JwtStrategy } from "@/common/guards/jwt.strategy";
 import { JwtAuthGuard } from "@/common/guards";
 import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
+import { BruteForceService } from "@/modules/auth/brute-force.service";
+import { MfaService } from "@/modules/mfa/mfa.service";
 
 @Module({
   imports: [
@@ -9365,6 +10121,8 @@ import { RedisService } from "@/common/service/redis.service";
     JwtAuthGuard,
     SessionService,
     RedisService,
+    BruteForceService,
+    MfaService,
   ],
   exports: [AuthService],
 })
@@ -9374,7 +10132,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 20.85 KB | LINES: 771
+SIZE: 22.14 KB | LINES: 819
 ================================================================================
 
 import {
@@ -9394,6 +10152,8 @@ import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
+import { BruteForceService } from "@/modules/auth/brute-force.service";
+import { MfaService } from "@/modules/mfa/mfa.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -9421,6 +10181,8 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
+    private readonly bruteForceService: BruteForceService,
+    private readonly mfaService: MfaService,
   ) {}
 
   /**
@@ -9532,7 +10294,10 @@ export class AuthService {
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+  }): Promise<
+    | { accessToken: string; refreshToken: string; user: any }
+    | { mfaRequired: boolean; tempToken: string; message: string }
+  > {
     const { tenantId, email, password, ip, userAgent } = data;
 
     // Find user
@@ -9566,11 +10331,12 @@ export class AuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    await this.bruteForceService.checkAccountLock(user);
+
     console.log("🔍 User found:", {
       userId: user.id,
       user,
       hasPassword: !!user.passwordHash,
-      passwordHashStart: user.passwordHash?.substring(0, 20),
     }); // ← ADD
 
     // Verify password
@@ -9579,6 +10345,7 @@ export class AuthService {
     console.log("🔍 Password check:", { isValid }); // ← ADD
 
     if (!isValid) {
+      await this.bruteForceService.recordFailedAttempt(user, tenantId, ip);
       await this.logSecurityEvent({
         tenantId,
         userId: user.id,
@@ -9586,10 +10353,12 @@ export class AuthService {
         severity: "critical",
         ipAddress: ip,
         userAgent,
-        metadata: { email, reason: "invalid_password" },
+        metadata: { email, reason: "invalid_password", password },
       });
       throw new UnauthorizedException("Invalid email or password");
     }
+
+    await this.bruteForceService.resetFailedAttempts(user);
 
     // Check if email verified (if required)
     if (
@@ -9606,6 +10375,43 @@ export class AuthService {
     ) {
       throw new UnauthorizedException("Please verify your email first");
     }
+
+    const mfaEnabled = await this.mfaService.isMfaEnabled(user.id, tenantId);
+
+    if (mfaEnabled) {
+      // Generate temporary token for MFA verification
+      const tempToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          tenantId,
+          type: "mfa_pending",
+        },
+        {
+          secret: this.configService.get("JWT_SECRET"),
+          expiresIn: "5m", // Short-lived
+        },
+      );
+
+      console.log(`🔐 MFA required for user ${user.email}`);
+
+      // Log MFA challenge
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "mfa_challenge_sent",
+        severity: "info",
+        ipAddress: ip,
+        userAgent,
+      });
+
+      return {
+        mfaRequired: true,
+        tempToken,
+        message: "MFA verification required",
+      };
+    }
+
     // === REFRESH TOKEN ROTATION LOGIC ===
 
     // 1. Generate new family ID
@@ -10145,6 +10951,200 @@ export class AuthService {
       userAgent: data.userAgent,
       metadata: data.metadata || {},
     });
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/auth/brute-force.service.ts
+SIZE: 5.26 KB | LINES: 187
+================================================================================
+
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { IsNull, Repository } from "typeorm";
+import { User } from "@repo/database";
+
+@Injectable()
+export class BruteForceService {
+  private readonly MAX_ATTEMPTS = 5;
+  private readonly LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in ms
+  private readonly PROGRESSIVE_DELAYS = [0, 1000, 2000, 5000, 10000]; // Delays in ms
+
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
+
+  /**
+   * Check if account is currently locked
+   * @throws UnauthorizedException if account is locked
+   */
+  async checkAccountLock(user: User): Promise<void> {
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 60000,
+      );
+
+      console.log(
+        `🔒 Account locked for user ${user.email} - ${minutesLeft} minutes remaining`,
+      );
+
+      throw new UnauthorizedException({
+        message: `Account temporarily locked due to too many failed login attempts`,
+        lockedUntil: user.lockedUntil,
+        minutesRemaining: minutesLeft,
+        statusCode: 423, // 423 Locked
+      });
+    }
+
+    // Clear lock if expired
+    if (user.lockedUntil && user.lockedUntil <= new Date()) {
+      user.lockedUntil = undefined;
+      user.failedLoginAttempts = 0;
+      await this.userRepository.save(user);
+      console.log(`🔓 Lock expired for user ${user.email}`);
+    }
+  }
+
+  /**
+   * Record a failed login attempt
+   * Implements progressive delays and account lockout
+   */
+  async recordFailedAttempt(
+    user: User,
+    tenantId: string,
+    ipAddress?: string,
+  ): Promise<void> {
+    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+    user.lastFailedLogin = new Date();
+
+    console.log(
+      `❌ Failed login attempt ${user.failedLoginAttempts}/${this.MAX_ATTEMPTS} for ${user.email}`,
+    );
+
+    // Lock account after max attempts
+    if (user.failedLoginAttempts >= this.MAX_ATTEMPTS) {
+      user.lockedUntil = new Date(Date.now() + this.LOCKOUT_DURATION);
+      await this.userRepository.save(user);
+
+      console.log(
+        `🔒 Account locked for user ${user.email} until ${user.lockedUntil}`,
+      );
+
+      // TODO: Send email notification about account lock
+      // await this.emailService.sendAccountLockedEmail(user);
+
+      throw new UnauthorizedException({
+        message: `Account locked due to too many failed login attempts. Try again in 15 minutes.`,
+        lockedUntil: user.lockedUntil,
+        statusCode: 423,
+      });
+    }
+
+    // Save failed attempt count
+    await this.userRepository.save(user);
+
+    // Apply progressive delay (prevents brute force timing attacks)
+    const delayIndex = Math.min(
+      user.failedLoginAttempts - 1,
+      this.PROGRESSIVE_DELAYS.length - 1,
+    );
+    const delay = this.PROGRESSIVE_DELAYS[delayIndex] as number;
+
+    if (delay > 0) {
+      console.log(`⏱️  Applying ${delay}ms delay for failed attempt`);
+      await this.sleep(delay);
+    }
+
+    // Throw error after delay
+    const attemptsLeft = this.MAX_ATTEMPTS - user.failedLoginAttempts;
+    throw new UnauthorizedException({
+      message: "Invalid email or password",
+      attemptsRemaining: attemptsLeft,
+    });
+  }
+
+  /**
+   * Reset failed login attempts on successful login
+   */
+  async resetFailedAttempts(user: User): Promise<void> {
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      console.log(`✅ Resetting failed attempts for ${user.email}`);
+
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+      user.lastFailedLogin = null;
+
+      await this.userRepository.save(user);
+    }
+  }
+
+  /**
+   * Manually unlock account (admin function)
+   */
+  async unlockAccount(userId: string, tenantId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    user.lockedUntil = null;
+    user.failedLoginAttempts = 0;
+    user.lastFailedLogin = null;
+
+    await this.userRepository.save(user);
+
+    console.log(`🔓 Account manually unlocked for ${user.email}`);
+  }
+
+  /**
+   * Get account status
+   */
+  async getAccountStatus(userId: string, tenantId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+      select: [
+        "id",
+        "email",
+        "failedLoginAttempts",
+        "lockedUntil",
+        "lastFailedLogin",
+      ],
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const isLocked = user.lockedUntil && user.lockedUntil > new Date();
+    const minutesUntilUnlock = isLocked
+      ? Math.ceil((user.lockedUntil!.getTime() - Date.now()) / 60000)
+      : 0;
+
+    return {
+      isLocked,
+      failedAttempts: user.failedLoginAttempts || 0,
+      maxAttempts: this.MAX_ATTEMPTS,
+      attemptsRemaining: Math.max(
+        0,
+        this.MAX_ATTEMPTS - (user.failedLoginAttempts || 0),
+      ),
+      lockedUntil: user.lockedUntil,
+      minutesUntilUnlock,
+      lastFailedLogin: user.lastFailedLogin,
+    };
+  }
+
+  /**
+   * Helper: Sleep for specified milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -11059,6 +12059,752 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
   imports: [UserModule, AuthModule, TenantModule, OAuthModule, RbacModule],
 })
 export class CombinedModules {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/mfa/dto/mfa.dto.ts
+SIZE: 2.88 KB | LINES: 105
+================================================================================
+
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsString, IsNotEmpty, Length, Matches } from "class-validator";
+
+// ============================================================
+// SETUP DTOs
+// ============================================================
+
+export class SetupTotpResponseDto {
+  @ApiProperty({ description: "TOTP secret (base32 encoded)" })
+  secret!: string;
+
+  @ApiProperty({ description: "QR code as data URL" })
+  qrCode!: string;
+
+  @ApiProperty({ description: "Backup codes (save these!)", type: [String] })
+  backupCodes!: string[];
+}
+
+// ============================================================
+// VERIFICATION DTOs
+// ============================================================
+
+export class VerifyTotpDto {
+  @ApiProperty({ example: "123456", description: "6-digit TOTP code" })
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/, { message: "Token must be 6 digits" })
+  token!: string;
+}
+
+export class VerifyBackupCodeDto {
+  @ApiProperty({ example: "ABCD-1234", description: "Backup code" })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/, {
+    message: "Invalid backup code format",
+  })
+  code!: string;
+}
+
+// ============================================================
+// MFA AUTH DTOs (for login flow)
+// ============================================================
+
+export class MfaVerifyDto {
+  @ApiProperty({ description: "Temporary token from login" })
+  @IsString()
+  @IsNotEmpty()
+  tempToken!: string;
+
+  @ApiProperty({ example: "123456", description: "6-digit TOTP code" })
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/, { message: "Token must be 6 digits" })
+  code!: string;
+}
+
+export class MfaVerifyBackupDto {
+  @ApiProperty({ description: "Temporary token from login" })
+  @IsString()
+  @IsNotEmpty()
+  tempToken!: string;
+
+  @ApiProperty({ example: "ABCD-1234", description: "Backup code" })
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+}
+
+// ============================================================
+// RESPONSE DTOs
+// ============================================================
+
+export class MfaStatusDto {
+  @ApiProperty({ description: "Whether MFA is enabled" })
+  enabled!: boolean;
+
+  @ApiProperty({ description: "Enabled MFA methods", type: [String] })
+  methods!: string[];
+
+  @ApiProperty({ description: "Preferred MFA method" })
+  preferredMethod?: string;
+
+  @ApiProperty({ description: "Number of backup codes remaining" })
+  backupCodesRemaining!: number;
+}
+
+export class MfaEnabledResponseDto {
+  @ApiProperty({ description: "Success message" })
+  message!: string;
+
+  @ApiProperty({ description: "Backup codes (save these!)", type: [String] })
+  backupCodes!: string[];
+}
+
+export class BackupCodesResponseDto {
+  @ApiProperty({ description: "New backup codes", type: [String] })
+  backupCodes!: string[];
+
+  @ApiProperty({ description: "Number of codes generated" })
+  count!: number;
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/mfa/mfa.controller.ts
+SIZE: 5.49 KB | LINES: 230
+================================================================================
+
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Request,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
+import { MfaService } from "./mfa.service";
+import {
+  VerifyTotpDto,
+  VerifyBackupCodeDto,
+  SetupTotpResponseDto,
+  MfaStatusDto,
+  MfaEnabledResponseDto,
+  BackupCodesResponseDto,
+} from "./dto/mfa.dto";
+import { JwtAuthGuard } from "@/common/guards";
+
+@ApiTags("MFA")
+@Controller("mfa")
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class MfaController {
+  constructor(private readonly mfaService: MfaService) {}
+
+  // ============================================================
+  // TOTP SETUP & MANAGEMENT
+  // ============================================================
+
+  /**
+   * Setup TOTP (Step 1: Generate QR code)
+   */
+  @Post("setup/totp")
+  @ApiOperation({
+    summary: "Setup TOTP MFA",
+    description: "Generate QR code and backup codes for TOTP setup",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "TOTP setup data",
+    type: SetupTotpResponseDto,
+  })
+  async setupTotp(@Request() req: any): Promise<SetupTotpResponseDto> {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    return this.mfaService.setupTotp(userId, tenantId);
+  }
+
+  /**
+   * Verify and enable TOTP (Step 2: Verify code from authenticator app)
+   */
+  @Post("verify/totp")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify and enable TOTP MFA",
+    description: "Verify TOTP code and enable MFA",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "TOTP enabled successfully",
+    type: MfaEnabledResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: "TOTP not setup or already enabled",
+  })
+  @ApiResponse({ status: 401, description: "Invalid TOTP code" })
+  async verifyAndEnableTotp(
+    @Request() req: any,
+    @Body() dto: VerifyTotpDto,
+  ): Promise<MfaEnabledResponseDto> {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const { backupCodes } = await this.mfaService.verifyAndEnableTotp(
+      userId,
+      tenantId,
+      dto.token,
+    );
+
+    return {
+      message: "TOTP MFA enabled successfully",
+      backupCodes,
+    };
+  }
+
+  /**
+   * Disable TOTP MFA
+   */
+  @Delete("totp")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Disable TOTP MFA",
+    description: "Turn off TOTP-based MFA",
+  })
+  @ApiResponse({ status: 200, description: "TOTP disabled" })
+  async disableTotp(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    await this.mfaService.disableTotp(userId, tenantId);
+
+    return { message: "TOTP MFA disabled successfully" };
+  }
+
+  // ============================================================
+  // BACKUP CODES
+  // ============================================================
+
+  /**
+   * Regenerate backup codes
+   */
+  @Post("backup-codes/regenerate")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Regenerate backup codes",
+    description: "Generate new backup codes (invalidates old ones)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "New backup codes generated",
+    type: BackupCodesResponseDto,
+  })
+  @ApiResponse({ status: 400, description: "MFA must be enabled first" })
+  async regenerateBackupCodes(
+    @Request() req: any,
+  ): Promise<BackupCodesResponseDto> {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const backupCodes = await this.mfaService.regenerateBackupCodes(
+      userId,
+      tenantId,
+    );
+
+    return {
+      backupCodes,
+      count: backupCodes.length,
+    };
+  }
+
+  /**
+   * Verify backup code (for testing)
+   */
+  @Post("verify/backup-code")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify backup code",
+    description: "Test a backup code (consumes it if valid)",
+  })
+  @ApiResponse({ status: 200, description: "Backup code verified" })
+  @ApiResponse({ status: 401, description: "Invalid backup code" })
+  async verifyBackupCode(
+    @Request() req: any,
+    @Body() dto: VerifyBackupCodeDto,
+  ) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const verified = await this.mfaService.verifyBackupCode(
+      userId,
+      tenantId,
+      dto.code,
+    );
+
+    if (!verified) {
+      return { valid: false, message: "Invalid backup code" };
+    }
+
+    return { valid: true, message: "Backup code verified and consumed" };
+  }
+
+  // ============================================================
+  // MFA STATUS
+  // ============================================================
+
+  /**
+   * Get MFA status
+   */
+  @Get("status")
+  @ApiOperation({
+    summary: "Get MFA status",
+    description: "Check which MFA methods are enabled",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "MFA status",
+    type: MfaStatusDto,
+  })
+  async getMfaStatus(@Request() req: any): Promise<MfaStatusDto> {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    return this.mfaService.getMfaStatus(
+      userId,
+      tenantId,
+    ) as unknown as MfaStatusDto;
+  }
+
+  /**
+   * Disable all MFA methods
+   */
+  @Delete("all")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Disable all MFA",
+    description: "Turn off all MFA methods",
+  })
+  @ApiResponse({ status: 200, description: "All MFA disabled" })
+  async disableAllMfa(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    await this.mfaService.disableAllMfa(userId, tenantId);
+
+    return { message: "All MFA methods disabled successfully" };
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/mfa/mfa.service.ts
+SIZE: 9.59 KB | LINES: 390
+================================================================================
+
+// apps/auth-service/src/modules/mfa/mfa.service.ts
+
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { MfaSettings, User } from "@repo/database";
+import * as speakeasy from "speakeasy";
+import * as QRCode from "qrcode";
+import * as crypto from "crypto";
+
+export interface SetupTotpResponse {
+  secret: string;
+  qrCode: string; // Data URL for QR code
+  backupCodes: string[];
+}
+
+export interface VerifyTotpDto {
+  token: string;
+}
+
+@Injectable()
+export class MfaService {
+  constructor(
+    @InjectRepository(MfaSettings)
+    private mfaRepository: Repository<MfaSettings>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
+
+  // ============================================================
+  // TOTP (Google Authenticator, Authy, etc.)
+  // ============================================================
+
+  /**
+   * Generate TOTP secret and QR code for setup
+   */
+  async setupTotp(
+    userId: string,
+    tenantId: string,
+  ): Promise<SetupTotpResponse> {
+    // Get user for email/name
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    // Generate secret
+    const secret = speakeasy.generateSecret({
+      name: `FortKnox (${user.email})`,
+      issuer: "Fort Knox Auth",
+      length: 32,
+    });
+
+    // Get or create MFA settings
+    let mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      mfaSettings = this.mfaRepository.create({
+        userId,
+        tenantId,
+      });
+    }
+
+    // Store secret (not yet verified)
+    mfaSettings.totpSecret = secret.base32;
+    await this.mfaRepository.save(mfaSettings);
+
+    // Generate QR code
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
+
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes();
+
+    return {
+      secret: secret.base32,
+      qrCode,
+      backupCodes,
+    };
+  }
+
+  /**
+   * Verify TOTP token and enable TOTP MFA
+   */
+  async verifyAndEnableTotp(
+    userId: string,
+    tenantId: string,
+    token: string,
+  ): Promise<{ backupCodes: string[] }> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+      select: ["id", "totpSecret", "totpEnabled"], // Include secret
+    });
+
+    if (!mfaSettings || !mfaSettings.totpSecret) {
+      throw new BadRequestException(
+        "TOTP not set up. Call /mfa/setup/totp first",
+      );
+    }
+
+    if (mfaSettings.totpEnabled) {
+      throw new BadRequestException("TOTP already enabled");
+    }
+
+    // Verify token
+    const verified = speakeasy.totp.verify({
+      secret: mfaSettings.totpSecret,
+      encoding: "base32",
+      token,
+      window: 2, // Allow 2 time steps before/after (60s window)
+    });
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid TOTP token");
+    }
+
+    // Enable TOTP
+    mfaSettings.totpEnabled = true;
+    mfaSettings.totpVerifiedAt = new Date();
+
+    // Generate and store backup codes
+    const backupCodes = this.generateBackupCodes();
+    mfaSettings.backupCodes = await Promise.all(
+      backupCodes.map((code) => this.hashBackupCode(code)),
+    );
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log(`✅ TOTP MFA enabled for user ${userId}`);
+
+    return { backupCodes };
+  }
+
+  /**
+   * Verify TOTP token during login
+   */
+  async verifyTotp(
+    userId: string,
+    tenantId: string,
+    token: string,
+  ): Promise<boolean> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId, totpEnabled: true },
+      select: ["id", "totpSecret"],
+    });
+
+    if (!mfaSettings || !mfaSettings.totpSecret) {
+      throw new BadRequestException("TOTP not enabled for this user");
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: mfaSettings.totpSecret,
+      encoding: "base32",
+      token,
+      window: 2,
+    });
+
+    if (!verified) {
+      console.log(`❌ Invalid TOTP token for user ${userId}`);
+      return false;
+    }
+
+    console.log(`✅ TOTP verified for user ${userId}`);
+    return true;
+  }
+
+  /**
+   * Disable TOTP MFA
+   */
+  async disableTotp(userId: string, tenantId: string): Promise<void> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      throw new NotFoundException("MFA settings not found");
+    }
+
+    mfaSettings.totpEnabled = false;
+    mfaSettings.totpSecret = undefined;
+    mfaSettings.totpVerifiedAt = undefined;
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log(`✅ TOTP MFA disabled for user ${userId}`);
+  }
+
+  // ============================================================
+  // BACKUP CODES
+  // ============================================================
+
+  /**
+   * Generate new backup codes
+   */
+  private generateBackupCodes(count = 10): string[] {
+    const codes: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      // Generate 8-character code (XXXX-XXXX format)
+      const code =
+        this.generateRandomString(4) + "-" + this.generateRandomString(4);
+      codes.push(code);
+    }
+
+    return codes;
+  }
+
+  /**
+   * Hash backup code for storage
+   */
+  private async hashBackupCode(code: string): Promise<string> {
+    return crypto.createHash("sha256").update(code).digest("hex");
+  }
+
+  /**
+   * Verify backup code
+   */
+  async verifyBackupCode(
+    userId: string,
+    tenantId: string,
+    code: string,
+  ): Promise<boolean> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+      select: ["id", "backupCodes"],
+    });
+
+    if (!mfaSettings || !mfaSettings.backupCodes) {
+      throw new BadRequestException("No backup codes available");
+    }
+
+    const codeHash = await this.hashBackupCode(code);
+
+    // Find and remove used code
+    const codeIndex = mfaSettings.backupCodes.indexOf(codeHash);
+
+    if (codeIndex === -1) {
+      console.log(`❌ Invalid backup code for user ${userId}`);
+      return false;
+    }
+
+    // Remove used code
+    mfaSettings.backupCodes.splice(codeIndex, 1);
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log(`✅ Backup code verified for user ${userId}`);
+    return true;
+  }
+
+  /**
+   * Regenerate backup codes
+   */
+  async regenerateBackupCodes(
+    userId: string,
+    tenantId: string,
+  ): Promise<string[]> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      throw new NotFoundException("MFA settings not found");
+    }
+
+    if (!mfaSettings.totpEnabled) {
+      throw new BadRequestException(
+        "MFA must be enabled to generate backup codes",
+      );
+    }
+
+    // Generate new codes
+    const backupCodes = this.generateBackupCodes();
+    mfaSettings.backupCodes = await Promise.all(
+      backupCodes.map((code) => this.hashBackupCode(code)),
+    );
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log(`✅ Backup codes regenerated for user ${userId}`);
+
+    return backupCodes;
+  }
+
+  // ============================================================
+  // MFA STATUS & MANAGEMENT
+  // ============================================================
+
+  /**
+   * Check if user has MFA enabled
+   */
+  async isMfaEnabled(userId: string, tenantId: string): Promise<boolean> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      return false;
+    }
+
+    return (
+      mfaSettings.totpEnabled ||
+      mfaSettings.smsEnabled ||
+      mfaSettings.emailEnabled ||
+      mfaSettings.webauthnEnabled
+    );
+  }
+
+  /**
+   * Get MFA status for user
+   */
+  async getMfaStatus(userId: string, tenantId: string) {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      return {
+        enabled: false,
+        methods: [],
+      };
+    }
+
+    const methods: string[] = [];
+    if (mfaSettings.totpEnabled) methods.push("totp");
+    if (mfaSettings.smsEnabled) methods.push("sms");
+    if (mfaSettings.emailEnabled) methods.push("email");
+    if (mfaSettings.webauthnEnabled) methods.push("webauthn");
+
+    return {
+      enabled: methods.length > 0,
+      methods,
+      preferredMethod: mfaSettings.preferredMethod,
+      backupCodesRemaining: mfaSettings.backupCodes?.length || 0,
+    };
+  }
+
+  /**
+   * Disable all MFA methods
+   */
+  async disableAllMfa(userId: string, tenantId: string): Promise<void> {
+    const mfaSettings = await this.mfaRepository.findOne({
+      where: { userId, tenantId },
+    });
+
+    if (!mfaSettings) {
+      return;
+    }
+
+    // Disable all methods
+    mfaSettings.totpEnabled = false;
+    mfaSettings.totpSecret = undefined;
+    mfaSettings.smsEnabled = false;
+    mfaSettings.emailEnabled = false;
+    mfaSettings.webauthnEnabled = false;
+    mfaSettings.backupCodes = [];
+
+    await this.mfaRepository.save(mfaSettings);
+
+    console.log(`✅ All MFA methods disabled for user ${userId}`);
+  }
+
+  // ============================================================
+  // HELPER METHODS
+  // ============================================================
+
+  /**
+   * Generate random alphanumeric string
+   */
+  private generateRandomString(length: number): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude similar chars
+    let result = "";
+    const bytes = crypto.randomBytes(length);
+
+    for (let i = 0; i < length; i++) {
+      result += chars[(bytes[i] as any) % chars.length];
+    }
+
+    return result;
+  }
+}
 
 
 
@@ -11998,7 +13744,7 @@ export class TokenErrorResponseDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/oauth/oauth.controller.ts
-SIZE: 17.88 KB | LINES: 688
+SIZE: 23.82 KB | LINES: 873
 ================================================================================
 
 import {
@@ -12016,6 +13762,8 @@ import {
   UnauthorizedException,
   BadRequestException,
   Headers,
+  Delete,
+  Put,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -12048,6 +13796,8 @@ import {
 } from "./dto";
 import { ConfigService } from "@nestjs/config";
 import { type Request, type Response } from "express";
+import { PermissionsGuard } from "../rbac/guards/permissions.guard";
+import { RequirePermissions } from "../rbac/decorators/rbac.decorator";
 
 @ApiTags("OAuth2/OIDC")
 @Controller("oauth")
@@ -12617,12 +14367,92 @@ export class OAuthController {
   // ============================================================
   // CLIENT MANAGEMENT (Admin endpoints)
   // ============================================================
+  //
+  // @Post("clients")
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({
+  //   summary: "Create OAuth Client",
+  //   description: "Register a new OAuth2 client application",
+  // })
+  // @ApiBody({ type: CreateOAuthClientDto })
+  // @ApiResponse({
+  //   status: 201,
+  //   description: "Client created",
+  //   type: CreateClientResponseDto,
+  // })
+  // async createClient(
+  //   @Body() dto: CreateOAuthClientDto,
+  //   @Req() req: Request,
+  // ): Promise<CreateClientResponseDto> {
+  //   const tenantId = req.tenantId!;
+  //   const userId = (req.user as any).userId;
+  //
+  //   const { client, clientSecret } = await this.clientService.createClient({
+  //     tenantId,
+  //     ...dto,
+  //     createdBy: userId,
+  //   });
+  //
+  //   return {
+  //     ...client,
+  //     clientSecret,
+  //   } as any;
+  // }
+  //
+  // @Get("clients")
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({
+  //   summary: "List OAuth Clients",
+  //   description: "Get all OAuth2 clients for current tenant",
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: "List of clients",
+  //   type: [OAuthClientResponseDto],
+  // })
+  // async listClients(@Req() req: Request) {
+  //   const tenantId = req.tenantId!;
+  //
+  //   const { clients } = await this.clientService.listClients(tenantId, {
+  //     isActive: true,
+  //   });
+  //
+  //   return clients;
+  // }
+  //
+  // @Get("clients/:clientId")
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({
+  //   summary: "Get OAuth Client",
+  //   description: "Get OAuth2 client details",
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: "Client details",
+  //   type: OAuthClientResponseDto,
+  // })
+  // async getClient(@Param("clientId") clientId: string) {
+  //   return this.clientService.getClient(clientId);
+  // }
 
+  // ============================================================
+  // CLIENT MANAGEMENT (Protected with RBAC)
+  // ============================================================
+
+  /**
+   * Create OAuth Client
+   * Requires: clients:write permission
+   * Only developers and admins can create OAuth clients
+   */
   @Post("clients")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:write")
   @ApiBearerAuth()
   @ApiOperation({
-    summary: "Create OAuth Client",
+    summary: "Create OAuth Client (Requires: clients:write)",
     description: "Register a new OAuth2 client application",
   })
   @ApiBody({ type: CreateOAuthClientDto })
@@ -12631,12 +14461,13 @@ export class OAuthController {
     description: "Client created",
     type: CreateClientResponseDto,
   })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async createClient(
     @Body() dto: CreateOAuthClientDto,
     @Req() req: Request,
   ): Promise<CreateClientResponseDto> {
     const tenantId = req.tenantId!;
-    const userId = (req.user as any).userId;
+    const userId = (req.user as any).sub;
 
     const { client, clientSecret } = await this.clientService.createClient({
       tenantId,
@@ -12646,15 +14477,20 @@ export class OAuthController {
 
     return {
       ...client,
-      clientSecret,
+      clientSecret, // Only shown once!
     } as any;
   }
 
+  /**
+   * List OAuth Clients
+   * Requires: clients:read permission
+   */
   @Get("clients")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:read")
   @ApiBearerAuth()
   @ApiOperation({
-    summary: "List OAuth Clients",
+    summary: "List OAuth Clients (Requires: clients:read)",
     description: "Get all OAuth2 clients for current tenant",
   })
   @ApiResponse({
@@ -12662,6 +14498,7 @@ export class OAuthController {
     description: "List of clients",
     type: [OAuthClientResponseDto],
   })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async listClients(@Req() req: Request) {
     const tenantId = req.tenantId!;
 
@@ -12672,11 +14509,16 @@ export class OAuthController {
     return clients;
   }
 
+  /**
+   * Get OAuth Client
+   * Requires: clients:read permission
+   */
   @Get("clients/:clientId")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:read")
   @ApiBearerAuth()
   @ApiOperation({
-    summary: "Get OAuth Client",
+    summary: "Get OAuth Client (Requires: clients:read)",
     description: "Get OAuth2 client details",
   })
   @ApiResponse({
@@ -12684,16 +14526,105 @@ export class OAuthController {
     description: "Client details",
     type: OAuthClientResponseDto,
   })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async getClient(@Param("clientId") clientId: string) {
     return this.clientService.getClient(clientId);
   }
+
+  /**
+   * Update OAuth Client
+   * Requires: clients:write permission
+   */
+  @Put("clients/:clientId")
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:write")
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Update OAuth Client (Requires: clients:write)",
+    description: "Update OAuth2 client configuration",
+  })
+  @ApiResponse({ status: 200, description: "Client updated" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  @ApiResponse({ status: 404, description: "Client not found" })
+  async updateClient(
+    @Param("clientId") clientId: string,
+    @Body() dto: UpdateOAuthClientDto,
+    @Req() req: Request,
+  ) {
+    const tenantId = req.tenantId!;
+    // TODO: Implement updateClient in service
+    return { message: "Client updated successfully" };
+  }
+
+  /**
+   * Delete OAuth Client
+   * Requires: clients:delete permission
+   */
+  @Delete("clients/:clientId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:delete")
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Delete OAuth Client (Requires: clients:delete)",
+    description: "Delete an OAuth2 client",
+  })
+  @ApiResponse({ status: 204, description: "Client deleted" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  @ApiResponse({ status: 404, description: "Client not found" })
+  async deleteClient(@Param("clientId") clientId: string) {
+    // TODO: Implement deleteClient in service
+    return;
+  }
+
+  /**
+   * Rotate Client Secret
+   * Requires: clients:write permission
+   */
+  @Post("clients/:clientId/rotate-secret")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions("clients:write")
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Rotate Client Secret (Requires: clients:write)",
+    description: "Generate a new client secret",
+  })
+  @ApiResponse({ status: 200, description: "Secret rotated" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async rotateClientSecret(@Param("clientId") clientId: string) {
+    const newSecret = await this.clientService.rotateClientSecret(clientId);
+    return {
+      message: "Client secret rotated successfully",
+      clientSecret: newSecret, // Only shown once!
+    };
+  }
+
+  // ============================================================
+  // NOTES ON PUBLIC ENDPOINTS (No RBAC protection needed)
+  // ============================================================
+
+  /*
+  These endpoints remain public/unprotected:
+
+  - GET /oauth/authorize - OAuth flow start (requires user login redirect)
+  - POST /oauth/token - Token exchange (validated by client credentials)
+  - GET /oauth/userinfo - Protected by Bearer token
+  - POST /oauth/revoke - Token revocation
+  - POST /oauth/introspect - Token introspection
+  - GET /.well-known/openid-configuration - OIDC discovery
+  - GET /oauth/jwks - Public keys
+
+  These are part of the OAuth2/OIDC spec and must remain accessible
+  for OAuth clients to function properly.
+  */
 }
 
 
 
 ================================================================================
 FILE: apps/auth-service/src/modules/oauth/oauth.module.ts
-SIZE: 1.07 KB | LINES: 40
+SIZE: 1.3 KB | LINES: 50
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -12706,12 +14637,17 @@ import {
   OAuthRefreshToken,
   OAuthConsent,
   User,
+  Role,
+  Permission,
+  UserRole,
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { OAuthController } from "./oauth.controller";
 import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { RbacModule } from "@/modules/rbac/rbac.module";
 
 @Module({
   imports: [
@@ -12722,8 +14658,12 @@ import { OAuthConsentService } from "./services/oauth-consent.service";
       OAuthRefreshToken,
       OAuthConsent,
       User,
+      Role,
+      Permission,
+      UserRole,
     ]),
     JwtModule.register({}), // Config provided in service
+    RbacModule,
   ],
   controllers: [OAuthController],
   providers: [
@@ -12731,6 +14671,7 @@ import { OAuthConsentService } from "./services/oauth-consent.service";
     OAuthTokenService,
     OAuthConsentService,
     PasswordService,
+    RbacService,
   ],
   exports: [OAuthClientService, OAuthTokenService, OAuthConsentService],
 })
@@ -16905,23 +18846,26 @@ export class TenantService {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/user/user.controller.ts
-SIZE: 4.97 KB | LINES: 179
+SIZE: 12.5 KB | LINES: 396
 ================================================================================
+
+// apps/auth-service/src/modules/user/user.controller.ts
+// UPDATED WITH RBAC PROTECTION
 
 import {
   Controller,
   Get,
-  Post,
   Put,
+  Post,
   Delete,
   Body,
   Param,
   Query,
-  UseGuards,
   Request,
   HttpCode,
   HttpStatus,
-  Req,
+  UseGuards,
+  Header,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -16929,29 +18873,33 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from "@nestjs/swagger";
+import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { UserService } from "./user.service";
+import {
+  UpdateUserDto,
+  ChangePasswordDto,
+  UserStatsDto,
+  ListUsersQueryDto,
+  BulkUpdateUsersDto,
+  ListUsersResponseDto,
+} from "./user.dto";
 import { JwtAuthGuard } from "@/common/guards";
-import { UpdateUserDto, ChangePasswordDto } from "./user.dto";
+import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 
-/**
- * User Controller
- *
- * Handles user management endpoints:
- * - Get user profile
- * - Update user profile
- * - Change password
- * - Get user sessions
- * - Delete account
- */
 @ApiTags("Users")
 @Controller("users")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard) // All endpoints require authentication
 @ApiBearerAuth()
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  // ============================================================
+  // CURRENT USER ENDPOINTS (Own Profile)
+  // ============================================================
+
   /**
    * Get current user profile
+   * Anyone authenticated can read their own profile
    */
   @Get("me")
   @ApiOperation({ summary: "Get current user profile" })
@@ -16963,6 +18911,7 @@ export class UserController {
 
   /**
    * Update current user profile
+   * Anyone authenticated can update their own profile
    */
   @Put("me")
   @ApiOperation({ summary: "Update current user profile" })
@@ -16978,7 +18927,8 @@ export class UserController {
   }
 
   /**
-   * Change password
+   * Change own password
+   * Anyone authenticated can change their own password
    */
   @Post("me/change-password")
   @HttpCode(HttpStatus.OK)
@@ -17004,6 +18954,7 @@ export class UserController {
 
   /**
    * Get active sessions for current user
+   * Anyone authenticated can view their own sessions
    */
   @Get("me/sessions")
   @ApiOperation({ summary: "Get all active sessions" })
@@ -17015,6 +18966,7 @@ export class UserController {
 
   /**
    * Revoke a specific session
+   * Anyone authenticated can revoke their own sessions
    */
   @Delete("me/sessions/:sessionId")
   @HttpCode(HttpStatus.OK)
@@ -17032,6 +18984,7 @@ export class UserController {
 
   /**
    * Revoke all sessions except current
+   * Anyone authenticated can revoke all their sessions
    */
   @Delete("me/sessions")
   @HttpCode(HttpStatus.OK)
@@ -17045,6 +18998,7 @@ export class UserController {
 
   /**
    * Get security events for current user
+   * Anyone authenticated can view their own security events
    */
   @Get("me/security-events")
   @ApiOperation({ summary: "Get security event history" })
@@ -17062,7 +19016,8 @@ export class UserController {
   }
 
   /**
-   * Delete account (soft delete)
+   * Delete own account (soft delete)
+   * Anyone authenticated can delete their own account
    */
   @Delete("me")
   @HttpCode(HttpStatus.OK)
@@ -17074,16 +19029,219 @@ export class UserController {
     return { message: "Account deleted successfully" };
   }
 
+  // ============================================================
+  // ADMIN ENDPOINTS (Manage Other Users)
+  // ============================================================
+
   /**
-   * Get user by ID (admin endpoint - to be protected with role guard later)
+   * List all users (Admin only)
+   * Requires: users:read permission
+   */
+  @Get()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:read")
+  @ApiOperation({ summary: "List all users (Admin)" })
+  @ApiResponse({ status: 200, description: "Users retrieved" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async listUsers(
+    @Request() req: any,
+    @Query() query: ListUsersQueryDto,
+  ): Promise<ListUsersResponseDto> {
+    const tenantId = req.tenantId!;
+
+    // Convert date strings to Date objects
+    const options: any = { ...query };
+    if (query.createdAfter) {
+      options.createdAfter = new Date(query.createdAfter);
+    }
+    if (query.createdBefore) {
+      options.createdBefore = new Date(query.createdBefore);
+    }
+
+    return this.userService.listUsers(tenantId, options);
+  }
+
+  /**
+   * Get user statistics (Admin)
+   */
+  @Get("stats")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:read")
+  @ApiOperation({
+    summary: "Get user statistics (Admin)",
+    description: "Get aggregate statistics about users",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Statistics retrieved",
+    type: UserStatsDto,
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async getUserStats(@Request() req: any): Promise<UserStatsDto> {
+    const tenantId = req.tenantId!;
+    return this.userService.getUserStats(tenantId);
+  }
+
+  /**
+   * Export users to CSV (Admin)
+   */
+  @Get("export")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:read")
+  @Header("Content-Type", "text/csv")
+  @Header("Content-Disposition", 'attachment; filename="users.csv"')
+  @ApiOperation({
+    summary: "Export users to CSV (Admin)",
+    description: "Download all users as CSV file",
+  })
+  @ApiResponse({ status: 200, description: "CSV file" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async exportUsers(
+    @Request() req: any,
+    @Query() query: ListUsersQueryDto,
+  ): Promise<string> {
+    const tenantId = req.tenantId!;
+
+    const options: any = { ...query };
+    if (query.createdAfter) {
+      options.createdAfter = new Date(query.createdAfter);
+    }
+    if (query.createdBefore) {
+      options.createdBefore = new Date(query.createdBefore);
+    }
+
+    return this.userService.exportUsers(tenantId, options);
+  }
+
+  /**
+   * Bulk update users active status (Admin)
+   */
+  @Post("bulk/update-status")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({
+    summary: "Bulk update user status (Admin)",
+    description: "Activate or deactivate multiple users at once",
+  })
+  @ApiResponse({ status: 200, description: "Users updated" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async bulkUpdateStatus(@Request() req: any, @Body() dto: BulkUpdateUsersDto) {
+    const tenantId = req.tenantId!;
+    const adminUserId = req.user.sub;
+
+    const result = await this.userService.bulkUpdateActiveStatus(
+      tenantId,
+      dto.userIds,
+      dto.isActive,
+      adminUserId,
+    );
+
+    return {
+      message: `Successfully updated ${result.updated} users`,
+      updated: result.updated,
+    };
+  }
+  /**
+   * Get user by ID (Admin only)
+   * Requires: users:read permission
    */
   @Get(":id")
-  @ApiOperation({ summary: "Get user by ID" })
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:read")
+  @ApiOperation({ summary: "Get user by ID (Admin)" })
   @ApiResponse({ status: 200, description: "User retrieved" })
   @ApiResponse({ status: 404, description: "User not found" })
-  async getUserById(@Req() req: any, @Param("id") id: string) {
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async getUserById(@Request() req: any, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     return this.userService.findById(tenantId, id);
+  }
+
+  /**
+   * Update user by ID (Admin only)
+   * Requires: users:write permission
+   */
+  @Put(":id")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Update user by ID (Admin)" })
+  @ApiResponse({ status: 200, description: "User updated successfully" })
+  @ApiResponse({ status: 404, description: "User not found" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async updateUser(
+    @Request() req: any,
+    @Param("id") id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const tenantId = req.tenantId!;
+    await this.userService.update(tenantId, id, updateUserDto);
+    return { message: "User updated successfully" };
+  }
+
+  /**
+   * Delete user by ID (Admin only)
+   * Requires: users:delete permission
+   */
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:delete")
+  @ApiOperation({ summary: "Delete user by ID (Admin)" })
+  @ApiResponse({ status: 204, description: "User deleted successfully" })
+  @ApiResponse({ status: 404, description: "User not found" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async deleteUser(@Request() req: any, @Param("id") id: string) {
+    const tenantId = req.tenantId!;
+    // TODO: Implement admin delete in UserService (different from self-delete)
+    await this.userService.deleteAccount(tenantId, id, ""); // Requires service update
+  }
+
+  /**
+   * Force password reset for user (Admin only)
+   * Requires: users:write permission
+   */
+  @Post(":id/force-password-reset")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Force user to reset password (Admin)" })
+  @ApiResponse({ status: 200, description: "Password reset forced" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async forcePasswordReset(@Request() req: any, @Param("id") id: string) {
+    const tenantId = req.tenantId!;
+    // TODO: Implement in UserService
+    return { message: "User will be required to reset password on next login" };
+  }
+
+  /**
+   * Lock/Unlock user account (Admin only)
+   * Requires: users:write permission
+   */
+  @Post(":id/lock")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Lock user account (Admin)" })
+  @ApiResponse({ status: 200, description: "User account locked" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async lockUser(@Request() req: any, @Param("id") id: string) {
+    const tenantId = req.tenantId!;
+    // TODO: Implement in UserService
+    return { message: "User account locked" };
+  }
+
+  @Post(":id/unlock")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Unlock user account (Admin)" })
+  @ApiResponse({ status: 200, description: "User account unlocked" })
+  @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
+  async unlockUser(@Request() req: any, @Param("id") id: string) {
+    const tenantId = req.tenantId!;
+    // TODO: Implement in UserService
+    return { message: "User account unlocked" };
   }
 }
 
@@ -17091,7 +19249,7 @@ export class UserController {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/user/user.dto.ts
-SIZE: 1.42 KB | LINES: 68
+SIZE: 5.74 KB | LINES: 295
 ================================================================================
 
 import {
@@ -17100,8 +19258,15 @@ import {
   MinLength,
   MaxLength,
   Matches,
+  IsInt,
+  Min,
+  Max,
+  IsEnum,
+  IsBoolean,
+  IsDateString,
 } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 
 /**
  * Update User DTO
@@ -17162,18 +19327,250 @@ export class ChangePasswordDto {
   newPassword!: string;
 }
 
+// ============================================================
+// NEW DTOs FOR LIST USERS
+// ============================================================
+
+/**
+ * Query parameters for listing users
+ */
+export class ListUsersQueryDto {
+  @ApiPropertyOptional({ example: 1, description: "Page number", minimum: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    example: 20,
+    description: "Number of items per page",
+    minimum: 1,
+    maximum: 100,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit?: number = 20;
+
+  @ApiPropertyOptional({
+    example: "createdAt",
+    description: "Field to sort by",
+    enum: [
+      "createdAt",
+      "updatedAt",
+      "email",
+      "firstName",
+      "lastName",
+      "lastLoginAt",
+    ],
+  })
+  @IsString()
+  @IsOptional()
+  sortBy?: string = "createdAt";
+
+  @ApiPropertyOptional({
+    example: "DESC",
+    description: "Sort order",
+    enum: ["ASC", "DESC"],
+  })
+  @IsEnum(["ASC", "DESC"])
+  @IsOptional()
+  sortOrder?: "ASC" | "DESC" = "DESC";
+
+  @ApiPropertyOptional({
+    example: "john",
+    description:
+      "Search term (searches email, first name, last name, display name)",
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: "Filter by active status",
+  })
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: "Filter by email verification status",
+  })
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  emailVerified?: boolean;
+
+  @ApiPropertyOptional({
+    example: "admin",
+    description: "Filter by role name",
+  })
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @ApiPropertyOptional({
+    example: "2024-01-01T00:00:00Z",
+    description: "Filter users created after this date",
+  })
+  @IsDateString()
+  @IsOptional()
+  createdAfter?: string;
+
+  @ApiPropertyOptional({
+    example: "2024-12-31T23:59:59Z",
+    description: "Filter users created before this date",
+  })
+  @IsDateString()
+  @IsOptional()
+  createdBefore?: string;
+}
+
+/**
+ * Response DTO for user list item
+ */
+export class UserListItemDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  email!: string;
+
+  @ApiPropertyOptional()
+  firstName?: string;
+
+  @ApiPropertyOptional()
+  lastName?: string;
+
+  @ApiPropertyOptional()
+  displayName?: string;
+
+  @ApiProperty()
+  emailVerified!: boolean;
+
+  @ApiProperty()
+  isActive!: boolean;
+
+  @ApiPropertyOptional()
+  lastLoginAt?: Date;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty()
+  updatedAt!: Date;
+
+  @ApiPropertyOptional()
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+/**
+ * Pagination metadata
+ */
+export class PaginationDto {
+  @ApiProperty({ example: 1 })
+  page!: number;
+
+  @ApiProperty({ example: 20 })
+  limit!: number;
+
+  @ApiProperty({ example: 150 })
+  total!: number;
+
+  @ApiProperty({ example: 8 })
+  totalPages!: number;
+
+  @ApiProperty({ example: true })
+  hasNextPage!: boolean;
+
+  @ApiProperty({ example: false })
+  hasPreviousPage!: boolean;
+}
+
+/**
+ * Response DTO for paginated users list
+ */
+export class ListUsersResponseDto {
+  @ApiProperty({ type: [UserListItemDto] })
+  users!: UserListItemDto[];
+
+  @ApiProperty({ type: PaginationDto })
+  pagination!: PaginationDto;
+}
+
+/**
+ * User statistics DTO
+ */
+export class UserStatsDto {
+  @ApiProperty({ example: 150, description: "Total users" })
+  total!: number;
+
+  @ApiProperty({ example: 145, description: "Active users" })
+  active!: number;
+
+  @ApiProperty({ example: 5, description: "Inactive users" })
+  inactive!: number;
+
+  @ApiProperty({ example: 140, description: "Email verified users" })
+  verified!: number;
+
+  @ApiProperty({ example: 10, description: "Email unverified users" })
+  unverified!: number;
+
+  @ApiProperty({ example: 45, description: "Users logged in last 7 days" })
+  recentLogins!: number;
+}
+
+/**
+ * Bulk update users DTO
+ */
+export class BulkUpdateUsersDto {
+  @ApiProperty({
+    example: ["user-id-1", "user-id-2"],
+    description: "User IDs to update",
+  })
+  @IsString({ each: true })
+  userIds!: string[];
+
+  @ApiProperty({ example: true, description: "Set active status" })
+  @IsBoolean()
+  isActive!: boolean;
+}
+
 
 
 ================================================================================
 FILE: apps/auth-service/src/modules/user/user.module.ts
-SIZE: 644 B | LINES: 24
+SIZE: 1.11 KB | LINES: 47
 ================================================================================
 
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { User, Session, SecurityEvent } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEvent,
+  UserRole,
+  Role,
+  RolePermission,
+  Permission,
+} from "@repo/database";
 import { UserController } from "./user.controller";
 import { UserService } from "./user.service";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { RbacModule } from "@/modules/rbac/rbac.module";
+import { RoleService } from "@/modules/rbac/services/role.service";
+import { PermissionService } from "@/modules/rbac/services/permission.service";
 
 /**
  * User Module
@@ -17186,9 +19583,20 @@ import { UserService } from "./user.service";
  * - Account deletion
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Session, SecurityEvent])],
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      Session,
+      SecurityEvent,
+      UserRole,
+      Role,
+      RolePermission,
+      UserRole,
+      Permission,
+    ]),
+  ],
   controllers: [UserController],
-  providers: [UserService],
+  providers: [UserService, RbacService, RoleService, PermissionService],
   exports: [UserService],
 })
 export class UserModule {}
@@ -17197,7 +19605,7 @@ export class UserModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/user/user.service.ts
-SIZE: 10.58 KB | LINES: 437
+SIZE: 18.97 KB | LINES: 790
 ================================================================================
 
 import {
@@ -17207,7 +19615,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull } from "typeorm";
+import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { User, Session, SecurityEvent } from "@repo/database";
 import { PasswordService } from "@repo/security";
 
@@ -17613,6 +20021,312 @@ export class UserService {
     });
   }
 
+  // ============================================================
+  // ADD THIS METHOD TO UserService CLASS
+  // ============================================================
+
+  /**
+   * List users with pagination, filtering, and search
+   *
+   * @param tenantId - Tenant ID to filter users
+   * @param options - Pagination and filtering options
+   * @returns Paginated list of users
+   *
+   * @example
+   * // Simple pagination
+   * const result = await userService.listUsers(tenantId, { page: 1, limit: 20 });
+   *
+   * @example
+   * // With search
+   * const result = await userService.listUsers(tenantId, {
+   *   page: 1,
+   *   limit: 20,
+   *   search: 'john',
+   * });
+   *
+   * @example
+   * // With filters
+   * const result = await userService.listUsers(tenantId, {
+   *   page: 1,
+   *   limit: 20,
+   *   emailVerified: true,
+   *   isActive: true,
+   *   sortBy: 'createdAt',
+   *   sortOrder: 'DESC',
+   * });
+   */
+  async listUsers(
+    tenantId: string,
+    options: ListUsersOptions = {},
+  ): Promise<PaginatedUsersResponse> {
+    // Default values
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20)); // Max 100 per page
+    const sortBy = options.sortBy || "createdAt";
+    const sortOrder = options.sortOrder || "DESC";
+    const skip = (page - 1) * limit;
+
+    // Validate sortBy field
+    const allowedSortFields = [
+      "createdAt",
+      "updatedAt",
+      "email",
+      "firstName",
+      "lastName",
+      "lastLoginAt",
+    ];
+
+    if (!allowedSortFields.includes(sortBy)) {
+      throw new BadRequestException(
+        `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}`,
+      );
+    }
+
+    // Build query
+    const queryBuilder = this.userRepository
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.tenant", "tenant")
+      .where("user.tenantId = :tenantId", { tenantId });
+
+    // Apply search filter
+    if (options.search) {
+      const searchTerm = `%${options.search}%`;
+      queryBuilder.andWhere(
+        "(user.email ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.displayName ILIKE :search)",
+        { search: searchTerm },
+      );
+    }
+
+    // Apply isActive filter
+    if (options.isActive !== undefined) {
+      queryBuilder.andWhere("user.isActive = :isActive", {
+        isActive: options.isActive,
+      });
+    }
+
+    // Apply emailVerified filter
+    if (options.emailVerified !== undefined) {
+      queryBuilder.andWhere("user.emailVerified = :emailVerified", {
+        emailVerified: options.emailVerified,
+      });
+    }
+
+    // Apply date range filters
+    if (options.createdAfter) {
+      queryBuilder.andWhere("user.createdAt >= :createdAfter", {
+        createdAfter: options.createdAfter,
+      });
+    }
+
+    if (options.createdBefore) {
+      queryBuilder.andWhere("user.createdAt <= :createdBefore", {
+        createdBefore: options.createdBefore,
+      });
+    }
+
+    if (options.role) {
+      queryBuilder
+        .leftJoin("user.userRoles", "userRole")
+        .leftJoin("userRole.role", "role")
+        .andWhere("role.name = :role", { role: options.role });
+    }
+
+    // Apply sorting
+    queryBuilder.orderBy(`user.${sortBy}`, sortOrder);
+
+    // Get total count
+    const total = await queryBuilder.getCount();
+
+    // Get paginated results
+    const users = await queryBuilder.skip(skip).take(limit).getMany();
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+
+    // Format response
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenant: user.tenant
+        ? {
+            id: user.tenant.id,
+            name: user.tenant.name,
+            slug: user.tenant.slug,
+          }
+        : undefined,
+    }));
+
+    return {
+      users: formattedUsers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      },
+    };
+  }
+
+  /**
+   * Get user statistics for admin dashboard
+   */
+  async getUserStats(tenantId: string): Promise<{
+    total: number;
+    active: number;
+    inactive: number;
+    verified: number;
+    unverified: number;
+    recentLogins: number; // Last 7 days
+  }> {
+    const total = await this.userRepository.count({
+      where: { tenantId },
+    });
+
+    const active = await this.userRepository.count({
+      where: { tenantId, isActive: true },
+    });
+
+    const verified = await this.userRepository.count({
+      where: { tenantId, emailVerified: true },
+    });
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentLogins = await this.userRepository.count({
+      where: {
+        tenantId,
+        lastLoginAt: MoreThan(sevenDaysAgo),
+      },
+    });
+
+    return {
+      total,
+      active,
+      inactive: total - active,
+      verified,
+      unverified: total - verified,
+      recentLogins,
+    };
+  }
+
+  /**
+   * Bulk activate/deactivate users
+   */
+  async bulkUpdateActiveStatus(
+    tenantId: string,
+    userIds: string[],
+    isActive: boolean,
+    adminUserId: string,
+  ): Promise<{ updated: number }> {
+    if (userIds.length === 0) {
+      return { updated: 0 };
+    }
+
+    // Verify all users belong to tenant
+    const users = await this.userRepository.find({
+      where: {
+        id: In(userIds),
+        tenantId,
+      },
+    });
+
+    if (users.length !== userIds.length) {
+      throw new BadRequestException(
+        "Some users not found or belong to different tenant",
+      );
+    }
+
+    // Update all users
+    const result = await this.userRepository.update(
+      {
+        id: In(userIds),
+        tenantId,
+      },
+      { isActive },
+    );
+
+    // Log security event for each user
+    for (const user of users) {
+      await this.logSecurityEvent({
+        userId: user.id,
+        tenantId,
+        eventType: isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+        severity: "info",
+        ipAddress: "0.0.0.0",
+        userAgent: "system",
+        metadata: { performedBy: adminUserId },
+      });
+    }
+
+    console.log(
+      `✅ Bulk ${isActive ? "activated" : "deactivated"} ${users.length} users`,
+    );
+
+    return { updated: result.affected || 0 };
+  }
+
+  /**
+   * Export users to CSV format
+   */
+  async exportUsers(
+    tenantId: string,
+    options: ListUsersOptions = {},
+  ): Promise<string> {
+    // Get all users (no pagination)
+    const result = await this.listUsers(tenantId, {
+      ...options,
+      limit: 10000, // Max export limit
+    });
+
+    // Generate CSV
+    const headers = [
+      "ID",
+      "Email",
+      "First Name",
+      "Last Name",
+      "Display Name",
+      "Email Verified",
+      "Active",
+      "Last Login",
+      "Created At",
+    ];
+
+    const rows = result.users.map((user) => [
+      user.id,
+      user.email,
+      user.firstName || "",
+      user.lastName || "",
+      user.displayName || "",
+      user.emailVerified ? "Yes" : "No",
+      user.isActive ? "Yes" : "No",
+      user.lastLoginAt ? user.lastLoginAt.toISOString() : "Never",
+      user.createdAt.toISOString(),
+    ]);
+
+    // CSV format
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      ),
+    ].join("\n");
+
+    return csv;
+  }
+
   /**
    * Log security event
    */
@@ -17635,6 +20349,53 @@ export class UserService {
       metadata: data.metadata || {},
     });
   }
+}
+
+/**
+ * Pagination options for listing users
+ */
+export interface ListUsersOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC";
+  search?: string;
+  isActive?: boolean;
+  emailVerified?: boolean;
+  role?: string;
+  createdAfter?: Date;
+  createdBefore?: Date;
+}
+
+/**
+ * Paginated response for listing users
+ */
+export interface PaginatedUsersResponse {
+  users: Array<{
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    emailVerified: boolean;
+    isActive: boolean;
+    lastLoginAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+    tenant?: {
+      id: string;
+      name: string;
+      slug: string;
+    };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
 
 
@@ -19851,7 +22612,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 771 B | LINES: 36
+SIZE: 888 B | LINES: 40
 ================================================================================
 
 {
@@ -19867,6 +22628,8 @@ SIZE: 771 B | LINES: 36
   "devDependencies": {
     "@types/cache-manager": "^5.0.0",
     "@types/ioredis": "^5.0.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/speakeasy": "^2.0.10",
     "prettier": "^3.6.2",
     "turbo": "^2.6.1",
     "typescript": "5.9.2"
@@ -19885,7 +22648,9 @@ SIZE: 771 B | LINES: 36
     "cache-manager": "^7.2.7",
     "ioredis": "^5.8.2",
     "next": "^16.0.1",
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
+    "speakeasy": "^2.0.0",
     "typeorm": "^0.3.28"
   }
 }
@@ -23042,7 +25807,7 @@ export class UserRole extends BaseEntity {
 
 ================================================================================
 FILE: packages/database/src/entities/user.entity.ts
-SIZE: 7.45 KB | LINES: 362
+SIZE: 7.6 KB | LINES: 369
 ================================================================================
 
 import {
@@ -23187,9 +25952,16 @@ export class User extends BaseEntity {
   @Column({
     type: "timestamp with time zone",
     nullable: true,
+    name: "last_failed_login",
+  })
+  lastFailedLogin?: Date | null;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
     name: "locked_until",
   })
-  lockedUntil?: Date;
+  lockedUntil?: Date | null;
 
   @Column({
     type: "timestamp with time zone",
@@ -25381,6 +28153,28 @@ export class Sh1766963531473 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "metadata"`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "email_verification_expires_at"`);
         await queryRunner.query(`ALTER TABLE "users" ADD "email_verification_expires" TIMESTAMP WITH TIME ZONE`);
+    }
+
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1766964901163-sh.ts
+SIZE: 488 B | LINES: 15
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Sh1766964901163 implements MigrationInterface {
+    name = 'Sh1766964901163'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "users" ADD "last_failed_login" TIMESTAMP WITH TIME ZONE`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "last_failed_login"`);
     }
 
 }
@@ -34301,8 +37095,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 247
-Total Lines: 32,565
+Files Processed: 252
+Total Lines: 35,324
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-28T23:19:20.396Z
+Generated: 2025-12-28T23:59:29.706Z

@@ -118,6 +118,8 @@ export class MfaSettings extends BaseEntity {
     publicKey: string;
     counter: number;
     deviceName?: string;
+    transports?: string[];
+    lastUsedAt: Date;
     createdAt: Date;
   }>;
 
