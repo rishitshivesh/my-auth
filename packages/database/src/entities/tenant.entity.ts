@@ -2,6 +2,7 @@
 import { Entity, Column, OneToMany, Index } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
+import { TenantSocialProvider } from "./tenant-social-providers.entity";
 
 @Entity("tenants")
 @Index(["slug"], { unique: true })
@@ -62,4 +63,7 @@ export class Tenant extends BaseEntity {
 
   @OneToMany(() => User, (user) => user.tenant)
   users!: User[];
+
+  @OneToMany(() => TenantSocialProvider, (provider) => provider.tenant)
+  socialProviders!: TenantSocialProvider[];
 }

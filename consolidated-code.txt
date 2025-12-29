@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-29T14:58:33.694Z
+Generated: 2025-12-29T15:13:24.293Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 111.94 KB | LINES: 4632
+SIZE: 114.71 KB | LINES: 4760
 ================================================================================
 
 {
@@ -3854,6 +3854,134 @@ SIZE: 111.94 KB | LINES: 4632
         "summary": "Delete WebAuthn credential",
         "tags": [
           "MFA"
+        ]
+      }
+    },
+    "/sessions/active": {
+      "get": {
+        "description": "List all active sessions/devices for the current user",
+        "operationId": "SessionController_getActiveSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of active sessions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get active sessions",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/analytics": {
+      "get": {
+        "operationId": "SessionController_getSessionAnalytics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get session analytics",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/{sessionId}": {
+      "delete": {
+        "description": "Logout from a specific device/session",
+        "operationId": "SessionController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revoke a session",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all/other": {
+      "delete": {
+        "description": "Revoke all sessions except the current one",
+        "operationId": "SessionController_revokeAllOtherSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all other devices",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all": {
+      "delete": {
+        "description": "Revoke all sessions including the current one",
+        "operationId": "SessionController_revokeAllSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all devices",
+        "tags": [
+          "Sessions"
         ]
       }
     }
@@ -11108,6 +11236,72 @@ bootstrap();
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/admin/admin-cleanup.controller.ts
+SIZE: 1.53 KB | LINES: 59
+================================================================================
+
+import {
+  Controller,
+  Post,
+  Get,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
+import { TokenCleanupService } from "../auth/token-cleanup.service";
+import { Protected } from "@/common/decorators/protected.decorator";
+import { RequireRoles } from "@/common/decorators/permission.decorator";
+
+@ApiTags("Admin - Token Cleanup")
+@Controller("admin/cleanup")
+@Protected()
+@RequireRoles("admin", "superadmin")
+export class AdminCleanupController {
+  constructor(private readonly tokenCleanupService: TokenCleanupService) {}
+
+  /**
+   * Trigger manual token cleanup
+   */
+  @Post("tokens")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Trigger token cleanup",
+    description: "Manually trigger token cleanup job (admin only)",
+  })
+  @ApiQuery({
+    name: "tenantId",
+    required: false,
+    description: "Cleanup tokens for specific tenant (optional)",
+  })
+  async triggerCleanup(@Query("tenantId") tenantId?: string) {
+    const result = await this.tokenCleanupService.manualCleanup(tenantId);
+
+    return {
+      message: "Token cleanup completed",
+      ...result,
+    };
+  }
+
+  /**
+   * Get cleanup statistics
+   */
+  @Get("stats")
+  @ApiOperation({ summary: "Get cleanup statistics" })
+  @ApiQuery({
+    name: "tenantId",
+    required: false,
+    description: "Get stats for specific tenant (optional)",
+  })
+  async getCleanupStats(@Query("tenantId") tenantId?: string) {
+    return this.tokenCleanupService.getCleanupStats(tenantId);
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
 SIZE: 14.95 KB | LINES: 592
 ================================================================================
@@ -11826,7 +12020,7 @@ export class VerifyMfaDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 2.18 KB | LINES: 74
+SIZE: 2.36 KB | LINES: 78
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -11858,6 +12052,8 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { ScheduleModule } from "@nestjs/schedule";
+import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 
 @Module({
   imports: [
@@ -11873,6 +12069,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
     UserModule,
     EmailModule,
     GuardsModule,
+    ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -11898,6 +12095,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
     WebAuthnService,
     RbacService,
     OAuthRefreshTokenService,
+    TokenCleanupService,
   ],
   exports: [AuthService, OAuthRefreshTokenService],
 })
@@ -13186,6 +13384,203 @@ export class BruteForceService {
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/auth/token-cleanup.service.ts
+SIZE: 4.83 KB | LINES: 190
+================================================================================
+
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Tenant } from "@repo/database";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+/**
+ * TokenCleanupService
+ *
+ * Handles scheduled cleanup of expired/used tokens
+ *
+ * Runs:
+ * - Daily at 2 AM: Full cleanup
+ * - Hourly: Quick cleanup of expired tokens
+ */
+@Injectable()
+export class TokenCleanupService {
+  private readonly logger = new Logger(TokenCleanupService.name);
+
+  constructor(
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
+  ) {}
+
+  /**
+   * Daily cleanup (2 AM)
+   *
+   * Comprehensive cleanup:
+   * - Expired tokens
+   * - Used tokens (rotation)
+   * - Old revoked tokens (>30 days)
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
+    name: "token-cleanup-daily",
+    timeZone: "UTC",
+  })
+  async dailyCleanup() {
+    this.logger.log("🧹 Starting daily token cleanup...");
+
+    const startTime = Date.now();
+    let totalDeleted = 0;
+
+    try {
+      // Get all active tenants
+      const tenants = await this.tenantRepository.find({
+        where: { active: true },
+        select: ["id", "name"],
+      });
+
+      this.logger.log(`Processing ${tenants.length} tenants...`);
+
+      // Cleanup tokens for each tenant
+      for (const tenant of tenants) {
+        try {
+          const deleted =
+            await this.oauthRefreshTokenService.cleanupExpiredTokens(tenant.id);
+
+          if (deleted > 0) {
+            this.logger.log(
+              `Cleaned up ${deleted} tokens for tenant ${tenant.name}`,
+            );
+            totalDeleted += deleted;
+          }
+        } catch (error: any) {
+          this.logger.error(
+            `Failed to cleanup tokens for tenant ${tenant.name}`,
+            {
+              error: error.message,
+              tenantId: tenant.id,
+            },
+          );
+        }
+      }
+
+      const duration = Date.now() - startTime;
+
+      this.logger.log("✅ Daily token cleanup completed", {
+        totalDeleted,
+        tenantsProcessed: tenants.length,
+        durationMs: duration,
+      });
+
+      // Store metrics (optional)
+      await this.recordCleanupMetrics({
+        totalDeleted,
+        tenantsProcessed: tenants.length,
+        durationMs: duration,
+        timestamp: new Date(),
+      });
+    } catch (error: any) {
+      this.logger.error("❌ Daily token cleanup failed", {
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+  }
+
+  /**
+   * Hourly quick cleanup
+   *
+   * Only deletes clearly expired tokens
+   * Faster than daily cleanup
+   */
+  @Cron(CronExpression.EVERY_HOUR, {
+    name: "token-cleanup-hourly",
+    timeZone: "UTC",
+  })
+  async hourlyCleanup() {
+    this.logger.debug("🧹 Starting hourly token cleanup...");
+
+    try {
+      // Quick cleanup without tenant iteration
+      const deleted =
+        await this.oauthRefreshTokenService.cleanupExpiredTokens();
+
+      if (deleted > 0) {
+        this.logger.log(`Hourly cleanup: deleted ${deleted} expired tokens`);
+      }
+    } catch (error: any) {
+      this.logger.error("❌ Hourly token cleanup failed", {
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Manual cleanup trigger (admin endpoint)
+   */
+  async manualCleanup(tenantId?: string): Promise<{
+    deleted: number;
+    durationMs: number;
+  }> {
+    this.logger.log("🧹 Starting manual token cleanup...", { tenantId });
+
+    const startTime = Date.now();
+
+    const deleted =
+      await this.oauthRefreshTokenService.cleanupExpiredTokens(tenantId);
+
+    const durationMs = Date.now() - startTime;
+
+    this.logger.log("✅ Manual cleanup completed", {
+      deleted,
+      durationMs,
+      tenantId,
+    });
+
+    return { deleted, durationMs };
+  }
+
+  /**
+   * Get cleanup statistics
+   */
+  async getCleanupStats(tenantId?: string): Promise<{
+    expiredTokens: number;
+    usedTokens: number;
+    revokedTokens: number;
+    totalToCleanup: number;
+  }> {
+    // Implementation depends on your metrics storage
+    // Could query database directly or read from metrics table
+    return {
+      expiredTokens: 0,
+      usedTokens: 0,
+      revokedTokens: 0,
+      totalToCleanup: 0,
+    };
+  }
+
+  /**
+   * Record cleanup metrics for monitoring
+   */
+  private async recordCleanupMetrics(metrics: {
+    totalDeleted: number;
+    tenantsProcessed: number;
+    durationMs: number;
+    timestamp: Date;
+  }): Promise<void> {
+    // Store in metrics table or send to monitoring service
+    // Example: CloudWatch, Datadog, Prometheus, etc.
+
+    this.logger.debug("Cleanup metrics recorded", metrics);
+
+    // TODO: Store in your metrics system
+    // await this.metricsService.record('token.cleanup', metrics);
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/email/email.controller.ts
 SIZE: 2.97 KB | LINES: 112
 ================================================================================
@@ -14080,7 +14475,7 @@ export class SESProvider implements EmailProvider {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/index.ts
-SIZE: 551 B | LINES: 20
+SIZE: 717 B | LINES: 24
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -14090,6 +14485,8 @@ import { TenantModule } from "@/modules/tenant/tenant.module";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
+import { SessionModule } from "@/modules/session/session.module";
+import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
   imports: [
@@ -14099,6 +14496,8 @@ import { MfaModule } from "@/modules/mfa/mfa.module";
     OAuthModule,
     RbacModule,
     MfaModule,
+    SessionModule,
+    ScheduleModule.forRoot(),
   ],
 })
 export class CombinedModules {}
@@ -21853,6 +22252,575 @@ export class RoleService {
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/session/session-management.service.ts
+SIZE: 8.9 KB | LINES: 394
+================================================================================
+
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull } from "typeorm";
+import { Session, OAuthRefreshToken } from "@repo/database";
+import * as geoip from "geoip-lite";
+import { UAParser } from "ua-parser-js";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+export interface ActiveSessionDto {
+  id: string;
+  deviceInfo: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    type?: string; // mobile, tablet, desktop
+  };
+  location?: {
+    city?: string;
+    country?: string;
+    timezone?: string;
+  };
+  ipAddress?: string;
+  lastActivity: Date;
+  createdAt: Date;
+  isCurrent: boolean; // Is this the current session?
+  tokenFamily: {
+    familyId: string;
+    tokensInFamily: number;
+    lastUsed: Date;
+  };
+}
+
+/**
+ * SessionManagementService
+ *
+ * Manages user sessions:
+ * - List active sessions
+ * - Revoke individual sessions
+ * - Logout all devices
+ * - Session analytics
+ */
+@Injectable()
+export class SessionManagementService {
+  private readonly logger = new Logger(SessionManagementService.name);
+
+  constructor(
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(OAuthRefreshToken)
+    private readonly refreshTokenRepository: Repository<OAuthRefreshToken>,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+  ) {}
+
+  /**
+   * Get all active sessions for a user
+   *
+   * Shows:
+   * - Device information (browser, OS)
+   * - Location (from IP)
+   * - Last activity
+   * - Current session indicator
+   */
+  async getActiveSessions(
+    userId: string,
+    tenantId: string,
+    currentSessionId?: string,
+  ): Promise<ActiveSessionDto[]> {
+    // Get all active sessions
+    const sessions = await this.sessionRepository.find({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+      order: {
+        lastActivity: "DESC",
+      },
+    });
+
+    // Get token families for each session
+    const activeSessions: ActiveSessionDto[] = [];
+
+    for (const session of sessions) {
+      // Get refresh tokens for this session
+      const tokens = await this.refreshTokenRepository.find({
+        where: {
+          sessionId: session.id,
+          tenantId,
+          revokedAt: IsNull(),
+        },
+        order: {
+          createdAt: "DESC",
+        },
+      });
+
+      if (tokens.length === 0) {
+        // Session has no active tokens, skip
+        continue;
+      }
+
+      // Get family info
+      const familyId = tokens?.[0]?.familyId!;
+      const lastUsed = tokens?.[0]?.createdAt!;
+
+      // Parse device info
+      const deviceInfo = this.parseUserAgent(session.userAgent);
+
+      // Get location from IP
+      const location = this.getLocationFromIP(session.ipAddress);
+
+      activeSessions.push({
+        id: session.id,
+        deviceInfo,
+        location,
+        ipAddress: session.ipAddress,
+        lastActivity: session.lastActivity,
+        createdAt: session.createdAt,
+        isCurrent: session.id === currentSessionId,
+        tokenFamily: {
+          familyId,
+          tokensInFamily: tokens.length,
+          lastUsed,
+        },
+      });
+    }
+
+    return activeSessions;
+  }
+
+  /**
+   * Get active session count for a user
+   */
+  async getActiveSessionCount(
+    userId: string,
+    tenantId: string,
+  ): Promise<number> {
+    const count = await this.sessionRepository.count({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    return count;
+  }
+
+  /**
+   * Revoke a specific session
+   *
+   * Also revokes all refresh tokens for that session
+   */
+  async revokeSession(
+    sessionId: string,
+    userId: string,
+    tenantId: string,
+    reason: string = "user_revoked",
+  ): Promise<void> {
+    // Verify session belongs to user
+    const session = await this.sessionRepository.findOne({
+      where: {
+        id: sessionId,
+        userId,
+        tenantId,
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException("Session not found");
+    }
+
+    if (session.revokedAt) {
+      // Already revoked
+      return;
+    }
+
+    // Revoke session
+    await this.sessionRepository.update(
+      { id: sessionId },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    // Revoke all refresh tokens for this session
+    await this.oauthRefreshTokenService.revokeSessionTokens(
+      sessionId,
+      tenantId,
+      reason,
+    );
+
+    this.logger.log("Session revoked", {
+      sessionId,
+      userId,
+      tenantId,
+      reason,
+    });
+  }
+
+  /**
+   * Revoke all sessions except current one
+   *
+   * "Logout all other devices"
+   */
+  async revokeAllOtherSessions(
+    userId: string,
+    tenantId: string,
+    currentSessionId: string,
+  ): Promise<number> {
+    // Get all sessions except current
+    const sessions = await this.sessionRepository.find({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    let revokedCount = 0;
+
+    for (const session of sessions) {
+      if (session.id !== currentSessionId) {
+        await this.revokeSession(
+          session.id,
+          userId,
+          tenantId,
+          "user_logout_other_devices",
+        );
+        revokedCount++;
+      }
+    }
+
+    this.logger.log("Revoked all other sessions", {
+      userId,
+      tenantId,
+      revokedCount,
+      keptSession: currentSessionId,
+    });
+
+    return revokedCount;
+  }
+
+  /**
+   * Revoke all sessions for a user
+   *
+   * "Logout all devices"
+   */
+  async revokeAllUserSessions(
+    userId: string,
+    tenantId: string,
+    reason: string = "user_logout_all",
+  ): Promise<number> {
+    // Revoke all sessions
+    const result = await this.sessionRepository.update(
+      {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    // Revoke all refresh tokens
+    await this.oauthRefreshTokenService.revokeAllUserTokens(
+      userId,
+      tenantId,
+      reason,
+    );
+
+    const revokedCount = result.affected || 0;
+
+    this.logger.log("Revoked all user sessions", {
+      userId,
+      tenantId,
+      revokedCount,
+      reason,
+    });
+
+    return revokedCount;
+  }
+
+  /**
+   * Get session analytics for a user
+   */
+  async getSessionAnalytics(
+    userId: string,
+    tenantId: string,
+  ): Promise<{
+    totalSessions: number;
+    activeSessions: number;
+    revokedSessions: number;
+    deviceBreakdown: Record<string, number>;
+    locationBreakdown: Record<string, number>;
+    lastActivity: Date | null;
+  }> {
+    const allSessions = await this.sessionRepository.find({
+      where: { userId, tenantId },
+    });
+
+    const activeSessions = allSessions.filter((s) => !s.revokedAt);
+    const revokedSessions = allSessions.filter((s) => s.revokedAt);
+
+    // Device breakdown
+    const deviceBreakdown: Record<string, number> = {};
+    for (const session of activeSessions) {
+      const device = this.parseUserAgent(session.userAgent);
+      const key = device.os || "Unknown";
+      deviceBreakdown[key] = (deviceBreakdown[key] || 0) + 1;
+    }
+
+    // Location breakdown
+    const locationBreakdown: Record<string, number> = {};
+    for (const session of activeSessions) {
+      const location = this.getLocationFromIP(session.ipAddress);
+      const key = location?.country || "Unknown";
+      locationBreakdown[key] = (locationBreakdown[key] || 0) + 1;
+    }
+
+    // Last activity
+    const lastActivity =
+      activeSessions.length > 0
+        ? activeSessions.reduce((latest, session) => {
+            return session.lastActivity > (latest as any)
+              ? session.lastActivity
+              : latest;
+          }, activeSessions?.[0]?.lastActivity)
+        : null;
+
+    return {
+      totalSessions: allSessions.length,
+      activeSessions: activeSessions.length,
+      revokedSessions: revokedSessions.length,
+      deviceBreakdown,
+      locationBreakdown,
+      lastActivity: lastActivity!,
+    };
+  }
+
+  /**
+   * Parse user agent string
+   */
+  private parseUserAgent(userAgent?: string): {
+    browser?: string;
+    os?: string;
+    device?: string;
+    type?: string;
+  } {
+    if (!userAgent) {
+      return {};
+    }
+
+    const parser = new UAParser(userAgent);
+    const result = parser.getResult();
+
+    return {
+      browser: result.browser.name,
+      os: `${result.os.name} ${result.os.version}`.trim(),
+      device: result.device.model || result.device.type,
+      type: result.device.type || "desktop",
+    };
+  }
+
+  /**
+   * Get location from IP address
+   */
+  private getLocationFromIP(ipAddress?: string):
+    | {
+        city?: string;
+        country?: string;
+        timezone?: string;
+      }
+    | undefined {
+    if (!ipAddress) {
+      return undefined;
+    }
+
+    const geo = geoip.lookup(ipAddress);
+
+    if (!geo) {
+      return undefined;
+    }
+
+    return {
+      city: geo.city,
+      country: geo.country,
+      timezone: geo.timezone,
+    };
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/session/session.controller.ts
+SIZE: 3.25 KB | LINES: 139
+================================================================================
+
+import {
+  Controller,
+  Get,
+  Delete,
+  Param,
+  UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { Protected } from "../../common/decorators/protected.decorator";
+import { SessionManagementService } from "./session-management.service";
+
+@ApiTags("Sessions")
+@Controller("sessions")
+export class SessionController {
+  constructor(
+    private readonly sessionManagementService: SessionManagementService,
+  ) {}
+
+  /**
+   * Get all active sessions for current user
+   */
+  @Get("active")
+  @Protected()
+  @ApiOperation({
+    summary: "Get active sessions",
+    description: "List all active sessions/devices for the current user",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "List of active sessions",
+  })
+  async getActiveSessions(@Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+    const currentSessionId = req.user.sessionId;
+
+    return this.sessionManagementService.getActiveSessions(
+      userId,
+      tenantId,
+      currentSessionId,
+    );
+  }
+
+  /**
+   * Get session analytics
+   */
+  @Get("analytics")
+  @Protected()
+  @ApiOperation({ summary: "Get session analytics" })
+  async getSessionAnalytics(@Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    return this.sessionManagementService.getSessionAnalytics(userId, tenantId);
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  @Delete(":sessionId")
+  @Protected()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Revoke a session",
+    description: "Logout from a specific device/session",
+  })
+  async revokeSession(@Param("sessionId") sessionId: string, @Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    await this.sessionManagementService.revokeSession(
+      sessionId,
+      userId,
+      tenantId,
+      "user_revoked_via_api",
+    );
+
+    return { message: "Session revoked successfully" };
+  }
+
+  /**
+   * Revoke all other sessions (logout all devices except current)
+   */
+  @Delete("all/other")
+  @Protected()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Logout all other devices",
+    description: "Revoke all sessions except the current one",
+  })
+  async revokeAllOtherSessions(@Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+    const currentSessionId = req.user.sessionId;
+
+    const revokedCount =
+      await this.sessionManagementService.revokeAllOtherSessions(
+        userId,
+        tenantId,
+        currentSessionId,
+      );
+
+    return {
+      message: "All other sessions revoked",
+      revokedCount,
+    };
+  }
+
+  /**
+   * Revoke all sessions (logout all devices including current)
+   */
+  @Delete("all")
+  @Protected()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Logout all devices",
+    description: "Revoke all sessions including the current one",
+  })
+  async revokeAllSessions(@Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    const revokedCount =
+      await this.sessionManagementService.revokeAllUserSessions(
+        userId,
+        tenantId,
+        "user_logout_all_via_api",
+      );
+
+    return {
+      message: "All sessions revoked",
+      revokedCount,
+    };
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/session/session.module.ts
+SIZE: 634 B | LINES: 15
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Session, OAuthRefreshToken } from "@repo/database";
+import { SessionController } from "./session.controller";
+import { SessionManagementService } from "./session-management.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Session, OAuthRefreshToken])],
+  controllers: [SessionController],
+  providers: [SessionManagementService, OAuthRefreshTokenService],
+  exports: [SessionManagementService],
+})
+export class SessionModule {}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/tenant/tenant.controller.ts
 SIZE: 1.38 KB | LINES: 67
 ================================================================================
@@ -26268,7 +27236,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 888 B | LINES: 40
+SIZE: 1.04 KB | LINES: 46
 ================================================================================
 
 {
@@ -26283,6 +27251,7 @@ SIZE: 888 B | LINES: 40
   },
   "devDependencies": {
     "@types/cache-manager": "^5.0.0",
+    "@types/cron": "^2.4.3",
     "@types/ioredis": "^5.0.0",
     "@types/qrcode": "^1.5.6",
     "@types/speakeasy": "^2.0.10",
@@ -26300,14 +27269,19 @@ SIZE: 888 B | LINES: 40
   ],
   "dependencies": {
     "@nestjs/cache-manager": "^3.1.0",
+    "@nestjs/schedule": "^6.1.0",
+    "@types/geoip-lite": "^1.4.4",
     "argon2": "^0.44.0",
     "cache-manager": "^7.2.7",
+    "cron": "^4.4.0",
+    "geoip-lite": "^1.4.10",
     "ioredis": "^5.8.2",
     "next": "^16.0.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "speakeasy": "^2.0.0",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "ua-parser-js": "^2.0.7"
   }
 }
 
@@ -40791,8 +41765,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 263
-Total Lines: 38,943
+Files Processed: 268
+Total Lines: 39,882
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-29T14:58:33.694Z
+Generated: 2025-12-29T15:13:24.293Z

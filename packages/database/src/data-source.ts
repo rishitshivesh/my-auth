@@ -17,6 +17,9 @@ import { OAuthRefreshToken } from "./entities/oauth-refresh-token.entity";
 import { OAuthConsent } from "./entities/oauth-consent.entity";
 import { RolePermission } from "./entities/role-permission.entity";
 import { UserRole } from "./entities/user-role.entity";
+import { SocialLinkRequestEntity } from "./entities/social-link-request.entity";
+import { TenantSocialProvider } from "./entities/tenant-social-providers.entity";
+import { UserSocialConnection } from "./entities/user-social-connections.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -52,6 +55,9 @@ export const dataSourceOptions: DataSourceOptions = {
     OAuthConsent,
     RolePermission,
     UserRole,
+    SocialLinkRequestEntity,
+    TenantSocialProvider,
+    UserSocialConnection,
   ],
 
   // Migrations

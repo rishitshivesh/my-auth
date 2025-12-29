@@ -15,6 +15,7 @@ import { MfaSettings } from "./mfa-settings.entity";
 import { Session } from "./session.entity";
 import { Role } from "./role.entity";
 import { UserRole } from "./user-role.entity";
+import { UserSocialConnection } from "./user-social-connections.entity";
 
 @Entity("users")
 @Index(["tenantId", "email"], { unique: true })
@@ -97,8 +98,28 @@ export class User extends BaseEntity {
     length: 255,
     name: "password_hash",
     select: false,
+    nullable: true,
   })
   passwordHash!: string;
+
+  @Column({
+    type: "varchar",
+    length: 50,
+    default: "password",
+    name: "primary_auth_method",
+    comment: "Primary authentication method",
+  })
+  primaryAuthMethod!:
+    | "password"
+    | "google"
+    | "github"
+    | "microsoft"
+    | "apple"
+    | "linkedin"
+    | "facebook";
+
+  @OneToMany(() => UserSocialConnection, (connection) => connection.user)
+  socialConnections!: UserSocialConnection[];
 
   @Column({
     type: "timestamp with time zone",
