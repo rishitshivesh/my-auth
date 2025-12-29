@@ -38,8 +38,8 @@ export class SessionService {
     userId: string;
     tenantId: string;
     email: string;
-    refreshTokenFamilyId: string;
-    refreshTokenHash: string;
+    refreshTokenFamilyId?: string;
+    refreshTokenHash?: string;
     ipAddress?: string;
     userAgent?: string;
     deviceId?: string;

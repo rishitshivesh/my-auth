@@ -8,6 +8,8 @@ import {
   SecurityEvent,
   Tenant,
   MfaSettings,
+  OAuthRefreshToken,
+  UserRole,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -22,6 +24,8 @@ import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { GuardsModule } from "@/common/guards/guards.module";
+import { RbacService } from "@/modules/rbac/services/rbac.service";
 
 @Module({
   imports: [
@@ -31,9 +35,12 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
       SecurityEvent,
       Tenant,
       MfaSettings,
+      OAuthRefreshToken,
+      UserRole,
     ]),
     UserModule,
     EmailModule,
+    GuardsModule,
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -57,6 +64,7 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
     BruteForceService,
     MfaService,
     WebAuthnService,
+    RbacService,
   ],
   exports: [AuthService],
 })

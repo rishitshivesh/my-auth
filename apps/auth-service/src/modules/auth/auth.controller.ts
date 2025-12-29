@@ -28,6 +28,7 @@ import {
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
+import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
 
 /**
  * Authentication Controller
@@ -208,17 +209,136 @@ export class AuthController {
   }
 
   /**
-   * Get current user info (for testing JWT)
+   * Get current authenticated user context
+   *
+   * This endpoint is critical for:
+   * 1. Testing auth boundary works correctly
+   * 2. Debugging token/session issues
+   * 3. Frontend to get current user info
+   *
+   * Returns complete auth context:
+   * - User info from JWT
+   * - Tenant info
+   * - Session info
+   * - Permissions/roles (if loaded)
    */
   @Get("me")
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get current authenticated user" })
-  @ApiResponse({ status: 200, description: "User info retrieved" })
-  async getMe(@Req() req: Request) {
-    const tenantId = req.tenantId!;
-    console.log(req.user);
-    return this.authService.getCurrentUser(tenantId, req.user.sub);
+  @UseGuards(FortKnoxProtectedGuard)
+  @ApiOperation({
+    summary: "Get current authenticated user",
+    description:
+      "Returns complete authentication context for debugging and user info display",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Current user context",
+    schema: {
+      type: "object",
+      properties: {
+        user: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            email: { type: "string" },
+            firstName: { type: "string" },
+            lastName: { type: "string" },
+          },
+        },
+        tenant: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            slug: { type: "string" },
+          },
+        },
+        session: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            createdAt: { type: "string" },
+            lastActivity: { type: "string" },
+            expiresAt: { type: "string" },
+            ipAddress: { type: "string" },
+            userAgent: { type: "string" },
+          },
+        },
+        auth: {
+          type: "object",
+          properties: {
+            method: { type: "string" },
+            issuedAt: { type: "string" },
+            expiresAt: { type: "string" },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid token or session",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Forbidden - Tenant mismatch",
+  })
+  async getCurrentUser(@Req() req: Request) {
+    const user = req.user; // From JWT payload
+    const session: any = req.session; // From SessionGuard
+    const tenant = req.tenant; // From TenantResolverMiddleware
+
+    // Fetch full user details
+    const fullUser = await this.authService.getCurrentUser(
+      tenant?.id!,
+      user.sub,
+    );
+
+    if (!fullUser) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    return {
+      user: {
+        id: fullUser.id,
+        email: fullUser.email,
+        firstName: fullUser.firstName,
+        lastName: fullUser.lastName,
+        emailVerified: fullUser.emailVerified,
+        lastLoginAt: fullUser.lastLoginAt,
+        lastLoginIp: fullUser.lastLoginIp,
+      },
+      tenant: {
+        id: tenant?.id,
+        name: tenant?.name,
+        slug: tenant?.slug,
+        customDomain: tenant?.customDomain,
+      },
+      session: {
+        id: session.id,
+        createdAt: session.createdAt,
+        lastActivity: session.lastActivity,
+        expiresAt: session.expiresAt,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        deviceId: session.deviceId,
+      },
+      auth: {
+        method: "jwt",
+        issuedAt: new Date(user.iat * 1000).toISOString(),
+        expiresAt: new Date(user.exp * 1000).toISOString(),
+        tokenTenant: user.tenantId,
+        requestTenant: req.tenantId,
+        tenantMatch: user.tenantId === req.tenantId,
+      },
+      debug: {
+        guards: {
+          jwtAuth: true,
+          tenantBinding: true,
+          session: true,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 
   /**

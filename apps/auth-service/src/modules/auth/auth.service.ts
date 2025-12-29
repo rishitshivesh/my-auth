@@ -9,7 +9,13 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { User, Session, SecurityEvent, Tenant } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEvent,
+  Tenant,
+  OAuthRefreshToken,
+} from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
@@ -40,6 +46,8 @@ export class AuthService {
     private readonly securityEventRepository: Repository<SecurityEvent>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(OAuthRefreshToken)
+    private readonly oauthRefreshTokenRepository: Repository<OAuthRefreshToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -287,6 +295,17 @@ export class AuthService {
 
     // === REFRESH TOKEN ROTATION LOGIC ===
 
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId: data.tenantId,
+      email: user.email,
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      deviceId: data.deviceId,
+    });
+
+    console.log("Session Created: ", session.id);
+
     // 1. Generate new family ID
     const familyId = uuidv4();
 
@@ -299,19 +318,23 @@ export class AuthService {
       .update(refreshToken)
       .digest("hex");
 
-    // 4. Create session with family
-    const session = await this.sessionService.createSession({
+    // Step 4: Store refresh token separately
+    await this.oauthRefreshTokenRepository.save({
+      tenantId: data.tenantId,
       userId: user.id,
-      tenantId,
-      email: user.email,
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
-      ipAddress: data.ip,
-      userAgent: data.userAgent,
-      deviceId: data.deviceId,
+      sessionId: session.id,
+      tokenHash: refreshTokenHash,
+      familyId,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     });
 
-    // 5. Generate access token
+    // Step 5: Update session with family ID
+    await this.sessionRepository.update(session.id, {
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+    });
+
+    // 6. Generate access token
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
@@ -723,6 +746,8 @@ export class AuthService {
       displayName: user.displayName,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
+      lastLoginAt: user.lastLoginAt,
+      lastLoginIp: user.lastLoginIp,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
