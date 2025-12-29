@@ -98,3 +98,13 @@ export class VerifyEmailDto {
   @IsString()
   token!: string;
 }
+
+export class VerifyMfaDto {
+  @ApiProperty({ example: "verification-token-here" })
+  @IsString()
+  tempToken!: string;
+
+  @ApiProperty({ example: "verification-code-here" })
+  @IsString()
+  code!: string;
+}

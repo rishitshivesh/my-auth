@@ -338,7 +338,7 @@ export class MfaService {
     return {
       enabled: methods.length > 0,
       methods,
-      preferredMethod: mfaSettings.preferredMethod,
+      preferredMethod: mfaSettings.preferredMethod || methods[0],
       backupCodesRemaining: mfaSettings.backupCodes?.length || 0,
     };
   }

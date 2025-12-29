@@ -1015,7 +1015,16 @@
     "/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Logout successful"
@@ -1154,6 +1163,276 @@
           }
         ],
         "summary": "Get current authenticated user",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/mfa/verify": {
+      "post": {
+        "description": "After receiving mfaRequired=true from login, use this endpoint to verify the TOTP code",
+        "operationId": "AuthController_verifyMfa",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tempToken": {
+                    "type": "string",
+                    "description": "Temporary token from login response"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "6-digit TOTP code from authenticator app",
+                    "pattern": "^\\d{6}$",
+                    "example": "123456"
+                  }
+                },
+                "required": [
+                  "tempToken",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MFA verified successfully, tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid MFA code or expired token"
+          }
+        },
+        "summary": "Verify MFA code and complete login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/mfa/verify-backup": {
+      "post": {
+        "description": "Use a backup code when authenticator app is unavailable",
+        "operationId": "AuthController_verifyMfaBackup",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tempToken": {
+                    "type": "string",
+                    "description": "Temporary token from login response"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Backup code in format XXXX-XXXX",
+                    "pattern": "^[A-Z0-9]{4}-[A-Z0-9]{4}$",
+                    "example": "ABCD-1234"
+                  }
+                },
+                "required": [
+                  "tempToken",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup code verified, tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "description": "Warning about remaining backup codes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid backup code"
+          }
+        },
+        "summary": "Verify MFA using backup code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/webauthn/login/start": {
+      "post": {
+        "description": "Initiate WebAuthn authentication flow",
+        "operationId": "AuthController_startWebAuthnLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WebAuthn authentication options"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "Start passwordless WebAuthn login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/webauthn/login/finish": {
+      "post": {
+        "description": "Verify WebAuthn response and issue authentication tokens",
+        "operationId": "AuthController_finishWebAuthnLogin",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "response": {
+                    "type": "object",
+                    "description": "WebAuthn authentication response from browser"
+                  }
+                },
+                "required": [
+                  "email",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "emailVerified": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          }
+        },
+        "summary": "Complete WebAuthn login",
         "tags": [
           "Authentication"
         ]
@@ -2496,6 +2775,362 @@
           "RBAC"
         ]
       }
+    },
+    "/mfa/setup/totp": {
+      "post": {
+        "description": "Generate QR code and backup codes for TOTP setup",
+        "operationId": "MfaController_setupTotp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP setup data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupTotpResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Setup TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify/totp": {
+      "post": {
+        "description": "Verify TOTP code and enable MFA",
+        "operationId": "MfaController_verifyAndEnableTotp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyTotpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP enabled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnabledResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "TOTP not setup or already enabled"
+          },
+          "401": {
+            "description": "Invalid TOTP code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify and enable TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/totp": {
+      "delete": {
+        "description": "Turn off TOTP-based MFA",
+        "operationId": "MfaController_disableTotp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "TOTP disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable TOTP MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/backup-codes/regenerate": {
+      "post": {
+        "description": "Generate new backup codes (invalidates old ones)",
+        "operationId": "MfaController_regenerateBackupCodes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "New backup codes generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupCodesResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "MFA must be enabled first"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerate backup codes",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify/backup-code": {
+      "post": {
+        "description": "Test a backup code (consumes it if valid)",
+        "operationId": "MfaController_verifyBackupCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyBackupCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backup code verified"
+          },
+          "401": {
+            "description": "Invalid backup code"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify backup code",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/status": {
+      "get": {
+        "description": "Check which MFA methods are enabled",
+        "operationId": "MfaController_getMfaStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "MFA status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get MFA status",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/all": {
+      "delete": {
+        "description": "Turn off all MFA methods",
+        "operationId": "MfaController_disableAllMfa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All MFA disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Disable all MFA",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/request-email-otp": {
+      "post": {
+        "description": "Send a 6-digit code to user email for MFA",
+        "operationId": "MfaController_requestEmailOtp",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request OTP code via email",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/verify-email-otp": {
+      "post": {
+        "description": "Verify the 6-digit code received via email",
+        "operationId": "MfaController_verifyEmailOtp",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify email OTP code",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/register/start": {
+      "post": {
+        "operationId": "MfaController_startWebAuthnRegistration",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start WebAuthn credential registration",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/register/finish": {
+      "post": {
+        "operationId": "MfaController_finishWebAuthnRegistration",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Finish WebAuthn credential registration",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/credentials": {
+      "get": {
+        "operationId": "MfaController_listWebAuthnCredentials",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List user WebAuthn credentials",
+        "tags": [
+          "MFA"
+        ]
+      }
+    },
+    "/mfa/webauthn/credentials/{credentialId}": {
+      "delete": {
+        "operationId": "MfaController_deleteWebAuthnCredential",
+        "parameters": [
+          {
+            "name": "credentialId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete WebAuthn credential",
+        "tags": [
+          "MFA"
+        ]
+      }
     }
   },
   "info": {
@@ -3712,6 +4347,127 @@
         },
         "required": [
           "role"
+        ]
+      },
+      "SetupTotpResponseDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "TOTP secret (base32 encoded)"
+          },
+          "qrCode": {
+            "type": "string",
+            "description": "QR code as data URL"
+          },
+          "backupCodes": {
+            "description": "Backup codes (save these!)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "secret",
+          "qrCode",
+          "backupCodes"
+        ]
+      },
+      "VerifyTotpDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit TOTP code"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "MfaEnabledResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          },
+          "backupCodes": {
+            "description": "Backup codes (save these!)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "message",
+          "backupCodes"
+        ]
+      },
+      "BackupCodesResponseDto": {
+        "type": "object",
+        "properties": {
+          "backupCodes": {
+            "description": "New backup codes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "number",
+            "description": "Number of codes generated"
+          }
+        },
+        "required": [
+          "backupCodes",
+          "count"
+        ]
+      },
+      "VerifyBackupCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ABCD-1234",
+            "description": "Backup code"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "MfaStatusDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether MFA is enabled"
+          },
+          "methods": {
+            "description": "Enabled MFA methods",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preferredMethod": {
+            "type": "string",
+            "description": "Preferred MFA method"
+          },
+          "backupCodesRemaining": {
+            "type": "number",
+            "description": "Number of backup codes remaining"
+          }
+        },
+        "required": [
+          "enabled",
+          "methods",
+          "preferredMethod",
+          "backupCodesRemaining"
         ]
       }
     }

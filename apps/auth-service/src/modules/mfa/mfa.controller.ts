@@ -8,6 +8,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
+  Param,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -25,13 +27,19 @@ import {
   BackupCodesResponseDto,
 } from "./dto/mfa.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { EmailOtpService } from "@/modules/mfa/email-otp.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 
 @ApiTags("MFA")
 @Controller("mfa")
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class MfaController {
-  constructor(private readonly mfaService: MfaService) {}
+  constructor(
+    private readonly mfaService: MfaService,
+    private readonly emailOtpService: EmailOtpService,
+    private readonly webauthnService: WebAuthnService,
+  ) {}
 
   // ============================================================
   // TOTP SETUP & MANAGEMENT
@@ -226,4 +234,288 @@ export class MfaController {
 
     return { message: "All MFA methods disabled successfully" };
   }
+
+  /**
+   * Request email OTP
+   */
+  @Post("request-email-otp")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Request OTP code via email",
+    description: "Send a 6-digit code to user email for MFA",
+  })
+  async requestEmailOtp(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    // Send OTP
+    await this.emailOtpService.sendOtp(userId, tenantId);
+
+    return {
+      message: "OTP code sent to your email",
+      expiresIn: "10 minutes",
+    };
+  }
+
+  /**
+   * Verify email OTP
+   */
+  @Post("verify-email-otp")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Verify email OTP code",
+    description: "Verify the 6-digit code received via email",
+  })
+  async verifyEmailOtp(@Request() req: any, @Body() dto: { code: string }) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const verified = await this.emailOtpService.verifyOtp(
+      userId,
+      tenantId,
+      dto.code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid or expired OTP code");
+    }
+
+    return { message: "Email OTP verified" };
+  }
+
+  /**
+   * Start WebAuthn registration
+   */
+  @Post("webauthn/register/start")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Start WebAuthn credential registration" })
+  async startWebAuthnRegistration(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const options = await this.webauthnService.startRegistration(
+      userId,
+      tenantId,
+    );
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn registration
+   */
+  @Post("webauthn/register/finish")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Finish WebAuthn credential registration" })
+  async finishWebAuthnRegistration(
+    @Request() req: any,
+    @Body() body: { response: any; deviceName?: string },
+  ) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const result = await this.webauthnService.finishRegistration(
+      userId,
+      tenantId,
+      body.response,
+      body.deviceName,
+    );
+
+    return {
+      success: true,
+      credentialId: result.credentialId,
+      message: "Passkey registered successfully",
+    };
+  }
+
+  /**
+   * List WebAuthn credentials
+   */
+  @Get("webauthn/credentials")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "List user WebAuthn credentials" })
+  async listWebAuthnCredentials(@Request() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    const credentials = await this.webauthnService.listCredentials(
+      userId,
+      tenantId,
+    );
+    return { credentials };
+  }
+
+  /**
+   * Delete WebAuthn credential
+   */
+  @Delete("webauthn/credentials/:credentialId")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Delete WebAuthn credential" })
+  async deleteWebAuthnCredential(
+    @Request() req: any,
+    @Param("credentialId") credentialId: string,
+  ) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId!;
+
+    await this.webauthnService.deleteCredential(userId, tenantId, credentialId);
+
+    return {
+      success: true,
+      message: "Passkey deleted successfully",
+    };
+  }
+  //
+  // /**
+  //  * Unified MFA verification endpoint
+  //  * Supports: TOTP, Email OTP, SMS OTP, Backup Codes
+  //  */
+  // @Post('mfa/verify')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOperation({
+  //   summary: 'Verify MFA using any enabled method',
+  //   description: 'Universal MFA verification endpoint'
+  // })
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       tempToken: { type: 'string', description: 'Temporary token from login' },
+  //       method: {
+  //         type: 'string',
+  //         enum: ['totp', 'email', 'sms', 'backup_code'],
+  //         description: 'MFA method to use'
+  //       },
+  //       code: {
+  //         type: 'string',
+  //         description: '6-digit code or backup code',
+  //         example: '123456'
+  //       },
+  //     },
+  //     required: ['tempToken', 'method', 'code'],
+  //   },
+  // })
+  // async verifyMfaUnified(
+  //   @Req() req: Request,
+  //   @Body() dto: {
+  //     tempToken: string;
+  //     method: 'totp' | 'email' | 'sms' | 'backup_code';
+  //     code: string;
+  //   },
+  //   @Ip() ip: string,
+  //   @Headers('user-agent') userAgent: string,
+  // ) {
+  //   const tenantId = req.tenantId!;
+  //
+  //   try {
+  //     // Step 1: Verify temporary token
+  //     const payload = this.jwtService.verify(dto.tempToken, {
+  //       secret: this.configService.get('JWT_SECRET'),
+  //     });
+  //
+  //     if (payload.type !== 'mfa_pending') {
+  //       throw new UnauthorizedException('Invalid token type');
+  //     }
+  //
+  //     console.log(`🔐 Verifying MFA using method: ${dto.method}`);
+  //
+  //     // Step 2: Verify based on method
+  //     let verified = false;
+  //
+  //     switch (dto.method) {
+  //       case 'totp':
+  //         verified = await this.mfaService.verifyTotp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'email':
+  //         verified = await this.emailOtpService.verifyOtp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'sms':
+  //         // TODO: Implement SMS OTP verification
+  //         verified = await this.smsOtpService.verifyOtp(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       case 'backup_code':
+  //         verified = await this.mfaService.verifyBackupCode(
+  //           payload.sub,
+  //           tenantId,
+  //           dto.code,
+  //         );
+  //         break;
+  //
+  //       default:
+  //         throw new BadRequestException('Invalid MFA method');
+  //     }
+  //
+  //     if (!verified) {
+  //       throw new UnauthorizedException(`Invalid ${dto.method} code`);
+  //     }
+  //
+  //     // Step 3: Generate real session and tokens
+  //     const familyId = uuidv4();
+  //     const refreshToken = crypto.randomBytes(32).toString('hex');
+  //     const refreshTokenHash = crypto
+  //       .createHash('sha256')
+  //       .update(refreshToken)
+  //       .digest('hex');
+  //
+  //     const session = await this.sessionService.createSession({
+  //       userId: payload.sub,
+  //       tenantId,
+  //       email: payload.email,
+  //       refreshTokenFamilyId: familyId,
+  //       refreshTokenHash,
+  //       ipAddress: ip,
+  //       userAgent: userAgent || 'unknown',
+  //     });
+  //
+  //     const accessToken = this.jwtService.sign(
+  //       {
+  //         sub: payload.sub,
+  //         email: payload.email,
+  //         tenantId,
+  //         sessionId: session.id,
+  //       },
+  //       {
+  //         secret: this.configService.get('JWT_SECRET'),
+  //         expiresIn: '15m',
+  //       },
+  //     );
+  //
+  //     console.log(`✅ MFA verified via ${dto.method} for ${payload.email}`);
+  //
+  //     return {
+  //       accessToken,
+  //       refreshToken,
+  //       message: 'MFA verified successfully',
+  //       method: dto.method,
+  //     };
+  //   } catch (error) {
+  //     console.error('❌ MFA verification failed:', error.message);
+  //
+  //     if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+  //       throw error;
+  //     }
+  //
+  //     throw new UnauthorizedException('Invalid or expired token');
+  //   }
+  // }
 }

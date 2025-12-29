@@ -9,12 +9,14 @@ import {
   Get,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
 } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import {
@@ -22,6 +24,7 @@ import {
   LoginDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  VerifyMfaDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
@@ -101,11 +104,15 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
-  async logout(@Req() req: any, @Ip() ip: string) {
+  async logout(
+    @Req() req: any,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
     const sessionId = req.user.sessionId;
-    await this.authService.logout(tenantId, userId, sessionId, ip);
+    await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
     return { message: "Logged out successfully" };
   }
 
@@ -212,5 +219,251 @@ export class AuthController {
     const tenantId = req.tenantId!;
     console.log(req.user);
     return this.authService.getCurrentUser(tenantId, req.user.sub);
+  }
+
+  /**
+   * Verify MFA code and complete login
+   */
+  @Post("mfa/verify")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify MFA code and complete login",
+    description:
+      "After receiving mfaRequired=true from login, use this endpoint to verify the TOTP code",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        tempToken: {
+          type: "string",
+          description: "Temporary token from login response",
+        },
+        code: {
+          type: "string",
+          description: "6-digit TOTP code from authenticator app",
+          pattern: "^\\d{6}$",
+          example: "123456",
+        },
+      },
+      required: ["tempToken", "code"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "MFA verified successfully, tokens issued",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        message: { type: "string" },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid MFA code or expired token",
+  })
+  async verifyMfa(
+    @Req() req: Request,
+    @Body() dto: VerifyMfaDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    try {
+      return await this.authService.verifyMfa(
+        tenantId,
+        dto.tempToken,
+        dto.code,
+        ip,
+        userAgent,
+      );
+    } catch (error: any) {
+      console.error("❌ MFA verification failed:", error.message);
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException("Invalid or expired token");
+    }
+  }
+
+  /**
+   * Verify MFA using backup code
+   */
+  @Post("mfa/verify-backup")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Verify MFA using backup code",
+    description: "Use a backup code when authenticator app is unavailable",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        tempToken: {
+          type: "string",
+          description: "Temporary token from login response",
+        },
+        code: {
+          type: "string",
+          description: "Backup code in format XXXX-XXXX",
+          pattern: "^[A-Z0-9]{4}-[A-Z0-9]{4}$",
+          example: "ABCD-1234",
+        },
+      },
+      required: ["tempToken", "code"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Backup code verified, tokens issued",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        message: { type: "string" },
+        warning: {
+          type: "string",
+          description: "Warning about remaining backup codes",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid backup code",
+  })
+  async verifyMfaBackup(
+    @Req() req: Request,
+    @Body() dto: VerifyMfaDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    try {
+      return await this.authService.verifyMfaBackup(
+        tenantId,
+        dto.tempToken,
+        dto.code,
+        ip,
+        userAgent,
+      );
+    } catch (error: any) {
+      console.error("❌ Backup code verification failed:", error.message);
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException("Invalid backup code");
+    }
+  }
+
+  // apps/auth-service/src/modules/auth/auth.controller.ts
+  // CLEAN CONTROLLER - ONLY ROUTING
+
+  /**
+   * Start WebAuthn authentication (passwordless login)
+   */
+  @Post("webauthn/login/start")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Start passwordless WebAuthn login",
+    description: "Initiate WebAuthn authentication flow",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        email: { type: "string", format: "email" },
+      },
+      required: ["email"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "WebAuthn authentication options",
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Invalid credentials",
+  })
+  async startWebAuthnLogin(
+    @Req() req: Request,
+    @Body() dto: { email: string },
+  ) {
+    const tenantId = req.tenantId!;
+
+    return this.authService.startWebAuthnLogin(tenantId, dto.email);
+  }
+
+  /**
+   * Finish WebAuthn authentication and get tokens
+   */
+  @Post("webauthn/login/finish")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Complete WebAuthn login",
+    description: "Verify WebAuthn response and issue authentication tokens",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        email: { type: "string", format: "email" },
+        response: {
+          type: "object",
+          description: "WebAuthn authentication response from browser",
+        },
+      },
+      required: ["email", "response"],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Authentication successful",
+    schema: {
+      type: "object",
+      properties: {
+        accessToken: { type: "string" },
+        refreshToken: { type: "string" },
+        user: {
+          type: "object",
+          properties: {
+            email: { type: "string" },
+            firstName: { type: "string" },
+            lastName: { type: "string" },
+            emailVerified: { type: "boolean" },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Authentication failed",
+  })
+  async finishWebAuthnLogin(
+    @Req() req: Request,
+    @Body() dto: { email: string; response: any },
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+
+    return this.authService.finishWebAuthnLogin({
+      tenantId,
+      email: dto.email,
+      webauthnResponse: dto.response,
+      ip,
+      userAgent,
+    });
   }
 }

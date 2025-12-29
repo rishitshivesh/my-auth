@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -46,6 +47,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
     private readonly bruteForceService: BruteForceService,
     private readonly mfaService: MfaService,
+    private readonly webauthnService: WebAuthnService,
   ) {}
 
   /**
@@ -159,7 +161,13 @@ export class AuthService {
     deviceId?: string;
   }): Promise<
     | { accessToken: string; refreshToken: string; user: any }
-    | { mfaRequired: boolean; tempToken: string; message: string }
+    | {
+        mfaRequired: boolean;
+        tempToken: string;
+        message: string;
+        availableMethods: string[];
+        preferredMethod: string;
+      }
   > {
     const { tenantId, email, password, ip, userAgent } = data;
 
@@ -239,9 +247,9 @@ export class AuthService {
       throw new UnauthorizedException("Please verify your email first");
     }
 
-    const mfaEnabled = await this.mfaService.isMfaEnabled(user.id, tenantId);
+    const mfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
 
-    if (mfaEnabled) {
+    if (mfaStatus.enabled) {
       // Generate temporary token for MFA verification
       const tempToken = this.jwtService.sign(
         {
@@ -271,6 +279,8 @@ export class AuthService {
       return {
         mfaRequired: true,
         tempToken,
+        availableMethods: mfaStatus.methods,
+        preferredMethod: mfaStatus.preferredMethod || "totp",
         message: "MFA verification required",
       };
     }
@@ -351,6 +361,7 @@ export class AuthService {
     tenantId: string,
     userId: string,
     sessionId?: string,
+    userAgent?: string,
     ip?: string,
   ): Promise<void> {
     if (sessionId) {
@@ -362,6 +373,7 @@ export class AuthService {
       tenantId,
       userId,
       ip,
+      userAgent,
       eventType: "logout",
       severity: "info",
       metadata: { sessionId },
@@ -794,6 +806,296 @@ export class AuthService {
   }
 
   /**
+   * Verify MFA code and complete login
+   */
+  async verifyMfa(
+    tenantId: string,
+    tempToken: string,
+    code: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    // Step 1: Verify temporary token
+    const payload = this.jwtService.verify(tempToken, {
+      secret: this.configService.get("JWT_SECRET"),
+    });
+
+    if (payload.type !== "mfa_pending") {
+      throw new UnauthorizedException("Invalid token type");
+    }
+
+    console.log(`🔐 Verifying MFA for user ${payload.email}`);
+
+    // Step 2: Verify TOTP code
+    const verified = await this.mfaService.verifyTotp(
+      payload.sub,
+      tenantId,
+      code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid MFA code");
+    }
+
+    // Step 3: Generate real session and tokens
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: payload.sub,
+      tenantId,
+      email: payload.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: payload.sub,
+        email: payload.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    console.log(`✅ MFA verified successfully for ${payload.email}`);
+
+    return {
+      accessToken,
+      refreshToken,
+      message: "MFA verified successfully",
+    };
+  }
+
+  /**
+   * Verify MFA using backup code
+   */
+  async verifyMfaBackup(
+    tenantId: string,
+    tempToken: string,
+    code: string,
+    ip: string,
+    userAgent: string,
+  ) {
+    // Step 1: Verify temporary token
+    const payload = this.jwtService.verify(tempToken, {
+      secret: this.configService.get("JWT_SECRET"),
+    });
+
+    if (payload.type !== "mfa_pending") {
+      throw new UnauthorizedException("Invalid token type");
+    }
+
+    console.log(`🔐 Verifying backup code for user ${payload.email}`);
+
+    // Step 2: Verify backup code
+    const verified = await this.mfaService.verifyBackupCode(
+      payload.sub,
+      tenantId,
+      code,
+    );
+
+    if (!verified) {
+      throw new UnauthorizedException("Invalid backup code");
+    }
+
+    // Step 3: Generate real session and tokens
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: payload.sub,
+      tenantId,
+      email: payload.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: payload.sub,
+        email: payload.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    console.log(`✅ Backup code verified for ${payload.email}`);
+
+    // Check remaining backup codes
+    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub, tenantId);
+    const remaining = mfaStatus.backupCodesRemaining as number;
+
+    return {
+      accessToken,
+      refreshToken,
+      message: "Backup code verified successfully",
+      warning:
+        remaining <= 2
+          ? `⚠️ Only ${remaining} backup codes remaining. Please regenerate new codes.`
+          : undefined,
+    };
+  }
+
+  // apps/auth-service/src/modules/auth/auth.service.ts
+  // ADD THESE METHODS TO AuthService
+
+  /**
+   * Start WebAuthn authentication (passwordless login)
+   */
+  async startWebAuthnLogin(tenantId: string, email: string): Promise<any> {
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    // Generate authentication options via WebAuthnService
+    const options = await this.webauthnService.startAuthentication(
+      user.id,
+      tenantId,
+    );
+
+    console.log(`🔑 WebAuthn login started for ${email}`);
+
+    return options;
+  }
+
+  /**
+   * Finish WebAuthn authentication and create session
+   */
+  async finishWebAuthnLogin(data: {
+    tenantId: string;
+    email: string;
+    webauthnResponse: any;
+    ip: string;
+    userAgent: string;
+    deviceId?: string;
+  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+    const { tenantId, email, webauthnResponse, ip, userAgent, deviceId } = data;
+
+    // Find user
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId },
+      relations: ["tenant"],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    // Verify WebAuthn response
+    const verified = await this.webauthnService.finishAuthentication(
+      user.id,
+      tenantId,
+      webauthnResponse,
+    );
+
+    if (!verified) {
+      await this.logSecurityEvent({
+        tenantId,
+        userId: user.id,
+        eventType: "login_failed",
+        severity: "warning",
+        ipAddress: ip,
+        userAgent,
+        metadata: { email, reason: "webauthn_verification_failed" },
+      });
+
+      throw new UnauthorizedException("WebAuthn verification failed");
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      throw new UnauthorizedException("Account is disabled");
+    }
+
+    // Generate tokens (same as normal login)
+    const familyId = uuidv4();
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId,
+      email: user.email,
+      refreshTokenFamilyId: familyId,
+      refreshTokenHash,
+      ipAddress: ip,
+      userAgent,
+      deviceId,
+    });
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log successful login
+    await this.logSecurityEvent({
+      tenantId,
+      userId: user.id,
+      eventType: "login_success",
+      severity: "info",
+      ipAddress: ip,
+      userAgent,
+      metadata: {
+        sessionId: session.id,
+        familyId,
+        authMethod: "webauthn",
+      },
+    });
+
+    console.log(`✅ WebAuthn login successful for ${user.email}`);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
    * Log security event (TENANT SCOPED) - PRIVATE METHOD
    */
   private async logSecurityEvent(data: {
@@ -802,6 +1104,7 @@ export class AuthService {
     eventType: string;
     severity: "info" | "warning" | "critical";
     ipAddress: string;
+    ip?: string;
     userAgent: string;
     metadata?: Record<string, any>;
   }) {
@@ -810,7 +1113,7 @@ export class AuthService {
       userId: data.userId,
       eventType: data.eventType,
       severity: data.severity,
-      ipAddress: data.ipAddress,
+      ipAddress: data.ipAddress || data.ip,
       userAgent: data.userAgent,
       metadata: data.metadata || {},
     });

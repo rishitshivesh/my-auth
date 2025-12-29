@@ -21,6 +21,7 @@ import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { MfaService } from "@/modules/mfa/mfa.service";
     RedisService,
     BruteForceService,
     MfaService,
+    WebAuthnService,
   ],
   exports: [AuthService],
 })
