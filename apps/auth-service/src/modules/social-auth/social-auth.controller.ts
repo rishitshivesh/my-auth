@@ -139,7 +139,7 @@ export class SocialAuthController {
       if (result.type === "link_required") {
         // Account linking required
         const linkUrl = new URL(
-          `${process.env.AUTH_SERVICE_URL}/link-required`,
+          `${process.env.INTERNAL_AUTH_SERVICE_URL}/link-required`,
         );
         linkUrl.searchParams.set("email", result.email);
         linkUrl.searchParams.set("provider", result.provider);
@@ -171,7 +171,9 @@ export class SocialAuthController {
       const result = await this.socialAuthService.confirmLinking(token);
 
       // Redirect to success page
-      const successUrl = new URL(`${process.env.PORTAL_URL}/link-success`);
+      const successUrl = new URL(
+        `${process.env.INTERNAL_PORTAL_URL}/link-success`,
+      );
       successUrl.searchParams.set("message", result.message);
 
       return res.redirect(successUrl.toString());
