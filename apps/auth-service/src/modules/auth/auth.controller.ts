@@ -282,9 +282,9 @@ export class AuthController {
     status: 403,
     description: "Forbidden - Tenant mismatch",
   })
-  async getCurrentUser(@Req() req: Request) {
+  async getCurrentUser(@Req() req: any) {
     const user = req.user; // From JWT payload
-    const session: any = req.session; // From SessionGuard
+    const session = req.fortknoxSession;
     const tenant = req.tenant; // From TenantResolverMiddleware
 
     // Fetch full user details
@@ -324,8 +324,8 @@ export class AuthController {
       },
       auth: {
         method: "jwt",
-        issuedAt: new Date(user.iat * 1000).toISOString(),
-        expiresAt: new Date(user.exp * 1000).toISOString(),
+        // issuedAt: new Date(user.iat * 1000).toISOString(),
+        // expiresAt: new Date(user.exp * 1000).toISOString(),
         tokenTenant: user.tenantId,
         requestTenant: req.tenantId,
         tenantMatch: user.tenantId === req.tenantId,

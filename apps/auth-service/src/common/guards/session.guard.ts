@@ -1,3 +1,6 @@
+// apps/auth-service/src/common/guards/session.guard.ts
+// FIXED VERSION - No conflict with express-session
+
 import {
   Injectable,
   CanActivate,
@@ -19,18 +22,8 @@ import { Session } from "@repo/database";
  * 4. Is not revoked
  * 5. Is not expired
  *
- * MUST run AFTER:
- * - JwtAuthGuard (validates JWT)
- * - TenantBindingGuard (validates tenant match)
- *
- * This prevents:
- * - Using tokens after logout
- * - Using tokens after session revocation
- * - Using tokens after session expiry
- * - Token replay with old session IDs
- *
- * Usage:
- * @UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard)
+ * IMPORTANT: Attaches to req.fortknoxSession (NOT req.session)
+ * to avoid conflict with express-session middleware
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -70,6 +63,8 @@ export class SessionGuard implements CanActivate {
         ipAddress: true,
         userAgent: true,
         lastActivity: true,
+        deviceId: true,
+        createdAt: true,
       },
     });
 
@@ -126,11 +121,11 @@ export class SessionGuard implements CanActivate {
       );
     }
 
-    // Step 7: Attach session to request for downstream use
-    request.session = session;
+    // Step 7: Attach session to request
+    // IMPORTANT: Use fortknoxSession to avoid conflict with express-session
+    request.fortknoxSession = session;
 
-    // Step 8: Update last activity (optional, can be async)
-    // Don't await to avoid blocking the request
+    // Step 8: Update last activity (optional, non-blocking)
     this.updateLastActivity(sessionId).catch((err) => {
       this.logger.error("Failed to update last activity", {
         sessionId,
