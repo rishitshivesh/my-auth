@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-29T14:42:03.664Z
+Generated: 2025-12-29T14:58:33.694Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -567,7 +567,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 111.75 KB | LINES: 4623
+SIZE: 111.94 KB | LINES: 4632
 ================================================================================
 
 {
@@ -1762,7 +1762,16 @@ SIZE: 111.75 KB | LINES: 4623
     "/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Token refreshed successfully"
@@ -11100,7 +11109,7 @@ bootstrap();
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
-SIZE: 14.87 KB | LINES: 590
+SIZE: 14.95 KB | LINES: 592
 ================================================================================
 
 import {
@@ -11307,10 +11316,12 @@ export class AuthController {
   async refresh(
     @Req() req: Request,
     @Body("refreshToken") refreshToken: string,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
 
-    return this.authService.refreshToken(tenantId, refreshToken);
+    return this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
   }
 
   /**
@@ -11815,7 +11826,7 @@ export class VerifyMfaDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 2.03 KB | LINES: 72
+SIZE: 2.18 KB | LINES: 74
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -11846,6 +11857,7 @@ import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 
 @Module({
   imports: [
@@ -11885,8 +11897,9 @@ import { RbacService } from "@/modules/rbac/services/rbac.service";
     MfaService,
     WebAuthnService,
     RbacService,
+    OAuthRefreshTokenService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, OAuthRefreshTokenService],
 })
 export class AuthModule {}
 
@@ -11894,7 +11907,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 30.19 KB | LINES: 1146
+SIZE: 28.36 KB | LINES: 1079
 ================================================================================
 
 import {
@@ -11923,6 +11936,7 @@ import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -11955,6 +11969,7 @@ export class AuthService {
     private readonly bruteForceService: BruteForceService,
     private readonly mfaService: MfaService,
     private readonly webauthnService: WebAuthnService,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
   ) {}
 
   /**
@@ -12194,6 +12209,7 @@ export class AuthService {
 
     // === REFRESH TOKEN ROTATION LOGIC ===
 
+    // Step 1: Create session
     const session = await this.sessionService.createSession({
       userId: user.id,
       tenantId: data.tenantId,
@@ -12203,41 +12219,29 @@ export class AuthService {
       deviceId: data.deviceId,
     });
 
-    console.log("Session Created: ", session.id);
+    console.log("✅ Session created:", session.id);
 
-    // 1. Generate new family ID
-    const familyId = uuidv4();
+    // Step 2: Create refresh token using OAuthRefreshTokenService
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId: data.tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        clientId: undefined, // No client for password login
+        ipAddress: data.ip,
+        userAgent: data.userAgent,
+        deviceId: data.deviceId,
+        expiresInDays: 30,
+      });
 
-    // 2. Generate refresh token (opaque random string)
-    const refreshToken = crypto.randomBytes(32).toString("hex");
+    console.log("✅ Refresh token created");
 
-    // 3. Hash it before storing
-    const refreshTokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
-    // Step 4: Store refresh token separately
-    // await this.oauthRefreshTokenRepository.save({
-    //   tenantId: data.tenantId,
-    //   userId: user.id,
-    //   sessionId: session.id,
-    //   familyId,
-    //   expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-    // });
-
-    // Step 5: Update session with family ID
-    await this.sessionRepository.update(session.id, {
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
-    });
-
-    // 6. Generate access token
+    // Step 3: Generate access token (NOW we have sessionId!)
     const accessToken = this.jwtService.sign(
       {
         sub: user.id,
         email: user.email,
-        tenantId,
+        tenantId: data.tenantId,
         sessionId: session.id,
       },
       {
@@ -12246,31 +12250,30 @@ export class AuthService {
       },
     );
 
-    // Log successful login
+    console.log("✅ Access token generated");
+
+    // Step 4: Log successful login
     await this.logSecurityEvent({
-      tenantId,
+      tenantId: data.tenantId,
       userId: user.id,
       eventType: "login_success",
       severity: "info",
-      ipAddress: ip,
-      userAgent,
-      metadata: { sessionId: session.id, familyId },
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: {
+        sessionId: session.id,
+        authMethod: "password",
+      },
     });
 
     return {
       accessToken,
-      refreshToken, // ← Return plaintext token to user
+      refreshToken,
       user: {
-        // id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         emailVerified: user.emailVerified,
-        // tenant: {
-        //   id: user.tenant.id,
-        //   name: user.tenant.name,
-        //   slug: user.tenant.slug,
-        // },
       },
     };
   }
@@ -12281,24 +12284,36 @@ export class AuthService {
   async logout(
     tenantId: string,
     userId: string,
-    sessionId?: string,
-    userAgent?: string,
-    ip?: string,
+    sessionId: string,
+    userAgent: string,
+    ip: string,
   ): Promise<void> {
-    if (sessionId) {
-      await this.sessionService.revokeSession(tenantId, sessionId);
-    } else {
-      await this.sessionService.revokeAllUserSessions(tenantId, userId);
-    }
+    // Revoke session
+    await this.sessionRepository.update(
+      { id: sessionId, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: "user_logout",
+      },
+    );
+
+    // Revoke all refresh tokens for this session
+    await this.oauthRefreshTokenService.revokeSessionTokens(
+      sessionId,
+      tenantId,
+      "user_logout",
+    );
+
+    // Log logout
     await this.logSecurityEvent({
       tenantId,
       userId,
-      ip,
       userAgent,
       eventType: "logout",
       severity: "info",
+      ipAddress: ip,
       metadata: { sessionId },
-    } as any);
+    });
   }
 
   /**
@@ -12509,114 +12524,45 @@ export class AuthService {
   async refreshToken(
     tenantId: string,
     refreshToken: string,
+    ip: string,
+    userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    // 1. Hash the incoming token
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
-    // 2. Find session by hash
-    const session = await this.sessionRepository.findOne({
-      where: {
+    // Use OAuthRefreshTokenService for rotation
+    const { accessTokenPayload, newToken } =
+      await this.oauthRefreshTokenService.rotateRefreshToken({
         tenantId,
-        refreshTokenHash: tokenHash,
-        revokedAt: IsNull(),
-      },
-      relations: ["user"],
+        token: refreshToken,
+        ipAddress: ip,
+        userAgent,
+      });
+
+    // Generate new access token
+    const accessToken = this.jwtService.sign(accessTokenPayload, {
+      secret: this.configService.get("JWT_SECRET"),
+      expiresIn: "15m",
     });
-
-    if (!session) {
-      throw new UnauthorizedException("Invalid refresh token");
-    }
-
-    // 3. Check if session expired
-    if (session.expiresAt && session.expiresAt < new Date()) {
-      await this.sessionRepository.update(session.id, {
-        revokedAt: new Date(),
-        revokedReason: "expired",
-      });
-      throw new UnauthorizedException("Session expired");
-    }
-
-    // === REUSE DETECTION ===
-    // 4. Check if this token was already used
-    if (session.lastRefreshAt) {
-      // TOKEN REUSE DETECTED!
-      // This token was already exchanged for a new one
-      // Someone is replaying an old token → security breach
-
-      console.error("🚨 REFRESH TOKEN REUSE DETECTED", {
-        sessionId: session.id,
-        familyId: session.refreshTokenFamilyId,
-        userId: session.userId,
-        tenantId: session.tenantId,
-      });
-
-      // Revoke entire family
-      await this.revokeSessionFamily(session.refreshTokenFamilyId!);
-
-      // Log critical security event
-      await this.logSecurityEvent({
-        tenantId,
-        userId: session.userId,
-        eventType: "refresh_token_reuse_detected",
-        severity: "critical",
-        ipAddress: session.ipAddress,
-        userAgent: session.userAgent,
-        metadata: {
-          sessionId: session.id,
-          familyId: session.refreshTokenFamilyId,
-        },
-      });
-
-      throw new UnauthorizedException(
-        "Token reuse detected - all sessions revoked",
-      );
-    }
-
-    // === ROTATION ===
-    // 5. Generate NEW refresh token
-    const newRefreshToken = crypto.randomBytes(32).toString("hex");
-    const newRefreshTokenHash = crypto
-      .createHash("sha256")
-      .update(newRefreshToken)
-      .digest("hex");
-
-    await this.sessionService.updateRefreshToken(
-      tenantId,
-      session.id,
-      newRefreshTokenHash,
-    );
-
-    // 7. Generate new access token
-    const accessToken = this.jwtService.sign(
-      {
-        sub: session.userId,
-        email: session.user.email,
-        tenantId: session.tenantId,
-        sessionId: session.id,
-      },
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
-    );
 
     // Log token refresh
     await this.logSecurityEvent({
       tenantId,
-      userId: session.userId,
+      userId: accessTokenPayload.sub,
       eventType: "token_refreshed",
       severity: "info",
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-      metadata: { sessionId: session.id },
+      ipAddress: ip,
+      userAgent,
+      metadata: {
+        sessionId: accessTokenPayload.sessionId,
+      },
+    });
+
+    console.log("Token refresh successful", {
+      userId: accessTokenPayload.sub,
+      sessionId: accessTokenPayload.sessionId,
     });
 
     return {
       accessToken,
-      refreshToken: newRefreshToken, // ← Return NEW token
+      refreshToken: newToken, // NEW token to client
     };
   }
 
@@ -18494,6 +18440,347 @@ export class OAuthConsentService {
 
     // Otherwise, consent is required
     return true;
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/oauth/services/oauth-refresh-token.service.ts
+SIZE: 8.73 KB | LINES: 334
+================================================================================
+
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull } from "typeorm";
+import { OAuthRefreshToken } from "@repo/database";
+import * as crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
+
+/**
+ * OAuthRefreshTokenService
+ *
+ * Handles refresh token storage, rotation, and reuse detection
+ *
+ * Security Features:
+ * - Token rotation (new token on each use)
+ * - Reuse detection (if old token used, revoke family)
+ * - Family tracking (all tokens in rotation chain)
+ * - Automatic expiration
+ */
+@Injectable()
+export class OAuthRefreshTokenService {
+  private readonly logger = new Logger(OAuthRefreshTokenService.name);
+
+  constructor(
+    @InjectRepository(OAuthRefreshToken)
+    private readonly refreshTokenRepository: Repository<OAuthRefreshToken>,
+  ) {}
+
+  /**
+   * Create a new refresh token
+   */
+  async createRefreshToken(params: {
+    tenantId: string;
+    userId: string;
+    sessionId: string;
+    clientId?: string;
+    scope?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    deviceId?: string;
+    expiresInDays?: number;
+  }): Promise<{ token: string; entity: OAuthRefreshToken }> {
+    const { expiresInDays = 30, ...rest } = params;
+
+    // Generate random token
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenHash = this.hashToken(token);
+
+    // Generate new family
+    const familyId = uuidv4();
+
+    // Calculate expiry
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+
+    // Store in database
+    const entity = await this.refreshTokenRepository.save({
+      ...rest,
+      tokenHash,
+      familyId,
+      expiresAt,
+    });
+
+    this.logger.log(`Created refresh token for user ${params.userId}`, {
+      tokenId: entity.id,
+      familyId,
+      expiresAt,
+    });
+
+    return { token, entity };
+  }
+
+  /**
+   * Validate and rotate refresh token
+   *
+   * Returns new token and handles reuse detection
+   */
+  async rotateRefreshToken(params: {
+    tenantId: string;
+    token: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<{ accessTokenPayload: any; newToken: string }> {
+    const { tenantId, token, ipAddress, userAgent } = params;
+
+    // Hash incoming token
+    const tokenHash = this.hashToken(token);
+
+    // Find token in database
+    const storedToken = await this.refreshTokenRepository.findOne({
+      where: {
+        tenantId,
+        tokenHash,
+      },
+      relations: ["user", "session"],
+    });
+
+    if (!storedToken) {
+      this.logger.warn("Refresh token not found", { tenantId });
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    // ============================================================
+    // REUSE DETECTION
+    // ============================================================
+    if (storedToken.usedAt) {
+      this.logger.error("🚨 REFRESH TOKEN REUSE DETECTED", {
+        tokenId: storedToken.id,
+        userId: storedToken.userId,
+        familyId: storedToken.familyId,
+        originalUse: storedToken.usedAt,
+        newAttempt: new Date(),
+      });
+
+      // SECURITY: Revoke entire token family
+      await this.revokeTokenFamily(storedToken.familyId, tenantId);
+
+      throw new UnauthorizedException(
+        "Token reuse detected. All sessions in this family have been revoked.",
+      );
+    }
+
+    // ============================================================
+    // VALIDATION
+    // ============================================================
+    if (storedToken.revokedAt) {
+      this.logger.warn("Refresh token revoked", {
+        tokenId: storedToken.id,
+        revokedAt: storedToken.revokedAt,
+        reason: storedToken.revokedReason,
+      });
+      throw new UnauthorizedException("Refresh token has been revoked");
+    }
+
+    if (storedToken.expiresAt < new Date()) {
+      this.logger.warn("Refresh token expired", {
+        tokenId: storedToken.id,
+        expiresAt: storedToken.expiresAt,
+      });
+      throw new UnauthorizedException("Refresh token has expired");
+    }
+
+    // Check session is still valid
+    if (!storedToken.session || storedToken.session.revokedAt) {
+      this.logger.warn("Session revoked or not found", {
+        sessionId: storedToken.sessionId,
+      });
+      throw new UnauthorizedException("Session no longer valid");
+    }
+
+    // ============================================================
+    // ROTATION
+    // ============================================================
+
+    // Mark current token as USED
+    storedToken.usedAt = new Date();
+    await this.refreshTokenRepository.save(storedToken);
+
+    this.logger.debug("Marked refresh token as used", {
+      tokenId: storedToken.id,
+    });
+
+    // Generate NEW refresh token (same family)
+    const newToken = crypto.randomBytes(32).toString("hex");
+    const newTokenHash = this.hashToken(newToken);
+
+    // Store new token
+    const newRefreshToken = await this.refreshTokenRepository.save({
+      tenantId,
+      userId: storedToken.userId,
+      sessionId: storedToken.sessionId,
+      clientId: storedToken.clientId,
+      scope: storedToken.scope,
+      tokenHash: newTokenHash,
+      familyId: storedToken.familyId, // SAME family
+      parentTokenId: storedToken.id, // Link to parent
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      ipAddress,
+      userAgent,
+    });
+
+    this.logger.log("Rotated refresh token", {
+      oldTokenId: storedToken.id,
+      newTokenId: newRefreshToken.id,
+      familyId: storedToken.familyId,
+    });
+
+    // Return payload for new access token
+    const accessTokenPayload = {
+      sub: storedToken.userId,
+      email: storedToken.user.email,
+      tenantId: storedToken.tenantId,
+      sessionId: storedToken.sessionId,
+      scope: storedToken.scope,
+    };
+
+    return {
+      accessTokenPayload,
+      newToken,
+    };
+  }
+
+  /**
+   * Revoke a single refresh token
+   */
+  async revokeToken(
+    tokenHash: string,
+    tenantId: string,
+    reason: string = "manual_revocation",
+  ): Promise<void> {
+    await this.refreshTokenRepository.update(
+      { tokenHash, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    this.logger.log("Revoked refresh token", { tokenHash, reason });
+  }
+
+  /**
+   * Revoke entire token family (for reuse detection)
+   */
+  async revokeTokenFamily(familyId: string, tenantId: string): Promise<void> {
+    const result = await this.refreshTokenRepository.update(
+      { familyId, tenantId },
+      {
+        revokedAt: new Date(),
+        revokedReason: "family_revoked_reuse_detection",
+      },
+    );
+
+    this.logger.warn("🔥 Revoked entire token family", {
+      familyId,
+      tenantId,
+      tokensRevoked: result.affected,
+    });
+  }
+
+  /**
+   * Revoke all tokens for a user
+   */
+  async revokeAllUserTokens(
+    userId: string,
+    tenantId: string,
+    reason: string = "user_logout_all",
+  ): Promise<void> {
+    const result = await this.refreshTokenRepository.update(
+      { userId, tenantId, revokedAt: IsNull() },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    this.logger.log("Revoked all user tokens", {
+      userId,
+      tenantId,
+      tokensRevoked: result.affected,
+    });
+  }
+
+  /**
+   * Revoke all tokens for a session
+   */
+  async revokeSessionTokens(
+    sessionId: string,
+    tenantId: string,
+    reason: string = "session_logout",
+  ): Promise<void> {
+    const result = await this.refreshTokenRepository.update(
+      { sessionId, tenantId, revokedAt: IsNull() },
+      {
+        revokedAt: new Date(),
+        revokedReason: reason,
+      },
+    );
+
+    this.logger.log("Revoked session tokens", {
+      sessionId,
+      tenantId,
+      tokensRevoked: result.affected,
+    });
+  }
+
+  /**
+   * Get all active tokens for a user
+   */
+  async getUserTokens(
+    userId: string,
+    tenantId: string,
+  ): Promise<OAuthRefreshToken[]> {
+    return this.refreshTokenRepository.find({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: IsNull(),
+      },
+      order: {
+        createdAt: "DESC",
+      },
+    });
+  }
+
+  /**
+   * Clean up expired tokens (run as cron job)
+   */
+  async cleanupExpiredTokens(tenantId?: string): Promise<number> {
+    const query = this.refreshTokenRepository.createQueryBuilder("token");
+
+    query.where("token.expiresAt < :now", { now: new Date() });
+
+    if (tenantId) {
+      query.andWhere("token.tenantId = :tenantId", { tenantId });
+    }
+
+    const result = await query.delete().execute();
+
+    this.logger.log("Cleaned up expired tokens", {
+      tenantId,
+      tokensDeleted: result.affected,
+    });
+
+    return result.affected || 0;
+  }
+
+  /**
+   * Hash a token using SHA-256
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash("sha256").update(token).digest("hex");
   }
 }
 
@@ -27924,7 +28211,7 @@ export class OAuthConsent extends BaseEntity {
 
 ================================================================================
 FILE: packages/database/src/entities/oauth-refresh-token.entity.ts
-SIZE: 5.3 KB | LINES: 231
+SIZE: 5.55 KB | LINES: 239
 ================================================================================
 
 import { Entity, Column, ManyToOne, JoinColumn, Index } from "typeorm";
@@ -27933,6 +28220,7 @@ import { Tenant } from "./tenant.entity";
 import { OAuthClient } from "./oauth-client.entity";
 import { User } from "./user.entity";
 import { OAuthAccessToken } from "./oauth-access-token.entity";
+import { Session } from "./session.entity";
 
 /**
  * OAuth2 Refresh Token
@@ -27963,7 +28251,7 @@ export class OAuthRefreshToken extends BaseEntity {
   @JoinColumn({ name: "tenant_id" })
   tenant!: Tenant;
 
-  @Column({ type: "uuid", name: "client_id" })
+  @Column({ type: "uuid", nullable: true, name: "client_id" })
   clientId!: string;
 
   @ManyToOne(() => OAuthClient, (client) => client.refreshTokens, {
@@ -27974,6 +28262,13 @@ export class OAuthRefreshToken extends BaseEntity {
 
   @Column({ type: "uuid", name: "user_id" })
   userId!: string;
+
+  @Column({ type: "uuid", nullable: true, name: "session_id" })
+  sessionId?: string;
+
+  @ManyToOne(() => Session, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "session_id" })
+  session?: Session;
 
   @ManyToOne(() => User, {
     onDelete: "CASCADE",
@@ -31546,6 +31841,36 @@ export class Sh1766964901163 implements MigrationInterface {
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "last_failed_login"`);
+    }
+
+}
+
+
+
+================================================================================
+FILE: packages/database/src/migrations/1767019692496-oauth-refresh-entity-update.ts
+SIZE: 1.67 KB | LINES: 23
+================================================================================
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Sh1767019692496 implements MigrationInterface {
+    name = 'Sh1767019692496'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD "session_id" uuid`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83"`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ALTER COLUMN "client_id" DROP NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83" FOREIGN KEY ("client_id") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD CONSTRAINT "FK_153ccd844f940084b8f51018b1e" FOREIGN KEY ("session_id") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_153ccd844f940084b8f51018b1e"`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83"`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ALTER COLUMN "client_id" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83" FOREIGN KEY ("client_id") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP COLUMN "session_id"`);
     }
 
 }
@@ -40466,8 +40791,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 261
-Total Lines: 38,632
+Files Processed: 263
+Total Lines: 38,943
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-29T14:42:03.664Z
+Generated: 2025-12-29T14:58:33.694Z

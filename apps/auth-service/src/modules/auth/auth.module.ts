@@ -27,6 +27,8 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { ScheduleModule } from "@nestjs/schedule";
+import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
     UserModule,
     EmailModule,
     GuardsModule,
+    ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -67,6 +70,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
     WebAuthnService,
     RbacService,
     OAuthRefreshTokenService,
+    TokenCleanupService,
   ],
   exports: [AuthService, OAuthRefreshTokenService],
 })
