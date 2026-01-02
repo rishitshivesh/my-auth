@@ -16,11 +16,41 @@ export class AppModule {
   static async startApp(): Promise<void> {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
     app.enableCors({
-      origin: ALLOWED_URLS,
-      methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-      optionsSuccessStatus: 200,
+      origin: (origin: any, cb: any) => {
+        // allow non-browser calls (curl/postman/server-to-server)
+        if (!origin) return cb(null, true);
+
+        const allowed = ALLOWED_URLS.includes(origin);
+        return allowed
+          ? cb(null, true)
+          : cb(new Error(`CORS blocked for origin: ${origin}`), false);
+      },
       credentials: true,
+      methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "x-tenant-id",
+        "x-authorization",
+        "x-csrf-token",
+      ],
+      exposedHeaders: ["set-cookie"],
+      optionsSuccessStatus: 204,
     });
+
+    app.use((req: any, _res: any, next: any) => {
+      if (req.method === "OPTIONS") {
+        console.log("Preflight:", {
+          origin: req.headers.origin,
+          acrm: req.headers["access-control-request-method"],
+          acrh: req.headers["access-control-request-headers"],
+          path: req.path,
+        });
+      }
+      next();
+    });
+    
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,

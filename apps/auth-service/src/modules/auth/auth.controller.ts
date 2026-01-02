@@ -25,6 +25,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   VerifyMfaDto,
+  RefreshTokenDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
@@ -201,12 +202,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
   async refresh(
     @Req() req: Request,
-    @Body("refreshToken") refreshToken: string,
+    @Body("refreshToken") body: RefreshTokenDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-
+    const refreshToken = body.refreshToken;
     return this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
   }
 

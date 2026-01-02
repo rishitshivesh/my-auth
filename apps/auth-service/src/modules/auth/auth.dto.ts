@@ -108,3 +108,10 @@ export class VerifyMfaDto {
   @IsString()
   code!: string;
 }
+
+
+export class RefreshTokenDto {
+  @ApiProperty({ example: "refresh-token-here" })
+  @IsString()
+  refreshToken!: string;
+}

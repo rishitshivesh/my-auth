@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2025-12-29T16:10:41.552Z
+Generated: 2026-01-02T18:14:32.697Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -446,6 +446,481 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 
 ================================================================================
+FILE: apps/admin-portal/README.md
+SIZE: 1.38 KB | LINES: 37
+================================================================================
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/globals.css
+SIZE: 32 B | LINES: 2
+================================================================================
+
+@import "@repo/ui/globals.css";
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/layout.tsx
+SIZE: 1.18 KB | LINES: 46
+================================================================================
+
+"use client"
+import "@repo/ui/globals.css";
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import Script from "next/script";
+import { ThemeProvider } from "@repo/ui/components/theme-provider";
+import { AuthProvider } from "@repo/web-sdk/react";
+import { defaultAuthClient } from "@repo/web-sdk";
+
+const geistSans = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-geist-sans",
+});
+const geistMono = localFont({
+  src: "./fonts/GeistMonoVF.woff",
+  variable: "--font-geist-mono",
+});
+
+
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <head>
+        <Script
+          async={true}
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8195619606985915"
+          crossOrigin="anonymous"
+        ></Script>
+        <meta name="google-adsense-account" content="ca-pub-8195619606985915" />
+      </head>
+
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <AuthProvider authClient={defaultAuthClient}>
+
+        <ThemeProvider>{children}</ThemeProvider>
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/page.module.css
+SIZE: 3.38 KB | LINES: 182
+================================================================================
+
+.page {
+    --gray-rgb: 0, 0, 0;
+    --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
+    --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
+
+    --button-primary-hover: #383838;
+    --button-secondary-hover: #f2f2f2;
+
+    display: grid;
+    grid-template-rows: 20px 1fr 20px;
+    align-items: center;
+    justify-items: center;
+    min-height: 100svh;
+    padding: 80px;
+    gap: 64px;
+    font-synthesis: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    .page {
+        --gray-rgb: 255, 255, 255;
+        --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
+        --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
+
+        --button-primary-hover: #ccc;
+        --button-secondary-hover: #1a1a1a;
+    }
+}
+
+.main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    grid-row-start: 2;
+}
+
+.main ol {
+    font-family: var(--font-geist-mono);
+    padding-left: 0;
+    margin: 0;
+    font-size: 14px;
+    line-height: 24px;
+    letter-spacing: -0.01em;
+    list-style-position: inside;
+}
+
+.main li:not(:last-of-type) {
+    margin-bottom: 8px;
+}
+
+.main code {
+    font-family: inherit;
+    background: var(--gray-alpha-100);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.ctas {
+    display: flex;
+    gap: 16px;
+}
+
+.ctas a {
+    appearance: none;
+    border-radius: 128px;
+    height: 48px;
+    padding: 0 20px;
+    font-family: var(--font-geist-sans);
+    border: 1px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+}
+
+a.primary {
+    background: var(--foreground);
+    color: var(--background);
+    gap: 8px;
+}
+
+a.secondary {
+    border-color: var(--gray-alpha-200);
+    min-width: 180px;
+}
+
+button.secondary {
+    appearance: none;
+    border-radius: 128px;
+    height: 48px;
+    padding: 0 20px;
+    font-family: var(--font-geist-sans);
+    border: 1px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    background: transparent;
+    border-color: var(--gray-alpha-200);
+    min-width: 180px;
+}
+
+.footer {
+    font-family: var(--font-geist-sans);
+    grid-row-start: 3;
+    display: flex;
+    gap: 24px;
+}
+
+.footer a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer img {
+    flex-shrink: 0;
+}
+
+/* Enable hover only on non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+    a.primary:hover {
+        background: var(--button-primary-hover);
+        border-color: transparent;
+    }
+
+    a.secondary:hover {
+        background: var(--button-secondary-hover);
+        border-color: transparent;
+    }
+
+    .footer a:hover {
+        text-decoration: underline;
+        text-underline-offset: 4px;
+    }
+}
+
+@media (max-width: 600px) {
+    .page {
+        padding: 32px;
+        padding-bottom: 80px;
+    }
+
+    .main {
+        align-items: center;
+    }
+
+    .main ol {
+        text-align: center;
+    }
+
+    .ctas {
+        flex-direction: column;
+    }
+
+    .ctas a {
+        font-size: 14px;
+        height: 40px;
+        padding: 0 16px;
+    }
+
+    a.secondary {
+        min-width: auto;
+    }
+
+    .footer {
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/page.tsx
+SIZE: 279 B | LINES: 9
+================================================================================
+
+import Image, { type ImageProps } from "next/image";
+import { Alert, AlertDescription, AlertTitle, Button } from "@repo/ui";
+import styles from "./page.module.css";
+import { LoginForm } from "../components/login/page";
+
+export default function Home() {
+  return <LoginForm />;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/portal/login/page.tsx
+SIZE: 120 B | LINES: 6
+================================================================================
+
+import { LoginForm } from "../../../components/login/page";
+
+export default function Home() {
+  return <LoginForm />;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/components/login/page.tsx
+SIZE: 6.5 KB | LINES: 132
+================================================================================
+
+"use client"
+import { cn } from "@repo/ui/lib/utils";
+import { Button } from "@repo/ui";
+import { Card, CardContent } from "@repo/ui";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@repo/ui";
+import { Input } from "@repo/ui";
+import { useAuth } from "@repo/web-sdk/react";
+import { useEffect } from "react";
+import axios from "axios";
+export function LoginForm({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+
+    const { login, user, isAuthenticated } = useAuth();
+
+    useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log("User is authenticated:", user);
+      // You can redirect the user or perform other actions here
+    }
+    else {
+      login({
+        email: "rishitshivesh@gmail.com",
+        password: "Test123!@#"
+      })
+      const res = axios.post('http://localhost:4000/auth/login', {
+        email: "rishitshivesh@gmail.com",
+        password: "Test123!@#"
+      });
+
+      console.log("Login response:", res);
+    }
+    }, [isAuthenticated, user]);
+
+
+  return (
+    <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <Card className="overflow-hidden p-0">
+        <CardContent className="grid p-0 md:grid-cols-2">
+          <form className="p-6 md:p-8">
+            <FieldGroup>
+              <div className="flex flex-col items-center gap-2 text-center">
+                <h1 className="text-2xl font-bold">Welcome back</h1>
+                <p className="text-muted-foreground text-balance">
+                  Login to your Acme Inc account
+                </p>
+              </div>
+              <Field>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  required
+                />
+              </Field>
+              <Field>
+                <div className="flex items-center">
+                  <FieldLabel htmlFor="password">Password</FieldLabel>
+                  <a
+                    href="#"
+                    className="ml-auto text-sm underline-offset-2 hover:underline"
+                  >
+                    Forgot your password?
+                  </a>
+                </div>
+                <Input id="password" type="password" required />
+              </Field>
+              <Field>
+                <Button type="submit">Login</Button>
+              </Field>
+              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+                Or continue with
+              </FieldSeparator>
+              <Field className="grid grid-cols-3 gap-4">
+                <Button variant="outline" type="button">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path
+                      d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <span className="sr-only">Login with Apple</span>
+                </Button>
+                <Button variant="outline" type="button">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path
+                      d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <span className="sr-only">Login with Google</span>
+                </Button>
+                <Button variant="outline" type="button">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path
+                      d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <span className="sr-only">Login with Meta</span>
+                </Button>
+              </Field>
+              <FieldDescription className="text-center">
+                Don&apos;t have an account? <a href="#">Sign up</a>
+              </FieldDescription>
+            </FieldGroup>
+          </form>
+          <div className="bg-muted relative hidden md:block">
+            <img
+              src="/placeholder.svg"
+              alt="Image"
+              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+            />
+          </div>
+        </CardContent>
+      </Card>
+      <FieldDescription className="px-6 text-center">
+        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+        and <a href="#">Privacy Policy</a>.
+      </FieldDescription>
+    </div>
+  );
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/eslint.config.js
+SIZE: 138 B | LINES: 5
+================================================================================
+
+import { nextJsConfig } from "@repo/eslint-config/next-js";
+
+/** @type {import("eslint").Linter.Config[]} */
+export default nextJsConfig;
+
+
+
+================================================================================
 FILE: apps/admin-portal/next-env.d.ts
 SIZE: 251 B | LINES: 7
 ================================================================================
@@ -456,6 +931,100 @@ import "./.next/dev/types/routes.d.ts";
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+
+
+================================================================================
+FILE: apps/admin-portal/next.config.js
+SIZE: 129 B | LINES: 7
+================================================================================
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+    transpilePackages: ["@repo/ui"]
+};
+
+export default nextConfig;
+
+
+
+================================================================================
+FILE: apps/admin-portal/package.json
+SIZE: 660 B | LINES: 29
+================================================================================
+
+{
+  "name": "admin-portal",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint --max-warnings 0",
+    "check-types": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/ui": "workspace:*",
+    "next": "^16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2"
+  }
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/postcss.config.js
+SIZE: 146 B | LINES: 9
+================================================================================
+
+/** @type {import("postcss-load-config").Config} */
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+
+
+
+================================================================================
+FILE: apps/admin-portal/tsconfig.json
+SIZE: 304 B | LINES: 21
+================================================================================
+
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
 
 
 
@@ -7137,12 +7706,12 @@ export const ERROR_CODES = {
 
 ================================================================================
 FILE: apps/auth-service/src/common/constants/index.ts
-SIZE: 1.38 KB | LINES: 51
+SIZE: 1.39 KB | LINES: 51
 ================================================================================
 
 export const AUTHORIZATION_KEY = 'x-authorization';
 
-export const ALLOWED_URLS = ['*'];
+export const ALLOWED_URLS = ['*', 'localhost:3000'];
 
 export const EXPIRES_IN = {
   ONE_MINUTE: 60,
@@ -12020,7 +12589,7 @@ export class VerifyMfaDto {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.module.ts
-SIZE: 2.41 KB | LINES: 80
+SIZE: 2.46 KB | LINES: 82
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -12036,6 +12605,7 @@ import {
   OAuthRefreshToken,
   UserRole,
   UserSocialConnection,
+  TenantSocialProvider,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -12067,6 +12637,7 @@ import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
       OAuthRefreshToken,
       UserRole,
       UserSocialConnection,
+      TenantSocialProvider,
     ]),
     UserModule,
     EmailModule,
@@ -12107,7 +12678,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 28.36 KB | LINES: 1079
+SIZE: 28.58 KB | LINES: 1088
 ================================================================================
 
 import {
@@ -12331,6 +12902,12 @@ export class AuthService {
       user,
       hasPassword: !!user.passwordHash,
     }); // ← ADD
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        "Social Provider was used to login. Please use the same or link to this account.",
+      );
+    }
 
     // Verify password
     const isValid = await PasswordService.verify(user.passwordHash, password);
@@ -12607,7 +13184,10 @@ export class AuthService {
     const newPasswordHash = await PasswordService.hash(newPassword);
 
     // Update password and history
-    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+    const updatedHistory = [
+      ...(user.passwordHash ? [user.passwordHash] : []),
+      ...passwordHistory,
+    ].slice(0, 5);
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
@@ -13380,6 +13960,201 @@ export class BruteForceService {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/auth/oauth-token-encryption.service.ts
+SIZE: 4.84 KB | LINES: 188
+================================================================================
+
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
+
+/**
+ * TokenEncryptionService
+ *
+ * Encrypts/decrypts OAuth tokens before storing in database
+ *
+ * Uses AES-256-GCM for authenticated encryption
+ *
+ * Why encrypt tokens?
+ * - Security: If DB is compromised, tokens can't be used
+ * - Compliance: GDPR, SOC2, ISO 27001 require encryption at rest
+ * - Best practice: Never store sensitive tokens in plaintext
+ */
+@Injectable()
+export class TokenEncryptionService {
+  private readonly logger = new Logger(TokenEncryptionService.name);
+  private readonly algorithm = "aes-256-gcm";
+  private readonly key: Buffer;
+
+  constructor(private configService: ConfigService) {
+    // Get encryption key from environment
+    const keyHex = this.configService.get<string>("TOKEN_ENCRYPTION_KEY");
+
+    if (!keyHex) {
+      throw new Error("TOKEN_ENCRYPTION_KEY not configured");
+    }
+
+    // Convert hex string to buffer (must be 32 bytes for AES-256)
+    this.key = Buffer.from(keyHex, "hex");
+
+    if (this.key.length !== 32) {
+      throw new Error(
+        "TOKEN_ENCRYPTION_KEY must be 32 bytes (64 hex characters)",
+      );
+    }
+
+    this.logger.log("TokenEncryptionService initialized");
+  }
+
+  /**
+   * Encrypt a token
+   *
+   * Format: iv:authTag:encryptedData
+   * All parts are hex-encoded
+   *
+   * @param plaintext Token to encrypt
+   * @returns Encrypted token string
+   */
+  encrypt(plaintext: string): string {
+    if (!plaintext) {
+      throw new Error("Cannot encrypt empty token");
+    }
+
+    try {
+      // Generate random IV (initialization vector)
+      const iv = crypto.randomBytes(16);
+
+      // Create cipher
+      const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
+
+      // Encrypt
+      let encrypted = cipher.update(plaintext, "utf8", "hex");
+      encrypted += cipher.final("hex");
+
+      // Get authentication tag (GCM mode)
+      const authTag = cipher.getAuthTag();
+
+      // Combine: iv:authTag:encrypted
+      const result = `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`;
+
+      this.logger.debug("Token encrypted successfully");
+
+      return result;
+    } catch (error: any) {
+      this.logger.error("Failed to encrypt token", {
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new Error("Token encryption failed");
+    }
+  }
+
+  /**
+   * Decrypt a token
+   *
+   * @param encryptedData Encrypted token string (iv:authTag:encrypted)
+   * @returns Decrypted token
+   */
+  decrypt(encryptedData: string): string {
+    if (!encryptedData) {
+      throw new Error("Cannot decrypt empty data");
+    }
+
+    try {
+      // Split into parts
+      const parts = encryptedData.split(":");
+
+      if (parts.length !== 3) {
+        throw new Error("Invalid encrypted data format");
+      }
+
+      const [ivHex, authTagHex, encrypted] = parts;
+
+      // Convert from hex
+      const iv = Buffer.from(ivHex!, "hex");
+      const authTag = Buffer.from(authTagHex!, "hex");
+
+      // Create decipher
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
+      decipher.setAuthTag(authTag);
+
+      // Decrypt
+      let decrypted = decipher.update(encrypted!, "hex", "utf8");
+      decrypted += decipher.final("utf8");
+
+      this.logger.debug("Token decrypted successfully");
+
+      return decrypted;
+    } catch (error: any) {
+      this.logger.error("Failed to decrypt token", {
+        error: error.message,
+      });
+      throw new Error("Token decryption failed");
+    }
+  }
+
+  /**
+   * Encrypt multiple tokens at once
+   */
+  encryptTokens(tokens: {
+    accessToken?: string;
+    refreshToken?: string;
+    idToken?: string;
+  }): {
+    accessToken?: string;
+    refreshToken?: string;
+    idToken?: string;
+  } {
+    return {
+      accessToken: tokens.accessToken
+        ? this.encrypt(tokens.accessToken)
+        : undefined,
+      refreshToken: tokens.refreshToken
+        ? this.encrypt(tokens.refreshToken)
+        : undefined,
+      idToken: tokens.idToken ? this.encrypt(tokens.idToken) : undefined,
+    };
+  }
+
+  /**
+   * Decrypt multiple tokens at once
+   */
+  decryptTokens(tokens: {
+    accessToken?: string;
+    refreshToken?: string;
+    idToken?: string;
+  }): {
+    accessToken?: string;
+    refreshToken?: string;
+    idToken?: string;
+  } {
+    return {
+      accessToken: tokens.accessToken
+        ? this.decrypt(tokens.accessToken)
+        : undefined,
+      refreshToken: tokens.refreshToken
+        ? this.decrypt(tokens.refreshToken)
+        : undefined,
+      idToken: tokens.idToken ? this.decrypt(tokens.idToken) : undefined,
+    };
+  }
+
+  /**
+   * Generate a secure encryption key
+   *
+   * Run this once to generate key, then store in env
+   *
+   * Usage:
+   * node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   */
+  static generateKey(): string {
+    return crypto.randomBytes(32).toString("hex");
   }
 }
 
@@ -22823,6 +23598,1255 @@ export class SessionModule {}
 
 
 ================================================================================
+FILE: apps/auth-service/src/modules/social-auth/social-auth.controller.ts
+SIZE: 6.51 KB | LINES: 230
+================================================================================
+
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Delete,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
+import { type Request, type Response } from "express";
+import { SocialAuthService, SocialProfile } from "./social-auth.service";
+import { Protected } from "../../common/decorators/protected.decorator";
+
+@ApiTags("Social Authentication")
+@Controller("auth/social")
+export class SocialAuthController {
+  constructor(private readonly socialAuthService: SocialAuthService) {}
+
+  // ============================================================
+  // GOOGLE OAUTH
+  // ============================================================
+
+  /**
+   * Initiate Google OAuth flow
+   *
+   * GET /auth/social/google/login?tenantId=xxx
+   */
+  @Get("google/login")
+  @UseGuards(AuthGuard("google"))
+  @ApiOperation({ summary: "Login with Google" })
+  @ApiQuery({ name: "tenantId", required: true })
+  googleLogin(@Req() req: Request) {
+    // Passport handles redirect
+  }
+
+  /**
+   * Google OAuth callback
+   *
+   * GET /auth/social/google/callback?code=xxx&state=xxx
+   */
+  @Get("google/callback")
+  @UseGuards(AuthGuard("google"))
+  @ApiOperation({ summary: "Google OAuth callback" })
+  async googleCallback(@Req() req: any, @Res() res: Response) {
+    return this.handleSocialCallback(req, res);
+  }
+
+  // ============================================================
+  // GITHUB OAUTH
+  // ============================================================
+
+  /**
+   * Initiate GitHub OAuth flow
+   */
+  @Get("github/login")
+  @UseGuards(AuthGuard("github"))
+  @ApiOperation({ summary: "Login with GitHub" })
+  @ApiQuery({ name: "tenantId", required: true })
+  githubLogin(@Req() req: Request) {
+    // Passport handles redirect
+  }
+
+  /**
+   * GitHub OAuth callback
+   */
+  @Get("github/callback")
+  @UseGuards(AuthGuard("github"))
+  @ApiOperation({ summary: "GitHub OAuth callback" })
+  async githubCallback(@Req() req: any, @Res() res: Response) {
+    return this.handleSocialCallback(req, res);
+  }
+
+  // ============================================================
+  // MICROSOFT OAUTH
+  // ============================================================
+
+  /**
+   * Initiate Microsoft OAuth flow
+   */
+  @Get("microsoft/login")
+  @UseGuards(AuthGuard("microsoft"))
+  @ApiOperation({ summary: "Login with Microsoft" })
+  @ApiQuery({ name: "tenantId", required: true })
+  microsoftLogin(@Req() req: Request) {
+    // Passport handles redirect
+  }
+
+  /**
+   * Microsoft OAuth callback
+   */
+  @Get("microsoft/callback")
+  @UseGuards(AuthGuard("microsoft"))
+  @ApiOperation({ summary: "Microsoft OAuth callback" })
+  async microsoftCallback(@Req() req: any, @Res() res: Response) {
+    return this.handleSocialCallback(req, res);
+  }
+
+  // ============================================================
+  // SHARED CALLBACK HANDLER
+  // ============================================================
+
+  /**
+   * Handle OAuth callback for all providers
+   */
+  private async handleSocialCallback(req: any, res: Response) {
+    const profile: SocialProfile = req.user;
+    const tenantId = req.query.tenantId || req.session?.tenantId;
+
+    if (!tenantId) {
+      return res.redirect(`/error?message=Missing tenant ID`);
+    }
+
+    try {
+      // Handle callback via service
+      const result = await this.socialAuthService.handleCallback({
+        tenantId,
+        profile,
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+      });
+
+      if (result.type === "success") {
+        // Success! Redirect to app with tokens
+        const redirectUrl = new URL(
+          process.env.PORTAL_URL || "http://localhost:3000",
+        );
+        redirectUrl.searchParams.set("access_token", result.accessToken);
+        redirectUrl.searchParams.set("refresh_token", result.refreshToken);
+
+        return res.redirect(redirectUrl.toString());
+      }
+
+      if (result.type === "link_required") {
+        // Account linking required
+        const linkUrl = new URL(
+          `${process.env.INTERNAL_AUTH_SERVICE_URL}/link-required`,
+        );
+        linkUrl.searchParams.set("email", result.email);
+        linkUrl.searchParams.set("provider", result.provider);
+        linkUrl.searchParams.set("message", result.message);
+
+        return res.redirect(linkUrl.toString());
+      }
+    } catch (error: any) {
+      return res.redirect(
+        `/error?message=${encodeURIComponent(error.message)}`,
+      );
+    }
+  }
+
+  // ============================================================
+  // ACCOUNT LINKING
+  // ============================================================
+
+  /**
+   * Confirm account linking
+   *
+   * GET /auth/social/link/confirm?token=xxx
+   */
+  @Get("link/confirm")
+  @ApiOperation({ summary: "Confirm account linking" })
+  @ApiQuery({ name: "token", required: true })
+  async confirmLinking(@Query("token") token: string, @Res() res: Response) {
+    try {
+      const result = await this.socialAuthService.confirmLinking(token);
+
+      // Redirect to success page
+      const successUrl = new URL(
+        `${process.env.INTERNAL_PORTAL_URL}/link-success`,
+      );
+      successUrl.searchParams.set("message", result.message);
+
+      return res.redirect(successUrl.toString());
+    } catch (error: any) {
+      return res.redirect(
+        `/error?message=${encodeURIComponent(error.message)}`,
+      );
+    }
+  }
+
+  // ============================================================
+  // MANAGE CONNECTIONS
+  // ============================================================
+
+  /**
+   * Get user's social connections
+   *
+   * GET /auth/social/connections
+   */
+  @Get("connections")
+  @Protected()
+  @ApiOperation({ summary: "Get connected social accounts" })
+  @ApiResponse({
+    status: 200,
+    description: "List of connected social accounts",
+  })
+  async getConnections(@Req() req: any) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    return this.socialAuthService.getUserConnections(userId, tenantId);
+  }
+
+  /**
+   * Unlink social account
+   *
+   * DELETE /auth/social/connections/:provider
+   */
+  @Delete("connections/:provider")
+  @Protected()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Unlink social account" })
+  @ApiResponse({
+    status: 200,
+    description: "Social account unlinked",
+  })
+  async unlinkAccount(@Req() req: any, @Param("provider") provider: string) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    return this.socialAuthService.unlinkAccount(userId, tenantId, provider);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/social-auth/social-auth.module.ts
+SIZE: 1.67 KB | LINES: 56
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import {
+  User,
+  UserSocialConnection,
+  TenantSocialProvider,
+  SocialLinkRequest,
+  SecurityEvent,
+  Session,
+  OAuthRefreshToken,
+} from "@repo/database";
+import { SocialAuthController } from "./social-auth.controller";
+import { SocialAuthService } from "./social-auth.service";
+import { GoogleStrategy } from "./strategies/google.strategy";
+import { GitHubStrategy } from "./strategies/github.strategy";
+import { MicrosoftStrategy } from "./strategies/microsoft.strategy";
+import { TokenEncryptionService } from "@/modules/auth/oauth-token-encryption.service";
+import { SessionService } from "@/common/service/session.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      UserSocialConnection,
+      TenantSocialProvider,
+      SocialLinkRequest,
+      SecurityEvent,
+      Session,
+      OAuthRefreshToken,
+    ]),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>("JWT_SECRET"),
+        signOptions: { expiresIn: "15m" },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+  controllers: [SocialAuthController],
+  providers: [
+    SocialAuthService,
+    GoogleStrategy,
+    GitHubStrategy,
+    MicrosoftStrategy,
+    TokenEncryptionService,
+    SessionService,
+    OAuthRefreshTokenService,
+  ],
+  exports: [SocialAuthService],
+})
+export class SocialAuthModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/social-auth/social-auth.service.ts
+SIZE: 16.9 KB | LINES: 655
+================================================================================
+
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import {
+  User,
+  UserSocialConnection,
+  TenantSocialProvider,
+  SocialLinkRequest,
+  Session,
+  SecurityEvent,
+} from "@repo/database";
+import { TokenEncryptionService } from "../auth/oauth-token-encryption.service";
+import * as crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
+import { SessionService } from "@/common/service/session.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+export interface SocialProfile {
+  provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
+  providerId: string;
+  email: string;
+  emailVerified?: boolean;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  scopes?: string;
+  raw?: any; // Raw provider response
+}
+
+/**
+ * SocialAuthService
+ *
+ * Main service for social authentication
+ *
+ * Features:
+ * - Login with Google/GitHub/Microsoft/etc.
+ * - Auto-create users on first login
+ * - Account linking (explicit with verification)
+ * - Token storage (encrypted)
+ * - Multi-tenant support
+ */
+@Injectable()
+export class SocialAuthService {
+  private readonly logger = new Logger(SocialAuthService.name);
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(UserSocialConnection)
+    private readonly socialConnectionRepository: Repository<UserSocialConnection>,
+    @InjectRepository(TenantSocialProvider)
+    private readonly tenantProviderRepository: Repository<TenantSocialProvider>,
+    @InjectRepository(SocialLinkRequest)
+    private readonly linkRequestRepository: Repository<SocialLinkRequest>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+    private readonly tokenEncryptionService: TokenEncryptionService,
+    private readonly sessionService: SessionService,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Handle social login callback
+   *
+   * This is called after user approves OAuth at provider
+   *
+   * Flow:
+   * 1. Check if social connection exists
+   * 2. If YES: Login user
+   * 3. If NO: Check if email exists
+   *    a. If email exists: Initiate account linking
+   *    b. If email doesn't exist: Create new user
+   */
+  async handleCallback(params: {
+    tenantId: string;
+    profile: SocialProfile;
+    ipAddress: string;
+    userAgent: string;
+  }): Promise<
+    | { type: "success"; accessToken: string; refreshToken: string; user: any }
+    | {
+        type: "link_required";
+        email: string;
+        provider: string;
+        message: string;
+      }
+  > {
+    const { tenantId, profile, ipAddress, userAgent } = params;
+
+    this.logger.log("Handling social login callback", {
+      tenantId,
+      provider: profile.provider,
+      email: profile.email,
+    });
+
+    // Step 1: Check if social connection exists
+    const existingConnection = await this.socialConnectionRepository.findOne({
+      where: {
+        tenantId,
+        provider: profile.provider,
+        providerId: profile.providerId,
+      },
+      relations: ["user"],
+    });
+
+    if (existingConnection) {
+      // User exists, login
+      return this.loginWithSocialConnection(
+        existingConnection,
+        profile,
+        ipAddress,
+        userAgent,
+      );
+    }
+
+    // Step 2: Check if user with this email exists
+    const existingUser = await this.userRepository.findOne({
+      where: {
+        tenantId,
+        email: profile.email,
+      },
+    });
+
+    if (existingUser) {
+      // Email exists, require account linking
+      this.logger.log("User exists with email, requiring account linking", {
+        userId: existingUser.id,
+        email: profile.email,
+        provider: profile.provider,
+      });
+
+      // Create link request (user needs to confirm via email)
+      await this.createLinkRequest(existingUser, profile, ipAddress, userAgent);
+
+      return {
+        type: "link_required",
+        email: profile.email,
+        provider: profile.provider,
+        message:
+          "An account with this email already exists. Please check your email to link accounts.",
+      };
+    }
+
+    // Step 3: No existing user, create new account
+    return this.createUserWithSocialConnection(
+      tenantId,
+      profile,
+      ipAddress,
+      userAgent,
+    );
+  }
+
+  /**
+   * Login user with existing social connection
+   */
+  private async loginWithSocialConnection(
+    connection: UserSocialConnection,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<{
+    type: "success";
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    const user = connection.user;
+
+    this.logger.log("Logging in user with social connection", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    // Update connection tokens
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    await this.socialConnectionRepository.update(connection.id, {
+      accessToken: encryptedTokens.accessToken,
+      refreshToken: encryptedTokens.refreshToken,
+      tokenExpiresAt: profile.expiresIn
+        ? new Date(Date.now() + profile.expiresIn * 1000)
+        : undefined,
+      lastUsedAt: new Date(),
+      // Update profile data
+      email: profile.email,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+    });
+
+    // Create session
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId: connection.tenantId,
+      email: user.email,
+      ipAddress,
+      userAgent,
+    });
+
+    // Create refresh token
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId: connection.tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        ipAddress,
+        userAgent,
+      });
+
+    // Generate access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId: connection.tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Update user last login
+    await this.userRepository.update(user.id, {
+      lastLoginAt: new Date(),
+      lastLoginIp: ipAddress,
+    });
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId: connection.tenantId,
+      userId: user.id,
+      eventType: "social_login_success",
+      severity: "info",
+      ipAddress,
+      userAgent,
+      metadata: {
+        provider: profile.provider,
+        sessionId: session.id,
+      },
+    });
+
+    this.logger.log("Social login successful", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    return {
+      type: "success",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl || profile.avatarUrl,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
+   * Create new user with social connection
+   */
+  private async createUserWithSocialConnection(
+    tenantId: string,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<{
+    type: "success";
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    this.logger.log("Creating new user with social connection", {
+      tenantId,
+      provider: profile.provider,
+      email: profile.email,
+    });
+
+    // Create user
+    const user = await this.userRepository.save({
+      tenantId,
+      email: profile.email,
+      emailVerified: profile.emailVerified ?? true, // Trust provider verification
+      firstName: profile.firstName || profile.displayName?.split(" ")[0],
+      lastName:
+        profile.lastName || profile.displayName?.split(" ").slice(1).join(" "),
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      primaryAuthMethod: profile.provider,
+      passwordHash: undefined, // No password for social users
+      status: "active",
+    });
+
+    // Encrypt tokens
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    // Create social connection
+    await this.socialConnectionRepository.save({
+      tenantId,
+      userId: user.id,
+      provider: profile.provider,
+      providerId: profile.providerId,
+      email: profile.email,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      accessToken: encryptedTokens.accessToken,
+      refreshToken: encryptedTokens.refreshToken,
+      tokenExpiresAt: profile.expiresIn
+        ? new Date(Date.now() + profile.expiresIn * 1000)
+        : undefined,
+      scopes: profile.scopes,
+      metadata: profile.raw,
+      primary: true,
+      lastUsedAt: new Date(),
+    });
+
+    // Create session
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId,
+      email: user.email,
+      ipAddress,
+      userAgent,
+    });
+
+    // Create refresh token
+    const { token: refreshToken } =
+      await this.oauthRefreshTokenService.createRefreshToken({
+        tenantId,
+        userId: user.id,
+        sessionId: session.id,
+        ipAddress,
+        userAgent,
+      });
+
+    // Generate access token
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        tenantId,
+        sessionId: session.id,
+      },
+      {
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId,
+      userId: user.id,
+      eventType: "user_created_social",
+      severity: "info",
+      ipAddress,
+      userAgent,
+      metadata: {
+        provider: profile.provider,
+        sessionId: session.id,
+      },
+    });
+
+    this.logger.log("New user created with social connection", {
+      userId: user.id,
+      provider: profile.provider,
+    });
+
+    return {
+      type: "success",
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerified,
+      },
+    };
+  }
+
+  /**
+   * Create account linking request
+   *
+   * Sends email to user to confirm linking
+   */
+  private async createLinkRequest(
+    user: User,
+    profile: SocialProfile,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<void> {
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString("hex");
+
+    // Encrypt tokens for storage
+    const encryptedTokens = this.tokenEncryptionService.encryptTokens({
+      accessToken: profile.accessToken,
+      refreshToken: profile.refreshToken,
+    });
+
+    // Create link request
+    await this.linkRequestRepository.save({
+      tenantId: user.tenantId,
+      userId: user.id,
+      provider: profile.provider,
+      providerId: profile.providerId,
+      providerEmail: profile.email,
+      token,
+      profileData: {
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        accessToken: encryptedTokens.accessToken!,
+        refreshToken: encryptedTokens.refreshToken,
+        tokenExpiresAt: profile.expiresIn
+          ? new Date(Date.now() + profile.expiresIn * 1000)
+          : undefined,
+        scopes: profile.scopes,
+        metadata: profile.raw,
+      },
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      ipAddress,
+      userAgent,
+    });
+
+    // TODO: Send email with link
+    // await this.emailService.sendAccountLinkRequest({
+    //   to: user.email,
+    //   provider: profile.provider,
+    //   linkUrl: `https://${tenant}.auth.scrolloop.com/auth/link/confirm?token=${token}`,
+    // });
+
+    this.logger.log("Account link request created", {
+      userId: user.id,
+      provider: profile.provider,
+      token,
+    });
+  }
+
+  /**
+   * Confirm account linking
+   *
+   * User clicks link in email to confirm
+   */
+  async confirmLinking(token: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    this.logger.log("Confirming account linking", { token });
+
+    // Find link request
+    const linkRequest = await this.linkRequestRepository.findOne({
+      where: { token, completed: false },
+      relations: ["user"],
+    });
+
+    if (!linkRequest) {
+      throw new UnauthorizedException("Invalid or expired linking token");
+    }
+
+    if (linkRequest.isExpired) {
+      throw new UnauthorizedException("Linking token has expired");
+    }
+
+    // Create social connection
+    await this.socialConnectionRepository.save({
+      tenantId: linkRequest.tenantId,
+      userId: linkRequest.userId,
+      provider: linkRequest.provider,
+      providerId: linkRequest.providerId,
+      email: linkRequest.providerEmail,
+      displayName: linkRequest.profileData.displayName,
+      avatarUrl: linkRequest.profileData.avatarUrl,
+      accessToken: linkRequest.profileData.accessToken,
+      refreshToken: linkRequest.profileData.refreshToken,
+      tokenExpiresAt: linkRequest.profileData.tokenExpiresAt,
+      scopes: linkRequest.profileData.scopes,
+      metadata: linkRequest.profileData.metadata,
+      primary: false,
+      lastUsedAt: new Date(),
+    });
+
+    // Mark request as completed
+    await this.linkRequestRepository.update(linkRequest.id, {
+      completed: true,
+      completedAt: new Date(),
+    });
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId: linkRequest.tenantId,
+      userId: linkRequest.userId,
+      eventType: "social_account_linked",
+      severity: "info",
+      ipAddress: linkRequest.ipAddress,
+      userAgent: linkRequest.userAgent,
+      metadata: {
+        provider: linkRequest.provider,
+      },
+    });
+
+    this.logger.log("Account linking confirmed", {
+      userId: linkRequest.userId,
+      provider: linkRequest.provider,
+    });
+
+    return {
+      success: true,
+      message: `${linkRequest.provider} account linked successfully`,
+    };
+  }
+
+  /**
+   * Unlink social account
+   */
+  async unlinkAccount(
+    userId: string,
+    tenantId: string,
+    provider: string,
+  ): Promise<{ success: boolean; message: string }> {
+    this.logger.log("Unlinking social account", {
+      userId,
+      tenantId,
+      provider,
+    });
+
+    // Find connection
+    const connection = await this.socialConnectionRepository.findOne({
+      where: {
+        userId,
+        tenantId,
+        provider: provider as any,
+      },
+    });
+
+    if (!connection) {
+      throw new UnauthorizedException("Social connection not found");
+    }
+
+    // Check if user has password or other auth method
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+      select: ["passwordHash"],
+    });
+
+    const otherConnections = await this.socialConnectionRepository.count({
+      where: {
+        userId,
+        tenantId,
+      },
+    });
+
+    if (!user?.passwordHash && otherConnections <= 1) {
+      throw new ConflictException(
+        "Cannot unlink last authentication method. Set a password first.",
+      );
+    }
+
+    // Delete connection
+    await this.socialConnectionRepository.delete(connection.id);
+
+    // Log security event
+    await this.logSecurityEvent({
+      tenantId,
+      userId,
+      eventType: "social_account_unlinked",
+      severity: "info",
+      metadata: {
+        provider,
+      },
+    });
+
+    this.logger.log("Social account unlinked", {
+      userId,
+      provider,
+    });
+
+    return {
+      success: true,
+      message: `${provider} account unlinked successfully`,
+    };
+  }
+
+  /**
+   * Get user's social connections
+   */
+  async getUserConnections(
+    userId: string,
+    tenantId: string,
+  ): Promise<UserSocialConnection[]> {
+    return this.socialConnectionRepository.find({
+      where: {
+        userId,
+        tenantId,
+      },
+      select: [
+        "id",
+        "provider",
+        "email",
+        "displayName",
+        "avatarUrl",
+        "primary",
+        "lastUsedAt",
+        "createdAt",
+      ],
+      order: {
+        primary: "DESC",
+        lastUsedAt: "DESC",
+      },
+    });
+  }
+
+  /**
+   * Log security event
+   */
+  private async logSecurityEvent(params: {
+    tenantId: string;
+    userId?: string;
+    eventType: string;
+    severity: "info" | "warning" | "critical";
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: any;
+  }): Promise<void> {
+    await this.securityEventRepository.save(params);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/social-auth/strategies/github.strategy.ts
+SIZE: 2.42 KB | LINES: 85
+================================================================================
+
+import { Injectable, Logger } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy, Profile } from "passport-github2";
+import { ConfigService } from "@nestjs/config";
+import { SocialProfile } from "../social-auth.service";
+
+/**
+ * GitHubStrategy
+ *
+ * Passport strategy for GitHub OAuth
+ *
+ * Scopes:
+ * - user:email: Get user's email addresses
+ *
+ * Note: GitHub doesn't use OIDC, just OAuth 2.0
+ */
+@Injectable()
+export class GitHubStrategy extends PassportStrategy(Strategy, "github") {
+  private readonly logger = new Logger(GitHubStrategy.name);
+
+  constructor(private configService: ConfigService) {
+    super({
+      clientID: configService.getOrThrow<string>("INTERNAL_GITHUB_CLIENT_ID"),
+      clientSecret: configService.getOrThrow<string>(
+        "INTERNAL_GITHUB_CLIENT_SECRET",
+      ),
+      callbackURL: configService.getOrThrow<string>(
+        "INTERNAL_GITHUB_CALLBACK_URL",
+      ),
+      scope: ["user:email"],
+      passReqToCallback: true,
+    });
+
+    this.logger.log("GitHubStrategy initialized");
+  }
+
+  async validate(
+    req: any,
+    accessToken: string,
+    refreshToken: string | undefined,
+    profile: Profile,
+    done: (error: any, user?: any) => void,
+  ): Promise<void> {
+    try {
+      this.logger.debug("GitHub OAuth callback received", {
+        profileId: profile.id,
+        username: profile.username,
+      });
+
+      // GitHub can return multiple emails
+      const primaryEmail: any =
+        profile.emails?.find((e: any) => e.primary) || profile.emails?.[0];
+      const email = primaryEmail?.value;
+
+      if (!email) {
+        return done(new Error("Email not provided by GitHub"), undefined);
+      }
+
+      // Map to SocialProfile
+      const socialProfile: SocialProfile = {
+        provider: "github",
+        providerId: profile.id,
+        email,
+        emailVerified: primaryEmail?.verified ?? false,
+        displayName: profile.displayName || profile.username,
+        firstName: profile.name?.givenName,
+        lastName: profile.name?.familyName,
+        avatarUrl: profile.photos?.[0]?.value || (profile as any).avatar_url,
+        accessToken,
+        refreshToken,
+        scopes: "user:email",
+        raw: (profile as any)._json,
+      };
+
+      done(null, socialProfile);
+    } catch (error: any) {
+      this.logger.error("GitHub validation error", {
+        error: error.message,
+        stack: error.stack,
+      });
+      done(error, undefined);
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/social-auth/strategies/google.strategy.ts
+SIZE: 2.71 KB | LINES: 96
+================================================================================
+
+import { Injectable, Logger } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy, VerifyCallback, Profile } from "passport-google-oauth20";
+import { ConfigService } from "@nestjs/config";
+import { SocialProfile } from "../social-auth.service";
+
+/**
+ * GoogleStrategy
+ *
+ * Passport strategy for Google OAuth 2.0
+ *
+ * Scopes:
+ * - openid: Required for OIDC
+ * - email: Get user's email
+ * - profile: Get user's profile (name, picture)
+ */
+@Injectable()
+export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
+  private readonly logger = new Logger(GoogleStrategy.name);
+
+  constructor(private configService: ConfigService) {
+    super({
+      clientID: configService.getOrThrow<string>("INTERNAL_GOOGLE_CLIENT_ID"),
+      clientSecret: configService.getOrThrow<string>(
+        "INTERNAL_GOOGLE_CLIENT_SECRET",
+      ),
+      callbackURL: configService.getOrThrow<string>(
+        "INTERNAL_GOOGLE_CALLBACK_URL",
+      ),
+      scope: ["openid", "email", "profile"],
+      passReqToCallback: true, // Pass request to validate()
+    });
+
+    this.logger.log("GoogleStrategy initialized");
+  }
+
+  /**
+   * Validate callback
+   *
+   * Called after user approves OAuth at Google
+   *
+   * @param req Express request
+   * @param accessToken Google access token
+   * @param refreshToken Google refresh token (might be undefined)
+   * @param profile User profile from Google
+   * @param done Callback
+   */
+  async validate(
+    req: any,
+    accessToken: string,
+    refreshToken: string | undefined,
+    profile: Profile,
+    done: VerifyCallback,
+  ): Promise<void> {
+    try {
+      this.logger.debug("Google OAuth callback received", {
+        profileId: profile.id,
+        email: profile.emails?.[0]?.value,
+      });
+
+      // Extract data from Google profile
+      const email = profile.emails?.[0]?.value;
+      const emailVerified = profile.emails?.[0]?.verified ?? false;
+
+      if (!email) {
+        return done(new Error("Email not provided by Google"), undefined);
+      }
+
+      // Map to SocialProfile
+      const socialProfile: SocialProfile = {
+        provider: "google",
+        providerId: profile.id,
+        email,
+        emailVerified,
+        displayName: profile.displayName,
+        firstName: profile.name?.givenName,
+        lastName: profile.name?.familyName,
+        avatarUrl: profile.photos?.[0]?.value,
+        accessToken,
+        refreshToken,
+        scopes: "openid email profile",
+        raw: profile._json,
+      };
+
+      // Attach to request for controller
+      done(null, socialProfile);
+    } catch (error: any) {
+      this.logger.error("Google validation error", {
+        error: error.message,
+        stack: error.stack,
+      });
+      done(error, undefined);
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/social-auth/strategies/microsoft.strategy.ts
+SIZE: 2.32 KB | LINES: 85
+================================================================================
+
+import { Injectable, Logger } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-microsoft";
+import { ConfigService } from "@nestjs/config";
+import { SocialProfile } from "../social-auth.service";
+
+/**
+ * MicrosoftStrategy
+ *
+ * Passport strategy for Microsoft OAuth 2.0 / Azure AD
+ *
+ * Scopes:
+ * - openid: OIDC
+ * - email: Get user's email
+ * - profile: Get user's profile
+ */
+@Injectable()
+export class MicrosoftStrategy extends PassportStrategy(Strategy, "microsoft") {
+  private readonly logger = new Logger(MicrosoftStrategy.name);
+
+  constructor(private configService: ConfigService) {
+    super({
+      clientID: configService.getOrThrow<string>(
+        "INTERNAL_MICROSOFT_CLIENT_ID",
+      ),
+      clientSecret: configService.getOrThrow<string>(
+        "INTERNAL_MICROSOFT_CLIENT_SECRET",
+      ),
+      callbackURL: configService.getOrThrow<string>(
+        "INTERNAL_MICROSOFT_CALLBACK_URL",
+      ),
+      scope: ["openid", "email", "profile"],
+      tenant: "common", // Support personal + work accounts
+      passReqToCallback: true,
+    });
+
+    this.logger.log("MicrosoftStrategy initialized");
+  }
+
+  async validate(
+    req: any,
+    accessToken: string,
+    refreshToken: string | undefined,
+    profile: any,
+    done: any,
+  ): Promise<void> {
+    try {
+      this.logger.debug("Microsoft OAuth callback received", {
+        profileId: profile.id,
+        email: profile.emails?.[0]?.value,
+      });
+
+      const email = profile.emails?.[0]?.value;
+
+      if (!email) {
+        return done(new Error("Email not provided by Microsoft"), undefined);
+      }
+
+      // Map to SocialProfile
+      const socialProfile: SocialProfile = {
+        provider: "microsoft",
+        providerId: profile.id,
+        email,
+        emailVerified: true, // Microsoft verifies emails
+        displayName: profile.displayName,
+        firstName: profile.name?.givenName,
+        lastName: profile.name?.familyName,
+        avatarUrl: profile.photos?.[0]?.value,
+        accessToken,
+        refreshToken,
+        scopes: "openid email profile",
+        raw: profile._json,
+      };
+
+      done(null, socialProfile);
+    } catch (error: any) {
+      this.logger.error("Microsoft validation error", {
+        error: error.message,
+        stack: error.stack,
+      });
+      done(error, undefined);
+    }
+  }
+}
+
+
+
+================================================================================
 FILE: apps/auth-service/src/modules/tenant/tenant.controller.ts
 SIZE: 1.38 KB | LINES: 67
 ================================================================================
@@ -23876,7 +25900,7 @@ export class UserModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/user/user.service.ts
-SIZE: 18.97 KB | LINES: 790
+SIZE: 19.11 KB | LINES: 798
 ================================================================================
 
 import {
@@ -23998,24 +26022,26 @@ export class UserService {
       throw new NotFoundException("User not found");
     }
 
-    // Verify current password
-    const isValid = await PasswordService.verify(
-      user.passwordHash,
-      currentPassword,
-    );
+    if (user.passwordHash) {
+      // Verify current password
+      const isValid = await PasswordService.verify(
+        user.passwordHash,
+        currentPassword,
+      );
 
-    if (!isValid) {
-      await this.logSecurityEvent({
-        userId,
-        tenantId: user.tenantId,
-        eventType: "PASSWORD_CHANGE_FAILED",
-        severity: "warning",
-        ipAddress: "0.0.0.0",
-        userAgent: "system",
-        metadata: { reason: "invalid_current_password" },
-      });
+      if (!isValid) {
+        await this.logSecurityEvent({
+          userId,
+          tenantId: user.tenantId,
+          eventType: "PASSWORD_CHANGE_FAILED",
+          severity: "warning",
+          ipAddress: "0.0.0.0",
+          userAgent: "system",
+          metadata: { reason: "invalid_current_password" },
+        });
 
-      throw new UnauthorizedException("Current password is incorrect");
+        throw new UnauthorizedException("Current password is incorrect");
+      }
     }
 
     // Validate new password strength
@@ -24043,7 +26069,10 @@ export class UserService {
     const newHash = await PasswordService.hash(newPassword);
 
     // Update password and history
-    const updatedHistory = [user.passwordHash, ...passwordHistory].slice(0, 5);
+    const updatedHistory = [
+      ...(user.passwordHash ? [user.passwordHash] : []),
+      ...passwordHistory,
+    ].slice(0, 5);
 
     await this.userRepository.update(userId, {
       passwordHash: newHash,
@@ -24188,7 +26217,10 @@ export class UserService {
     }
 
     // Verify password
-    const isValid = await PasswordService.verify(user.passwordHash, password);
+    const isValid = await PasswordService.verify(
+      user.passwordHash ?? "",
+      password,
+    );
 
     if (!isValid) {
       await this.logSecurityEvent({
@@ -26394,463 +28426,6 @@ SIZE: 304 B | LINES: 21
 
 
 ================================================================================
-FILE: apps/travel/README.md
-SIZE: 1.38 KB | LINES: 37
-================================================================================
-
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-
-================================================================================
-FILE: apps/travel/app/globals.css
-SIZE: 32 B | LINES: 2
-================================================================================
-
-@import "@repo/ui/globals.css";
-
-
-
-================================================================================
-FILE: apps/travel/app/layout.tsx
-SIZE: 1.1 KB | LINES: 43
-================================================================================
-
-import "@repo/ui/globals.css";
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import Script from "next/script";
-import { ThemeProvider } from "@repo/ui/components/theme-provider";
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-});
-
-export const metadata: Metadata = {
-  title: "Create Next App",
-  description: "Generated by create next app",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <head>
-        <Script
-          async={true}
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8195619606985915"
-          crossOrigin="anonymous"
-        ></Script>
-        <meta name="google-adsense-account" content="ca-pub-8195619606985915" />
-      </head>
-
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
-    </html>
-  );
-}
-
-
-
-================================================================================
-FILE: apps/travel/app/page.module.css
-SIZE: 3.38 KB | LINES: 182
-================================================================================
-
-.page {
-    --gray-rgb: 0, 0, 0;
-    --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
-    --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
-
-    --button-primary-hover: #383838;
-    --button-secondary-hover: #f2f2f2;
-
-    display: grid;
-    grid-template-rows: 20px 1fr 20px;
-    align-items: center;
-    justify-items: center;
-    min-height: 100svh;
-    padding: 80px;
-    gap: 64px;
-    font-synthesis: none;
-}
-
-@media (prefers-color-scheme: dark) {
-    .page {
-        --gray-rgb: 255, 255, 255;
-        --gray-alpha-200: rgba(var(--gray-rgb), 0.145);
-        --gray-alpha-100: rgba(var(--gray-rgb), 0.06);
-
-        --button-primary-hover: #ccc;
-        --button-secondary-hover: #1a1a1a;
-    }
-}
-
-.main {
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-    grid-row-start: 2;
-}
-
-.main ol {
-    font-family: var(--font-geist-mono);
-    padding-left: 0;
-    margin: 0;
-    font-size: 14px;
-    line-height: 24px;
-    letter-spacing: -0.01em;
-    list-style-position: inside;
-}
-
-.main li:not(:last-of-type) {
-    margin-bottom: 8px;
-}
-
-.main code {
-    font-family: inherit;
-    background: var(--gray-alpha-100);
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-weight: 600;
-}
-
-.ctas {
-    display: flex;
-    gap: 16px;
-}
-
-.ctas a {
-    appearance: none;
-    border-radius: 128px;
-    height: 48px;
-    padding: 0 20px;
-    font-family: var(--font-geist-sans);
-    border: 1px solid transparent;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    line-height: 20px;
-    font-weight: 500;
-}
-
-a.primary {
-    background: var(--foreground);
-    color: var(--background);
-    gap: 8px;
-}
-
-a.secondary {
-    border-color: var(--gray-alpha-200);
-    min-width: 180px;
-}
-
-button.secondary {
-    appearance: none;
-    border-radius: 128px;
-    height: 48px;
-    padding: 0 20px;
-    font-family: var(--font-geist-sans);
-    border: 1px solid transparent;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    line-height: 20px;
-    font-weight: 500;
-    background: transparent;
-    border-color: var(--gray-alpha-200);
-    min-width: 180px;
-}
-
-.footer {
-    font-family: var(--font-geist-sans);
-    grid-row-start: 3;
-    display: flex;
-    gap: 24px;
-}
-
-.footer a {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.footer img {
-    flex-shrink: 0;
-}
-
-/* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-    a.primary:hover {
-        background: var(--button-primary-hover);
-        border-color: transparent;
-    }
-
-    a.secondary:hover {
-        background: var(--button-secondary-hover);
-        border-color: transparent;
-    }
-
-    .footer a:hover {
-        text-decoration: underline;
-        text-underline-offset: 4px;
-    }
-}
-
-@media (max-width: 600px) {
-    .page {
-        padding: 32px;
-        padding-bottom: 80px;
-    }
-
-    .main {
-        align-items: center;
-    }
-
-    .main ol {
-        text-align: center;
-    }
-
-    .ctas {
-        flex-direction: column;
-    }
-
-    .ctas a {
-        font-size: 14px;
-        height: 40px;
-        padding: 0 16px;
-    }
-
-    a.secondary {
-        min-width: auto;
-    }
-
-    .footer {
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: center;
-    }
-}
-
-
-
-
-================================================================================
-FILE: apps/travel/app/page.tsx
-SIZE: 947 B | LINES: 38
-================================================================================
-
-import Image, { type ImageProps } from "next/image";
-import { Alert, AlertDescription, AlertTitle, Button } from "@repo/ui";
-import styles from "./page.module.css";
-
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
-
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src={"/logo.svg"}
-          alt={"Scrolloop"}
-          width={180}
-          height={38}
-          priority
-        />
-
-        <ol>
-          <li>Welcome to Scrolloop!</li>
-          <li>We're brewing something for you. Stay Tuned!.</li>
-        </ol>
-        <Button size={"lg"} variant={"default"} className={"bg-primary"}>
-          Open alert
-        </Button>
-        <Alert>
-          <AlertTitle>Hi</AlertTitle>
-          <AlertDescription>Theme</AlertDescription>
-        </Alert>
-      </main>
-    </div>
-  );
-}
-
-
-
-================================================================================
-FILE: apps/travel/eslint.config.js
-SIZE: 138 B | LINES: 5
-================================================================================
-
-import { nextJsConfig } from "@repo/eslint-config/next-js";
-
-/** @type {import("eslint").Linter.Config[]} */
-export default nextJsConfig;
-
-
-
-================================================================================
-FILE: apps/travel/next-env.d.ts
-SIZE: 251 B | LINES: 7
-================================================================================
-
-/// <reference types="next" />
-/// <reference types="next/image-types/global" />
-import "./.next/dev/types/routes.d.ts";
-
-// NOTE: This file should not be edited
-// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
-
-
-
-================================================================================
-FILE: apps/travel/next.config.js
-SIZE: 129 B | LINES: 7
-================================================================================
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-    transpilePackages: ["@repo/ui"]
-};
-
-export default nextConfig;
-
-
-
-================================================================================
-FILE: apps/travel/package.json
-SIZE: 654 B | LINES: 29
-================================================================================
-
-{
-  "name": "travel",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint --max-warnings 0",
-    "check-types": "next typegen && tsc --noEmit"
-  },
-  "dependencies": {
-    "@repo/ui": "workspace:*",
-    "next": "^16.0.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@repo/eslint-config": "*",
-    "@repo/typescript-config": "*",
-    "@types/node": "^22.15.3",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
-    "eslint": "^9.39.1",
-    "typescript": "5.9.2"
-  }
-}
-
-
-
-================================================================================
-FILE: apps/travel/postcss.config.js
-SIZE: 146 B | LINES: 9
-================================================================================
-
-/** @type {import("postcss-load-config").Config} */
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
-
-export default config;
-
-
-
-================================================================================
-FILE: apps/travel/tsconfig.json
-SIZE: 304 B | LINES: 21
-================================================================================
-
-{
-  "extends": "@repo/typescript-config/nextjs.json",
-  "compilerOptions": {
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "next-env.d.ts",
-    "next.config.js",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
-}
-
-
-
-================================================================================
 FILE: consolidate.js
 SIZE: 9.59 KB | LINES: 379
 ================================================================================
@@ -27238,7 +28813,7 @@ module.exports = CodeConsolidator;
 
 ================================================================================
 FILE: package.json
-SIZE: 1.04 KB | LINES: 46
+SIZE: 1.36 KB | LINES: 55
 ================================================================================
 
 {
@@ -27255,6 +28830,9 @@ SIZE: 1.04 KB | LINES: 46
     "@types/cache-manager": "^5.0.0",
     "@types/cron": "^2.4.3",
     "@types/ioredis": "^5.0.0",
+    "@types/passport-github2": "^1.2.9",
+    "@types/passport-google-oauth20": "^2.0.17",
+    "@types/passport-microsoft": "^2.1.1",
     "@types/qrcode": "^1.5.6",
     "@types/speakeasy": "^2.0.10",
     "prettier": "^3.6.2",
@@ -27271,6 +28849,7 @@ SIZE: 1.04 KB | LINES: 46
   ],
   "dependencies": {
     "@nestjs/cache-manager": "^3.1.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/schedule": "^6.1.0",
     "@types/geoip-lite": "^1.4.4",
     "argon2": "^0.44.0",
@@ -27279,9 +28858,14 @@ SIZE: 1.04 KB | LINES: 46
     "geoip-lite": "^1.4.10",
     "ioredis": "^5.8.2",
     "next": "^16.0.1",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-microsoft": "^2.1.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "speakeasy": "^2.0.0",
+    "tsup": "^8.5.1",
     "typeorm": "^0.3.28",
     "ua-parser-js": "^2.0.7"
   }
@@ -30958,7 +32542,7 @@ export class User extends BaseEntity {
     select: false,
     nullable: true,
   })
-  passwordHash!: string;
+  passwordHash?: string;
 
   @Column({
     type: "varchar",
@@ -35321,6 +36905,119 @@ export function Code({
 }): JSX.Element {
   return <code className={className}>{children}</code>;
 }
+
+
+
+================================================================================
+FILE: packages/ui/src/components/common/login.tsx
+SIZE: 6.17 KB | LINES: 106
+================================================================================
+
+// import { cn } from "@/lib/utils";
+// import { Button } from "@/components/ui/button";
+// import { Card, CardContent } from "@/components/ui/card";
+// import {
+//   Field,
+//   FieldDescription,
+//   FieldGroup,
+//   FieldLabel,
+//   FieldSeparator,
+// } from "@/components/ui/field";
+// import { Input } from "@/components/ui/input";
+//
+// export function LoginForm({
+//   className,
+//   ...props
+// }: React.ComponentProps<"div">) {
+//   return (
+//     <div className={cn("flex flex-col gap-6", className)} {...props}>
+//       <Card className="overflow-hidden p-0">
+//         <CardContent className="grid p-0 md:grid-cols-2">
+//           <form className="p-6 md:p-8">
+//             <FieldGroup>
+//               <div className="flex flex-col items-center gap-2 text-center">
+//                 <h1 className="text-2xl font-bold">Welcome back</h1>
+//                 <p className="text-muted-foreground text-balance">
+//                   Login to your Acme Inc account
+//                 </p>
+//               </div>
+//               <Field>
+//                 <FieldLabel htmlFor="email">Email</FieldLabel>
+//                 <Input
+//                   id="email"
+//                   type="email"
+//                   placeholder="m@example.com"
+//                   required
+//                 />
+//               </Field>
+//               <Field>
+//                 <div className="flex items-center">
+//                   <FieldLabel htmlFor="password">Password</FieldLabel>
+//                   <a
+//                     href="#"
+//                     className="ml-auto text-sm underline-offset-2 hover:underline"
+//                   >
+//                     Forgot your password?
+//                   </a>
+//                 </div>
+//                 <Input id="password" type="password" required />
+//               </Field>
+//               <Field>
+//                 <Button type="submit">Login</Button>
+//               </Field>
+//               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+//                 Or continue with
+//               </FieldSeparator>
+//               <Field className="grid grid-cols-3 gap-4">
+//                 <Button variant="outline" type="button">
+//                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+//                     <path
+//                       d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+//                       fill="currentColor"
+//                     />
+//                   </svg>
+//                   <span className="sr-only">Login with Apple</span>
+//                 </Button>
+//                 <Button variant="outline" type="button">
+//                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+//                     <path
+//                       d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+//                       fill="currentColor"
+//                     />
+//                   </svg>
+//                   <span className="sr-only">Login with Google</span>
+//                 </Button>
+//                 <Button variant="outline" type="button">
+//                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+//                     <path
+//                       d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z"
+//                       fill="currentColor"
+//                     />
+//                   </svg>
+//                   <span className="sr-only">Login with Meta</span>
+//                 </Button>
+//               </Field>
+//               <FieldDescription className="text-center">
+//                 Don&apos;t have an account? <a href="#">Sign up</a>
+//               </FieldDescription>
+//             </FieldGroup>
+//           </form>
+//           <div className="bg-muted relative hidden md:block">
+//             <img
+//               src="/placeholder.svg"
+//               alt="Image"
+//               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+//             />
+//           </div>
+//         </CardContent>
+//       </Card>
+//       <FieldDescription className="px-6 text-center">
+//         By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+//         and <a href="#">Privacy Policy</a>.
+//       </FieldDescription>
+//     </div>
+//   );
+// }
 
 
 
@@ -42217,6 +43914,2053 @@ SIZE: 221 B | LINES: 11
 
 
 ================================================================================
+FILE: packages/web-sdk/README.md
+SIZE: 1.88 KB | LINES: 87
+================================================================================
+
+# @repo/web-sdk
+
+TypeScript authentication SDK for Fort Knox Auth Service.
+
+## Features
+
+- 🔐 **Type-safe authentication** - Full TypeScript support
+- 🔄 **Automatic token refresh** - Seamless token management with Axios interceptors
+- ⚛️ **React hooks** - Easy integration with React applications
+- 🍪 **HttpOnly cookies** - Secure refresh token storage
+- 🔑 **Social OAuth** - Google, GitHub, Microsoft support
+- 🛡️ **MFA support** - TOTP, SMS, and WebAuthn
+- 📱 **Session management** - View and revoke active sessions
+
+## Installation
+
+```bash
+npm install @repo/web-sdk
+# or
+yarn add @repo/web-sdk
+# or
+pnpm add @repo/web-sdk
+```
+
+## Quick Start
+
+### 1. Create Auth Client
+
+```typescript
+import { AuthClient } from '@repo/auth-sdk';
+
+export const authClient = new AuthClient({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+  tenantId: 'your-tenant-id',
+  storage: 'cookie', // 'cookie' | 'localStorage' | 'memory'
+});
+```
+
+### 2. Wrap Your App (React)
+
+```tsx
+import { AuthProvider } from '@repo/auth-sdk/react';
+import { authClient } from './lib/auth';
+
+export default function App({ children }) {
+  return (
+    <AuthProvider authClient={authClient}>
+      {children}
+    </AuthProvider>
+  );
+}
+```
+
+### 3. Use Auth in Components
+
+```tsx
+import { useAuth } from '@repo/auth-sdk/react';
+
+export default function LoginPage() {
+  const { login, isAuthenticated, user } = useAuth();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    await login({ email, password });
+  };
+
+  if (isAuthenticated) {
+    return <div>Welcome, {user?.email}!</div>;
+  }
+
+  return (
+    <form onSubmit={handleLogin}>
+      <input type="email" name="email" />
+      <input type="password" name="password" />
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+```
+
+## Documentation
+
+See [FRONTEND_AUTH_INTEGRATION.md](../../docs/FRONTEND_AUTH_INTEGRATION.md) for complete documentation.
+
+## License
+
+MIT
+
+
+================================================================================
+FILE: packages/web-sdk/package.json
+SIZE: 1.52 KB | LINES: 74
+================================================================================
+
+{
+  "name": "@repo/web-sdk",
+  "version": "0.1.0",
+  "description": "Fort Knox Authentication SDK for TypeScript/React applications",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "oauth",
+    "mfa",
+    "jwt",
+    "typescript",
+    "react"
+  ],
+  "author": "Fort Knox Security",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.5"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^8.56.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rishitshivesh/my-auth.git",
+    "directory": "packages/auth-sdk"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/api-client.ts
+SIZE: 12.05 KB | LINES: 456
+================================================================================
+
+/**
+ * Fort Knox Auth SDK - API Client
+ *
+ * HTTP client with automatic token refresh using Axios interceptors.
+ * Handles authentication, retries, and error handling.
+ */
+
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
+import type { AuthTokens, AuthError, StorageType } from "./types";
+
+export class ApiClient {
+  private client: AxiosInstance;
+  private accessToken: string | null = null;
+  private refreshPromise: Promise<AuthTokens> | null = null;
+  private isRefreshing = false;
+
+  constructor(
+    private baseUrl: string,
+    private tenantId?: string,
+    private storage: StorageType = "cookie",
+    private onTokenRefresh?: (tokens: AuthTokens) => void,
+    private onAuthError?: (error: AuthError) => void,
+    private debug: boolean = false,
+  ) {
+    this.client = axios.create({
+      baseURL: baseUrl,
+      timeout: 30000, // 30 seconds
+      withCredentials: true, // Send cookies
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    this.setupInterceptors();
+    this.loadTokensFromStorage();
+  }
+
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+
+  /**
+   * Load tokens from storage on initialization
+   */
+  private loadTokensFromStorage(): void {
+    if (this.storage === "localStorage" && typeof window !== "undefined") {
+      try {
+        const accessToken = localStorage.getItem("auth_access_token");
+        if (accessToken) {
+          this.accessToken = accessToken;
+          this.log("Loaded access token from localStorage", this.isRefreshing);
+        }
+      } catch (error) {
+        this.log("Failed to load tokens from localStorage", error);
+      }
+    }
+    // For 'cookie' and 'memory', tokens are managed differently
+  }
+
+  // ============================================================
+  // INTERCEPTORS
+  // ============================================================
+
+  /**
+   * Setup request and response interceptors
+   */
+  private setupInterceptors(): void {
+    // Request interceptor - add auth headers
+    this.client.interceptors.request.use(
+      (config) => {
+        // Add tenant ID if provided
+        if (this.tenantId) {
+          config.headers["X-Tenant-ID"] = this.tenantId;
+        }
+
+        // Add access token if available
+        if (this.accessToken) {
+          config.headers["Authorization"] = `Bearer ${this.accessToken}`;
+        }
+
+        this.log("Request:", config.method?.toUpperCase(), config.url);
+
+        return config;
+      },
+      (error) => {
+        this.log("Request error:", error);
+        return Promise.reject(error);
+      },
+    );
+
+    // Response interceptor - handle errors and token refresh
+    this.client.interceptors.response.use(
+      (response) => {
+        this.log("Response:", response.status, response.config.url);
+        return response;
+      },
+      async (error: AxiosError) => {
+        const originalRequest = error.config as AxiosRequestConfig & {
+          _retry?: boolean;
+        };
+
+        this.log("Response error:", error.response?.status, error.config?.url);
+
+        // If 401 and not already retrying
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+
+          // Don't retry if this is the refresh endpoint itself
+          if (originalRequest.url?.includes("/auth/refresh")) {
+            this.log("Refresh token failed, clearing tokens");
+            this.clearTokens();
+
+            const authError: AuthError = {
+              code: "SESSION_EXPIRED",
+              message: "Your session has expired. Please log in again.",
+            };
+
+            if (this.onAuthError) {
+              this.onAuthError(authError);
+            }
+
+            return Promise.reject(authError);
+          }
+
+          try {
+            this.log("Attempting token refresh...");
+
+            // Refresh token
+            const tokens = await this.refreshTokens();
+            this.setAccessToken(tokens.accessToken);
+
+            // Retry original request with new token
+            if (originalRequest.headers) {
+              originalRequest.headers["Authorization"] =
+                `Bearer ${tokens.accessToken}`;
+            }
+
+            this.log("Token refreshed, retrying original request");
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            this.log("Token refresh failed:", refreshError);
+
+            // Refresh failed, clear tokens
+            this.clearTokens();
+
+            const authError: AuthError = {
+              code: "SESSION_EXPIRED",
+              message: "Your session has expired. Please log in again.",
+            };
+
+            if (this.onAuthError) {
+              this.onAuthError(authError);
+            }
+
+            return Promise.reject(authError);
+          }
+        }
+
+        // Transform axios error to AuthError
+        const authError = this.transformError(error);
+        return Promise.reject(authError);
+      },
+    );
+  }
+
+  // ============================================================
+  // TOKEN MANAGEMENT
+  // ============================================================
+
+  /**
+   * Refresh access token using refresh token
+   * Uses singleton pattern to prevent multiple simultaneous refresh requests
+   */
+  private async refreshTokens(): Promise<AuthTokens> {
+    // If already refreshing, return existing promise
+    if (this.refreshPromise) {
+      this.log("Token refresh already in progress, waiting...");
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+
+    this.refreshPromise = (async () => {
+      try {
+        this.log("Calling refresh endpoint...");
+
+        const response = await axios.post(
+          `${this.baseUrl}/auth/refresh`,
+          {},
+          {
+            withCredentials: true, // Send refresh token cookie
+            headers: this.tenantId ? { "X-Tenant-ID": this.tenantId } : {},
+          },
+        );
+
+        const tokens: AuthTokens = {
+          accessToken: response.data.accessToken,
+          refreshToken: response.data.refreshToken,
+          expiresIn: response.data.expiresIn,
+        };
+
+        this.log("Token refresh successful");
+
+        // Save to storage
+        this.saveTokensToStorage(tokens);
+
+        // Notify callback
+        if (this.onTokenRefresh) {
+          this.onTokenRefresh(tokens);
+        }
+
+        return tokens;
+      } catch (error) {
+        this.log("Token refresh failed:", error);
+        throw error;
+      } finally {
+        this.refreshPromise = null;
+        this.isRefreshing = false;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  /**
+   * Set access token
+   */
+  setAccessToken(token: string | null): void {
+    this.accessToken = token;
+
+    if (this.storage === "localStorage" && typeof window !== "undefined") {
+      if (token) {
+        localStorage.setItem("auth_access_token", token);
+        this.log("Saved access token to localStorage");
+      } else {
+        localStorage.removeItem("auth_access_token");
+        this.log("Removed access token from localStorage");
+      }
+    }
+  }
+
+  /**
+   * Get current access token
+   */
+  getAccessToken(): string | null {
+    return this.accessToken;
+  }
+
+  /**
+   * Save tokens to storage
+   */
+  private saveTokensToStorage(tokens: AuthTokens): void {
+    this.setAccessToken(tokens.accessToken);
+
+    if (
+      this.storage === "localStorage" &&
+      typeof window !== "undefined" &&
+      tokens.refreshToken
+    ) {
+      localStorage.setItem("auth_refresh_token", tokens.refreshToken);
+      this.log("Saved refresh token to localStorage");
+    }
+  }
+
+  /**
+   * Clear all tokens
+   */
+  clearTokens(): void {
+    this.accessToken = null;
+
+    if (this.storage === "localStorage" && typeof window !== "undefined") {
+      localStorage.removeItem("auth_access_token");
+      localStorage.removeItem("auth_refresh_token");
+      this.log("Cleared tokens from localStorage");
+    }
+  }
+
+  // ============================================================
+  // HTTP METHODS
+  // ============================================================
+
+  /**
+   * GET request
+   */
+  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.get<T>(url, config);
+    return response.data;
+  }
+
+  /**
+   * POST request
+   */
+  async post<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig,
+  ): Promise<T> {
+    const response = await this.client.post<T>(url, data, config);
+    return response.data;
+  }
+
+  /**
+   * PATCH request
+   */
+  async patch<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig,
+  ): Promise<T> {
+    const response = await this.client.patch<T>(url, data, config);
+    return response.data;
+  }
+
+  /**
+   * PUT request
+   */
+  async put<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig,
+  ): Promise<T> {
+    const response = await this.client.put<T>(url, data, config);
+    return response.data;
+  }
+
+  /**
+   * DELETE request
+   */
+  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.delete<T>(url, config);
+    return response.data;
+  }
+
+  // ============================================================
+  // ERROR HANDLING
+  // ============================================================
+
+  /**
+   * Transform Axios error to AuthError
+   */
+  private transformError(error: AxiosError): AuthError {
+    // Network error
+    if (!error.response) {
+      return {
+        code: "NETWORK_ERROR",
+        message:
+          "Unable to connect to the server. Please check your internet connection.",
+        details: error.message,
+      };
+    }
+
+    // Server error response
+    const response = error.response;
+    const data = response.data as any;
+
+    // Extract error from response
+    if (data && typeof data === "object") {
+      return {
+        code: data.code || this.getErrorCodeFromStatus(response.status),
+        message:
+          data.message || this.getErrorMessageFromStatus(response.status),
+        details: data.details || data,
+      };
+    }
+
+    // Fallback to status-based error
+    return {
+      code: this.getErrorCodeFromStatus(response.status),
+      message: this.getErrorMessageFromStatus(response.status),
+    };
+  }
+
+  /**
+   * Get error code from HTTP status
+   */
+  private getErrorCodeFromStatus(status: number): string {
+    switch (status) {
+      case 400:
+        return "INVALID_REQUEST";
+      case 401:
+        return "UNAUTHORIZED";
+      case 403:
+        return "FORBIDDEN";
+      case 404:
+        return "NOT_FOUND";
+      case 409:
+        return "CONFLICT";
+      case 429:
+        return "RATE_LIMIT_EXCEEDED";
+      case 500:
+        return "SERVER_ERROR";
+      default:
+        return "UNKNOWN_ERROR";
+    }
+  }
+
+  /**
+   * Get error message from HTTP status
+   */
+  private getErrorMessageFromStatus(status: number): string {
+    switch (status) {
+      case 400:
+        return "Invalid request. Please check your input.";
+      case 401:
+        return "You are not authenticated. Please log in.";
+      case 403:
+        return "You do not have permission to perform this action.";
+      case 404:
+        return "The requested resource was not found.";
+      case 409:
+        return "A conflict occurred. The resource may already exist.";
+      case 429:
+        return "Too many requests. Please try again later.";
+      case 500:
+        return "A server error occurred. Please try again later.";
+      default:
+        return "An unexpected error occurred.";
+    }
+  }
+
+  // ============================================================
+  // UTILITIES
+  // ============================================================
+
+  /**
+   * Get the underlying Axios instance
+   */
+  getClient(): AxiosInstance {
+    return this.client;
+  }
+
+  /**
+   * Update tenant ID
+   */
+  setTenantId(tenantId: string): void {
+    this.tenantId = tenantId;
+    this.log("Tenant ID updated:", tenantId);
+  }
+
+  /**
+   * Get current tenant ID
+   */
+  getTenantId(): string | undefined {
+    return this.tenantId;
+  }
+
+  /**
+   * Debug logging
+   */
+  private log(...args: any[]): void {
+    if (this.debug) {
+      console.log("[AuthSDK]", ...args);
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/client.ts
+SIZE: 11.46 KB | LINES: 511
+================================================================================
+
+/**
+ * Fort Knox Auth SDK - Main Client
+ *
+ * Main authentication client providing all auth-related methods.
+ */
+
+import { ApiClient } from "./api-client";
+import type {
+  User,
+  AuthTokens,
+  LoginCredentials,
+  SignupCredentials,
+  LoginResponse,
+  SignupResponse,
+  MfaChallenge,
+  MfaMethod,
+  MfaSetupResponse,
+  SocialProviderType,
+  SocialProvider,
+  SocialConnection,
+  Session,
+  PasswordResetRequest,
+  PasswordResetConfirm,
+  PasswordChangeRequest,
+  TenantConfig,
+  AuthClientConfig,
+} from "./types";
+
+export class AuthClient {
+  private api: ApiClient;
+  private user: User | null = null;
+  private config: AuthClientConfig;
+
+  constructor(config: AuthClientConfig) {
+    this.config = {
+      storage: "cookie",
+      debug: false,
+      ...config,
+    };
+
+    this.api = new ApiClient(
+      config.baseUrl,
+      config.tenantId,
+      this.config.storage,
+      config.onTokenRefresh,
+      config.onAuthError,
+      this.config.debug,
+    );
+  }
+
+  // ============================================================
+  // AUTHENTICATION
+  // ============================================================
+
+  /**
+   * Login with email and password
+   */
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    try {
+      const response = await this.api.post<any>("/auth/login", credentials);
+
+      // Check if MFA is required
+      if (response.mfaRequired) {
+        return {
+          user: null as any,
+          tokens: null as any,
+          mfaRequired: true,
+          mfaChallenge: response.mfaChallenge as MfaChallenge,
+        };
+      }
+
+      // Set access token
+      this.api.setAccessToken(response.accessToken);
+      this.user = response.user;
+
+      return {
+        user: response.user,
+        tokens: {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresIn: response.expiresIn,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Sign up new user
+   */
+  async signup(credentials: SignupCredentials): Promise<SignupResponse> {
+    try {
+      const response = await this.api.post<any>("/auth/register", credentials);
+
+      this.api.setAccessToken(response.accessToken);
+      this.user = response.user;
+
+      return {
+        user: response.user,
+        tokens: {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresIn: response.expiresIn,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Logout
+   */
+  async logout(): Promise<void> {
+    try {
+      await this.api.post("/auth/logout");
+    } catch (error) {
+      // Logout even if API call fails
+      console.error("Logout API call failed:", error);
+    } finally {
+      this.api.clearTokens();
+      this.user = null;
+
+      if (this.config.onLogout) {
+        this.config.onLogout();
+      }
+    }
+  }
+
+  /**
+   * Get current user
+   * Returns cached user if available, otherwise fetches from API
+   */
+  async getCurrentUser(forceRefresh = false): Promise<User> {
+    if (this.user && !forceRefresh) {
+      return this.user;
+    }
+
+    const user = await this.api.get<User>("/users/me");
+    this.user = user;
+    return user;
+  }
+
+  /**
+   * Refresh session (get new access token)
+   */
+  async refreshSession(): Promise<AuthTokens> {
+    const response = await this.api.post<any>("/auth/refresh");
+
+    this.api.setAccessToken(response.accessToken);
+
+    return {
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      expiresIn: response.expiresIn,
+    };
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated(): boolean {
+    return !!this.api.getAccessToken();
+  }
+
+  // ============================================================
+  // MULTI-FACTOR AUTHENTICATION
+  // ============================================================
+
+  /**
+   * Verify MFA code during login
+   */
+  async verifyMfa(
+    tempToken: string,
+    code: string,
+    method: MfaMethod = "totp",
+  ): Promise<LoginResponse> {
+    const response = await this.api.post<any>(
+      "/auth/mfa/verify",
+      { code, method },
+      {
+        headers: { Authorization: `Bearer ${tempToken}` },
+      },
+    );
+
+    this.api.setAccessToken(response.accessToken);
+    this.user = response.user;
+
+    return {
+      user: response.user,
+      tokens: {
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        expiresIn: response.expiresIn,
+      },
+    };
+  }
+
+  /**
+   * Setup TOTP MFA
+   */
+  async setupTotpMfa(): Promise<MfaSetupResponse> {
+    return this.api.post<MfaSetupResponse>("/auth/mfa/setup/totp");
+  }
+
+  /**
+   * Setup SMS MFA
+   */
+  async setupSmsMfa(phoneNumber: string): Promise<MfaSetupResponse> {
+    return this.api.post<MfaSetupResponse>("/auth/mfa/setup/sms", {
+      phoneNumber,
+    });
+  }
+
+  /**
+   * Verify MFA setup
+   */
+  async verifyMfaSetup(
+    code: string,
+    method: MfaMethod = "totp",
+  ): Promise<{ success: boolean; backupCodes?: string[] }> {
+    return this.api.post("/auth/mfa/verify-setup", { code, method });
+  }
+
+  /**
+   * Disable MFA
+   */
+  async disableMfa(password: string): Promise<void> {
+    await this.api.delete("/auth/mfa", {
+      data: { password },
+    });
+
+    // Update cached user
+    if (this.user) {
+      this.user.mfaEnabled = false;
+    }
+  }
+
+  /**
+   * Get MFA status
+   */
+  async getMfaStatus(): Promise<{ enabled: boolean; methods: MfaMethod[] }> {
+    return this.api.get("/auth/mfa/status");
+  }
+
+  // ============================================================
+  // SOCIAL AUTHENTICATION
+  // ============================================================
+
+  /**
+   * Get social login URL for OAuth flow
+   */
+  getSocialLoginUrl(provider: SocialProviderType, returnUrl?: string): string {
+    const params = new URLSearchParams();
+
+    if (this.api.getTenantId()) {
+      params.append("tenantId", this.api.getTenantId()!);
+    }
+
+    if (returnUrl) {
+      params.append("returnUrl", returnUrl);
+    }
+
+    return `${this.config.baseUrl}/auth/social/${provider}/login?${params.toString()}`;
+  }
+
+  /**
+   * Get available social providers for current tenant
+   */
+  async getSocialProviders(): Promise<SocialProvider[]> {
+    try {
+      const response = await this.api.get<{ providers: string[]; tenant: any }>(
+        "/api/public/tenant",
+      );
+
+      return response.providers.map((provider) => ({
+        provider: provider as SocialProviderType,
+        url: this.getSocialLoginUrl(provider as SocialProviderType),
+        enabled: true,
+      }));
+    } catch (error) {
+      // Return empty array if endpoint fails
+      return [];
+    }
+  }
+
+  /**
+   * Get connected social accounts
+   */
+  async getSocialConnections(): Promise<SocialConnection[]> {
+    return this.api.get<SocialConnection[]>("/auth/social/connections");
+  }
+
+  /**
+   * Unlink social account
+   */
+  async unlinkSocialAccount(provider: SocialProviderType): Promise<void> {
+    await this.api.delete(`/auth/social/connections/${provider}`);
+  }
+
+  /**
+   * Confirm social account linking via email
+   */
+  async confirmSocialLinking(token: string): Promise<void> {
+    await this.api.get(`/auth/social/link/confirm?token=${token}`);
+  }
+
+  // ============================================================
+  // PASSWORD MANAGEMENT
+  // ============================================================
+
+  /**
+   * Request password reset email
+   */
+  async forgotPassword(email: string): Promise<void> {
+    await this.api.post("/auth/forgot-password", {
+      email,
+    } as PasswordResetRequest);
+  }
+
+  /**
+   * Reset password with token from email
+   */
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await this.api.post("/auth/reset-password", {
+      token,
+      newPassword,
+    } as PasswordResetConfirm);
+  }
+
+  /**
+   * Change password (authenticated user)
+   */
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    await this.api.post("/users/me/password", {
+      currentPassword,
+      newPassword,
+    } as PasswordChangeRequest);
+  }
+
+  // ============================================================
+  // EMAIL VERIFICATION
+  // ============================================================
+
+  /**
+   * Verify email with token
+   */
+  async verifyEmail(token: string): Promise<void> {
+    await this.api.post("/auth/verify-email", { token });
+
+    // Update cached user
+    if (this.user) {
+      this.user.emailVerified = true;
+    }
+  }
+
+  /**
+   * Resend verification email
+   */
+  async resendVerificationEmail(): Promise<void> {
+    await this.api.post("/auth/resend-verification");
+  }
+
+  // ============================================================
+  // USER PROFILE
+  // ============================================================
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(data: Partial<User>): Promise<User> {
+    const user = await this.api.patch<User>("/users/me", data);
+    this.user = user;
+    return user;
+  }
+
+  /**
+   * Upload avatar
+   */
+  async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const response = await this.api.post<{ avatarUrl: string }>(
+      "/users/me/avatar",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    // Update cached user
+    if (this.user) {
+      this.user.avatarUrl = response.avatarUrl;
+    }
+
+    return response;
+  }
+
+  /**
+   * Delete account
+   */
+  async deleteAccount(password: string): Promise<void> {
+    await this.api.delete("/users/me", {
+      data: { password },
+    });
+
+    this.api.clearTokens();
+    this.user = null;
+
+    if (this.config.onLogout) {
+      this.config.onLogout();
+    }
+  }
+
+  // ============================================================
+  // SESSION MANAGEMENT
+  // ============================================================
+
+  /**
+   * Get active sessions
+   */
+  async getSessions(): Promise<Session[]> {
+    return this.api.get<Session[]>("/sessions/active");
+  }
+
+  /**
+   * Revoke specific session
+   */
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.api.delete(`/sessions/${sessionId}`);
+  }
+
+  /**
+   * Revoke all other sessions (keep current)
+   */
+  async revokeAllOtherSessions(): Promise<void> {
+    await this.api.delete("/sessions/all/other");
+  }
+
+  // ============================================================
+  // TENANT CONFIGURATION
+  // ============================================================
+
+  /**
+   * Get tenant configuration
+   */
+  async getTenantConfig(): Promise<TenantConfig> {
+    return this.api.get<TenantConfig>("/api/public/tenant");
+  }
+
+  // ============================================================
+  // UTILITIES
+  // ============================================================
+
+  /**
+   * Set access token manually
+   */
+  setAccessToken(token: string): void {
+    this.api.setAccessToken(token);
+  }
+
+  /**
+   * Get current access token
+   */
+  getAccessToken(): string | null {
+    return this.api.getAccessToken();
+  }
+
+  /**
+   * Set tenant ID
+   */
+  setTenantId(tenantId: string): void {
+    this.api.setTenantId(tenantId);
+  }
+
+  /**
+   * Get current tenant ID
+   */
+  getTenantId(): string | undefined {
+    return this.api.getTenantId();
+  }
+
+  /**
+   * Get API client for custom requests
+   */
+  getApiClient(): ApiClient {
+    return this.api;
+  }
+
+  /**
+   * Get cached user (without API call)
+   */
+  getCachedUser(): User | null {
+    return this.user;
+  }
+
+  /**
+   * Clear cached user
+   */
+  clearCache(): void {
+    this.user = null;
+  }
+}
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/index.ts
+SIZE: 532 B | LINES: 20
+================================================================================
+
+"use client";
+import { AuthClient } from "./client.ts";
+
+export * from "./api-client";
+export * from "./client";
+export * from "./types";
+export * from "./react";
+
+export const defaultAuthClient = new AuthClient({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
+  tenantId: "0dc7571b-f592-4f9c-aacf-1a164000a19a", // Or extract from subdomain
+  storage: "cookie",
+  onTokenRefresh: () => {
+    console.log("Token refreshed");
+  },
+  onAuthError: (error) => {
+    console.error("Auth error:", error);
+  },
+});
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/react/auth-provider.tsx
+SIZE: 7.64 KB | LINES: 311
+================================================================================
+
+'use client';
+/**
+ * Fort Knox Auth SDK - React Provider
+ * 
+ * React context provider for authentication state management.
+ */
+
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AuthClient } from '../client';
+import type { User, AuthState, LoginCredentials, SignupCredentials, SocialProviderType } from '../types';
+
+// ============================================================
+// CONTEXT DEFINITION
+// ============================================================
+
+interface AuthContextValue extends AuthState {
+  // Authentication
+  login: (credentials: LoginCredentials) => Promise<void>;
+  signup: (credentials: SignupCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  
+  // MFA
+  verifyMfa: (tempToken: string, code: string, method?: 'totp' | 'sms') => Promise<void>;
+  
+  // Session
+  refreshSession: () => Promise<void>;
+  
+  // Social Auth
+  getSocialLoginUrl: (provider: SocialProviderType, returnUrl?: string) => string;
+  
+  // User
+  updateUser: (data: Partial<User>) => Promise<void>;
+  
+  // Auth client
+  authClient: AuthClient;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+// ============================================================
+// PROVIDER COMPONENT
+// ============================================================
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+  authClient: AuthClient;
+  onAuthError?: (error: Error) => void;
+  onLoginSuccess?: (user: User) => void;
+  onLogoutSuccess?: () => void;
+}
+
+export function AuthProvider({
+  children,
+  authClient,
+  onAuthError,
+  onLoginSuccess,
+  onLogoutSuccess,
+}: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+  const isInitialized = useRef(false);
+
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+
+  /**
+   * Initialize - check if user is logged in
+   * Only runs once on mount
+   */
+  useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    const initAuth = async () => {
+      try {
+        // Try to refresh session (will use cookie if available)
+        try {
+          await authClient.refreshSession();
+        } catch (refreshError) {
+          // If refresh fails, try to get user with existing token
+          // (might have token in memory from previous page)
+          const accessToken = authClient.getAccessToken();
+          if (!accessToken) {
+            // No token at all, user is not logged in
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Get current user
+        const currentUser = await authClient.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        // Not logged in or session expired
+        console.log('Auth initialization: User not authenticated');
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+  }, [authClient]);
+
+  // ============================================================
+  // AUTHENTICATION METHODS
+  // ============================================================
+
+  /**
+   * Login with email and password
+   */
+  const login = useCallback(
+    async (credentials: LoginCredentials) => {
+      try {
+        setError(null);
+        setIsLoading(true);
+
+        const result = await authClient.login(credentials);
+
+        if (result.mfaRequired) {
+          // MFA is required, throw error with challenge
+          const mfaError: any = new Error('MFA_REQUIRED');
+          mfaError.mfaChallenge = result.mfaChallenge;
+          throw mfaError;
+        }
+
+        setUser(result.user);
+
+        if (onLoginSuccess) {
+          onLoginSuccess(result.user);
+        }
+      } catch (error) {
+        setError(error);
+        if (onAuthError) {
+          onAuthError(error as Error);
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [authClient, onAuthError, onLoginSuccess],
+  );
+
+  /**
+   * Sign up new user
+   */
+  const signup = useCallback(
+    async (credentials: SignupCredentials) => {
+      try {
+        setError(null);
+        setIsLoading(true);
+
+        const result = await authClient.signup(credentials);
+        setUser(result.user);
+
+        if (onLoginSuccess) {
+          onLoginSuccess(result.user);
+        }
+      } catch (error) {
+        setError(error);
+        if (onAuthError) {
+          onAuthError(error as Error);
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [authClient, onAuthError, onLoginSuccess],
+  );
+
+  /**
+   * Logout
+   */
+  const logout = useCallback(async () => {
+    try {
+      setError(null);
+      await authClient.logout();
+      setUser(null);
+
+      if (onLogoutSuccess) {
+        onLogoutSuccess();
+      }
+    } catch (error) {
+      setError(error);
+      if (onAuthError) {
+        onAuthError(error as Error);
+      }
+      throw error;
+    }
+  }, [authClient, onAuthError, onLogoutSuccess]);
+
+  /**
+   * Verify MFA code
+   */
+  const verifyMfa = useCallback(
+    async (tempToken: string, code: string, method: 'totp' | 'sms' = 'totp') => {
+      try {
+        setError(null);
+        setIsLoading(true);
+
+        const result = await authClient.verifyMfa(tempToken, code, method);
+        setUser(result.user);
+
+        if (onLoginSuccess) {
+          onLoginSuccess(result.user);
+        }
+      } catch (error) {
+        setError(error);
+        if (onAuthError) {
+          onAuthError(error as Error);
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [authClient, onAuthError, onLoginSuccess],
+  );
+
+  /**
+   * Refresh session
+   */
+  const refreshSession = useCallback(async () => {
+    try {
+      setError(null);
+      await authClient.refreshSession();
+      const currentUser = await authClient.getCurrentUser(true);
+      setUser(currentUser);
+    } catch (error) {
+      setUser(null);
+      setError(error);
+      if (onAuthError) {
+        onAuthError(error as Error);
+      }
+    }
+  }, [authClient, onAuthError]);
+
+  /**
+   * Get social login URL
+   */
+  const getSocialLoginUrl = useCallback(
+    (provider: SocialProviderType, returnUrl?: string) => {
+      return authClient.getSocialLoginUrl(provider, returnUrl);
+    },
+    [authClient],
+  );
+
+  /**
+   * Update user profile
+   */
+  const updateUser = useCallback(
+    async (data: Partial<User>) => {
+      try {
+        setError(null);
+        const updatedUser = await authClient.updateProfile(data);
+        setUser(updatedUser);
+      } catch (error) {
+        setError(error);
+        if (onAuthError) {
+          onAuthError(error as Error);
+        }
+        throw error;
+      }
+    },
+    [authClient, onAuthError],
+  );
+
+  // ============================================================
+  // CONTEXT VALUE
+  // ============================================================
+
+  const value: AuthContextValue = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    error,
+    login,
+    signup,
+    logout,
+    verifyMfa,
+    refreshSession,
+    getSocialLoginUrl,
+    updateUser,
+    authClient,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+// ============================================================
+// HOOK
+// ============================================================
+
+/**
+ * Hook to access auth context
+ * Must be used within AuthProvider
+ */
+export function useAuthContext() {
+  const context = useContext(AuthContext);
+
+  if (context === undefined) {
+    throw new Error('useAuthContext must be used within AuthProvider');
+  }
+
+  return context;
+}
+
+
+================================================================================
+FILE: packages/web-sdk/src/react/index.ts
+SIZE: 418 B | LINES: 18
+================================================================================
+
+"use client";
+
+/**
+ * Fort Knox Auth SDK - React
+ *
+ * React-specific exports including hooks and providers.
+ * Import from '@repo/auth-sdk/react' to use these.
+ */
+
+"use client";
+
+export { AuthProvider } from "./auth-provider.tsx";
+export { useAuth } from "./use-auth";
+export { useUser } from "./use-user";
+
+// Re-export types that are commonly used with React hooks
+export type { User, AuthState } from "../types";
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/react/use-auth.ts
+SIZE: 1.16 KB | LINES: 55
+================================================================================
+
+/**
+ * Fort Knox Auth SDK - useAuth Hook
+ *
+ * Main hook for authentication operations.
+ * Extracted from AuthProvider for cleaner API.
+ */
+
+"use client";
+
+import { useAuthContext } from "./auth-provider";
+
+/**
+ * Hook to access authentication state and methods
+ *
+ * @example
+ * ```tsx
+ * function LoginPage() {
+ *   const { login, isAuthenticated, user } = useAuth();
+ *
+ *   const handleLogin = async (e) => {
+ *     await login({ email, password });
+ *   };
+ *
+ *   if (isAuthenticated) {
+ *     return <div>Welcome {user?.email}!</div>;
+ *   }
+ *
+ *   return <LoginForm onSubmit={handleLogin} />;
+ * }
+ * ```
+ */
+export function useAuth() {
+  const context = useAuthContext();
+
+  return {
+    // State
+    user: context.user,
+    isAuthenticated: context.isAuthenticated,
+    isLoading: context.isLoading,
+    error: context.error,
+
+    // Methods
+    login: context.login,
+    signup: context.signup,
+    logout: context.logout,
+    verifyMfa: context.verifyMfa,
+    refreshSession: context.refreshSession,
+    getSocialLoginUrl: context.getSocialLoginUrl,
+    updateUser: context.updateUser,
+
+    // Auth client (for advanced usage)
+    authClient: context.authClient,
+  };
+}
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/react/use-user.ts
+SIZE: 234 B | LINES: 15
+================================================================================
+
+import { useAuth } from "./use-auth";
+
+/**
+ * Convenient hook to just get user
+ */
+export function useUser() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  return {
+    user,
+    isLoading,
+    isAuthenticated,
+  };
+}
+
+
+
+================================================================================
+FILE: packages/web-sdk/src/types.ts
+SIZE: 7.18 KB | LINES: 314
+================================================================================
+
+/**
+ * Fort Knox Auth SDK - Type Definitions
+ * 
+ * All TypeScript types and interfaces used throughout the SDK.
+ */
+
+// ============================================================
+// USER TYPES
+// ============================================================
+
+export interface User {
+  id: string;
+  tenantId: string;
+  email: string;
+  emailVerified: boolean;
+  phone?: string;
+  phoneVerified: boolean;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  primaryAuthMethod: 'password' | 'google' | 'github' | 'microsoft' | 'apple' | 'linkedin' | 'facebook';
+  mfaEnabled: boolean;
+  status: 'active' | 'suspended' | 'deleted';
+  lastLoginAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================================
+// AUTHENTICATION TYPES
+// ============================================================
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken?: string; // Optional if using httpOnly cookies
+  expiresIn?: number; // Seconds until expiration
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupCredentials {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
+
+export interface LoginResponse {
+  user: User;
+  tokens: AuthTokens;
+  mfaRequired?: boolean;
+  mfaChallenge?: MfaChallenge;
+}
+
+export interface SignupResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+// ============================================================
+// MFA TYPES
+// ============================================================
+
+export type MfaMethod = 'totp' | 'sms' | 'webauthn' | 'backup_code';
+
+export interface MfaChallenge {
+  tempToken: string;
+  methods: MfaMethod[];
+  remainingAttempts?: number;
+}
+
+export interface MfaSetupResponse {
+  qrCode?: string; // Base64 QR code for TOTP
+  secret?: string; // Manual entry secret for TOTP
+  backupCodes?: string[]; // Backup codes
+  method: MfaMethod;
+}
+
+export interface MfaVerifyRequest {
+  code: string;
+  method: MfaMethod;
+}
+
+// ============================================================
+// SOCIAL AUTH TYPES
+// ============================================================
+
+export type SocialProviderType = 'google' | 'github' | 'microsoft' | 'apple' | 'linkedin' | 'facebook';
+
+export interface SocialProvider {
+  provider: SocialProviderType;
+  url: string; // OAuth URL to redirect to
+  enabled: boolean;
+}
+
+export interface SocialConnection {
+  id: string;
+  provider: SocialProviderType;
+  providerId: string;
+  email: string;
+  displayName?: string;
+  avatarUrl?: string;
+  primary: boolean;
+  lastUsedAt?: Date;
+  createdAt: Date;
+}
+
+export interface SocialLinkRequest {
+  provider: SocialProviderType;
+  token: string;
+  expiresAt: Date;
+}
+
+// ============================================================
+// SESSION TYPES
+// ============================================================
+
+export interface Session {
+  id: string;
+  userId: string;
+  tenantId: string;
+  deviceInfo?: {
+    userAgent?: string;
+    browser?: string;
+    os?: string;
+    device?: string;
+  };
+  ipAddress?: string;
+  location?: {
+    city?: string;
+    country?: string;
+  };
+  current: boolean; // Is this the current session?
+  expiresAt: Date;
+  lastActivityAt: Date;
+  createdAt: Date;
+}
+
+// ============================================================
+// PASSWORD TYPES
+// ============================================================
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirm {
+  token: string;
+  newPassword: string;
+}
+
+export interface PasswordChangeRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// ============================================================
+// EMAIL VERIFICATION TYPES
+// ============================================================
+
+export interface EmailVerificationRequest {
+  token: string;
+}
+
+// ============================================================
+// TENANT TYPES
+// ============================================================
+
+export interface TenantConfig {
+  slug: string;
+  name: string;
+  logo?: string;
+  primaryColor?: string;
+  customDomain?: string;
+  settings: {
+    allowSignup: boolean;
+    requireEmailVerification: boolean;
+    mfaRequired: boolean;
+    sessionTimeout: number; // In seconds
+  };
+  enabledProviders: SocialProviderType[];
+}
+
+// ============================================================
+// ERROR TYPES
+// ============================================================
+
+export interface AuthError {
+  code: string;
+  message: string;
+  details?: any;
+}
+
+export type AuthErrorCode =
+  | 'INVALID_CREDENTIALS'
+  | 'USER_NOT_FOUND'
+  | 'EMAIL_ALREADY_EXISTS'
+  | 'INVALID_TOKEN'
+  | 'TOKEN_EXPIRED'
+  | 'MFA_REQUIRED'
+  | 'MFA_INVALID_CODE'
+  | 'SESSION_EXPIRED'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'NETWORK_ERROR'
+  | 'UNKNOWN_ERROR';
+
+// ============================================================
+// AUTH STATE TYPES
+// ============================================================
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error?: AuthError | null;
+}
+
+// ============================================================
+// SDK CONFIGURATION TYPES
+// ============================================================
+
+export type StorageType = 'memory' | 'localStorage' | 'cookie';
+
+export interface AuthClientConfig {
+  /**
+   * Base URL of the auth service
+   * @example 'https://auth.scrolloop.com' or 'http://localhost:4000'
+   */
+  baseUrl: string;
+
+  /**
+   * Tenant ID or slug
+   * If not provided, will be extracted from subdomain
+   * @example 'portal' or 'acme'
+   */
+  tenantId?: string;
+
+  /**
+   * How to store tokens
+   * - 'cookie': Refresh token in httpOnly cookie, access token in memory (recommended for production)
+   * - 'localStorage': Both tokens in localStorage (dev only, not secure)
+   * - 'memory': Both tokens in memory (lost on page refresh)
+   * @default 'cookie'
+   */
+  storage?: StorageType;
+
+  /**
+   * Callback when tokens are refreshed
+   */
+  onTokenRefresh?: (tokens: AuthTokens) => void;
+
+  /**
+   * Callback when auth error occurs
+   */
+  onAuthError?: (error: AuthError) => void;
+
+  /**
+   * Callback when user logs out
+   */
+  onLogout?: () => void;
+
+  /**
+   * Enable debug logging
+   * @default false
+   */
+  debug?: boolean;
+}
+
+// ============================================================
+// API RESPONSE TYPES
+// ============================================================
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: AuthError;
+  message?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+// ============================================================
+// UTILITY TYPES
+// ============================================================
+
+/**
+ * Make certain properties optional
+ */
+export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+/**
+ * Make certain properties required
+ */
+export type RequiredBy<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
+
+/**
+ * Deep partial type
+ */
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+
+================================================================================
+FILE: packages/web-sdk/tsconfig.json
+SIZE: 1.01 KB | LINES: 41
+================================================================================
+
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    /* Modules */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+
+    /* Emit */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "noEmit": true, // tsup handles emit
+
+    /* Interop Constraints */
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Completeness */
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}
+
+
+================================================================================
+FILE: packages/web-sdk/tsup.config.ts
+SIZE: 1.06 KB | LINES: 61
+================================================================================
+
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  // Entry points
+  entry: {
+    index: "src/index.ts",
+    "react/index": "src/react/index.ts",
+  },
+
+  // Output formats
+  format: ["cjs", "esm"],
+
+  // Generate .d.ts files
+  dts: true,
+
+  // Clean output directory before build
+  clean: true,
+
+  // Source maps for debugging
+  sourcemap: true,
+
+  // Minify in production
+  minify: false,
+
+  // Split code by entry points
+  splitting: false,
+
+  // Transpile to ES2020
+  target: "es2020",
+
+  // External dependencies (not bundled)
+  external: ["react", "react-dom", "axios"],
+
+  // Preserve JSX (will be transpiled by consumer)
+  jsx: "automatic",
+
+  // Output directory
+  outDir: "dist",
+
+  // Tree shaking
+  treeshake: true,
+
+  // Bundle everything except externals
+  bundle: true,
+
+  // Don't bundle node_modules
+  noExternal: [],
+
+  // Preserve use client directive for React Server Components
+  banner: {
+    js: "'use client';",
+  },
+
+  // Additional esbuild options
+  esbuildOptions(options) {
+    options.banner = {
+      js: "'use client';",
+    };
+  },
+});
+
+
+
+================================================================================
 FILE: turbo.json
 SIZE: 414 B | LINES: 22
 ================================================================================
@@ -42248,8 +45992,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 272
-Total Lines: 40,337
+Files Processed: 293
+Total Lines: 43,934
 Files Skipped: 37
 Errors: 0
-Generated: 2025-12-29T16:10:41.552Z
+Generated: 2026-01-02T18:14:32.697Z
