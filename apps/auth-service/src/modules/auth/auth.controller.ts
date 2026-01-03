@@ -27,6 +27,8 @@ import {
   ResetPasswordDto,
   VerifyMfaDto,
   RefreshTokenDto,
+  LoginIntentRequestDto,
+  LoginIntentResponseDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request, type Response } from "express";
@@ -633,5 +635,155 @@ export class AuthController {
       ip,
       userAgent,
     });
+  }
+
+  /**
+   * Login Intent - Check what auth methods are available for an email
+   * 
+   * This is step 1 of the email-first login flow
+   */
+  @Post('login-intent')
+  @ApiOperation({
+    summary: 'Check available authentication methods',
+    description: `
+      Check what authentication methods are available for a given email address.
+      This is the first step in the email-first login flow.
+      
+      Returns:
+      - Whether the user exists
+      - Available authentication methods (password, magic link, passkey, social)
+      - Whether MFA is required
+      - Preferred authentication method
+      - Tenant branding information
+      
+      Use this to dynamically show the appropriate login options to the user.
+    `,
+  })
+  @ApiBody({
+    type: LoginIntentRequestDto,
+    description: 'Email address to check',
+    examples: {
+      'Existing User': {
+        value: {
+          email: 'john@example.com',
+        },
+      },
+      'New User': {
+        value: {
+          email: 'newuser@example.com',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available authentication methods returned successfully',
+    type: LoginIntentResponseDto,
+    examples: {
+      'Existing User with Multiple Methods': {
+        summary: "Existing User with Multiple Methods",
+        value: {
+          exists: true,
+          email: 'john@example.com',
+          methods: {
+            password: true,
+            magicLink: true,
+            passkey: false,
+            mfa: true,
+            social: ['google', 'github'],
+          },
+          preferredMethod: 'password',
+          branding: {
+            logoUrl: 'https://cdn.example.com/logo.png',
+            primaryColor: '#0066FF',
+            backgroundColor: '#FFFFFF',
+            textColor: '#000000',
+            buttonColor: '#0066FF',
+            buttonTextColor: '#FFFFFF',
+            companyName: 'Acme Corp',
+            supportEmail: 'support@acme.com',
+          },
+        },
+      },
+      'New User (Signup)': {
+        "summary" : "New User (Signup)",
+        value: {
+          exists: false,
+          email: 'newuser@example.com',
+          methods: {
+            password: true,
+            magicLink: false,
+            passkey: false,
+            mfa: false,
+            social: ['google', 'github'],
+          },
+          preferredMethod: 'password',
+          branding: {
+            primaryColor: '#0066FF',
+            backgroundColor: '#FFFFFF',
+            companyName: 'Acme Corp',
+          },
+        },
+      },
+      'Legacy User (Password Only)': {
+        summary: "Legacy User (Password Only)",
+        value: {
+          exists: true,
+          email: 'legacy@example.com',
+          methods: {
+            password: true,
+            magicLink: false,
+            passkey: false,
+            mfa: false,
+            social: [],
+          },
+          preferredMethod: 'password',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid email format',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 400 },
+        message: { type: 'string', example: 'Invalid email format' },
+        error: { type: 'string', example: 'Bad Request' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Tenant not found',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 404 },
+        message: { type: 'string', example: 'Tenant not found' },
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
+  })
+  async loginIntent(
+    @Body() body: LoginIntentRequestDto,
+    @Req() req: any,
+  ): Promise<LoginIntentResponseDto> {
+    const { email } = body;
+    const tenantId = req.tenantId!; // From TenantResolverMiddleware
+
+    console.log('🔍 Login intent check:', { email, tenantId });
+
+    const result = await this.authService.getLoginIntent(email, tenantId);
+
+    console.log('✅ Login intent result:', {
+      email,
+      exists: result.exists,
+      methods: result.methods,
+      preferredMethod: result.preferredMethod,
+    });
+
+    return result;
   }
 }

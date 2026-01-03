@@ -15,6 +15,7 @@ import {
   SecurityEvent,
   Tenant,
   OAuthRefreshToken,
+  UserSocialConnection,
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
@@ -25,6 +26,7 @@ import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { LoginIntentResponseDto } from "./auth.dto";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -49,6 +51,8 @@ export class AuthService {
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(OAuthRefreshToken)
     private readonly oauthRefreshTokenRepository: Repository<OAuthRefreshToken>,
+    @InjectRepository(UserSocialConnection)
+    private readonly socialConnectionRepository: Repository<UserSocialConnection>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -1059,6 +1063,207 @@ export class AuthService {
         emailVerified: user.emailVerified,
       },
     };
+  }
+
+  /**
+   * Get login intent - what auth methods are available for this email
+   */
+  async getLoginIntent(
+    email: string,
+    tenantId: string,
+  ): Promise<LoginIntentResponseDto> {
+    // Get tenant first
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new Error('Tenant not found');
+    }
+
+    // Find user
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .leftJoinAndSelect('user.mfaSettings', 'mfa')
+      .where("user.email = :email", { email })
+      .andWhere("user.tenantId = :tenantId", { tenantId })
+      .select([
+        "user.id",
+        "user.email",
+        "user.passwordHash",
+        "user.emailVerified",
+        "user.mfaEnabled",
+        "user.preferredAuthMethod",
+        "user.primaryAuthMethod",
+
+        // everything from MFA
+        "mfa",
+      ])
+      .getOne();
+
+    // User doesn't exist - return signup options
+    if (!user) {
+      return this.getSignupIntent(email, tenant);
+    }
+
+    // User exists - return login options
+    return this.getUserLoginIntent(user, tenant, tenantId);
+  }
+
+  /**
+   * Get signup intent for new users
+   */
+  private getSignupIntent(email: string, tenant: Tenant): LoginIntentResponseDto {
+    const allowSignup = tenant.settings?.allowSignup ?? true;
+
+    if (!allowSignup) {
+      return {
+        exists: false,
+        email,
+        methods: {
+          password: false,
+          magicLink: false,
+          passkey: false,
+          mfa: false,
+          social: [],
+        },
+      };
+    }
+
+    // Signup allowed
+    return {
+      exists: false,
+      email,
+      methods: {
+        password: true, // Always allow password signup
+        magicLink: tenant.featureFlags?.['magicLinkEnabled'] ?? false,
+        passkey: tenant.featureFlags?.['passkeyEnabled'] ?? false,
+        mfa: false, // No MFA for new users
+        social: this.getEnabledSocialProviders(tenant),
+      },
+      preferredMethod: 'password', // Default for signup
+      branding: tenant.branding,
+    };
+  }
+
+  /**
+   * Get login intent for existing user
+   */
+  private async getUserLoginIntent(
+    user: User,
+    tenant: Tenant,
+    tenantId: string,
+  ): Promise<LoginIntentResponseDto> {
+    // Get user's linked social accounts
+    const socialConnections = await this.socialConnectionRepository.find({
+      where: { userId: user.id, tenantId },
+      select: ['provider'],
+    });
+
+    const linkedProviders = socialConnections.map((sc) => sc.provider);
+
+    const methods = {
+      // Password: User has set a password
+      password: !!user.passwordHash,
+
+      // Magic Link: Tenant enabled + email verified (or verification not required)
+      magicLink:
+        (tenant.featureFlags?.['magicLinkEnabled'] ?? false) &&
+        (user.emailVerified || !(tenant.settings?.requireEmailVerification ?? false)),
+
+      // Passkey: Would need to check webauthn_credentials table (not in current schema)
+      // For now, set to false
+      passkey: tenant.featureFlags?.['passkeyEnabled'] ?? false,
+
+      // MFA: User has enabled MFA
+      mfa: user.mfaEnabled ?? false,
+
+      // Social: Providers that are both enabled AND linked
+      social: this.getAvailableSocialProviders(tenant, linkedProviders),
+    };
+
+    const preferredMethod =
+      (user.preferredAuthMethod as any) ||
+      this.determineDefaultMethod(methods);
+
+    return {
+      exists: true,
+      email: user.email,
+      methods,
+      preferredMethod,
+      branding: tenant.branding,
+    };
+  }
+
+  /**
+   * Get social providers enabled by tenant
+   */
+  private getEnabledSocialProviders(tenant: Tenant): string[] {
+    // Check feature flags for individual providers
+    const providers: string[] = [];
+
+    if (tenant.featureFlags?.['googleEnabled']) providers.push('google');
+    if (tenant.featureFlags?.['githubEnabled']) providers.push('github');
+    if (tenant.featureFlags?.['microsoftEnabled']) providers.push('microsoft');
+    if (tenant.featureFlags?.['appleEnabled']) providers.push('apple');
+    if (tenant.featureFlags?.['linkedinEnabled']) providers.push('linkedin');
+    if (tenant.featureFlags?.['facebookEnabled']) providers.push('facebook');
+
+    return providers;
+  }
+
+  /**
+   * Get social providers available for user
+   * (Must be both enabled by tenant AND linked to user)
+   */
+  private getAvailableSocialProviders(
+    tenant: Tenant,
+    linkedProviders: string[],
+  ): string[] {
+    const enabledProviders = this.getEnabledSocialProviders(tenant);
+
+    // Return intersection of enabled and linked
+    return enabledProviders.filter((provider) =>
+      linkedProviders.includes(provider),
+    );
+  }
+
+  /**
+   * Determine smart default method
+   * Priority: Passkey > Magic Link > Social > Password
+   */
+  private determineDefaultMethod(methods: {
+    password: boolean;
+    magicLink: boolean;
+    passkey: boolean;
+    social: string[];
+  }): 'password' | 'magicLink' | 'passkey' | 'social' {
+    if (methods.passkey) return 'passkey';
+    if (methods.magicLink) return 'magicLink';
+    if (methods.social.length > 0) return 'social';
+    return 'password';
+  }
+
+  /**
+   * Check if method requires MFA
+   * Only password-based login requires additional MFA
+   */
+  requiresMFA(method: string, user: User): boolean {
+    // Magic link = email access (inherently 2FA)
+    if (method === 'magicLink') return false;
+
+    // Passkey = biometric + device (inherently 2FA)
+    if (method === 'passkey') return false;
+
+    // Social = trusted provider (verified identity)
+    if (method === 'social') return false;
+
+    // Password = only if user has MFA enabled
+    if (method === 'password') {
+      return user.mfaEnabled ?? false;
+    }
+
+    return false;
   }
 
   /**

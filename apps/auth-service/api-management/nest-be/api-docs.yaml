@@ -138,6 +138,80 @@
         ]
       }
     },
+    "/tenants/current/branding": {
+      "get": {
+        "operationId": "TenantBrandingController_getBranding",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "TenantBranding"
+        ]
+      },
+      "patch": {
+        "operationId": "TenantBrandingController_updateBranding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantBrandingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "TenantBranding"
+        ]
+      }
+    },
+    "/tenants/current/branding/reset": {
+      "patch": {
+        "operationId": "TenantBrandingController_resetBranding",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "tags": [
+          "TenantBranding"
+        ]
+      }
+    },
     "/stats/system": {
       "get": {
         "operationId": "StatsController_getSystemStats",
@@ -1586,6 +1660,168 @@
           }
         },
         "summary": "Complete WebAuthn login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/login-intent": {
+      "post": {
+        "description": "\n      Check what authentication methods are available for a given email address.\n      This is the first step in the email-first login flow.\n      \n      Returns:\n      - Whether the user exists\n      - Available authentication methods (password, magic link, passkey, social)\n      - Whether MFA is required\n      - Preferred authentication method\n      - Tenant branding information\n      \n      Use this to dynamically show the appropriate login options to the user.\n    ",
+        "operationId": "AuthController_loginIntent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Email address to check",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIntentRequestDto"
+              },
+              "examples": {
+                "Existing User": {
+                  "value": {
+                    "email": "john@example.com"
+                  }
+                },
+                "New User": {
+                  "value": {
+                    "email": "newuser@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Available authentication methods returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginIntentResponseDto"
+                },
+                "examples": {
+                  "Existing User with Multiple Methods": {
+                    "summary": "Existing User with Multiple Methods",
+                    "value": {
+                      "exists": true,
+                      "email": "john@example.com",
+                      "methods": {
+                        "password": true,
+                        "magicLink": true,
+                        "passkey": false,
+                        "mfa": true,
+                        "social": [
+                          "google",
+                          "github"
+                        ]
+                      },
+                      "preferredMethod": "password",
+                      "branding": {
+                        "logoUrl": "https://cdn.example.com/logo.png",
+                        "primaryColor": "#0066FF",
+                        "backgroundColor": "#FFFFFF",
+                        "textColor": "#000000",
+                        "buttonColor": "#0066FF",
+                        "buttonTextColor": "#FFFFFF",
+                        "companyName": "Acme Corp",
+                        "supportEmail": "support@acme.com"
+                      }
+                    }
+                  },
+                  "New User (Signup)": {
+                    "summary": "New User (Signup)",
+                    "value": {
+                      "exists": false,
+                      "email": "newuser@example.com",
+                      "methods": {
+                        "password": true,
+                        "magicLink": false,
+                        "passkey": false,
+                        "mfa": false,
+                        "social": [
+                          "google",
+                          "github"
+                        ]
+                      },
+                      "preferredMethod": "password",
+                      "branding": {
+                        "primaryColor": "#0066FF",
+                        "backgroundColor": "#FFFFFF",
+                        "companyName": "Acme Corp"
+                      }
+                    }
+                  },
+                  "Legacy User (Password Only)": {
+                    "summary": "Legacy User (Password Only)",
+                    "value": {
+                      "exists": true,
+                      "email": "legacy@example.com",
+                      "methods": {
+                        "password": true,
+                        "magicLink": false,
+                        "passkey": false,
+                        "mfa": false,
+                        "social": []
+                      },
+                      "preferredMethod": "password"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid email format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Invalid email format"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Bad Request"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Tenant not found"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Not Found"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check available authentication methods",
         "tags": [
           "Authentication"
         ]
@@ -3439,6 +3675,72 @@
         "type": "object",
         "properties": {}
       },
+      "TenantBrandingDto": {
+        "type": "object",
+        "properties": {
+          "logoUrl": {
+            "type": "string",
+            "description": "URL to the company logo image",
+            "example": "https://cdn.example.com/logo.png"
+          },
+          "faviconUrl": {
+            "type": "string",
+            "description": "URL to the favicon image",
+            "example": "https://cdn.example.com/favicon.ico"
+          },
+          "primaryColor": {
+            "type": "string",
+            "description": "Primary brand color in hex format",
+            "example": "#0066FF",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "backgroundColor": {
+            "type": "string",
+            "description": "Background color in hex format",
+            "example": "#FFFFFF",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "textColor": {
+            "type": "string",
+            "description": "Text color in hex format",
+            "example": "#000000",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "buttonColor": {
+            "type": "string",
+            "description": "Button background color in hex format",
+            "example": "#0066FF",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "buttonTextColor": {
+            "type": "string",
+            "description": "Button text color in hex format",
+            "example": "#FFFFFF",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "companyName": {
+            "type": "string",
+            "description": "Company display name",
+            "example": "Acme Corporation",
+            "maxLength": 255
+          },
+          "supportEmail": {
+            "type": "string",
+            "description": "Support email address",
+            "example": "support@acme.com"
+          },
+          "privacyPolicyUrl": {
+            "type": "string",
+            "description": "URL to privacy policy page",
+            "example": "https://acme.com/privacy"
+          },
+          "termsOfServiceUrl": {
+            "type": "string",
+            "description": "URL to terms of service page",
+            "example": "https://acme.com/terms"
+          }
+        }
+      },
       "UpdateUserDto": {
         "type": "object",
         "properties": {
@@ -3634,6 +3936,171 @@
         "required": [
           "token",
           "password"
+        ]
+      },
+      "LoginIntentRequestDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to check for available authentication methods",
+            "example": "john@example.com",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AuthMethodsDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "boolean",
+            "description": "Whether password authentication is available",
+            "example": true
+          },
+          "magicLink": {
+            "type": "boolean",
+            "description": "Whether magic link authentication is available",
+            "example": true
+          },
+          "passkey": {
+            "type": "boolean",
+            "description": "Whether passkey (WebAuthn) authentication is available",
+            "example": false
+          },
+          "mfa": {
+            "type": "boolean",
+            "description": "Whether multi-factor authentication is required",
+            "example": true
+          },
+          "social": {
+            "description": "List of available social authentication providers",
+            "example": [
+              "google",
+              "github",
+              "microsoft"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "password",
+          "magicLink",
+          "passkey",
+          "mfa",
+          "social"
+        ]
+      },
+      "LoginBrandingDto": {
+        "type": "object",
+        "properties": {
+          "logoUrl": {
+            "type": "string",
+            "description": "URL to company logo",
+            "example": "https://cdn.example.com/logo.png"
+          },
+          "faviconUrl": {
+            "type": "string",
+            "description": "URL to favicon",
+            "example": "https://cdn.example.com/favicon.ico"
+          },
+          "primaryColor": {
+            "type": "string",
+            "description": "Primary brand color",
+            "example": "#0066FF"
+          },
+          "backgroundColor": {
+            "type": "string",
+            "description": "Background color",
+            "example": "#FFFFFF"
+          },
+          "textColor": {
+            "type": "string",
+            "description": "Text color",
+            "example": "#000000"
+          },
+          "buttonColor": {
+            "type": "string",
+            "description": "Button background color",
+            "example": "#0066FF"
+          },
+          "buttonTextColor": {
+            "type": "string",
+            "description": "Button text color",
+            "example": "#FFFFFF"
+          },
+          "companyName": {
+            "type": "string",
+            "description": "Company display name",
+            "example": "Acme Corporation"
+          },
+          "supportEmail": {
+            "type": "string",
+            "description": "Support email",
+            "example": "support@acme.com"
+          },
+          "privacyPolicyUrl": {
+            "type": "string",
+            "description": "Privacy policy URL",
+            "example": "https://acme.com/privacy"
+          },
+          "termsOfServiceUrl": {
+            "type": "string",
+            "description": "Terms of service URL",
+            "example": "https://acme.com/terms"
+          }
+        }
+      },
+      "LoginIntentResponseDto": {
+        "type": "object",
+        "properties": {
+          "exists": {
+            "type": "boolean",
+            "description": "Whether a user with this email exists",
+            "example": true
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address that was checked",
+            "example": "john@example.com"
+          },
+          "methods": {
+            "description": "Available authentication methods for this user",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuthMethodsDto"
+              }
+            ]
+          },
+          "preferredMethod": {
+            "type": "string",
+            "description": "Preferred authentication method (recommended to show first)",
+            "example": "password",
+            "enum": [
+              "password",
+              "magicLink",
+              "passkey",
+              "social"
+            ]
+          },
+          "branding": {
+            "description": "Tenant branding configuration for UI customization",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LoginBrandingDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "exists",
+          "email",
+          "methods"
         ]
       },
       "TokenRequestDto": {

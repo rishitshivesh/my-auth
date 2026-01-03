@@ -10,6 +10,7 @@ import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { type Cache } from "cache-manager";
+import { TenantBrandingDto } from "./dto/tenant-branding.dto";
 
 @Injectable()
 export class TenantService {
@@ -178,5 +179,68 @@ export class TenantService {
     await this.invalidateCache(tenantId);
 
     return tenant;
+  }
+
+  /**
+   * Get tenant by ID
+   */
+  async getTenantById(tenantId: string): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
+  }
+
+  /**
+   * Update tenant branding
+   */
+  async updateBranding(
+    tenantId: string,
+    branding: Partial<TenantBrandingDto>,
+  ): Promise<Tenant> {
+    const tenant = await this.getTenantById(tenantId);
+
+    if (!tenant) {
+      throw new Error('Tenant not found');
+    }
+
+    // Merge with existing branding
+    const updatedBranding = {
+      ...tenant.branding,
+      ...branding,
+    };
+
+    // Update tenant
+    await this.tenantRepository.update(
+      { id: tenantId },
+      { branding: updatedBranding },
+    );
+
+    // Return updated tenant
+    const updatedTenant = await this.getTenantById(tenantId);
+    return updatedTenant!;
+  }
+
+  /**
+   * Get tenant branding (public - no auth required)
+   */
+  async getBrandingBySlug(slug: string): Promise<TenantBrandingDto | null> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { slug },
+      select: ['branding'],
+    });
+
+    return tenant?.branding || null;
+  }
+
+  /**
+   * Get tenant branding by domain (for custom domains)
+   */
+  async getBrandingByDomain(domain: string): Promise<TenantBrandingDto | null> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { customDomain: domain },
+      select: ['branding'],
+    });
+
+    return tenant?.branding || null;
   }
 }

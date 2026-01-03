@@ -263,6 +263,28 @@ export class User extends BaseEntity {
   @OneToMany(() => UserRole, (userRole) => userRole.user)
   userRoles!: UserRole[];
 
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+    name: 'preferred_auth_method',
+    comment: 'User preferred authentication method',
+  })
+  preferredAuthMethod?:
+    | 'password'
+    | 'magicLink'
+    | 'passkey'
+    | 'social';
+
+  // ⭐ NEW: MFA enabled flag
+  @Column({
+    type: 'boolean',
+    default: false,
+    name: 'mfa_enabled',
+    comment: 'Whether user has enabled MFA',
+  })
+  mfaEnabled!: boolean;
+
   // ============================================================
   // RBAC HELPER METHODS - NEW
   // ============================================================

@@ -4,6 +4,20 @@ import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { TenantSocialProvider } from "./tenant-social-providers.entity";
 
+export interface TenantBranding {
+  logoUrl?: string;          // Company logo URL
+  faviconUrl?: string;        // Favicon URL
+  primaryColor?: string;      // #0066FF
+  backgroundColor?: string;   // #FFFFFF
+  textColor?: string;         // #000000
+  buttonColor?: string;       // #0066FF
+  buttonTextColor?: string;   // #FFFFFF
+  companyName?: string;       // Display name (can differ from tenant.name)
+  supportEmail?: string;      // support@company.com
+  privacyPolicyUrl?: string;  // https://company.com/privacy
+  termsOfServiceUrl?: string; // https://company.com/terms
+}
+
 @Entity("tenants")
 @Index(["slug"], { unique: true })
 @Index(["customDomain"], { unique: true, where: "custom_domain IS NOT NULL" })
@@ -54,6 +68,12 @@ export class Tenant extends BaseEntity {
     sessionTimeout?: number;
     mfaRequired?: boolean;
   };
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+  })
+  branding?: TenantBranding;
 
   @Column({
     type: "boolean",
