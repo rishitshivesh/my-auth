@@ -45,27 +45,32 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const isInitialized = useRef(false);
 
   // Initialize - check if user is logged in
   useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
+      const initialize = async () => {
+        try {
+          setIsLoading(true);
 
-    const initialize = async () => {
-      try {
-        // Try to get current user (will auto-refresh if needed)
-        const currentUser = await client.getCurrentUser();
-        setUser(currentUser);
-      } catch (err) {
-        // Not logged in or session expired
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+          // Wait for SDK to restore session from cookie
+          await client.waitForInit();
 
-    initialize();
+          // If we have a token now, get the user
+          if (client.isAuthenticated()) {
+            const currentUser = await client.getCurrentUser();
+            setUser(currentUser);
+          } else {
+            setUser(null);
+          }
+        } catch (err) {
+          console.error('Failed to restore session:', err);
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      initialize();
   }, [client]);
 
   // Listen to auth events

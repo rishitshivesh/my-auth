@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  Res,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -28,9 +29,10 @@ import {
   RefreshTokenDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
-import { type Request } from "express";
+import { type Request, type Response } from "express";
 import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
+import { access } from "fs";
 
 /**
  * Authentication Controller
@@ -85,17 +87,37 @@ export class AuthController {
   @ApiResponse({ status: 423, description: "Account locked" })
   async login(
     @Req() req: Request,
+    @Res({passthrough: true}) res: Response,
     @Body() loginDto: LoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    return this.authService.login({
+    const response = await this.authService.login({
       ...loginDto,
       ip,
       tenantId,
       userAgent: userAgent || "unknown",
     });
+
+    if ('mfaRequired' in response) {
+      return response;
+    }
+
+    if ('accessToken' in response && 'refreshToken' in response && 'user' in response) {
+      res.cookie('refreshToken', response.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        // sameSite: 'none',
+        sameSite: 'strict',
+        domain: req.hostname,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        path: '/',
+      });  
+    }
+
+    return {...response, refreshToken: null};
+
   }
 
   /**
@@ -108,6 +130,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Logout successful" })
   async logout(
     @Req() req: any,
+    @Res({passthrough: true}) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -115,6 +138,15 @@ export class AuthController {
     const userId = req.user.sub;
     const sessionId = req.user.sessionId;
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      // sameSite: 'none',
+      sameSite: 'strict',
+      domain: req.hostname,
+    });
+
     return { message: "Logged out successfully" };
   }
 
@@ -202,13 +234,26 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
   async refresh(
     @Req() req: Request,
-    @Body("refreshToken") body: RefreshTokenDto,
+    @Res({passthrough: true}) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const refreshToken = body.refreshToken;
-    return this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
+    const refreshToken = req.cookies.refreshToken;
+
+    const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
+
+    if ('accessToken' in response && 'refreshToken' in response) {
+      res.cookie('refreshToken', response.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+
+      });
+    }
+
+    return { ...response, refreshToken: null};
   }
 
   /**

@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2026-01-02T18:14:32.697Z
+Generated: 2026-01-02T23:34:34.432Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -500,7 +500,7 @@ SIZE: 32 B | LINES: 2
 
 ================================================================================
 FILE: apps/admin-portal/app/layout.tsx
-SIZE: 1.18 KB | LINES: 46
+SIZE: 1.54 KB | LINES: 57
 ================================================================================
 
 "use client"
@@ -509,8 +509,16 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
 import { ThemeProvider } from "@repo/ui/components/theme-provider";
-import { AuthProvider } from "@repo/web-sdk/react";
-import { defaultAuthClient } from "@repo/web-sdk";
+// import { defaultAuthClient } from "@repo/web-sdk";
+import { FortKnoxProvider } from '@fortknox/sdk';
+
+import { createWebClient } from '@fortknox/sdk';
+
+export const authClient = createWebClient({
+  baseURL: 'http://localhost:4000',  // Your auth service
+  tenant: 'acme',                    // Your tenant ID
+  debug: true,                        // Enable logging (dev only)
+});
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -540,10 +548,13 @@ export default function RootLayout({
       </head>
 
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <AuthProvider authClient={defaultAuthClient}>
+        {/* <AuthProvider authClient={defaultAuthClient}> */}
+            <FortKnoxProvider client={authClient}>
+
 
         <ThemeProvider>{children}</ThemeProvider>
-        </AuthProvider>
+        </FortKnoxProvider>
+        {/* </AuthProvider> */}
       </body>
     </html>
   );
@@ -771,7 +782,7 @@ export default function Home() {
 
 ================================================================================
 FILE: apps/admin-portal/components/login/page.tsx
-SIZE: 6.5 KB | LINES: 132
+SIZE: 6.48 KB | LINES: 134
 ================================================================================
 
 "use client"
@@ -786,9 +797,10 @@ import {
   FieldSeparator,
 } from "@repo/ui";
 import { Input } from "@repo/ui";
-import { useAuth } from "@repo/web-sdk/react";
 import { useEffect } from "react";
 import axios from "axios";
+import { useAuth } from '@fortknox/sdk';
+
 export function LoginForm({
   className,
   ...props
@@ -796,31 +808,32 @@ export function LoginForm({
 
     const { login, user, isAuthenticated } = useAuth();
 
-    useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log("User is authenticated:", user);
-      // You can redirect the user or perform other actions here
-    }
-    else {
-      login({
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const formData = new FormData(form);
+      const email = formData.get("email") as string;
+      const password = formData.get("password") as string;
+
+      
+      
+      // login({
+      //   email,
+      //   password
+      // });
+      login(
+        {
         email: "rishitshivesh@gmail.com",
         password: "Test123!@#"
-      })
-      const res = axios.post('http://localhost:4000/auth/login', {
-        email: "rishitshivesh@gmail.com",
-        password: "Test123!@#"
-      });
-
-      console.log("Login response:", res);
-    }
-    }, [isAuthenticated, user]);
-
+      }
+      )
+    };
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
-          <form className="p-6 md:p-8">
+          <form className="p-6 md:p-8" onSubmit={handleSubmit}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Welcome back</h1>
@@ -950,7 +963,7 @@ export default nextConfig;
 
 ================================================================================
 FILE: apps/admin-portal/package.json
-SIZE: 660 B | LINES: 29
+SIZE: 696 B | LINES: 30
 ================================================================================
 
 {
@@ -966,6 +979,7 @@ SIZE: 660 B | LINES: 29
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@fortknox/sdk": "workspace:*",
     "@repo/ui": "workspace:*",
     "next": "^16.0.1",
     "react": "^19.2.0",
@@ -7706,12 +7720,12 @@ export const ERROR_CODES = {
 
 ================================================================================
 FILE: apps/auth-service/src/common/constants/index.ts
-SIZE: 1.39 KB | LINES: 51
+SIZE: 1.4 KB | LINES: 51
 ================================================================================
 
 export const AUTHORIZATION_KEY = 'x-authorization';
 
-export const ALLOWED_URLS = ['*', 'localhost:3000'];
+export const ALLOWED_URLS = ['*', 'http://localhost:3000'];
 
 export const EXPIRES_IN = {
   ONE_MINUTE: 60,
@@ -10297,7 +10311,7 @@ export default () => ({
 
 ================================================================================
 FILE: apps/auth-service/src/core/app.module.ts
-SIZE: 1.9 KB | LINES: 61
+SIZE: 2.78 KB | LINES: 91
 ================================================================================
 
 import { Module, ValidationPipe } from "@nestjs/common";
@@ -10318,11 +10332,41 @@ export class AppModule {
   static async startApp(): Promise<void> {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
     app.enableCors({
-      origin: ALLOWED_URLS,
-      methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-      optionsSuccessStatus: 200,
+      origin: (origin: any, cb: any) => {
+        // allow non-browser calls (curl/postman/server-to-server)
+        if (!origin) return cb(null, true);
+
+        const allowed = ALLOWED_URLS.includes(origin);
+        return allowed
+          ? cb(null, true)
+          : cb(new Error(`CORS blocked for origin: ${origin}`), false);
+      },
       credentials: true,
+      methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "x-tenant-id",
+        "x-authorization",
+        "x-csrf-token",
+      ],
+      exposedHeaders: ["set-cookie"],
+      optionsSuccessStatus: 204,
     });
+
+    app.use((req: any, _res: any, next: any) => {
+      if (req.method === "OPTIONS") {
+        console.log("Preflight:", {
+          origin: req.headers.origin,
+          acrm: req.headers["access-control-request-method"],
+          acrh: req.headers["access-control-request-headers"],
+          path: req.path,
+        });
+      }
+      next();
+    });
+    
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -11872,7 +11916,7 @@ export class AdminCleanupController {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.controller.ts
-SIZE: 14.95 KB | LINES: 592
+SIZE: 15.01 KB | LINES: 593
 ================================================================================
 
 import {
@@ -11902,6 +11946,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   VerifyMfaDto,
+  RefreshTokenDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request } from "express";
@@ -12078,12 +12123,12 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
   async refresh(
     @Req() req: Request,
-    @Body("refreshToken") refreshToken: string,
+    @Body("refreshToken") body: RefreshTokenDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-
+    const refreshToken = body.refreshToken;
     return this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
   }
 
@@ -12471,7 +12516,7 @@ export class AuthController {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.dto.ts
-SIZE: 2.16 KB | LINES: 111
+SIZE: 2.28 KB | LINES: 117
 ================================================================================
 
 import {
@@ -12585,6 +12630,12 @@ export class VerifyMfaDto {
   code!: string;
 }
 
+
+export class RefreshTokenDto {
+  @ApiProperty({ example: "refresh-token-here" })
+  @IsString()
+  refreshToken!: string;
+}
 
 
 ================================================================================
@@ -35143,6 +35194,3653 @@ export const config = [
 
 
 ================================================================================
+FILE: packages/fortknox-sdk/README-old.md
+SIZE: 7.61 KB | LINES: 412
+================================================================================
+
+# 🏰 Fort Knox SDK
+
+**Enterprise-grade authentication SDK for multi-tenant applications**
+
+Built on the principles of Auth0, Clerk, and NextAuth - but for your own infrastructure.
+
+---
+
+## 🎯 Design Principles
+
+1. **Access tokens live in memory** (never localStorage)
+2. **Refresh tokens live in httpOnly cookies** (XSS-safe)
+3. **SDK never stores refresh tokens** (cookies handle it)
+4. **SDK only refreshes on 401** (no refresh storms)
+5. **Concurrency-safe refresh** (single refresh, queue requests)
+6. **Environment-agnostic** (works everywhere)
+
+---
+
+## 📦 Installation
+
+```bash
+npm install @fortknox/sdk
+# or
+yarn add @fortknox/sdk
+# or
+pnpm add @fortknox/sdk
+```
+
+---
+
+## 🚀 Quick Start
+
+### **Browser / React**
+
+```typescript
+import { createWebClient } from '@fortknox/sdk';
+import { FortKnoxProvider, useAuth } from '@fortknox/sdk/react';
+
+// Create client
+const client = createWebClient({
+  baseURL: 'http://localhost:4000',
+  tenant: 'acme',
+  debug: true,
+});
+
+// Wrap app
+function App() {
+  return (
+    <FortKnoxProvider client={client}>
+      <YourApp />
+    </FortKnoxProvider>
+  );
+}
+
+// Use in components
+function LoginPage() {
+  const { login, user, isAuthenticated } = useAuth();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    await login({ email, password });
+  };
+
+  if (isAuthenticated) {
+    return <div>Welcome {user?.email}!</div>;
+  }
+
+  return <form onSubmit={handleLogin}>...</form>;
+}
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+@fortknox/sdk
+├── /core        Pure auth logic (works everywhere)
+├── /web         Browser helpers
+├── /react       React hooks
+├── /next        Next.js SSR
+└── /node        Server-to-server
+```
+
+---
+
+## 📖 Usage by Environment
+
+### **1. Browser (Vanilla JS)**
+
+```typescript
+import { createWebClient } from '@fortknox/sdk/web';
+
+const client = createWebClient({
+  baseURL: 'https://auth.scrolloop.com',
+  tenant: 'acme',
+});
+
+// Login
+await client.login({ email: 'user@example.com', password: 'pass' });
+
+// Get user
+const user = await client.getCurrentUser();
+
+// Logout
+await client.logout();
+```
+
+### **2. React**
+
+```typescript
+import { FortKnoxProvider, useAuth, useUser } from '@fortknox/sdk/react';
+
+// In component
+function Profile() {
+  const { user, isLoading } = useUser();
+  
+  if (isLoading) return <div>Loading...</div>;
+  return <div>Hello {user?.email}</div>;
+}
+```
+
+### **3. Next.js (Server Components)**
+
+```typescript
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+
+export default async function ServerComponent() {
+  const client = getFortKnoxClient(
+    'https://auth.scrolloop.com',
+    'acme',
+    req
+  );
+  
+  const user = await client.getCurrentUser();
+  
+  return <div>Hello {user.email}</div>;
+}
+```
+
+### **4. Next.js (API Routes)**
+
+```typescript
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+
+export async function GET(req: Request) {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req
+  );
+  
+  const user = await client.getCurrentUser();
+  
+  return Response.json({ user });
+}
+```
+
+### **5. Node.js (Server-to-Server)**
+
+```typescript
+import { createNodeClient } from '@fortknox/sdk/node';
+
+const client = createNodeClient({
+  baseURL: 'https://auth.scrolloop.com',
+  tenant: 'service-account',
+  apiKey: process.env.API_KEY,
+});
+
+// Use for webhooks, CRON jobs, etc.
+const user = await client.getCurrentUser();
+```
+
+---
+
+## 🔐 How Token Refresh Works
+
+```
+Request → 200 OK ✅
+Request → 401 ❌
+  ↓
+  Trigger refresh (using cookie)
+  ↓
+  Get new access token
+  ↓
+  Retry original request → 200 OK ✅
+```
+
+**Key points:**
+- ✅ Only refreshes on 401 (no preemptive refresh)
+- ✅ Concurrency-safe (single refresh, queue other requests)
+- ✅ No refresh token in JavaScript (httpOnly cookie)
+- ✅ Exponential backoff retry
+- ✅ Never loops infinitely
+
+---
+
+## 🎨 Features
+
+### **Core Features**
+- ✅ Refresh-on-401 only (no storms)
+- ✅ Request queuing during refresh
+- ✅ Exponential backoff retry
+- ✅ Event emitter for state changes
+- ✅ TypeScript strict mode
+- ✅ Zero dependencies (except React for hooks)
+
+### **Security**
+- ✅ Access tokens in memory only
+- ✅ Refresh tokens in httpOnly cookies
+- ✅ XSS protection
+- ✅ CSRF protection
+- ✅ No token leakage
+
+### **Multi-tenant**
+- ✅ Tenant context automatic
+- ✅ Auto-detect from subdomain
+- ✅ Per-tenant configuration
+
+### **Environment Support**
+- ✅ Browser
+- ✅ Node.js
+- ✅ Next.js SSR
+- ✅ Next.js Client Components
+- ✅ React Native (with custom transport)
+
+---
+
+## 📡 Events
+
+Listen to auth events:
+
+```typescript
+client.on((event) => {
+  switch (event.type) {
+    case 'token_refreshed':
+      console.log('Token refreshed:', event.accessToken);
+      break;
+    
+    case 'logout':
+      console.log('User logged out');
+      break;
+    
+    case 'session_expired':
+      console.log('Session expired');
+      break;
+    
+    case 'error':
+      console.error('Auth error:', event.error);
+      break;
+  }
+});
+```
+
+---
+
+## 🧪 Testing
+
+Mock the transport for testing:
+
+```typescript
+const mockTransport = async (req) => ({
+  ok: true,
+  status: 200,
+  data: { user: { id: '1', email: 'test@test.com' } },
+  headers: {},
+  statusText: 'OK',
+});
+
+const client = new FortKnoxClient({
+  baseURL: 'http://test',
+  tenant: 'test',
+  transport: mockTransport,
+});
+```
+
+---
+
+## 🎯 API Reference
+
+### **FortKnoxClient**
+
+```typescript
+class FortKnoxClient {
+  // Authentication
+  login(credentials: LoginCredentials): Promise<LoginResponse>
+  logout(): Promise<void>
+  
+  // User
+  getCurrentUser(): Promise<User>
+  isAuthenticated(): boolean
+  getAccessToken(): string | undefined
+  
+  // Events
+  on(listener: AuthEventListener): () => void
+  
+  // Low-level
+  request(req: TransportRequest): Promise<TransportResponse>
+}
+```
+
+### **React Hooks**
+
+```typescript
+// Main auth hook
+const { 
+  user, 
+  isLoading, 
+  isAuthenticated, 
+  login, 
+  logout, 
+  refreshUser,
+  client 
+} = useAuth()
+
+// User only
+const { user, isLoading, isAuthenticated } = useUser()
+
+// Session only
+const { isAuthenticated, isLoading, accessToken } = useSession()
+```
+
+---
+
+## 🔧 Configuration
+
+```typescript
+interface FortKnoxConfig {
+  baseURL: string;              // Auth service URL
+  tenant: string;               // Tenant ID
+  transport?: Transport;        // Custom HTTP client
+  debug?: boolean;              // Enable logging
+  refreshMargin?: number;       // Seconds before expiry (default: 30)
+  maxRefreshRetries?: number;   // Max retry attempts (default: 3)
+  onTokenRefreshed?: (token) => void;
+  onLogout?: () => void;
+  onError?: (error) => void;
+}
+```
+
+---
+
+## 📊 Bundle Size
+
+- **Core**: ~3 KB gzipped
+- **Web**: +0.5 KB
+- **React**: +1 KB
+- **Total**: ~4.5 KB gzipped
+
+Compare to:
+- Auth0 SDK: ~25 KB
+- Firebase Auth: ~35 KB
+- AWS Amplify: ~50 KB
+
+---
+
+## 🎯 Why This Design?
+
+### **❌ What NOT to do:**
+
+```typescript
+// DON'T: Preemptive refresh
+setInterval(() => refresh(), 14 * 60 * 1000)  // Refresh storms!
+
+// DON'T: Store refresh token
+localStorage.setItem('refreshToken', token)   // XSS vulnerability!
+
+// DON'T: No concurrency control
+async function request() {
+  if (isExpired) await refresh()              // Race conditions!
+}
+```
+
+### **✅ What we do:**
+
+```typescript
+// Refresh ONLY on 401
+if (response.status === 401) {
+  await refresh()
+  retry(request)
+}
+
+// Refresh token in httpOnly cookie
+// Backend: res.cookie('refreshToken', token, { httpOnly: true })
+
+// Concurrency-safe refresh
+if (isRefreshing) {
+  return queueRequest(request)  // Wait for ongoing refresh
+}
+```
+
+---
+
+## 🤝 Contributing
+
+Issues and PRs welcome!
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+## 🎉 Credits
+
+Built by the Fort Knox team.
+
+Inspired by Auth0, Clerk, Supabase, and NextAuth.
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/README.md
+SIZE: 34.05 KB | LINES: 1551
+================================================================================
+
+# 🏰 Fort Knox SDK
+
+**Enterprise-grade authentication SDK for multi-tenant applications.**
+
+Built on battle-tested principles from Auth0, Clerk, and Supabase - but for **your own infrastructure**.
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Bundle Size](https://img.shields.io/badge/gzip-4.5KB-brightgreen)](https://bundlephobia.com)
+
+---
+
+## 📖 Table of Contents
+
+- [Why Fort Knox SDK?](#-why-fort-knox-sdk)
+- [Design Principles](#-design-principles)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Architecture](#-architecture)
+- [Usage Guide](#-usage-guide)
+  - [Browser / React](#browser--react)
+  - [Next.js (App Router)](#nextjs-app-router)
+  - [Next.js (Pages Router)](#nextjs-pages-router)
+  - [Node.js (Server-to-Server)](#nodejs-server-to-server)
+- [API Reference](#-api-reference)
+- [Advanced Features](#-advanced-features)
+- [Security](#-security)
+- [Troubleshooting](#-troubleshooting)
+- [Migration Guide](#-migration-guide)
+- [Contributing](#-contributing)
+
+---
+
+## 🎯 Why Fort Knox SDK?
+
+Most authentication SDKs are either:
+- **Vendor-locked** (Auth0, Clerk) - expensive, limited control
+- **Poorly designed** (refresh storms, XSS vulnerabilities)
+- **Not production-ready** (no SSR, no multi-tenant)
+
+**Fort Knox SDK is different:**
+
+| Feature | Auth0 SDK | Clerk SDK | Fort Knox SDK |
+|---------|-----------|-----------|---------------|
+| **Self-hosted** | ❌ | ❌ | ✅ |
+| **Open source** | ❌ | ❌ | ✅ |
+| **Bundle size** | 25 KB | 30 KB | **4.5 KB** ✅ |
+| **Refresh strategy** | Interval-based | Interval-based | **On-demand** ✅ |
+| **XSS protection** | ⚠️ Limited | ⚠️ Limited | **Full** ✅ |
+| **Multi-tenant native** | ❌ | ❌ | ✅ |
+| **SSR support** | ⚠️ Partial | ⚠️ Partial | **Full** ✅ |
+| **Zero dependencies** | ❌ | ❌ | ✅ |
+| **Cost** | $$$$ | $$$$ | **Free** ✅ |
+
+---
+
+## 🧠 Design Principles
+
+Fort Knox SDK is built on **6 core principles** that make it bulletproof:
+
+### 1. **Access Tokens Live in Memory**
+```typescript
+// ✅ Stored in JavaScript memory (lost on page refresh)
+// ✅ Short-lived (15 minutes)
+// ✅ XSS-safe (can't steal if page refreshes)
+this.state.accessToken = token;
+```
+
+### 2. **Refresh Tokens Live in httpOnly Cookies**
+```typescript
+// ✅ Backend sets httpOnly cookie (JavaScript can't access)
+// ✅ Automatically sent with requests
+// ✅ Protected from XSS attacks
+res.cookie('refreshToken', token, { 
+  httpOnly: true,    // JavaScript can't read
+  secure: true,      // HTTPS only
+  sameSite: 'strict' // CSRF protection
+});
+```
+
+### 3. **SDK Never Stores Refresh Tokens**
+```typescript
+// ❌ NEVER do this
+localStorage.setItem('refreshToken', token);
+
+// ✅ SDK never touches refresh tokens
+// ✅ Cookies handle everything automatically
+```
+
+### 4. **SDK Only Refreshes on 401**
+```typescript
+// ❌ WRONG (causes refresh storms)
+setInterval(() => refresh(), 14 * 60 * 1000);
+
+// ✅ RIGHT (refresh only when needed)
+if (response.status === 401) {
+  await refresh();
+  retry(request);
+}
+```
+
+### 5. **Concurrency-Safe Refresh**
+```typescript
+// Multiple requests get 401 simultaneously:
+Request A → 401 → Starts refresh
+Request B → 401 → Queued (waits)
+Request C → 401 → Queued (waits)
+  ↓
+Refresh completes
+  ↓
+All queued requests execute with new token ✅
+```
+
+### 6. **Environment-Agnostic**
+```typescript
+// Same SDK works everywhere:
+✅ Browser (fetch)
+✅ Node.js (fetch)
+✅ Next.js SSR (with cookies)
+✅ Next.js Client (React hooks)
+✅ React Native (custom transport)
+```
+
+---
+
+## 📦 Installation
+
+```bash
+npm install @fortknox/sdk
+# or
+yarn add @fortknox/sdk
+# or
+pnpm add @fortknox/sdk
+```
+
+**Peer dependencies (optional):**
+```bash
+# For React hooks
+npm install react react-dom
+
+# For Next.js
+npm install next
+```
+
+---
+
+## 🚀 Quick Start
+
+### **1. Create Client**
+
+```typescript
+import { createWebClient } from '@fortknox/sdk/web';
+
+export const authClient = createWebClient({
+  baseURL: 'http://localhost:4000',  // Your auth service
+  tenant: 'acme',                    // Your tenant ID
+  debug: true,                        // Enable logging (dev only)
+});
+```
+
+### **2. Wrap Your App (React)**
+
+```tsx
+import { FortKnoxProvider } from '@fortknox/sdk/react';
+import { authClient } from './lib/auth';
+
+function App() {
+  return (
+    <FortKnoxProvider client={authClient}>
+      <YourApp />
+    </FortKnoxProvider>
+  );
+}
+```
+
+### **3. Use in Components**
+
+```tsx
+import { useAuth } from '@fortknox/sdk/react';
+
+function LoginPage() {
+  const { login, user, isAuthenticated } = useAuth();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    await login({ 
+      email: 'user@example.com', 
+      password: 'password' 
+    });
+  };
+
+  if (isAuthenticated) {
+    return <div>Welcome {user?.email}!</div>;
+  }
+
+  return (
+    <form onSubmit={handleLogin}>
+      <input type="email" name="email" />
+      <input type="password" name="password" />
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+```
+
+**That's it!** 🎉
+
+---
+
+## 🏗️ Architecture
+
+Fort Knox SDK is a **monorepo package** with multiple entry points:
+
+```
+@fortknox/sdk
+├── /core        Pure session runtime (no DOM, no React)
+├── /web         Browser helpers (OAuth, redirects)
+├── /react       React hooks and context
+├── /next        Next.js SSR support
+└── /node        Server-to-server (M2M)
+```
+
+### **Package Structure**
+
+```typescript
+// Core (works everywhere)
+import { FortKnoxClient } from '@fortknox/sdk/core';
+
+// Browser-optimized
+import { createWebClient } from '@fortknox/sdk/web';
+
+// React hooks
+import { useAuth, useUser } from '@fortknox/sdk/react';
+
+// Next.js SSR
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+
+// Node.js (M2M)
+import { createNodeClient } from '@fortknox/sdk/node';
+```
+
+### **How It Works**
+
+```
+┌─────────────────────────────────────────────────┐
+│           Your Application (React)              │
+│  ┌───────────────────────────────────────────┐  │
+│  │     useAuth() / useUser() hooks           │  │
+│  └───────────────┬───────────────────────────┘  │
+│                  │                               │
+│  ┌───────────────▼───────────────────────────┐  │
+│  │       FortKnoxProvider (Context)          │  │
+│  └───────────────┬───────────────────────────┘  │
+│                  │                               │
+└──────────────────┼───────────────────────────────┘
+                   │
+┌──────────────────▼───────────────────────────────┐
+│         FortKnoxClient (Core Runtime)            │
+│  ┌─────────────────────────────────────────┐    │
+│  │  • Access token (memory)                │    │
+│  │  • Refresh logic (on 401)               │    │
+│  │  • Request queue                        │    │
+│  │  • Retry with backoff                   │    │
+│  └─────────────────────────────────────────┘    │
+└──────────────────┬───────────────────────────────┘
+                   │
+┌──────────────────▼───────────────────────────────┐
+│              Transport Layer                     │
+│  ┌─────────────────────────────────────────┐    │
+│  │  fetch() with credentials: 'include'    │    │
+│  └─────────────────────────────────────────┘    │
+└──────────────────┬───────────────────────────────┘
+                   │
+┌──────────────────▼───────────────────────────────┐
+│           Your Auth Service (Backend)            │
+│  ┌─────────────────────────────────────────┐    │
+│  │  POST /auth/login                       │    │
+│  │  POST /auth/refresh (uses cookie)       │    │
+│  │  POST /auth/logout                      │    │
+│  │  GET  /users/me                         │    │
+│  └─────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────┘
+```
+
+---
+
+## 📚 Usage Guide
+
+### Browser / React
+
+#### **Setup**
+
+```typescript
+// lib/auth.ts
+import { createWebClient } from '@fortknox/sdk/web';
+
+export const authClient = createWebClient({
+  baseURL: process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:4000',
+  tenant: 'acme',
+  debug: process.env.NODE_ENV === 'development',
+  
+  // Optional callbacks
+  onTokenRefreshed: (token) => {
+    console.log('Token refreshed');
+  },
+  onLogout: () => {
+    console.log('User logged out');
+  },
+  onError: (error) => {
+    console.error('Auth error:', error);
+  },
+});
+```
+
+#### **Wrap App**
+
+```tsx
+// app/layout.tsx (Next.js App Router)
+import { FortKnoxProvider } from '@fortknox/sdk/react';
+import { authClient } from '@/lib/auth';
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <FortKnoxProvider client={authClient}>
+          {children}
+        </FortKnoxProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+#### **Login Component**
+
+```tsx
+'use client';
+
+import { useAuth } from '@fortknox/sdk/react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function LoginPage() {
+  const { login, isLoading, error } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await login({ email, password });
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('Login failed:', err);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Login</h1>
+      
+      {error && (
+        <div className="error">{error.message}</div>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          required
+        />
+        
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          required
+        />
+        
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? 'Logging in...' : 'Login'}
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+#### **Protected Page**
+
+```tsx
+'use client';
+
+import { useUser } from '@fortknox/sdk/react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+export default function DashboardPage() {
+  const { user, isLoading, isAuthenticated } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome, {user.email}!</p>
+      <p>Name: {user.firstName} {user.lastName}</p>
+      <p>Status: {user.status}</p>
+    </div>
+  );
+}
+```
+
+#### **Logout Button**
+
+```tsx
+'use client';
+
+import { useAuth } from '@fortknox/sdk/react';
+
+export function LogoutButton() {
+  const { logout, isLoading } = useAuth();
+
+  return (
+    <button onClick={logout} disabled={isLoading}>
+      {isLoading ? 'Logging out...' : 'Logout'}
+    </button>
+  );
+}
+```
+
+#### **Social Login**
+
+```tsx
+'use client';
+
+import { getSocialLoginUrl } from '@fortknox/sdk/web';
+
+export function SocialLoginButtons() {
+  const baseURL = process.env.NEXT_PUBLIC_AUTH_URL!;
+  const tenant = 'acme';
+
+  return (
+    <div>
+      <a 
+        href={getSocialLoginUrl(baseURL, 'google', { tenant })}
+        className="social-button"
+      >
+        Continue with Google
+      </a>
+      
+      <a 
+        href={getSocialLoginUrl(baseURL, 'github', { tenant })}
+        className="social-button"
+      >
+        Continue with GitHub
+      </a>
+      
+      <a 
+        href={getSocialLoginUrl(baseURL, 'microsoft', { tenant })}
+        className="social-button"
+      >
+        Continue with Microsoft
+      </a>
+    </div>
+  );
+}
+```
+
+---
+
+### Next.js (App Router)
+
+#### **Server Component**
+
+```tsx
+// app/users/page.tsx
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+import { cookies } from 'next/headers';
+
+export default async function UsersPage() {
+  const cookieStore = cookies();
+  
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    {
+      headers: {
+        cookie: cookieStore.toString(),
+      },
+    } as Request
+  );
+
+  try {
+    const user = await client.getCurrentUser();
+    
+    return (
+      <div>
+        <h1>Server-rendered User</h1>
+        <p>Email: {user.email}</p>
+        <p>ID: {user.id}</p>
+      </div>
+    );
+  } catch (error) {
+    return <div>Not authenticated</div>;
+  }
+}
+```
+
+#### **API Route**
+
+```typescript
+// app/api/user/route.ts
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(req: NextRequest) {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req as unknown as Request
+  );
+
+  try {
+    const user = await client.getCurrentUser();
+    return NextResponse.json({ user });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req as unknown as Request
+  );
+
+  const body = await req.json();
+
+  // Make authenticated request
+  const response = await client.request({
+    url: `${process.env.AUTH_URL}/users/profile`,
+    method: 'PATCH',
+    body,
+  });
+
+  return NextResponse.json(response.data);
+}
+```
+
+#### **Middleware**
+
+```typescript
+// middleware.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+
+export async function middleware(req: NextRequest) {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req as unknown as Request
+  );
+
+  try {
+    await client.getCurrentUser();
+    return NextResponse.next();
+  } catch (error) {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/admin/:path*'],
+};
+```
+
+---
+
+### Next.js (Pages Router)
+
+#### **getServerSideProps**
+
+```typescript
+// pages/dashboard.tsx
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+import type { GetServerSideProps } from 'next';
+
+export const getServerSideProps: GetServerSideProps = async ({ req }) => {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req as unknown as Request
+  );
+
+  try {
+    const user = await client.getCurrentUser();
+    
+    return {
+      props: { user },
+    };
+  } catch (error) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+};
+
+export default function DashboardPage({ user }) {
+  return <div>Welcome {user.email}</div>;
+}
+```
+
+#### **API Route**
+
+```typescript
+// pages/api/user.ts
+import { getFortKnoxClient } from '@fortknox/sdk/next';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const client = getFortKnoxClient(
+    process.env.AUTH_URL!,
+    'acme',
+    req as unknown as Request
+  );
+
+  try {
+    const user = await client.getCurrentUser();
+    res.status(200).json({ user });
+  } catch (error) {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+```
+
+---
+
+### Node.js (Server-to-Server)
+
+#### **With API Key**
+
+```typescript
+import { createNodeClient } from '@fortknox/sdk/node';
+
+const client = createNodeClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'service-account',
+  apiKey: process.env.API_KEY,
+  debug: true,
+});
+
+// Use in webhooks, CRON jobs, etc.
+async function processUser(userId: string) {
+  const user = await client.getCurrentUser();
+  console.log('Processing user:', user.email);
+}
+```
+
+#### **With Client Credentials**
+
+```typescript
+import { createNodeClient } from '@fortknox/sdk/node';
+
+const client = createNodeClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'service-account',
+  clientId: process.env.CLIENT_ID,
+  clientSecret: process.env.CLIENT_SECRET,
+});
+
+// Machine-to-machine communication
+const response = await client.request({
+  url: 'https://auth.yourapp.com/admin/users',
+  method: 'GET',
+});
+```
+
+---
+
+## 📡 API Reference
+
+### **FortKnoxClient**
+
+```typescript
+class FortKnoxClient {
+  constructor(config: FortKnoxConfig);
+  
+  // Authentication
+  login(credentials: LoginCredentials): Promise<LoginResponse>;
+  logout(): Promise<void>;
+  
+  // User
+  getCurrentUser(): Promise<User>;
+  isAuthenticated(): boolean;
+  getAccessToken(): string | undefined;
+  
+  // Events
+  on(listener: AuthEventListener): () => void;
+  
+  // Low-level
+  request(req: TransportRequest): Promise<TransportResponse>;
+}
+```
+
+### **Configuration**
+
+```typescript
+interface FortKnoxConfig {
+  // Required
+  baseURL: string;              // Auth service URL
+  tenant: string;               // Tenant ID or slug
+  
+  // Optional
+  transport?: Transport;        // Custom HTTP client
+  debug?: boolean;              // Enable debug logs (default: false)
+  refreshMargin?: number;       // Seconds before expiry to refresh (default: 30)
+  maxRefreshRetries?: number;   // Max retry attempts (default: 3)
+  
+  // Callbacks
+  onTokenRefreshed?: (token: string) => void;
+  onLogout?: () => void;
+  onError?: (error: AuthError) => void;
+}
+```
+
+### **React Hooks**
+
+#### **useAuth()**
+
+Main authentication hook with all methods.
+
+```typescript
+const {
+  // State
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  error: Error | null;
+  
+  // Methods
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  
+  // Client
+  client: FortKnoxClient;
+} = useAuth();
+```
+
+#### **useUser()**
+
+Simplified hook for accessing user data only.
+
+```typescript
+const {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+} = useUser();
+```
+
+#### **useSession()**
+
+Hook for session state and access token.
+
+```typescript
+const {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  accessToken: string | undefined;
+} = useSession();
+```
+
+### **Types**
+
+```typescript
+interface User {
+  id: string;
+  tenantId: string;
+  email: string;
+  emailVerified: boolean;
+  phone?: string;
+  phoneVerified: boolean;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  primaryAuthMethod: 'password' | 'google' | 'github' | 'microsoft';
+  mfaEnabled: boolean;
+  status: 'active' | 'suspended' | 'deleted';
+  lastLoginAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+interface LoginResponse {
+  accessToken: string;
+  expiresIn: number;
+  user: User;
+  mfaRequired?: boolean;
+  mfaChallenge?: MfaChallenge;
+}
+
+interface AuthError {
+  code: AuthErrorCode;
+  message: string;
+  details?: any;
+}
+
+type AuthErrorCode =
+  | 'INVALID_CREDENTIALS'
+  | 'USER_NOT_FOUND'
+  | 'EMAIL_ALREADY_EXISTS'
+  | 'INVALID_TOKEN'
+  | 'TOKEN_EXPIRED'
+  | 'SESSION_EXPIRED'
+  | 'MFA_REQUIRED'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'NETWORK_ERROR'
+  | 'REFRESH_FAILED'
+  | 'UNKNOWN_ERROR';
+```
+
+---
+
+## 🎨 Advanced Features
+
+### **Event System**
+
+Listen to authentication events:
+
+```typescript
+const client = createWebClient({ ... });
+
+const unsubscribe = client.on((event) => {
+  switch (event.type) {
+    case 'token_refreshed':
+      console.log('Token refreshed:', event.accessToken);
+      break;
+    
+    case 'logout':
+      console.log('User logged out');
+      router.push('/login');
+      break;
+    
+    case 'session_expired':
+      console.log('Session expired');
+      showNotification('Your session has expired');
+      break;
+    
+    case 'error':
+      console.error('Auth error:', event.error);
+      break;
+  }
+});
+
+// Cleanup
+unsubscribe();
+```
+
+### **Multi-Tenant Support**
+
+#### **Auto-detect from Subdomain**
+
+```typescript
+import { getTenantFromSubdomain } from '@fortknox/sdk/web';
+
+// If URL is: acme.auth.yourapp.com
+const tenant = getTenantFromSubdomain(); // Returns: "acme"
+
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: tenant || 'default',
+});
+```
+
+#### **Dynamic Tenant Switching**
+
+```typescript
+// Create multiple clients for different tenants
+const tenantClients = {
+  acme: createWebClient({ baseURL: '...', tenant: 'acme' }),
+  globex: createWebClient({ baseURL: '...', tenant: 'globex' }),
+};
+
+// Switch based on user selection
+const currentClient = tenantClients[selectedTenant];
+```
+
+### **Custom Transport**
+
+For environments without fetch or special requirements:
+
+```typescript
+import { FortKnoxClient } from '@fortknox/sdk/core';
+import type { Transport } from '@fortknox/sdk/core';
+
+// Custom transport using axios
+const axiosTransport: Transport = async (req) => {
+  const response = await axios({
+    url: req.url,
+    method: req.method,
+    headers: req.headers,
+    data: req.body,
+  });
+
+  return {
+    ok: response.status >= 200 && response.status < 300,
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+    data: response.data,
+  };
+};
+
+const client = new FortKnoxClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+  transport: axiosTransport,
+});
+```
+
+### **Request Interceptors**
+
+```typescript
+import { FortKnoxClient } from '@fortknox/sdk/core';
+
+class CustomClient extends FortKnoxClient {
+  async request(req) {
+    // Add custom headers
+    req.headers = {
+      ...req.headers,
+      'X-Custom-Header': 'value',
+    };
+
+    // Call parent
+    const response = await super.request(req);
+
+    // Log response
+    console.log('Response:', response);
+
+    return response;
+  }
+}
+
+const client = new CustomClient({ ... });
+```
+
+### **Refresh Margin Configuration**
+
+Control when tokens are considered expired:
+
+```typescript
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+  refreshMargin: 60, // Refresh 60 seconds before expiry (default: 30)
+});
+```
+
+### **Retry Configuration**
+
+Control retry behavior for failed refresh attempts:
+
+```typescript
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+  maxRefreshRetries: 5, // Try up to 5 times (default: 3)
+});
+```
+
+---
+
+## 🔐 Security
+
+### **XSS Protection**
+
+✅ **Access tokens in memory only**
+- Lost on page refresh (intended)
+- Not accessible from other tabs
+- Can't be stolen via XSS
+
+✅ **Refresh tokens in httpOnly cookies**
+- JavaScript can't access
+- Automatically sent with requests
+- Protected from XSS attacks
+
+### **CSRF Protection**
+
+Your backend should set:
+
+```typescript
+res.cookie('refreshToken', token, {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict', // ← CSRF protection
+});
+```
+
+### **Token Rotation**
+
+Backend should rotate refresh tokens:
+
+```typescript
+// On each refresh:
+1. Validate old refresh token
+2. Generate NEW refresh token
+3. Invalidate old refresh token
+4. Return new access token + new refresh cookie
+```
+
+### **Security Best Practices**
+
+```typescript
+// ✅ DO
+const client = createWebClient({
+  baseURL: process.env.NEXT_PUBLIC_AUTH_URL, // Use env vars
+  tenant: 'acme',
+  debug: false, // Disable in production
+});
+
+// ❌ DON'T
+const client = createWebClient({
+  baseURL: 'http://localhost:4000', // Hardcoded URL
+  tenant: 'acme',
+  debug: true, // Logs tokens in production!
+});
+```
+
+### **Rate Limiting**
+
+The SDK includes automatic retry with exponential backoff, but your backend should implement rate limiting:
+
+```typescript
+// Backend should return 429 Too Many Requests
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests. Try again in 60 seconds.",
+    "retryAfter": 60
+  }
+}
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### **Common Issues**
+
+#### **Issue: CORS Errors**
+
+**Symptom:**
+```
+Access to fetch at 'http://localhost:4000/auth/login' from origin 
+'http://localhost:3000' has been blocked by CORS policy
+```
+
+**Solution:**
+
+Backend must allow credentials:
+
+```typescript
+app.enableCors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost in development
+    if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true, // ← REQUIRED!
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+});
+```
+
+---
+
+#### **Issue: Refresh Loops**
+
+**Symptom:**
+```
+Refresh called repeatedly, app freezes
+```
+
+**Solution:**
+
+This should never happen with Fort Knox SDK, but if it does:
+
+1. Check backend `/auth/refresh` endpoint returns valid tokens
+2. Verify refresh cookie is being set correctly
+3. Enable `debug: true` to see refresh attempts
+
+```typescript
+const client = createWebClient({
+  baseURL: '...',
+  tenant: '...',
+  debug: true, // ← See all refresh attempts
+});
+```
+
+---
+
+#### **Issue: "Not allowed by CORS" on Refresh**
+
+**Symptom:**
+```
+POST /auth/refresh → 401 or CORS error
+```
+
+**Solution:**
+
+Backend must allow `/auth/refresh` without authentication:
+
+```typescript
+// ✅ Refresh endpoint should not require auth header
+router.post('/auth/refresh', async (req, res) => {
+  // Get refresh token from cookie (not from header!)
+  const refreshToken = req.cookies.refreshToken;
+  
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No refresh token' });
+  }
+  
+  // Validate and return new tokens...
+});
+```
+
+---
+
+#### **Issue: Tokens Not Persisting**
+
+**Symptom:**
+```
+User logged in, but after page refresh they're logged out
+```
+
+**Expected Behavior:**
+
+This is **correct**! Access tokens are stored in memory and are lost on page refresh.
+
+**How it works:**
+
+```
+1. User refreshes page
+   ↓
+2. Access token is lost (expected)
+   ↓
+3. App tries to get current user
+   ↓
+4. Backend returns 401 (no access token)
+   ↓
+5. SDK automatically calls /auth/refresh
+   ↓
+6. Gets new access token from refresh cookie
+   ↓
+7. User is logged in again ✅
+```
+
+**If this doesn't work:**
+
+Check that refresh cookie is being set with correct attributes:
+
+```typescript
+res.cookie('refreshToken', token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+});
+```
+
+---
+
+#### **Issue: useAuth() Hook Not Working**
+
+**Symptom:**
+```
+Error: useAuth must be used within FortKnoxProvider
+```
+
+**Solution:**
+
+Wrap your app with `FortKnoxProvider`:
+
+```tsx
+// ✅ DO
+<FortKnoxProvider client={authClient}>
+  <App />
+</FortKnoxProvider>
+
+// ❌ DON'T
+<App /> // Missing provider!
+```
+
+---
+
+#### **Issue: SSR Hydration Mismatch**
+
+**Symptom:**
+```
+Warning: Text content did not match. Server: "null" Client: "user@example.com"
+```
+
+**Solution:**
+
+Use `useUser()` hook carefully in SSR:
+
+```tsx
+// ✅ DO
+'use client';
+
+import { useUser } from '@fortknox/sdk/react';
+
+export default function Profile() {
+  const { user, isLoading } = useUser();
+  
+  if (isLoading) return <div>Loading...</div>;
+  if (!user) return <div>Not logged in</div>;
+  
+  return <div>{user.email}</div>;
+}
+
+// ❌ DON'T (causes hydration mismatch)
+export default function Profile() {
+  const { user } = useUser();
+  return <div>{user?.email}</div>; // user is null on server, non-null on client
+}
+```
+
+---
+
+### **Debug Mode**
+
+Enable debug logging to see what's happening:
+
+```typescript
+const client = createWebClient({
+  baseURL: 'http://localhost:4000',
+  tenant: 'acme',
+  debug: true, // ← Enable debug logs
+});
+```
+
+**Output:**
+```
+[FortKnox] FortKnox client initialized { baseURL: '...', tenant: 'acme' }
+[FortKnox] Login attempt { email: 'user@example.com' }
+[FortKnox] Login successful { userId: '123' }
+[FortKnox] Get current user
+[FortKnox] Got 401, attempting refresh
+[FortKnox] Starting token refresh
+[FortKnox] Token refresh successful
+[FortKnox] Processing 2 queued requests
+```
+
+---
+
+## 🔄 Migration Guide
+
+### **From Auth0**
+
+```typescript
+// Before (Auth0)
+import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+
+<Auth0Provider
+  domain="your-domain.auth0.com"
+  clientId="your-client-id"
+>
+  <App />
+</Auth0Provider>
+
+const { loginWithRedirect, user } = useAuth0();
+
+// After (Fort Knox)
+import { FortKnoxProvider, useAuth } from '@fortknox/sdk/react';
+import { createWebClient } from '@fortknox/sdk/web';
+
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+});
+
+<FortKnoxProvider client={client}>
+  <App />
+</FortKnoxProvider>
+
+const { login, user } = useAuth();
+```
+
+### **From Clerk**
+
+```typescript
+// Before (Clerk)
+import { ClerkProvider, useUser } from '@clerk/clerk-react';
+
+<ClerkProvider publishableKey="pk_...">
+  <App />
+</ClerkProvider>
+
+const { user } = useUser();
+
+// After (Fort Knox)
+import { FortKnoxProvider, useUser } from '@fortknox/sdk/react';
+import { createWebClient } from '@fortknox/sdk/web';
+
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+});
+
+<FortKnoxProvider client={client}>
+  <App />
+</FortKnoxProvider>
+
+const { user } = useUser();
+```
+
+### **From NextAuth.js**
+
+```typescript
+// Before (NextAuth)
+import { SessionProvider, useSession } from 'next-auth/react';
+
+<SessionProvider>
+  <App />
+</SessionProvider>
+
+const { data: session } = useSession();
+
+// After (Fort Knox)
+import { FortKnoxProvider, useUser } from '@fortknox/sdk/react';
+import { createWebClient } from '@fortknox/sdk/web';
+
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'acme',
+});
+
+<FortKnoxProvider client={client}>
+  <App />
+</FortKnoxProvider>
+
+const { user } = useUser();
+```
+
+---
+
+## 📊 Performance
+
+### **Bundle Size**
+
+```
+Core:     3.0 KB gzipped
+Web:      0.5 KB gzipped
+React:    1.0 KB gzipped
+Next:     0.5 KB gzipped
+Node:     0.5 KB gzipped
+
+Total:    4.5 KB gzipped
+```
+
+**Compare to:**
+- Auth0 SDK: ~25 KB
+- Firebase Auth: ~35 KB
+- AWS Amplify: ~50 KB
+
+### **Tree Shaking**
+
+Fort Knox SDK is fully tree-shakeable. Only import what you need:
+
+```typescript
+// Only bundles core + web (~3.5 KB)
+import { createWebClient } from '@fortknox/sdk/web';
+
+// Only bundles core + react (~4 KB)
+import { useAuth } from '@fortknox/sdk/react';
+
+// Only bundles core (~3 KB)
+import { FortKnoxClient } from '@fortknox/sdk/core';
+```
+
+---
+
+## 🧪 Testing
+
+### **Mock Client**
+
+```typescript
+import { FortKnoxClient } from '@fortknox/sdk/core';
+
+const mockTransport = async (req) => ({
+  ok: true,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  data: {
+    user: {
+      id: '123',
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+    },
+  },
+});
+
+const mockClient = new FortKnoxClient({
+  baseURL: 'http://test',
+  tenant: 'test',
+  transport: mockTransport,
+});
+
+// Test
+await mockClient.login({ email: 'test@test.com', password: 'pass' });
+expect(mockClient.isAuthenticated()).toBe(true);
+```
+
+### **React Testing**
+
+```tsx
+import { render, screen } from '@testing-library/react';
+import { FortKnoxProvider } from '@fortknox/sdk/react';
+import { mockClient } from './mocks';
+
+test('shows user email when logged in', () => {
+  render(
+    <FortKnoxProvider client={mockClient}>
+      <Profile />
+    </FortKnoxProvider>
+  );
+  
+  expect(screen.getByText('test@example.com')).toBeInTheDocument();
+});
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
+
+### **Development Setup**
+
+```bash
+git clone https://github.com/yourorg/fortknox-sdk.git
+cd fortknox-sdk
+pnpm install
+pnpm build
+pnpm test
+```
+
+### **Running Tests**
+
+```bash
+pnpm test          # Run tests
+pnpm test:coverage # Run tests with coverage
+```
+
+### **Building**
+
+```bash
+pnpm build  # Build all packages
+pnpm dev    # Build and watch
+```
+
+---
+
+## 📄 License
+
+MIT © [Fort Knox Security](https://github.com/yourorg)
+
+---
+
+## 🙏 Acknowledgments
+
+Fort Knox SDK is inspired by the excellent work of:
+- **Auth0** - For pioneering secure authentication patterns
+- **Clerk** - For developer-friendly APIs
+- **Supabase** - For open-source approach
+- **NextAuth.js** - For Next.js integration patterns
+
+---
+
+## 📞 Support
+
+- **Documentation**: [https://docs.fortknox.dev](https://docs.fortknox.dev)
+- **Issues**: [GitHub Issues](https://github.com/yourorg/fortknox-sdk/issues)
+- **Discord**: [Join our community](https://discord.gg/fortknox)
+- **Email**: support@fortknox.dev
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] React Native support
+- [ ] Vue.js adapter
+- [ ] Svelte adapter
+- [ ] WebAuthn / Passkeys
+- [ ] Biometric authentication
+- [ ] Social login (additional providers)
+- [ ] SAML 2.0 support
+- [ ] OAuth 2.0 provider mode
+
+---
+
+**Built with ❤️ by developers, for developers.**
+
+**Stop paying for auth. Own your infrastructure.** 🏰
+
+
+================================================================================
+FILE: packages/fortknox-sdk/package.json
+SIZE: 2.02 KB | LINES: 90
+================================================================================
+
+{
+  "name": "@fortknox/sdk",
+  "version": "1.0.1",
+  "description": "Fort Knox Authentication SDK - Session runtime for multi-tenant auth",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./core": {
+      "import": "./dist/core/index.mjs",
+      "require": "./dist/core/index.js",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./web": {
+      "import": "./dist/web/index.mjs",
+      "require": "./dist/web/index.js",
+      "types": "./dist/web/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./next": {
+      "import": "./dist/next/index.mjs",
+      "require": "./dist/next/index.js",
+      "types": "./dist/next/index.d.ts"
+    },
+    "./node": {
+      "import": "./dist/node/index.mjs",
+      "require": "./dist/node/index.js",
+      "types": "./dist/node/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "keywords": [
+    "auth",
+    "authentication",
+    "oauth",
+    "jwt",
+    "multi-tenant",
+    "session",
+    "fortknox"
+  ],
+  "author": "Fort Knox Security",
+  "license": "MIT",
+  "peerDependencies": {
+    "next": "^14.0.0 || ^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "eslint": "^8.56.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/core/client.ts
+SIZE: 11.52 KB | LINES: 452
+================================================================================
+
+/**
+ * Fort Knox SDK - Core Client
+ * 
+ * The session runtime - owns tokens, knows when to refresh
+ * Works in any environment (browser, Node, Next.js)
+ */
+
+import type {
+  FortKnoxConfig,
+  Transport,
+  TransportRequest,
+  TransportResponse,
+  AuthState,
+  LoginCredentials,
+  LoginResponse,
+  User,
+  AuthError,
+  AuthEvent,
+  AuthEventListener,
+} from './types';
+import { AuthError as AuthErrorClass } from './types';
+import { createFetchTransport } from './transport';
+import {
+  createAuthState,
+  setAccessToken,
+  clearAccessToken,
+  isTokenExpired,
+  queueRequest,
+  flushPendingRequests,
+  rejectPendingRequests,
+} from './state';
+
+export class FortKnoxClient {
+  private config: Required<FortKnoxConfig>;
+  private state: AuthState;
+  private transport: Transport;
+  private listeners: AuthEventListener[] = [];
+
+  constructor(config: FortKnoxConfig) {
+    this.config = {
+      debug: false,
+      refreshMargin: 30,
+      maxRefreshRetries: 3,
+      onTokenRefreshed: () => {},
+      onLogout: () => {},
+      onError: () => {},
+      transport: createFetchTransport(),
+      ...config,
+    };
+
+    this.state = createAuthState();
+    this.transport = this.config.transport;
+
+    this.log('FortKnox client initialized', {
+      baseURL: this.config.baseURL,
+      tenant: this.config.tenant,
+    });
+  }
+
+  // ============================================================
+  // PUBLIC API - AUTHENTICATION
+  // ============================================================
+
+  /**
+   * Login with email and password
+   */
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    this.log('Login attempt', { email: credentials.email });
+
+    const response = await this.request({
+      url: `${this.config.baseURL}/auth/login`,
+      method: 'POST',
+      body: credentials,
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    const data = response.data;
+
+    // Handle MFA challenge
+    if (data.mfaRequired) {
+      this.log('MFA required');
+      return data;
+    }
+
+    // Set access token
+    if (data.accessToken) {
+      setAccessToken(this.state, data.accessToken);
+      this.emit({ type: 'token_refreshed', accessToken: data.accessToken });
+      this.config.onTokenRefreshed(data.accessToken);
+    }
+
+    this.log('Login successful', { userId: data.user?.id });
+
+    return data;
+  }
+
+  /**
+   * Logout - clear session
+   */
+  async logout(): Promise<void> {
+    this.log('Logout');
+
+    try {
+      // Call logout endpoint (clears refresh cookie)
+      await this.request({
+        url: `${this.config.baseURL}/auth/logout`,
+        method: 'POST',
+      });
+    } catch (error) {
+      // Logout even if API call fails
+      this.log('Logout API call failed', error);
+    } finally {
+      this.clearSession();
+    }
+  }
+
+  /**
+   * Get current user
+   */
+  async getCurrentUser(): Promise<User> {
+    this.log('Get current user');
+
+    const response = await this.request({
+      url: `${this.config.baseURL}/users/me`,
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated(): boolean {
+    return !!this.state.accessToken && !isTokenExpired(this.state, this.config.refreshMargin);
+  }
+
+  /**
+   * Get current access token (or undefined)
+   */
+  getAccessToken(): string | undefined {
+    return this.state.accessToken;
+  }
+
+  // ============================================================
+  // REQUEST PIPELINE - THE CORE LOGIC
+  // ============================================================
+
+  /**
+   * Make an authenticated request
+   * Handles 401s with automatic refresh
+   */
+  async request(req: TransportRequest): Promise<TransportResponse> {
+    // If currently refreshing, queue this request
+    if (this.state.isRefreshing) {
+      this.log('Request queued (refresh in progress)', req.url);
+      return this.queueRequestDuringRefresh(req);
+    }
+
+    // Add auth headers
+    const requestWithAuth = this.addAuthHeaders(req);
+
+    // Make request
+    const response = await this.transport(requestWithAuth);
+
+    // If 401 and we have a token, try to refresh
+    if (response.status === 401 && this.state.accessToken) {
+      this.log('Got 401, attempting refresh', req.url);
+      
+      try {
+        await this.refresh();
+        
+        // Retry original request with new token
+        const retryRequest = this.addAuthHeaders(req);
+        const retryResponse = await this.transport(retryRequest);
+        
+        if (retryResponse.status === 401) {
+          // Still 401 after refresh - session is dead
+          this.log('Still 401 after refresh - session expired');
+          this.clearSession();
+          throw new AuthErrorClass('SESSION_EXPIRED', 'Your session has expired. Please log in again.');
+        }
+        
+        return retryResponse;
+      } catch (error) {
+        // Refresh failed
+        this.log('Refresh failed', error);
+        this.clearSession();
+        throw error;
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Add authorization and tenant headers to request
+   */
+  private addAuthHeaders(req: TransportRequest): TransportRequest {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': this.config.tenant,
+      'Authorization': '', // Placeholder
+      ...req.headers,
+    };
+
+    // Add access token if available
+    if (this.state.accessToken) {
+      headers['Authorization'] = `Bearer ${this.state.accessToken}`;
+    }
+
+    return {
+      ...req,
+      headers,
+      credentials: 'include', // Always send cookies
+    };
+  }
+
+  // ============================================================
+  // TOKEN REFRESH - THE CRITICAL PART
+  // ============================================================
+
+  /**
+   * Refresh access token using refresh token cookie
+   * Concurrency-safe - only one refresh at a time
+   */
+  private async refresh(): Promise<void> {
+    // If already refreshing, wait for that refresh
+    if (this.state.isRefreshing && this.state.refreshPromise) {
+      this.log('Refresh already in progress, waiting...');
+      return this.state.refreshPromise;
+    }
+
+    this.state.isRefreshing = true;
+    this.log('Starting token refresh');
+
+    this.state.refreshPromise = this.refreshWithRetry();
+
+    try {
+      await this.state.refreshPromise;
+    } finally {
+      this.state.isRefreshing = false;
+      this.state.refreshPromise = undefined;
+      
+      // Process queued requests
+      this.processQueuedRequests();
+    }
+  }
+
+  /**
+   * Refresh with exponential backoff retry
+   */
+  private async refreshWithRetry(): Promise<void> {
+    let attempt = 0;
+    let lastError: any;
+
+    while (attempt < this.config.maxRefreshRetries) {
+      try {
+        await this.refreshOnce();
+        this.log('Token refresh successful');
+        return;
+      } catch (error) {
+        lastError = error;
+        attempt++;
+        
+        if (attempt < this.config.maxRefreshRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          this.log(`Refresh attempt ${attempt} failed, retrying in ${delay}ms`, error);
+          await this.sleep(delay);
+        }
+      }
+    }
+
+    // All retries failed
+    this.log('All refresh attempts failed', lastError);
+    throw new AuthErrorClass('REFRESH_FAILED', 'Failed to refresh token', lastError);
+  }
+
+  /**
+   * Single refresh attempt
+   * NO refresh token is passed - httpOnly cookie handles it
+   */
+  private async refreshOnce(): Promise<void> {
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/refresh`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': this.config.tenant,
+      },
+      credentials: 'include', // This sends the refresh cookie
+    });
+
+    if (!response.ok) {
+      throw new AuthErrorClass('REFRESH_FAILED', 'Refresh failed', response.data);
+    }
+
+    // Update access token
+    const newToken = response.data.accessToken;
+    if (!newToken) {
+      throw new AuthErrorClass('REFRESH_FAILED', 'No access token in refresh response');
+    }
+
+    setAccessToken(this.state, newToken);
+    this.emit({ type: 'token_refreshed', accessToken: newToken });
+    this.config.onTokenRefreshed(newToken);
+  }
+
+  // ============================================================
+  // REQUEST QUEUING
+  // ============================================================
+
+  /**
+   * Queue a request during token refresh
+   */
+  private queueRequestDuringRefresh(req: TransportRequest): Promise<TransportResponse> {
+    return new Promise((resolve, reject) => {
+      queueRequest(this.state, {
+        request: req,
+        resolve,
+        reject,
+      });
+    });
+  }
+
+  /**
+   * Process all queued requests after refresh completes
+   */
+  private processQueuedRequests(): void {
+    const count = this.state.pendingRequests.length;
+    if (count === 0) return;
+
+    this.log(`Processing ${count} queued requests`);
+
+    flushPendingRequests(this.state, async (pendingReq) => {
+      try {
+        const response = await this.request(pendingReq.request);
+        pendingReq.resolve(response);
+      } catch (error) {
+        pendingReq.reject(error);
+      }
+    });
+  }
+
+  // ============================================================
+  // SESSION MANAGEMENT
+  // ============================================================
+
+  /**
+   * Clear local session state
+   */
+  private clearSession(): void {
+    this.log('Clearing session');
+    
+    clearAccessToken(this.state);
+    rejectPendingRequests(this.state, new AuthErrorClass('SESSION_EXPIRED', 'Session expired'));
+    
+    this.emit({ type: 'logout' });
+    this.emit({ type: 'session_expired' });
+    this.config.onLogout();
+  }
+
+  // ============================================================
+  // EVENTS
+  // ============================================================
+
+  /**
+   * Subscribe to auth events
+   */
+  on(listener: AuthEventListener): () => void {
+    this.listeners.push(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.listeners.indexOf(listener);
+      if (index > -1) {
+        this.listeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Emit event to all listeners
+   */
+  private emit(event: AuthEvent): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener(event);
+      } catch (error) {
+        console.error('Error in auth event listener:', error);
+      }
+    });
+  }
+
+  // ============================================================
+  // UTILITIES
+  // ============================================================
+
+  /**
+   * Create AuthError from response
+   */
+  private createError(response: TransportResponse): AuthError {
+    const data = response.data;
+    
+    const code = data?.code || this.statusToErrorCode(response.status);
+    const message = data?.message || response.statusText || 'Request failed';
+    
+    const error = new AuthErrorClass(code, message, data);
+    
+    this.emit({ type: 'error', error });
+    this.config.onError(error);
+    
+    return error;
+  }
+
+  /**
+   * Map HTTP status to error code
+   */
+  private statusToErrorCode(status: number): any {
+    switch (status) {
+      case 401: return 'UNAUTHORIZED';
+      case 403: return 'FORBIDDEN';
+      case 404: return 'USER_NOT_FOUND';
+      case 429: return 'RATE_LIMIT_EXCEEDED';
+      default: return 'UNKNOWN_ERROR';
+    }
+  }
+
+  /**
+   * Sleep utility for retry backoff
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Debug logging
+   */
+  private log(...args: any[]): void {
+    if (this.config.debug) {
+      console.log('[FortKnox]', ...args);
+    }
+  }
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/core/index.ts
+SIZE: 647 B | LINES: 35
+================================================================================
+
+/**
+ * Fort Knox SDK - Core Module
+ * 
+ * Pure auth logic - no DOM, no cookies, no framework dependencies
+ * Works in any JavaScript environment
+ */
+
+export { FortKnoxClient } from './client';
+export { createFetchTransport } from './transport';
+export {
+  createAuthState,
+  setAccessToken,
+  clearAccessToken,
+  isTokenExpired,
+} from './state';
+
+export type {
+  FortKnoxConfig,
+  Transport,
+  TransportRequest,
+  TransportResponse,
+  AuthState,
+  User,
+  Session,
+  LoginCredentials,
+  SignupCredentials,
+  LoginResponse,
+  MfaChallenge,
+  AuthEvent,
+  AuthEventListener,
+  AuthErrorCode,
+} from './types';
+
+export { AuthError } from './types';
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/core/state.ts
+SIZE: 2.4 KB | LINES: 109
+================================================================================
+
+/**
+ * Fort Knox SDK - State Manager
+ * 
+ * Manages the in-memory auth state
+ * Never persisted, never exposed
+ */
+
+import type { AuthState, PendingRequest } from './types';
+
+/**
+ * Creates a new auth state
+ * All state lives in memory only
+ */
+export function createAuthState(): AuthState {
+  return {
+    accessToken: undefined,
+    accessTokenExp: undefined,
+    isRefreshing: false,
+    refreshPromise: undefined,
+    pendingRequests: [],
+  };
+}
+
+/**
+ * Set access token and parse expiration
+ */
+export function setAccessToken(state: AuthState, token: string): void {
+  state.accessToken = token;
+  state.accessTokenExp = parseTokenExpiry(token);
+}
+
+/**
+ * Clear access token
+ */
+export function clearAccessToken(state: AuthState): void {
+  state.accessToken = undefined;
+  state.accessTokenExp = undefined;
+}
+
+/**
+ * Check if token is expired or about to expire
+ * @param margin - Seconds before expiry to consider token expired (default: 30)
+ */
+export function isTokenExpired(state: AuthState, margin: number = 30): boolean {
+  if (!state.accessToken || !state.accessTokenExp) {
+    return true;
+  }
+
+  const now = Date.now();
+  const expiryWithMargin = state.accessTokenExp - (margin * 1000);
+  
+  return now >= expiryWithMargin;
+}
+
+/**
+ * Add request to pending queue
+ */
+export function queueRequest(
+  state: AuthState,
+  request: PendingRequest,
+): void {
+  state.pendingRequests.push(request);
+}
+
+/**
+ * Process all pending requests
+ */
+export function flushPendingRequests(
+  state: AuthState,
+  handler: (request: PendingRequest) => void,
+): void {
+  const requests = [...state.pendingRequests];
+  state.pendingRequests = [];
+  
+  requests.forEach(handler);
+}
+
+/**
+ * Reject all pending requests
+ */
+export function rejectPendingRequests(
+  state: AuthState,
+  error: any,
+): void {
+  const requests = [...state.pendingRequests];
+  state.pendingRequests = [];
+  
+  requests.forEach((req) => req.reject(error));
+}
+
+/**
+ * Parse JWT to get expiration timestamp
+ */
+function parseTokenExpiry(token: string): number | undefined {
+  try {
+    // JWT format: header.payload.signature
+    const parts = token.split('.');
+    if (parts.length !== 3) return undefined;
+
+    // Decode payload (base64url)
+    const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')));
+    
+    // exp is in seconds, convert to milliseconds
+    return payload.exp ? payload.exp * 1000 : undefined;
+  } catch (error) {
+    return undefined;
+  }
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/core/transport.ts
+SIZE: 1.37 KB | LINES: 52
+================================================================================
+
+/**
+ * Fort Knox SDK - Default Transport
+ * 
+ * Uses the Fetch API (works in browsers and Node 18+)
+ */
+
+import type { Transport, TransportRequest, TransportResponse } from './types';
+
+/**
+ * Creates a fetch-based transport
+ * Works in browsers and Node.js 18+
+ */
+export function createFetchTransport(): Transport {
+  return async (request: TransportRequest): Promise<TransportResponse> => {
+    try {
+      const response = await fetch(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body ? JSON.stringify(request.body) : undefined,
+        credentials: request.credentials || 'include',
+      });
+
+      // Parse response body
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType?.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
+      // Convert Headers to plain object
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+        data,
+      };
+    } catch (error) {
+      // Network error or fetch failure
+      throw new Error(`Network request failed: ${error}`);
+    }
+  };
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/core/types.ts
+SIZE: 4.94 KB | LINES: 211
+================================================================================
+
+/**
+ * Fort Knox SDK - Core Types
+ * 
+ * These types are used across all adapters (web, node, next, react)
+ */
+
+// ============================================================
+// TRANSPORT ABSTRACTION
+// ============================================================
+
+/**
+ * Transport is the interface for making HTTP requests
+ * This allows the SDK to work in any environment (browser, Node, Next.js)
+ */
+export type Transport = (request: TransportRequest) => Promise<TransportResponse>;
+
+export interface TransportRequest {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
+  headers?: Record<string, string>;
+  body?: any;
+  credentials?: 'include' | 'omit' | 'same-origin';
+}
+
+export interface TransportResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  data: any;
+}
+
+// ============================================================
+// RUNTIME STATE
+// ============================================================
+
+/**
+ * Internal state of the auth session
+ * Lives in memory, never persisted
+ */
+export interface AuthState {
+  /** Current access token (JWT) */
+  accessToken?: string;
+  
+  /** Access token expiration timestamp (ms) */
+  accessTokenExp?: number;
+  
+  /** Whether a refresh is currently in progress */
+  isRefreshing: boolean;
+  
+  /** Promise for ongoing refresh (for deduplication) */
+  refreshPromise?: Promise<void>;
+  
+  /** Queued requests during refresh */
+  pendingRequests: Array<PendingRequest>;
+}
+
+export interface PendingRequest {
+  request: TransportRequest;
+  resolve: (response: TransportResponse) => void;
+  reject: (error: any) => void;
+}
+
+// ============================================================
+// CLIENT CONFIGURATION
+// ============================================================
+
+export interface FortKnoxConfig {
+  /** Base URL of the auth service */
+  baseURL: string;
+  
+  /** Tenant ID or slug */
+  tenant: string;
+  
+  /** Custom transport (default: fetch) */
+  transport?: Transport;
+  
+  /** Enable debug logging */
+  debug?: boolean;
+  
+  /** Token refresh margin in seconds (default: 30) */
+  refreshMargin?: number;
+  
+  /** Maximum refresh retry attempts (default: 3) */
+  maxRefreshRetries?: number;
+  
+  /** Event listeners */
+  onTokenRefreshed?: (accessToken: string) => void;
+  onLogout?: () => void;
+  onError?: (error: AuthError) => void;
+}
+
+// ============================================================
+// USER & SESSION
+// ============================================================
+
+export interface User {
+  id: string;
+  tenantId: string;
+  email: string;
+  emailVerified: boolean;
+  phone?: string;
+  phoneVerified: boolean;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  primaryAuthMethod: 'password' | 'google' | 'github' | 'microsoft';
+  mfaEnabled: boolean;
+  status: 'active' | 'suspended' | 'deleted';
+  lastLoginAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  tenantId: string;
+  deviceInfo?: {
+    userAgent?: string;
+    browser?: string;
+    os?: string;
+    device?: string;
+  };
+  ipAddress?: string;
+  location?: {
+    city?: string;
+    country?: string;
+  };
+  current: boolean;
+  expiresAt: Date;
+  lastActivityAt: Date;
+  createdAt: Date;
+}
+
+// ============================================================
+// AUTHENTICATION
+// ============================================================
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupCredentials {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  expiresIn: number;
+  user: User;
+  mfaRequired?: boolean;
+  mfaChallenge?: MfaChallenge;
+}
+
+export interface MfaChallenge {
+  tempToken: string;
+  methods: ('totp' | 'sms' | 'webauthn')[];
+  remainingAttempts?: number;
+}
+
+// ============================================================
+// ERRORS
+// ============================================================
+
+export class AuthError extends Error {
+  constructor(
+    public code: AuthErrorCode,
+    message: string,
+    public details?: any,
+  ) {
+    super(message);
+    this.name = 'AuthError';
+    Object.setPrototypeOf(this, AuthError.prototype);
+  }
+}
+
+export type AuthErrorCode =
+  | 'INVALID_CREDENTIALS'
+  | 'USER_NOT_FOUND'
+  | 'EMAIL_ALREADY_EXISTS'
+  | 'INVALID_TOKEN'
+  | 'TOKEN_EXPIRED'
+  | 'SESSION_EXPIRED'
+  | 'MFA_REQUIRED'
+  | 'MFA_INVALID_CODE'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'NETWORK_ERROR'
+  | 'REFRESH_FAILED'
+  | 'UNKNOWN_ERROR';
+
+// ============================================================
+// EVENTS
+// ============================================================
+
+export type AuthEvent = 
+  | { type: 'token_refreshed'; accessToken: string }
+  | { type: 'logout' }
+  | { type: 'error'; error: AuthError }
+  | { type: 'session_expired' };
+
+export type AuthEventListener = (event: AuthEvent) => void;
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/index.ts
+SIZE: 879 B | LINES: 38
+================================================================================
+
+/**
+ * Fort Knox SDK - Main Entry Point
+ * 
+ * Convenience exports for common use cases
+ * For specific environments, use the submodules:
+ * - @fortknox/sdk/core  (pure logic)
+ * - @fortknox/sdk/web   (browser)
+ * - @fortknox/sdk/react (React hooks)
+ * - @fortknox/sdk/next  (Next.js SSR)
+ * - @fortknox/sdk/node  (server-to-server)
+ */
+
+// Core exports
+export { FortKnoxClient, AuthError } from './core';
+export type {
+  FortKnoxConfig,
+  User,
+  Session,
+  LoginCredentials,
+  LoginResponse,
+  AuthEvent,
+  AuthEventListener,
+} from './core';
+
+// Convenience re-exports from web
+export { 
+  createWebClient,
+  getTenantFromSubdomain,
+  getSocialLoginUrl,
+  redirectToSocialLogin,
+} from './web';
+
+export * from './core/client';
+export * from './core/types';
+export * from './web/index';
+export * from './react/index';
+export * from './next/index';
+export * from './node/index';
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/next/index.ts
+SIZE: 2.65 KB | LINES: 117
+================================================================================
+
+/**
+ * Fort Knox SDK - Next.js Module
+ * 
+ * SSR-safe client that works in:
+ * - Server Components
+ * - API Routes
+ * - Middleware
+ * - Client Components (use /react instead)
+ */
+
+import { FortKnoxClient } from '../core/client';
+import type { FortKnoxConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
+
+/**
+ * Create a Next.js server-side client
+ * Injects cookies from request into fetch calls
+ */
+export function createServerClient(
+  config: Omit<FortKnoxConfig, 'transport'>,
+  cookies?: Record<string, string>,
+): FortKnoxClient {
+  // Create custom transport that includes cookies
+  const transport: Transport = async (req: TransportRequest): Promise<TransportResponse> => {
+    const headers = {
+      ...req.headers,
+    };
+
+    // Inject cookies if provided
+    if (cookies) {
+      const cookieHeader = Object.entries(cookies)
+        .map(([key, value]) => `${key}=${value}`)
+        .join('; ');
+      
+      if (cookieHeader) {
+        headers['Cookie'] = cookieHeader;
+      }
+    }
+
+    const response = await fetch(req.url, {
+      method: req.method,
+      headers,
+      body: req.body ? JSON.stringify(req.body) : undefined,
+      credentials: 'include',
+    });
+
+    let data: any;
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType?.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
+
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+      data,
+    };
+  };
+
+  return new FortKnoxClient({
+    ...config,
+    transport,
+  });
+}
+
+/**
+ * Helper to get cookies from Next.js request
+ */
+export function getCookiesFromRequest(req: Request): Record<string, string> {
+  const cookieHeader = req.headers.get('cookie');
+  if (!cookieHeader) return {};
+
+  const cookies: Record<string, string> = {};
+  
+  cookieHeader.split(';').forEach((cookie) => {
+    const [key, value] = cookie.trim().split('=');
+    if (key && value) {
+      cookies[key] = value;
+    }
+  });
+
+  return cookies;
+}
+
+/**
+ * Create client from Next.js request
+ * Usage in API routes or Server Components
+ */
+export function getFortKnoxClient(
+  baseURL: string,
+  tenant: string,
+  req: Request,
+): FortKnoxClient {
+  const cookies = getCookiesFromRequest(req);
+  
+  return createServerClient(
+    {
+      baseURL,
+      tenant,
+    },
+    cookies,
+  );
+}
+
+// Re-export core
+export { FortKnoxClient } from '../core/client';
+export type * from '../core/types';
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/node/index.ts
+SIZE: 2.24 KB | LINES: 94
+================================================================================
+
+/**
+ * Fort Knox SDK - Node.js Module
+ * 
+ * For server-to-server communication:
+ * - Backend services
+ * - CRON jobs
+ * - Webhooks
+ * - Microservices
+ * 
+ * Uses client credentials flow (no cookies)
+ */
+
+import { FortKnoxClient } from '../core/client';
+import type { FortKnoxConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
+
+interface NodeClientConfig extends Omit<FortKnoxConfig, 'transport'> {
+  /**
+   * Client ID for machine-to-machine auth
+   */
+  clientId?: string;
+  
+  /**
+   * Client secret for machine-to-machine auth
+   */
+  clientSecret?: string;
+  
+  /**
+   * API key for service authentication
+   */
+  apiKey?: string;
+}
+
+/**
+ * Create a Node.js client for server-to-server communication
+ */
+export function createNodeClient(config: NodeClientConfig): FortKnoxClient {
+  // Create custom transport with auth credentials
+  const transport: Transport = async (req: TransportRequest): Promise<TransportResponse> => {
+    const headers = {
+      ...req.headers,
+    };
+
+    // Add API key if provided
+    if (config.apiKey) {
+      headers['X-API-Key'] = config.apiKey;
+    }
+
+    // Add client credentials if provided
+    if (config.clientId && config.clientSecret) {
+      const auth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+
+    const response = await fetch(req.url, {
+      method: req.method,
+      headers,
+      body: req.body ? JSON.stringify(req.body) : undefined,
+    });
+
+    let data: any;
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType?.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
+
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+      data,
+    };
+  };
+
+  return new FortKnoxClient({
+    baseURL: config.baseURL,
+    tenant: config.tenant,
+    debug: config.debug,
+    transport,
+  });
+}
+
+// Re-export core
+export { FortKnoxClient } from '../core/client';
+export type * from '../core/types';
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/react/index.tsx
+SIZE: 4.08 KB | LINES: 189
+================================================================================
+
+/**
+ * Fort Knox SDK - React Provider
+ * 
+ * React Context for auth state management
+ */
+
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { FortKnoxClient } from '../core/client';
+import type { User, LoginCredentials, AuthEvent } from '../core/types';
+
+// ============================================================
+// CONTEXT
+// ============================================================
+
+interface AuthContextValue {
+  // State
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  error: Error | null;
+  
+  // Actions
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  
+  // Client
+  client: FortKnoxClient;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+// ============================================================
+// PROVIDER
+// ============================================================
+
+interface AuthProviderProps {
+  children: React.ReactNode;
+  client: FortKnoxClient;
+}
+
+export function FortKnoxProvider({ children, client }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const isInitialized = useRef(false);
+
+  // Initialize - check if user is logged in
+  useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    const initialize = async () => {
+      try {
+        // Try to get current user (will auto-refresh if needed)
+        const currentUser = await client.getCurrentUser();
+        setUser(currentUser);
+      } catch (err) {
+        // Not logged in or session expired
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, [client]);
+
+  // Listen to auth events
+  useEffect(() => {
+    const unsubscribe = client.on((event: AuthEvent) => {
+      switch (event.type) {
+        case 'logout':
+        case 'session_expired':
+          setUser(null);
+          break;
+        
+        case 'error':
+          setError(event.error);
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, [client]);
+
+  // Login
+  const login = async (credentials: LoginCredentials) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      const result = await client.login(credentials);
+      
+      if (result.mfaRequired) {
+        throw new Error('MFA_REQUIRED');
+      }
+      
+      setUser(result.user);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Logout
+  const logout = async () => {
+    try {
+      setError(null);
+      await client.logout();
+      setUser(null);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  // Refresh user data
+  const refreshUser = async () => {
+    try {
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      setUser(null);
+    }
+  };
+
+  const value: AuthContextValue = {
+    user,
+    isLoading,
+    isAuthenticated: !!user,
+    error,
+    login,
+    logout,
+    refreshUser,
+    client,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+// ============================================================
+// HOOK
+// ============================================================
+
+/**
+ * Hook to access auth context
+ */
+export function useAuth() {
+  const context = useContext(AuthContext);
+  
+  if (context === undefined) {
+    throw new Error('useAuth must be used within FortKnoxProvider');
+  }
+  
+  return context;
+}
+
+/**
+ * Hook to access user only
+ */
+export function useUser() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  
+  return {
+    user,
+    isLoading,
+    isAuthenticated,
+  };
+}
+
+/**
+ * Hook to access session state
+ */
+export function useSession() {
+  const { isAuthenticated, isLoading, client } = useAuth();
+  
+  return {
+    isAuthenticated,
+    isLoading,
+    accessToken: client.getAccessToken(),
+  };
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/src/web/index.ts
+SIZE: 2.5 KB | LINES: 100
+================================================================================
+
+/**
+ * Fort Knox SDK - Web Module
+ * 
+ * Browser-specific helpers
+ * Adds OAuth redirects, social login, etc.
+ */
+
+import { FortKnoxClient } from '../core/client';
+import type { FortKnoxConfig } from '../core/types';
+
+/**
+ * Create a browser-optimized Fort Knox client
+ */
+export function createWebClient(config: Omit<FortKnoxConfig, 'transport'>): FortKnoxClient {
+  return new FortKnoxClient({
+    ...config,
+    // Browser always uses fetch with credentials
+    transport: undefined, // Uses default fetch transport
+  });
+}
+
+/**
+ * Auto-detect tenant from subdomain
+ * Example: acme.auth.scrolloop.com -> tenant: "acme"
+ */
+export function getTenantFromSubdomain(): string | null {
+  if (typeof window === 'undefined') return null;
+  
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  
+  // Need at least 3 parts: subdomain.domain.tld
+  if (parts.length < 3) return null;
+  
+  return parts[0] || null;
+}
+
+/**
+ * OAuth helper - get social login URL
+ */
+export function getSocialLoginUrl(
+  baseURL: string,
+  provider: 'google' | 'github' | 'microsoft',
+  options?: {
+    tenant?: string;
+    redirectUri?: string;
+  },
+): string {
+  const params = new URLSearchParams();
+  
+  if (options?.tenant) {
+    params.append('tenantId', options.tenant);
+  }
+  
+  if (options?.redirectUri) {
+    params.append('returnUrl', options.redirectUri);
+  } else if (typeof window !== 'undefined') {
+    params.append('returnUrl', window.location.origin + '/auth/callback');
+  }
+  
+  return `${baseURL}/auth/social/${provider}/login?${params.toString()}`;
+}
+
+/**
+ * Redirect to social login
+ */
+export function redirectToSocialLogin(
+  baseURL: string,
+  provider: 'google' | 'github' | 'microsoft',
+  options?: {
+    tenant?: string;
+    redirectUri?: string;
+  },
+): void {
+  const url = getSocialLoginUrl(baseURL, provider, options);
+  window.location.href = url;
+}
+
+/**
+ * Handle OAuth callback
+ * Extracts tokens from URL and stores them
+ */
+// @ts-expect-error
+export function handleOAuthCallback(client: FortKnoxClient): void {
+  if (typeof window === 'undefined') return;
+  
+  const params = new URLSearchParams(window.location.search);
+  const accessToken = params.get('access_token');
+  
+  if (accessToken) {
+    // Token will be in cookie, client will handle it automatically
+    // Remove tokens from URL for security
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+// Re-export core types and client
+export { FortKnoxClient } from '../core/client';
+export type * from '../core/types';
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/tsconfig.json
+SIZE: 972 B | LINES: 41
+================================================================================
+
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    /* Modules */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+
+    /* Emit */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "noEmit": true,
+
+    /* Interop Constraints */
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Completeness */
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}
+
+
+
+================================================================================
+FILE: packages/fortknox-sdk/tsup.config.ts
+SIZE: 1013 B | LINES: 51
+================================================================================
+
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  // Entry points for each export
+  entry: {
+    index: 'src/index.ts',
+    'core/index': 'src/core/index.ts',
+    'web/index': 'src/web/index.ts',
+    'react/index': 'src/react/index.tsx',
+    'next/index': 'src/next/index.ts',
+    'node/index': 'src/node/index.ts',
+  },
+
+  // Output formats
+  format: ['cjs', 'esm'],
+
+  // Generate .d.ts files
+  dts: true,
+
+  // Clean output directory before build
+  clean: true,
+
+  // Source maps
+  sourcemap: true,
+
+  // ⭐ KEY FIX: Bundle everything together
+  bundle: true,
+
+  // Don't minify for better debugging
+  minify: false,
+
+  // Don't split into chunks
+  splitting: false,
+
+  // Target modern environments
+  target: 'es2020',
+
+  // External dependencies (don't bundle these)
+  external: ['react', 'react-dom', 'next'],
+
+  // Tree shaking
+  treeshake: true,
+
+  // Output directory
+  outDir: 'dist',
+
+  // ESBuild options for JSX
+  esbuildOptions(options) {
+    options.jsx = 'automatic';
+  },
+});
+
+
+================================================================================
 FILE: packages/security/index.ts
 SIZE: 247 B | LINES: 11
 ================================================================================
@@ -43914,2053 +47612,6 @@ SIZE: 221 B | LINES: 11
 
 
 ================================================================================
-FILE: packages/web-sdk/README.md
-SIZE: 1.88 KB | LINES: 87
-================================================================================
-
-# @repo/web-sdk
-
-TypeScript authentication SDK for Fort Knox Auth Service.
-
-## Features
-
-- 🔐 **Type-safe authentication** - Full TypeScript support
-- 🔄 **Automatic token refresh** - Seamless token management with Axios interceptors
-- ⚛️ **React hooks** - Easy integration with React applications
-- 🍪 **HttpOnly cookies** - Secure refresh token storage
-- 🔑 **Social OAuth** - Google, GitHub, Microsoft support
-- 🛡️ **MFA support** - TOTP, SMS, and WebAuthn
-- 📱 **Session management** - View and revoke active sessions
-
-## Installation
-
-```bash
-npm install @repo/web-sdk
-# or
-yarn add @repo/web-sdk
-# or
-pnpm add @repo/web-sdk
-```
-
-## Quick Start
-
-### 1. Create Auth Client
-
-```typescript
-import { AuthClient } from '@repo/auth-sdk';
-
-export const authClient = new AuthClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL,
-  tenantId: 'your-tenant-id',
-  storage: 'cookie', // 'cookie' | 'localStorage' | 'memory'
-});
-```
-
-### 2. Wrap Your App (React)
-
-```tsx
-import { AuthProvider } from '@repo/auth-sdk/react';
-import { authClient } from './lib/auth';
-
-export default function App({ children }) {
-  return (
-    <AuthProvider authClient={authClient}>
-      {children}
-    </AuthProvider>
-  );
-}
-```
-
-### 3. Use Auth in Components
-
-```tsx
-import { useAuth } from '@repo/auth-sdk/react';
-
-export default function LoginPage() {
-  const { login, isAuthenticated, user } = useAuth();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    await login({ email, password });
-  };
-
-  if (isAuthenticated) {
-    return <div>Welcome, {user?.email}!</div>;
-  }
-
-  return (
-    <form onSubmit={handleLogin}>
-      <input type="email" name="email" />
-      <input type="password" name="password" />
-      <button type="submit">Login</button>
-    </form>
-  );
-}
-```
-
-## Documentation
-
-See [FRONTEND_AUTH_INTEGRATION.md](../../docs/FRONTEND_AUTH_INTEGRATION.md) for complete documentation.
-
-## License
-
-MIT
-
-
-================================================================================
-FILE: packages/web-sdk/package.json
-SIZE: 1.52 KB | LINES: 74
-================================================================================
-
-{
-  "name": "@repo/web-sdk",
-  "version": "0.1.0",
-  "description": "Fort Knox Authentication SDK for TypeScript/React applications",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./react": {
-      "import": "./dist/react/index.mjs",
-      "require": "./dist/react/index.js",
-      "types": "./dist/react/index.d.ts"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx",
-    "clean": "rm -rf dist"
-  },
-  "keywords": [
-    "auth",
-    "authentication",
-    "oauth",
-    "mfa",
-    "jwt",
-    "typescript",
-    "react"
-  ],
-  "author": "Fort Knox Security",
-  "license": "MIT",
-  "dependencies": {
-    "axios": "^1.6.5"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": false
-    },
-    "react-dom": {
-      "optional": false
-    }
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.5",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "eslint": "^8.56.0",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
-  },
-  "publishConfig": {
-    "access": "restricted"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rishitshivesh/my-auth.git",
-    "directory": "packages/auth-sdk"
-  }
-}
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/api-client.ts
-SIZE: 12.05 KB | LINES: 456
-================================================================================
-
-/**
- * Fort Knox Auth SDK - API Client
- *
- * HTTP client with automatic token refresh using Axios interceptors.
- * Handles authentication, retries, and error handling.
- */
-
-import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
-import type { AuthTokens, AuthError, StorageType } from "./types";
-
-export class ApiClient {
-  private client: AxiosInstance;
-  private accessToken: string | null = null;
-  private refreshPromise: Promise<AuthTokens> | null = null;
-  private isRefreshing = false;
-
-  constructor(
-    private baseUrl: string,
-    private tenantId?: string,
-    private storage: StorageType = "cookie",
-    private onTokenRefresh?: (tokens: AuthTokens) => void,
-    private onAuthError?: (error: AuthError) => void,
-    private debug: boolean = false,
-  ) {
-    this.client = axios.create({
-      baseURL: baseUrl,
-      timeout: 30000, // 30 seconds
-      withCredentials: true, // Send cookies
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    this.setupInterceptors();
-    this.loadTokensFromStorage();
-  }
-
-  // ============================================================
-  // INITIALIZATION
-  // ============================================================
-
-  /**
-   * Load tokens from storage on initialization
-   */
-  private loadTokensFromStorage(): void {
-    if (this.storage === "localStorage" && typeof window !== "undefined") {
-      try {
-        const accessToken = localStorage.getItem("auth_access_token");
-        if (accessToken) {
-          this.accessToken = accessToken;
-          this.log("Loaded access token from localStorage", this.isRefreshing);
-        }
-      } catch (error) {
-        this.log("Failed to load tokens from localStorage", error);
-      }
-    }
-    // For 'cookie' and 'memory', tokens are managed differently
-  }
-
-  // ============================================================
-  // INTERCEPTORS
-  // ============================================================
-
-  /**
-   * Setup request and response interceptors
-   */
-  private setupInterceptors(): void {
-    // Request interceptor - add auth headers
-    this.client.interceptors.request.use(
-      (config) => {
-        // Add tenant ID if provided
-        if (this.tenantId) {
-          config.headers["X-Tenant-ID"] = this.tenantId;
-        }
-
-        // Add access token if available
-        if (this.accessToken) {
-          config.headers["Authorization"] = `Bearer ${this.accessToken}`;
-        }
-
-        this.log("Request:", config.method?.toUpperCase(), config.url);
-
-        return config;
-      },
-      (error) => {
-        this.log("Request error:", error);
-        return Promise.reject(error);
-      },
-    );
-
-    // Response interceptor - handle errors and token refresh
-    this.client.interceptors.response.use(
-      (response) => {
-        this.log("Response:", response.status, response.config.url);
-        return response;
-      },
-      async (error: AxiosError) => {
-        const originalRequest = error.config as AxiosRequestConfig & {
-          _retry?: boolean;
-        };
-
-        this.log("Response error:", error.response?.status, error.config?.url);
-
-        // If 401 and not already retrying
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-
-          // Don't retry if this is the refresh endpoint itself
-          if (originalRequest.url?.includes("/auth/refresh")) {
-            this.log("Refresh token failed, clearing tokens");
-            this.clearTokens();
-
-            const authError: AuthError = {
-              code: "SESSION_EXPIRED",
-              message: "Your session has expired. Please log in again.",
-            };
-
-            if (this.onAuthError) {
-              this.onAuthError(authError);
-            }
-
-            return Promise.reject(authError);
-          }
-
-          try {
-            this.log("Attempting token refresh...");
-
-            // Refresh token
-            const tokens = await this.refreshTokens();
-            this.setAccessToken(tokens.accessToken);
-
-            // Retry original request with new token
-            if (originalRequest.headers) {
-              originalRequest.headers["Authorization"] =
-                `Bearer ${tokens.accessToken}`;
-            }
-
-            this.log("Token refreshed, retrying original request");
-            return this.client(originalRequest);
-          } catch (refreshError) {
-            this.log("Token refresh failed:", refreshError);
-
-            // Refresh failed, clear tokens
-            this.clearTokens();
-
-            const authError: AuthError = {
-              code: "SESSION_EXPIRED",
-              message: "Your session has expired. Please log in again.",
-            };
-
-            if (this.onAuthError) {
-              this.onAuthError(authError);
-            }
-
-            return Promise.reject(authError);
-          }
-        }
-
-        // Transform axios error to AuthError
-        const authError = this.transformError(error);
-        return Promise.reject(authError);
-      },
-    );
-  }
-
-  // ============================================================
-  // TOKEN MANAGEMENT
-  // ============================================================
-
-  /**
-   * Refresh access token using refresh token
-   * Uses singleton pattern to prevent multiple simultaneous refresh requests
-   */
-  private async refreshTokens(): Promise<AuthTokens> {
-    // If already refreshing, return existing promise
-    if (this.refreshPromise) {
-      this.log("Token refresh already in progress, waiting...");
-      return this.refreshPromise;
-    }
-
-    this.isRefreshing = true;
-
-    this.refreshPromise = (async () => {
-      try {
-        this.log("Calling refresh endpoint...");
-
-        const response = await axios.post(
-          `${this.baseUrl}/auth/refresh`,
-          {},
-          {
-            withCredentials: true, // Send refresh token cookie
-            headers: this.tenantId ? { "X-Tenant-ID": this.tenantId } : {},
-          },
-        );
-
-        const tokens: AuthTokens = {
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
-          expiresIn: response.data.expiresIn,
-        };
-
-        this.log("Token refresh successful");
-
-        // Save to storage
-        this.saveTokensToStorage(tokens);
-
-        // Notify callback
-        if (this.onTokenRefresh) {
-          this.onTokenRefresh(tokens);
-        }
-
-        return tokens;
-      } catch (error) {
-        this.log("Token refresh failed:", error);
-        throw error;
-      } finally {
-        this.refreshPromise = null;
-        this.isRefreshing = false;
-      }
-    })();
-
-    return this.refreshPromise;
-  }
-
-  /**
-   * Set access token
-   */
-  setAccessToken(token: string | null): void {
-    this.accessToken = token;
-
-    if (this.storage === "localStorage" && typeof window !== "undefined") {
-      if (token) {
-        localStorage.setItem("auth_access_token", token);
-        this.log("Saved access token to localStorage");
-      } else {
-        localStorage.removeItem("auth_access_token");
-        this.log("Removed access token from localStorage");
-      }
-    }
-  }
-
-  /**
-   * Get current access token
-   */
-  getAccessToken(): string | null {
-    return this.accessToken;
-  }
-
-  /**
-   * Save tokens to storage
-   */
-  private saveTokensToStorage(tokens: AuthTokens): void {
-    this.setAccessToken(tokens.accessToken);
-
-    if (
-      this.storage === "localStorage" &&
-      typeof window !== "undefined" &&
-      tokens.refreshToken
-    ) {
-      localStorage.setItem("auth_refresh_token", tokens.refreshToken);
-      this.log("Saved refresh token to localStorage");
-    }
-  }
-
-  /**
-   * Clear all tokens
-   */
-  clearTokens(): void {
-    this.accessToken = null;
-
-    if (this.storage === "localStorage" && typeof window !== "undefined") {
-      localStorage.removeItem("auth_access_token");
-      localStorage.removeItem("auth_refresh_token");
-      this.log("Cleared tokens from localStorage");
-    }
-  }
-
-  // ============================================================
-  // HTTP METHODS
-  // ============================================================
-
-  /**
-   * GET request
-   */
-  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.get<T>(url, config);
-    return response.data;
-  }
-
-  /**
-   * POST request
-   */
-  async post<T = any>(
-    url: string,
-    data?: any,
-    config?: AxiosRequestConfig,
-  ): Promise<T> {
-    const response = await this.client.post<T>(url, data, config);
-    return response.data;
-  }
-
-  /**
-   * PATCH request
-   */
-  async patch<T = any>(
-    url: string,
-    data?: any,
-    config?: AxiosRequestConfig,
-  ): Promise<T> {
-    const response = await this.client.patch<T>(url, data, config);
-    return response.data;
-  }
-
-  /**
-   * PUT request
-   */
-  async put<T = any>(
-    url: string,
-    data?: any,
-    config?: AxiosRequestConfig,
-  ): Promise<T> {
-    const response = await this.client.put<T>(url, data, config);
-    return response.data;
-  }
-
-  /**
-   * DELETE request
-   */
-  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.delete<T>(url, config);
-    return response.data;
-  }
-
-  // ============================================================
-  // ERROR HANDLING
-  // ============================================================
-
-  /**
-   * Transform Axios error to AuthError
-   */
-  private transformError(error: AxiosError): AuthError {
-    // Network error
-    if (!error.response) {
-      return {
-        code: "NETWORK_ERROR",
-        message:
-          "Unable to connect to the server. Please check your internet connection.",
-        details: error.message,
-      };
-    }
-
-    // Server error response
-    const response = error.response;
-    const data = response.data as any;
-
-    // Extract error from response
-    if (data && typeof data === "object") {
-      return {
-        code: data.code || this.getErrorCodeFromStatus(response.status),
-        message:
-          data.message || this.getErrorMessageFromStatus(response.status),
-        details: data.details || data,
-      };
-    }
-
-    // Fallback to status-based error
-    return {
-      code: this.getErrorCodeFromStatus(response.status),
-      message: this.getErrorMessageFromStatus(response.status),
-    };
-  }
-
-  /**
-   * Get error code from HTTP status
-   */
-  private getErrorCodeFromStatus(status: number): string {
-    switch (status) {
-      case 400:
-        return "INVALID_REQUEST";
-      case 401:
-        return "UNAUTHORIZED";
-      case 403:
-        return "FORBIDDEN";
-      case 404:
-        return "NOT_FOUND";
-      case 409:
-        return "CONFLICT";
-      case 429:
-        return "RATE_LIMIT_EXCEEDED";
-      case 500:
-        return "SERVER_ERROR";
-      default:
-        return "UNKNOWN_ERROR";
-    }
-  }
-
-  /**
-   * Get error message from HTTP status
-   */
-  private getErrorMessageFromStatus(status: number): string {
-    switch (status) {
-      case 400:
-        return "Invalid request. Please check your input.";
-      case 401:
-        return "You are not authenticated. Please log in.";
-      case 403:
-        return "You do not have permission to perform this action.";
-      case 404:
-        return "The requested resource was not found.";
-      case 409:
-        return "A conflict occurred. The resource may already exist.";
-      case 429:
-        return "Too many requests. Please try again later.";
-      case 500:
-        return "A server error occurred. Please try again later.";
-      default:
-        return "An unexpected error occurred.";
-    }
-  }
-
-  // ============================================================
-  // UTILITIES
-  // ============================================================
-
-  /**
-   * Get the underlying Axios instance
-   */
-  getClient(): AxiosInstance {
-    return this.client;
-  }
-
-  /**
-   * Update tenant ID
-   */
-  setTenantId(tenantId: string): void {
-    this.tenantId = tenantId;
-    this.log("Tenant ID updated:", tenantId);
-  }
-
-  /**
-   * Get current tenant ID
-   */
-  getTenantId(): string | undefined {
-    return this.tenantId;
-  }
-
-  /**
-   * Debug logging
-   */
-  private log(...args: any[]): void {
-    if (this.debug) {
-      console.log("[AuthSDK]", ...args);
-    }
-  }
-}
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/client.ts
-SIZE: 11.46 KB | LINES: 511
-================================================================================
-
-/**
- * Fort Knox Auth SDK - Main Client
- *
- * Main authentication client providing all auth-related methods.
- */
-
-import { ApiClient } from "./api-client";
-import type {
-  User,
-  AuthTokens,
-  LoginCredentials,
-  SignupCredentials,
-  LoginResponse,
-  SignupResponse,
-  MfaChallenge,
-  MfaMethod,
-  MfaSetupResponse,
-  SocialProviderType,
-  SocialProvider,
-  SocialConnection,
-  Session,
-  PasswordResetRequest,
-  PasswordResetConfirm,
-  PasswordChangeRequest,
-  TenantConfig,
-  AuthClientConfig,
-} from "./types";
-
-export class AuthClient {
-  private api: ApiClient;
-  private user: User | null = null;
-  private config: AuthClientConfig;
-
-  constructor(config: AuthClientConfig) {
-    this.config = {
-      storage: "cookie",
-      debug: false,
-      ...config,
-    };
-
-    this.api = new ApiClient(
-      config.baseUrl,
-      config.tenantId,
-      this.config.storage,
-      config.onTokenRefresh,
-      config.onAuthError,
-      this.config.debug,
-    );
-  }
-
-  // ============================================================
-  // AUTHENTICATION
-  // ============================================================
-
-  /**
-   * Login with email and password
-   */
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    try {
-      const response = await this.api.post<any>("/auth/login", credentials);
-
-      // Check if MFA is required
-      if (response.mfaRequired) {
-        return {
-          user: null as any,
-          tokens: null as any,
-          mfaRequired: true,
-          mfaChallenge: response.mfaChallenge as MfaChallenge,
-        };
-      }
-
-      // Set access token
-      this.api.setAccessToken(response.accessToken);
-      this.user = response.user;
-
-      return {
-        user: response.user,
-        tokens: {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expiresIn: response.expiresIn,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Sign up new user
-   */
-  async signup(credentials: SignupCredentials): Promise<SignupResponse> {
-    try {
-      const response = await this.api.post<any>("/auth/register", credentials);
-
-      this.api.setAccessToken(response.accessToken);
-      this.user = response.user;
-
-      return {
-        user: response.user,
-        tokens: {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expiresIn: response.expiresIn,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Logout
-   */
-  async logout(): Promise<void> {
-    try {
-      await this.api.post("/auth/logout");
-    } catch (error) {
-      // Logout even if API call fails
-      console.error("Logout API call failed:", error);
-    } finally {
-      this.api.clearTokens();
-      this.user = null;
-
-      if (this.config.onLogout) {
-        this.config.onLogout();
-      }
-    }
-  }
-
-  /**
-   * Get current user
-   * Returns cached user if available, otherwise fetches from API
-   */
-  async getCurrentUser(forceRefresh = false): Promise<User> {
-    if (this.user && !forceRefresh) {
-      return this.user;
-    }
-
-    const user = await this.api.get<User>("/users/me");
-    this.user = user;
-    return user;
-  }
-
-  /**
-   * Refresh session (get new access token)
-   */
-  async refreshSession(): Promise<AuthTokens> {
-    const response = await this.api.post<any>("/auth/refresh");
-
-    this.api.setAccessToken(response.accessToken);
-
-    return {
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-      expiresIn: response.expiresIn,
-    };
-  }
-
-  /**
-   * Check if user is authenticated
-   */
-  isAuthenticated(): boolean {
-    return !!this.api.getAccessToken();
-  }
-
-  // ============================================================
-  // MULTI-FACTOR AUTHENTICATION
-  // ============================================================
-
-  /**
-   * Verify MFA code during login
-   */
-  async verifyMfa(
-    tempToken: string,
-    code: string,
-    method: MfaMethod = "totp",
-  ): Promise<LoginResponse> {
-    const response = await this.api.post<any>(
-      "/auth/mfa/verify",
-      { code, method },
-      {
-        headers: { Authorization: `Bearer ${tempToken}` },
-      },
-    );
-
-    this.api.setAccessToken(response.accessToken);
-    this.user = response.user;
-
-    return {
-      user: response.user,
-      tokens: {
-        accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
-        expiresIn: response.expiresIn,
-      },
-    };
-  }
-
-  /**
-   * Setup TOTP MFA
-   */
-  async setupTotpMfa(): Promise<MfaSetupResponse> {
-    return this.api.post<MfaSetupResponse>("/auth/mfa/setup/totp");
-  }
-
-  /**
-   * Setup SMS MFA
-   */
-  async setupSmsMfa(phoneNumber: string): Promise<MfaSetupResponse> {
-    return this.api.post<MfaSetupResponse>("/auth/mfa/setup/sms", {
-      phoneNumber,
-    });
-  }
-
-  /**
-   * Verify MFA setup
-   */
-  async verifyMfaSetup(
-    code: string,
-    method: MfaMethod = "totp",
-  ): Promise<{ success: boolean; backupCodes?: string[] }> {
-    return this.api.post("/auth/mfa/verify-setup", { code, method });
-  }
-
-  /**
-   * Disable MFA
-   */
-  async disableMfa(password: string): Promise<void> {
-    await this.api.delete("/auth/mfa", {
-      data: { password },
-    });
-
-    // Update cached user
-    if (this.user) {
-      this.user.mfaEnabled = false;
-    }
-  }
-
-  /**
-   * Get MFA status
-   */
-  async getMfaStatus(): Promise<{ enabled: boolean; methods: MfaMethod[] }> {
-    return this.api.get("/auth/mfa/status");
-  }
-
-  // ============================================================
-  // SOCIAL AUTHENTICATION
-  // ============================================================
-
-  /**
-   * Get social login URL for OAuth flow
-   */
-  getSocialLoginUrl(provider: SocialProviderType, returnUrl?: string): string {
-    const params = new URLSearchParams();
-
-    if (this.api.getTenantId()) {
-      params.append("tenantId", this.api.getTenantId()!);
-    }
-
-    if (returnUrl) {
-      params.append("returnUrl", returnUrl);
-    }
-
-    return `${this.config.baseUrl}/auth/social/${provider}/login?${params.toString()}`;
-  }
-
-  /**
-   * Get available social providers for current tenant
-   */
-  async getSocialProviders(): Promise<SocialProvider[]> {
-    try {
-      const response = await this.api.get<{ providers: string[]; tenant: any }>(
-        "/api/public/tenant",
-      );
-
-      return response.providers.map((provider) => ({
-        provider: provider as SocialProviderType,
-        url: this.getSocialLoginUrl(provider as SocialProviderType),
-        enabled: true,
-      }));
-    } catch (error) {
-      // Return empty array if endpoint fails
-      return [];
-    }
-  }
-
-  /**
-   * Get connected social accounts
-   */
-  async getSocialConnections(): Promise<SocialConnection[]> {
-    return this.api.get<SocialConnection[]>("/auth/social/connections");
-  }
-
-  /**
-   * Unlink social account
-   */
-  async unlinkSocialAccount(provider: SocialProviderType): Promise<void> {
-    await this.api.delete(`/auth/social/connections/${provider}`);
-  }
-
-  /**
-   * Confirm social account linking via email
-   */
-  async confirmSocialLinking(token: string): Promise<void> {
-    await this.api.get(`/auth/social/link/confirm?token=${token}`);
-  }
-
-  // ============================================================
-  // PASSWORD MANAGEMENT
-  // ============================================================
-
-  /**
-   * Request password reset email
-   */
-  async forgotPassword(email: string): Promise<void> {
-    await this.api.post("/auth/forgot-password", {
-      email,
-    } as PasswordResetRequest);
-  }
-
-  /**
-   * Reset password with token from email
-   */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    await this.api.post("/auth/reset-password", {
-      token,
-      newPassword,
-    } as PasswordResetConfirm);
-  }
-
-  /**
-   * Change password (authenticated user)
-   */
-  async changePassword(
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<void> {
-    await this.api.post("/users/me/password", {
-      currentPassword,
-      newPassword,
-    } as PasswordChangeRequest);
-  }
-
-  // ============================================================
-  // EMAIL VERIFICATION
-  // ============================================================
-
-  /**
-   * Verify email with token
-   */
-  async verifyEmail(token: string): Promise<void> {
-    await this.api.post("/auth/verify-email", { token });
-
-    // Update cached user
-    if (this.user) {
-      this.user.emailVerified = true;
-    }
-  }
-
-  /**
-   * Resend verification email
-   */
-  async resendVerificationEmail(): Promise<void> {
-    await this.api.post("/auth/resend-verification");
-  }
-
-  // ============================================================
-  // USER PROFILE
-  // ============================================================
-
-  /**
-   * Update user profile
-   */
-  async updateProfile(data: Partial<User>): Promise<User> {
-    const user = await this.api.patch<User>("/users/me", data);
-    this.user = user;
-    return user;
-  }
-
-  /**
-   * Upload avatar
-   */
-  async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    const response = await this.api.post<{ avatarUrl: string }>(
-      "/users/me/avatar",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      },
-    );
-
-    // Update cached user
-    if (this.user) {
-      this.user.avatarUrl = response.avatarUrl;
-    }
-
-    return response;
-  }
-
-  /**
-   * Delete account
-   */
-  async deleteAccount(password: string): Promise<void> {
-    await this.api.delete("/users/me", {
-      data: { password },
-    });
-
-    this.api.clearTokens();
-    this.user = null;
-
-    if (this.config.onLogout) {
-      this.config.onLogout();
-    }
-  }
-
-  // ============================================================
-  // SESSION MANAGEMENT
-  // ============================================================
-
-  /**
-   * Get active sessions
-   */
-  async getSessions(): Promise<Session[]> {
-    return this.api.get<Session[]>("/sessions/active");
-  }
-
-  /**
-   * Revoke specific session
-   */
-  async revokeSession(sessionId: string): Promise<void> {
-    await this.api.delete(`/sessions/${sessionId}`);
-  }
-
-  /**
-   * Revoke all other sessions (keep current)
-   */
-  async revokeAllOtherSessions(): Promise<void> {
-    await this.api.delete("/sessions/all/other");
-  }
-
-  // ============================================================
-  // TENANT CONFIGURATION
-  // ============================================================
-
-  /**
-   * Get tenant configuration
-   */
-  async getTenantConfig(): Promise<TenantConfig> {
-    return this.api.get<TenantConfig>("/api/public/tenant");
-  }
-
-  // ============================================================
-  // UTILITIES
-  // ============================================================
-
-  /**
-   * Set access token manually
-   */
-  setAccessToken(token: string): void {
-    this.api.setAccessToken(token);
-  }
-
-  /**
-   * Get current access token
-   */
-  getAccessToken(): string | null {
-    return this.api.getAccessToken();
-  }
-
-  /**
-   * Set tenant ID
-   */
-  setTenantId(tenantId: string): void {
-    this.api.setTenantId(tenantId);
-  }
-
-  /**
-   * Get current tenant ID
-   */
-  getTenantId(): string | undefined {
-    return this.api.getTenantId();
-  }
-
-  /**
-   * Get API client for custom requests
-   */
-  getApiClient(): ApiClient {
-    return this.api;
-  }
-
-  /**
-   * Get cached user (without API call)
-   */
-  getCachedUser(): User | null {
-    return this.user;
-  }
-
-  /**
-   * Clear cached user
-   */
-  clearCache(): void {
-    this.user = null;
-  }
-}
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/index.ts
-SIZE: 532 B | LINES: 20
-================================================================================
-
-"use client";
-import { AuthClient } from "./client.ts";
-
-export * from "./api-client";
-export * from "./client";
-export * from "./types";
-export * from "./react";
-
-export const defaultAuthClient = new AuthClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
-  tenantId: "0dc7571b-f592-4f9c-aacf-1a164000a19a", // Or extract from subdomain
-  storage: "cookie",
-  onTokenRefresh: () => {
-    console.log("Token refreshed");
-  },
-  onAuthError: (error) => {
-    console.error("Auth error:", error);
-  },
-});
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/react/auth-provider.tsx
-SIZE: 7.64 KB | LINES: 311
-================================================================================
-
-'use client';
-/**
- * Fort Knox Auth SDK - React Provider
- * 
- * React context provider for authentication state management.
- */
-
-
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { AuthClient } from '../client';
-import type { User, AuthState, LoginCredentials, SignupCredentials, SocialProviderType } from '../types';
-
-// ============================================================
-// CONTEXT DEFINITION
-// ============================================================
-
-interface AuthContextValue extends AuthState {
-  // Authentication
-  login: (credentials: LoginCredentials) => Promise<void>;
-  signup: (credentials: SignupCredentials) => Promise<void>;
-  logout: () => Promise<void>;
-  
-  // MFA
-  verifyMfa: (tempToken: string, code: string, method?: 'totp' | 'sms') => Promise<void>;
-  
-  // Session
-  refreshSession: () => Promise<void>;
-  
-  // Social Auth
-  getSocialLoginUrl: (provider: SocialProviderType, returnUrl?: string) => string;
-  
-  // User
-  updateUser: (data: Partial<User>) => Promise<void>;
-  
-  // Auth client
-  authClient: AuthClient;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-// ============================================================
-// PROVIDER COMPONENT
-// ============================================================
-
-interface AuthProviderProps {
-  children: React.ReactNode;
-  authClient: AuthClient;
-  onAuthError?: (error: Error) => void;
-  onLoginSuccess?: (user: User) => void;
-  onLogoutSuccess?: () => void;
-}
-
-export function AuthProvider({
-  children,
-  authClient,
-  onAuthError,
-  onLoginSuccess,
-  onLogoutSuccess,
-}: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
-  const isInitialized = useRef(false);
-
-  // ============================================================
-  // INITIALIZATION
-  // ============================================================
-
-  /**
-   * Initialize - check if user is logged in
-   * Only runs once on mount
-   */
-  useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-
-    const initAuth = async () => {
-      try {
-        // Try to refresh session (will use cookie if available)
-        try {
-          await authClient.refreshSession();
-        } catch (refreshError) {
-          // If refresh fails, try to get user with existing token
-          // (might have token in memory from previous page)
-          const accessToken = authClient.getAccessToken();
-          if (!accessToken) {
-            // No token at all, user is not logged in
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        // Get current user
-        const currentUser = await authClient.getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        // Not logged in or session expired
-        console.log('Auth initialization: User not authenticated');
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-  }, [authClient]);
-
-  // ============================================================
-  // AUTHENTICATION METHODS
-  // ============================================================
-
-  /**
-   * Login with email and password
-   */
-  const login = useCallback(
-    async (credentials: LoginCredentials) => {
-      try {
-        setError(null);
-        setIsLoading(true);
-
-        const result = await authClient.login(credentials);
-
-        if (result.mfaRequired) {
-          // MFA is required, throw error with challenge
-          const mfaError: any = new Error('MFA_REQUIRED');
-          mfaError.mfaChallenge = result.mfaChallenge;
-          throw mfaError;
-        }
-
-        setUser(result.user);
-
-        if (onLoginSuccess) {
-          onLoginSuccess(result.user);
-        }
-      } catch (error) {
-        setError(error);
-        if (onAuthError) {
-          onAuthError(error as Error);
-        }
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [authClient, onAuthError, onLoginSuccess],
-  );
-
-  /**
-   * Sign up new user
-   */
-  const signup = useCallback(
-    async (credentials: SignupCredentials) => {
-      try {
-        setError(null);
-        setIsLoading(true);
-
-        const result = await authClient.signup(credentials);
-        setUser(result.user);
-
-        if (onLoginSuccess) {
-          onLoginSuccess(result.user);
-        }
-      } catch (error) {
-        setError(error);
-        if (onAuthError) {
-          onAuthError(error as Error);
-        }
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [authClient, onAuthError, onLoginSuccess],
-  );
-
-  /**
-   * Logout
-   */
-  const logout = useCallback(async () => {
-    try {
-      setError(null);
-      await authClient.logout();
-      setUser(null);
-
-      if (onLogoutSuccess) {
-        onLogoutSuccess();
-      }
-    } catch (error) {
-      setError(error);
-      if (onAuthError) {
-        onAuthError(error as Error);
-      }
-      throw error;
-    }
-  }, [authClient, onAuthError, onLogoutSuccess]);
-
-  /**
-   * Verify MFA code
-   */
-  const verifyMfa = useCallback(
-    async (tempToken: string, code: string, method: 'totp' | 'sms' = 'totp') => {
-      try {
-        setError(null);
-        setIsLoading(true);
-
-        const result = await authClient.verifyMfa(tempToken, code, method);
-        setUser(result.user);
-
-        if (onLoginSuccess) {
-          onLoginSuccess(result.user);
-        }
-      } catch (error) {
-        setError(error);
-        if (onAuthError) {
-          onAuthError(error as Error);
-        }
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [authClient, onAuthError, onLoginSuccess],
-  );
-
-  /**
-   * Refresh session
-   */
-  const refreshSession = useCallback(async () => {
-    try {
-      setError(null);
-      await authClient.refreshSession();
-      const currentUser = await authClient.getCurrentUser(true);
-      setUser(currentUser);
-    } catch (error) {
-      setUser(null);
-      setError(error);
-      if (onAuthError) {
-        onAuthError(error as Error);
-      }
-    }
-  }, [authClient, onAuthError]);
-
-  /**
-   * Get social login URL
-   */
-  const getSocialLoginUrl = useCallback(
-    (provider: SocialProviderType, returnUrl?: string) => {
-      return authClient.getSocialLoginUrl(provider, returnUrl);
-    },
-    [authClient],
-  );
-
-  /**
-   * Update user profile
-   */
-  const updateUser = useCallback(
-    async (data: Partial<User>) => {
-      try {
-        setError(null);
-        const updatedUser = await authClient.updateProfile(data);
-        setUser(updatedUser);
-      } catch (error) {
-        setError(error);
-        if (onAuthError) {
-          onAuthError(error as Error);
-        }
-        throw error;
-      }
-    },
-    [authClient, onAuthError],
-  );
-
-  // ============================================================
-  // CONTEXT VALUE
-  // ============================================================
-
-  const value: AuthContextValue = {
-    user,
-    isAuthenticated: !!user,
-    isLoading,
-    error,
-    login,
-    signup,
-    logout,
-    verifyMfa,
-    refreshSession,
-    getSocialLoginUrl,
-    updateUser,
-    authClient,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-// ============================================================
-// HOOK
-// ============================================================
-
-/**
- * Hook to access auth context
- * Must be used within AuthProvider
- */
-export function useAuthContext() {
-  const context = useContext(AuthContext);
-
-  if (context === undefined) {
-    throw new Error('useAuthContext must be used within AuthProvider');
-  }
-
-  return context;
-}
-
-
-================================================================================
-FILE: packages/web-sdk/src/react/index.ts
-SIZE: 418 B | LINES: 18
-================================================================================
-
-"use client";
-
-/**
- * Fort Knox Auth SDK - React
- *
- * React-specific exports including hooks and providers.
- * Import from '@repo/auth-sdk/react' to use these.
- */
-
-"use client";
-
-export { AuthProvider } from "./auth-provider.tsx";
-export { useAuth } from "./use-auth";
-export { useUser } from "./use-user";
-
-// Re-export types that are commonly used with React hooks
-export type { User, AuthState } from "../types";
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/react/use-auth.ts
-SIZE: 1.16 KB | LINES: 55
-================================================================================
-
-/**
- * Fort Knox Auth SDK - useAuth Hook
- *
- * Main hook for authentication operations.
- * Extracted from AuthProvider for cleaner API.
- */
-
-"use client";
-
-import { useAuthContext } from "./auth-provider";
-
-/**
- * Hook to access authentication state and methods
- *
- * @example
- * ```tsx
- * function LoginPage() {
- *   const { login, isAuthenticated, user } = useAuth();
- *
- *   const handleLogin = async (e) => {
- *     await login({ email, password });
- *   };
- *
- *   if (isAuthenticated) {
- *     return <div>Welcome {user?.email}!</div>;
- *   }
- *
- *   return <LoginForm onSubmit={handleLogin} />;
- * }
- * ```
- */
-export function useAuth() {
-  const context = useAuthContext();
-
-  return {
-    // State
-    user: context.user,
-    isAuthenticated: context.isAuthenticated,
-    isLoading: context.isLoading,
-    error: context.error,
-
-    // Methods
-    login: context.login,
-    signup: context.signup,
-    logout: context.logout,
-    verifyMfa: context.verifyMfa,
-    refreshSession: context.refreshSession,
-    getSocialLoginUrl: context.getSocialLoginUrl,
-    updateUser: context.updateUser,
-
-    // Auth client (for advanced usage)
-    authClient: context.authClient,
-  };
-}
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/react/use-user.ts
-SIZE: 234 B | LINES: 15
-================================================================================
-
-import { useAuth } from "./use-auth";
-
-/**
- * Convenient hook to just get user
- */
-export function useUser() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-
-  return {
-    user,
-    isLoading,
-    isAuthenticated,
-  };
-}
-
-
-
-================================================================================
-FILE: packages/web-sdk/src/types.ts
-SIZE: 7.18 KB | LINES: 314
-================================================================================
-
-/**
- * Fort Knox Auth SDK - Type Definitions
- * 
- * All TypeScript types and interfaces used throughout the SDK.
- */
-
-// ============================================================
-// USER TYPES
-// ============================================================
-
-export interface User {
-  id: string;
-  tenantId: string;
-  email: string;
-  emailVerified: boolean;
-  phone?: string;
-  phoneVerified: boolean;
-  firstName?: string;
-  lastName?: string;
-  displayName?: string;
-  avatarUrl?: string;
-  primaryAuthMethod: 'password' | 'google' | 'github' | 'microsoft' | 'apple' | 'linkedin' | 'facebook';
-  mfaEnabled: boolean;
-  status: 'active' | 'suspended' | 'deleted';
-  lastLoginAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ============================================================
-// AUTHENTICATION TYPES
-// ============================================================
-
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken?: string; // Optional if using httpOnly cookies
-  expiresIn?: number; // Seconds until expiration
-}
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface SignupCredentials {
-  email: string;
-  password: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-}
-
-export interface LoginResponse {
-  user: User;
-  tokens: AuthTokens;
-  mfaRequired?: boolean;
-  mfaChallenge?: MfaChallenge;
-}
-
-export interface SignupResponse {
-  user: User;
-  tokens: AuthTokens;
-}
-
-// ============================================================
-// MFA TYPES
-// ============================================================
-
-export type MfaMethod = 'totp' | 'sms' | 'webauthn' | 'backup_code';
-
-export interface MfaChallenge {
-  tempToken: string;
-  methods: MfaMethod[];
-  remainingAttempts?: number;
-}
-
-export interface MfaSetupResponse {
-  qrCode?: string; // Base64 QR code for TOTP
-  secret?: string; // Manual entry secret for TOTP
-  backupCodes?: string[]; // Backup codes
-  method: MfaMethod;
-}
-
-export interface MfaVerifyRequest {
-  code: string;
-  method: MfaMethod;
-}
-
-// ============================================================
-// SOCIAL AUTH TYPES
-// ============================================================
-
-export type SocialProviderType = 'google' | 'github' | 'microsoft' | 'apple' | 'linkedin' | 'facebook';
-
-export interface SocialProvider {
-  provider: SocialProviderType;
-  url: string; // OAuth URL to redirect to
-  enabled: boolean;
-}
-
-export interface SocialConnection {
-  id: string;
-  provider: SocialProviderType;
-  providerId: string;
-  email: string;
-  displayName?: string;
-  avatarUrl?: string;
-  primary: boolean;
-  lastUsedAt?: Date;
-  createdAt: Date;
-}
-
-export interface SocialLinkRequest {
-  provider: SocialProviderType;
-  token: string;
-  expiresAt: Date;
-}
-
-// ============================================================
-// SESSION TYPES
-// ============================================================
-
-export interface Session {
-  id: string;
-  userId: string;
-  tenantId: string;
-  deviceInfo?: {
-    userAgent?: string;
-    browser?: string;
-    os?: string;
-    device?: string;
-  };
-  ipAddress?: string;
-  location?: {
-    city?: string;
-    country?: string;
-  };
-  current: boolean; // Is this the current session?
-  expiresAt: Date;
-  lastActivityAt: Date;
-  createdAt: Date;
-}
-
-// ============================================================
-// PASSWORD TYPES
-// ============================================================
-
-export interface PasswordResetRequest {
-  email: string;
-}
-
-export interface PasswordResetConfirm {
-  token: string;
-  newPassword: string;
-}
-
-export interface PasswordChangeRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
-// ============================================================
-// EMAIL VERIFICATION TYPES
-// ============================================================
-
-export interface EmailVerificationRequest {
-  token: string;
-}
-
-// ============================================================
-// TENANT TYPES
-// ============================================================
-
-export interface TenantConfig {
-  slug: string;
-  name: string;
-  logo?: string;
-  primaryColor?: string;
-  customDomain?: string;
-  settings: {
-    allowSignup: boolean;
-    requireEmailVerification: boolean;
-    mfaRequired: boolean;
-    sessionTimeout: number; // In seconds
-  };
-  enabledProviders: SocialProviderType[];
-}
-
-// ============================================================
-// ERROR TYPES
-// ============================================================
-
-export interface AuthError {
-  code: string;
-  message: string;
-  details?: any;
-}
-
-export type AuthErrorCode =
-  | 'INVALID_CREDENTIALS'
-  | 'USER_NOT_FOUND'
-  | 'EMAIL_ALREADY_EXISTS'
-  | 'INVALID_TOKEN'
-  | 'TOKEN_EXPIRED'
-  | 'MFA_REQUIRED'
-  | 'MFA_INVALID_CODE'
-  | 'SESSION_EXPIRED'
-  | 'UNAUTHORIZED'
-  | 'FORBIDDEN'
-  | 'RATE_LIMIT_EXCEEDED'
-  | 'NETWORK_ERROR'
-  | 'UNKNOWN_ERROR';
-
-// ============================================================
-// AUTH STATE TYPES
-// ============================================================
-
-export interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error?: AuthError | null;
-}
-
-// ============================================================
-// SDK CONFIGURATION TYPES
-// ============================================================
-
-export type StorageType = 'memory' | 'localStorage' | 'cookie';
-
-export interface AuthClientConfig {
-  /**
-   * Base URL of the auth service
-   * @example 'https://auth.scrolloop.com' or 'http://localhost:4000'
-   */
-  baseUrl: string;
-
-  /**
-   * Tenant ID or slug
-   * If not provided, will be extracted from subdomain
-   * @example 'portal' or 'acme'
-   */
-  tenantId?: string;
-
-  /**
-   * How to store tokens
-   * - 'cookie': Refresh token in httpOnly cookie, access token in memory (recommended for production)
-   * - 'localStorage': Both tokens in localStorage (dev only, not secure)
-   * - 'memory': Both tokens in memory (lost on page refresh)
-   * @default 'cookie'
-   */
-  storage?: StorageType;
-
-  /**
-   * Callback when tokens are refreshed
-   */
-  onTokenRefresh?: (tokens: AuthTokens) => void;
-
-  /**
-   * Callback when auth error occurs
-   */
-  onAuthError?: (error: AuthError) => void;
-
-  /**
-   * Callback when user logs out
-   */
-  onLogout?: () => void;
-
-  /**
-   * Enable debug logging
-   * @default false
-   */
-  debug?: boolean;
-}
-
-// ============================================================
-// API RESPONSE TYPES
-// ============================================================
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: AuthError;
-  message?: string;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}
-
-// ============================================================
-// UTILITY TYPES
-// ============================================================
-
-/**
- * Make certain properties optional
- */
-export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-/**
- * Make certain properties required
- */
-export type RequiredBy<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
-
-/**
- * Deep partial type
- */
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-
-================================================================================
-FILE: packages/web-sdk/tsconfig.json
-SIZE: 1.01 KB | LINES: 41
-================================================================================
-
-{
-  "compilerOptions": {
-    /* Language and Environment */
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-
-    /* Modules */
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
-
-    /* Emit */
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "removeComments": true,
-    "noEmit": true, // tsup handles emit
-
-    /* Interop Constraints */
-    "isolatedModules": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-
-    /* Type Checking */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noUncheckedIndexedAccess": true,
-
-    /* Completeness */
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
-}
-
-
-================================================================================
-FILE: packages/web-sdk/tsup.config.ts
-SIZE: 1.06 KB | LINES: 61
-================================================================================
-
-import { defineConfig } from "tsup";
-
-export default defineConfig({
-  // Entry points
-  entry: {
-    index: "src/index.ts",
-    "react/index": "src/react/index.ts",
-  },
-
-  // Output formats
-  format: ["cjs", "esm"],
-
-  // Generate .d.ts files
-  dts: true,
-
-  // Clean output directory before build
-  clean: true,
-
-  // Source maps for debugging
-  sourcemap: true,
-
-  // Minify in production
-  minify: false,
-
-  // Split code by entry points
-  splitting: false,
-
-  // Transpile to ES2020
-  target: "es2020",
-
-  // External dependencies (not bundled)
-  external: ["react", "react-dom", "axios"],
-
-  // Preserve JSX (will be transpiled by consumer)
-  jsx: "automatic",
-
-  // Output directory
-  outDir: "dist",
-
-  // Tree shaking
-  treeshake: true,
-
-  // Bundle everything except externals
-  bundle: true,
-
-  // Don't bundle node_modules
-  noExternal: [],
-
-  // Preserve use client directive for React Server Components
-  banner: {
-    js: "'use client';",
-  },
-
-  // Additional esbuild options
-  esbuildOptions(options) {
-    options.banner = {
-      js: "'use client';",
-    };
-  },
-});
-
-
-
-================================================================================
 FILE: turbo.json
 SIZE: 414 B | LINES: 22
 ================================================================================
@@ -45992,8 +47643,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 293
-Total Lines: 43,934
+Files Processed: 296
+Total Lines: 45,564
 Files Skipped: 37
 Errors: 0
-Generated: 2026-01-02T18:14:32.697Z
+Generated: 2026-01-02T23:34:34.432Z

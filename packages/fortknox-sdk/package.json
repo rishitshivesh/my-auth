@@ -1,39 +1,39 @@
 {
   "name": "@fortknox/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Fort Knox Authentication SDK - Session runtime for multi-tenant auth",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
-      "import": "./dist/index.mjs"
+      "import": "./dist/index.js"
     },
     "./core": {
-      "import": "./dist/core/index.mjs",
+      "import": "./dist/core/index.js",
       "require": "./dist/core/index.js",
       "types": "./dist/core/index.d.ts"
     },
     "./web": {
-      "import": "./dist/web/index.mjs",
+      "import": "./dist/web/index.js",
       "require": "./dist/web/index.js",
       "types": "./dist/web/index.d.ts"
     },
     "./react": {
-      "import": "./dist/react/index.mjs",
+      "import": "./dist/react/index.js",
       "require": "./dist/react/index.js",
       "types": "./dist/react/index.d.ts"
     },
     "./next": {
-      "import": "./dist/next/index.mjs",
+      "import": "./dist/next/index.js",
       "require": "./dist/next/index.js",
       "types": "./dist/next/index.d.ts"
     },
     "./node": {
-      "import": "./dist/node/index.mjs",
+      "import": "./dist/node/index.js",
       "require": "./dist/node/index.js",
       "types": "./dist/node/index.d.ts"
     }

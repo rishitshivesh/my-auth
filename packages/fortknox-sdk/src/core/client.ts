@@ -35,21 +35,23 @@ export class FortKnoxClient {
   private state: AuthState;
   private transport: Transport;
   private listeners: AuthEventListener[] = [];
+  private initPromise?: Promise<void>;
 
   constructor(config: FortKnoxConfig) {
-    this.config = {
+      this.config = {
       debug: false,
       refreshMargin: 30,
       maxRefreshRetries: 3,
       onTokenRefreshed: () => {},
       onLogout: () => {},
       onError: () => {},
-      transport: createFetchTransport(),
-      ...config,
+      ...config,  // ← Spread config FIRST
+      transport: config.transport || createFetchTransport(),  // ← Then set transport
     };
 
     this.state = createAuthState();
     this.transport = this.config.transport;
+    this.initPromise = this.tryRestoreSession();
 
     this.log('FortKnox client initialized', {
       baseURL: this.config.baseURL,
@@ -77,7 +79,7 @@ export class FortKnoxClient {
       throw this.createError(response);
     }
 
-    const data = response.data;
+    const data = response.data?.data;
 
     // Handle MFA challenge
     if (data.mfaRequired) {
@@ -92,7 +94,7 @@ export class FortKnoxClient {
       this.config.onTokenRefreshed(data.accessToken);
     }
 
-    this.log('Login successful', { userId: data.user?.id });
+    this.log('Login successful', { email: data.user?.email });
 
     return data;
   }
@@ -117,10 +119,38 @@ export class FortKnoxClient {
     }
   }
 
+   /**
+   * ⭐ NEW: Try to restore session from refresh cookie
+   */
+  private async tryRestoreSession(): Promise<void> {
+    try {
+      this.log('Attempting to restore session from refresh cookie');
+      
+      // Try to refresh - uses httpOnly cookie
+      await this.refreshOnce();
+      
+      this.log('Session restored successfully');
+    } catch (error) {
+      // No valid refresh cookie - that's OK
+      this.log('No valid session to restore');
+    }
+  }
+
+  /**
+   * ⭐ NEW: Wait for initialization to complete
+   */
+  async waitForInit(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
+  }
+
+
   /**
    * Get current user
    */
   async getCurrentUser(): Promise<User> {
+    await this.waitForInit(); // ← Add this line
     this.log('Get current user');
 
     const response = await this.request({
@@ -132,7 +162,7 @@ export class FortKnoxClient {
       throw this.createError(response);
     }
 
-    return response.data;
+    return response.data?.data;
   }
 
   /**

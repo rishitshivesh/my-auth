@@ -12,39 +12,43 @@ import {
 import { Input } from "@repo/ui";
 import { useEffect } from "react";
 import axios from "axios";
+import { useAuth } from '@fortknox/sdk';
+
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
 
-    // const { login, user, isAuthenticated } = useAuth();
+    const { login, user, isAuthenticated } = useAuth();
 
-    // const handleSubmit = (e: React.FormEvent) => {
-    //   e.preventDefault();
-    //   const form = e.target as HTMLFormElement;
-    //   const formData = new FormData(form);
-    //   const email = formData.get("email") as string;
-    //   const password = formData.get("password") as string;
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const formData = new FormData(form);
+      const email = formData.get("email") as string;
+      const password = formData.get("password") as string;
 
       
       
-    //   // login({
-    //   //   email,
-    //   //   password
-    //   // });
-    //   login(
-    //     {
-    //     email: "rishitshivesh@gmail.com",
-    //     password: "Test123!@#"
-    //   }
-    //   )
-    // };
+      // login({
+      //   email,
+      //   password
+      // });
+      login(
+        {
+        email: "rishitshivesh@gmail.com",
+        password: "SecureP@ssw0rd123!"
+      }
+      )
+    };
+
+    console.log({user});
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
-          <form className="p-6 md:p-8">
+          <form className="p-6 md:p-8" onSubmit={handleSubmit}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Welcome back</h1>

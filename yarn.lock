@@ -1586,7 +1586,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fortknox/sdk@workspace:packages/fortknox-sdk":
+"@fortknox/sdk@workspace:*, @fortknox/sdk@workspace:packages/fortknox-sdk":
   version: 0.0.0-use.local
   resolution: "@fortknox/sdk@workspace:packages/fortknox-sdk"
   dependencies:
@@ -6914,6 +6914,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "admin-portal@workspace:apps/admin-portal"
   dependencies:
+    "@fortknox/sdk": "workspace:*"
     "@repo/eslint-config": "npm:*"
     "@repo/typescript-config": "npm:*"
     "@repo/ui": "workspace:*"
