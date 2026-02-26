@@ -17,6 +17,7 @@ import type {
   AuthError,
   AuthEvent,
   AuthEventListener,
+  LoginIntentResponse,
 } from './types';
 import { AuthError as AuthErrorClass } from './types';
 import { createFetchTransport } from './transport';
@@ -97,6 +98,21 @@ export class FortKnoxClient {
     this.log('Login successful', { email: data.user?.email });
 
     return data;
+  }
+
+  async loginIntent(email: string): Promise<LoginIntentResponse> {
+    this.log('Login Intent request', { email });
+      const response = await this.request({
+        url: `${this.config.baseURL}/auth/login-intent`,
+        method: 'POST',
+        body: {email},
+      });
+
+      if (!response.ok) {
+       throw this.createError(response);
+      }
+
+      return response.data?.data;
   }
 
   /**

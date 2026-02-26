@@ -23,6 +23,7 @@ interface AuthContextValue {
   
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginIntent: (params: {email: string}) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   
@@ -30,7 +31,7 @@ interface AuthContextValue {
   client: FortKnoxClient;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue>(undefined as any);
 
 // ============================================================
 // PROVIDER
@@ -112,6 +113,21 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
+  const loginIntent = async ({email}: {email: string}) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      const result = await client.loginIntent(email);
+      return result;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Logout
   const logout = async () => {
     try {
@@ -144,6 +160,7 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     logout,
     refreshUser,
     client,
+    loginIntent
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -156,14 +173,14 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
 /**
  * Hook to access auth context
  */
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   
   if (context === undefined) {
     throw new Error('useAuth must be used within FortKnoxProvider');
   }
   
-  return context;
+  return context as AuthContextValue;
 }
 
 /**

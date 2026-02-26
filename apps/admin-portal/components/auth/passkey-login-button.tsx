@@ -8,10 +8,11 @@ import { Key, Loader } from "lucide-react"
 interface PasskeyLoginButtonProps {
   onAuthenticate?: (credential: any) => void
   primaryColor?: string
+  loading?: boolean
 }
 
-export function PasskeyLoginButton({ onAuthenticate, primaryColor = "#6366f1" }: PasskeyLoginButtonProps) {
-  const [loading, setLoading] = useState(false)
+export function PasskeyLoginButton({ onAuthenticate, primaryColor = "#6366f1", loading: l }: PasskeyLoginButtonProps) {
+  const [loading, setLoading] = useState(l)
   const [error, setError] = useState<string | null>(null)
 
   const handlePasskeyLogin = async () => {

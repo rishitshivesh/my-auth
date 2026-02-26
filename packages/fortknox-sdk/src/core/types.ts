@@ -159,6 +159,25 @@ export interface LoginResponse {
   mfaChallenge?: MfaChallenge;
 }
 
+export interface LoginIntentResponse {
+  exists: boolean,
+  email: string,
+  methods: {
+    password: boolean,
+    magicLink: boolean,
+    passkey: boolean,
+    mfa: boolean,
+    social: string[]
+  },
+  preferredMethod: string[],
+  branding: {
+    logo: string,
+    primaryColor: string,
+    companyName: string
+  }
+}
+
+
 export interface MfaChallenge {
   tempToken: string;
   methods: ('totp' | 'sms' | 'webauthn')[];
