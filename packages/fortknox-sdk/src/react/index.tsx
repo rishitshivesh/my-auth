@@ -6,13 +6,7 @@
 
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-} from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { FortKnoxClient } from "../core/client";
 import type { User, LoginCredentials, AuthEvent } from "../core/types";
 
