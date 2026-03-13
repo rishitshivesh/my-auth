@@ -1,14 +1,20 @@
 /**
  * Fort Knox SDK - React Provider
- * 
+ *
  * React Context for auth state management
  */
 
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { FortKnoxClient } from '../core/client';
-import type { User, LoginCredentials, AuthEvent } from '../core/types';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
+import { FortKnoxClient } from "../core/client";
+import type { User, LoginCredentials, AuthEvent } from "../core/types";
 
 // ============================================================
 // CONTEXT
@@ -20,13 +26,13 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: Error | null;
-  
+
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
-  loginIntent: (params: {email: string}) => Promise<any>;
+  loginIntent: (params: { email: string }) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  
+
   // Client
   client: FortKnoxClient;
 }
@@ -49,41 +55,43 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
 
   // Initialize - check if user is logged in
   useEffect(() => {
-      const initialize = async () => {
-        try {
-          setIsLoading(true);
+    const initialize = async () => {
+      try {
+        setIsLoading(true);
 
-          // Wait for SDK to restore session from cookie
-          await client.waitForInit();
+        // Wait for SDK to restore session from cookie
+        await client.waitForInit();
 
-          // If we have a token now, get the user
-          if (client.isAuthenticated()) {
-            const currentUser = await client.getCurrentUser();
-            setUser(currentUser);
-          } else {
-            setUser(null);
-          }
-        } catch (err) {
-          console.error('Failed to restore session:', err);
+        console.log({ client });
+
+        // If we have a token now, get the user
+        if (client.isAuthenticated()) {
+          const currentUser = await client.getCurrentUser();
+          setUser(currentUser);
+        } else {
           setUser(null);
-        } finally {
-          setIsLoading(false);
         }
-      };
+      } catch (err) {
+        console.error("Failed to restore session:", err);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      initialize();
+    initialize();
   }, [client]);
 
   // Listen to auth events
   useEffect(() => {
     const unsubscribe = client.on((event: AuthEvent) => {
       switch (event.type) {
-        case 'logout':
-        case 'session_expired':
+        case "logout":
+        case "session_expired":
           setUser(null);
           break;
-        
-        case 'error':
+
+        case "error":
           setError(event.error);
           break;
       }
@@ -97,13 +105,13 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     try {
       setError(null);
       setIsLoading(true);
-      
+
       const result = await client.login(credentials);
-      
+
       if (result.mfaRequired) {
-        throw new Error('MFA_REQUIRED');
+        throw new Error("MFA_REQUIRED");
       }
-      
+
       setUser(result.user);
     } catch (err) {
       setError(err as Error);
@@ -113,11 +121,11 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const loginIntent = async ({email}: {email: string}) => {
+  const loginIntent = async ({ email }: { email: string }) => {
     try {
       setError(null);
       setIsLoading(true);
-      
+
       const result = await client.loginIntent(email);
       return result;
     } catch (err) {
@@ -160,7 +168,7 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     logout,
     refreshUser,
     client,
-    loginIntent
+    loginIntent,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -175,11 +183,11 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
  */
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  
+
   if (context === undefined) {
-    throw new Error('useAuth must be used within FortKnoxProvider');
+    throw new Error("useAuth must be used within FortKnoxProvider");
   }
-  
+
   return context as AuthContextValue;
 }
 
@@ -188,7 +196,7 @@ export function useAuth(): AuthContextValue {
  */
 export function useUser() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  
+
   return {
     user,
     isLoading,
@@ -201,7 +209,7 @@ export function useUser() {
  */
 export function useSession() {
   const { isAuthenticated, isLoading, client } = useAuth();
-  
+
   return {
     isAuthenticated,
     isLoading,

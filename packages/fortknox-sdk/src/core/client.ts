@@ -1,6 +1,6 @@
 /**
  * Fort Knox SDK - Core Client
- * 
+ *
  * The session runtime - owns tokens, knows when to refresh
  * Works in any environment (browser, Node, Next.js)
  */
@@ -18,9 +18,9 @@ import type {
   AuthEvent,
   AuthEventListener,
   LoginIntentResponse,
-} from './types';
-import { AuthError as AuthErrorClass } from './types';
-import { createFetchTransport } from './transport';
+} from "./types";
+import { AuthError as AuthErrorClass } from "./types";
+import { createFetchTransport } from "./transport";
 import {
   createAuthState,
   setAccessToken,
@@ -29,7 +29,7 @@ import {
   queueRequest,
   flushPendingRequests,
   rejectPendingRequests,
-} from './state';
+} from "./state";
 
 export class FortKnoxClient {
   private config: Required<FortKnoxConfig>;
@@ -39,22 +39,22 @@ export class FortKnoxClient {
   private initPromise?: Promise<void>;
 
   constructor(config: FortKnoxConfig) {
-      this.config = {
+    this.config = {
       debug: false,
       refreshMargin: 30,
       maxRefreshRetries: 3,
       onTokenRefreshed: () => {},
       onLogout: () => {},
       onError: () => {},
-      ...config,  // ← Spread config FIRST
-      transport: config.transport || createFetchTransport(),  // ← Then set transport
+      ...config, // ← Spread config FIRST
+      transport: config.transport || createFetchTransport(), // ← Then set transport
     };
 
     this.state = createAuthState();
     this.transport = this.config.transport;
     this.initPromise = this.tryRestoreSession();
 
-    this.log('FortKnox client initialized', {
+    this.log("FortKnox client initialized", {
       baseURL: this.config.baseURL,
       tenant: this.config.tenant,
     });
@@ -68,11 +68,11 @@ export class FortKnoxClient {
    * Login with email and password
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    this.log('Login attempt', { email: credentials.email });
+    this.log("Login attempt", { email: credentials.email });
 
     const response = await this.request({
       url: `${this.config.baseURL}/auth/login`,
-      method: 'POST',
+      method: "POST",
       body: credentials,
     });
 
@@ -84,71 +84,72 @@ export class FortKnoxClient {
 
     // Handle MFA challenge
     if (data.mfaRequired) {
-      this.log('MFA required');
+      this.log("MFA required");
       return data;
     }
 
     // Set access token
     if (data.accessToken) {
       setAccessToken(this.state, data.accessToken);
-      this.emit({ type: 'token_refreshed', accessToken: data.accessToken });
+      this.emit({ type: "token_refreshed", accessToken: data.accessToken });
       this.config.onTokenRefreshed(data.accessToken);
     }
 
-    this.log('Login successful', { email: data.user?.email });
+    this.log("Login successful", { email: data.user?.email });
 
     return data;
   }
 
   async loginIntent(email: string): Promise<LoginIntentResponse> {
-    this.log('Login Intent request', { email });
-      const response = await this.request({
-        url: `${this.config.baseURL}/auth/login-intent`,
-        method: 'POST',
-        body: {email},
-      });
+    this.log("Login Intent request", { email });
+    const response = await this.request({
+      url: `${this.config.baseURL}/auth/login-intent`,
+      method: "POST",
+      body: { email },
+    });
 
-      if (!response.ok) {
-       throw this.createError(response);
-      }
+    if (!response.ok) {
+      throw this.createError(response);
+    }
 
-      return response.data?.data;
+    return response.data?.data;
   }
 
   /**
    * Logout - clear session
    */
   async logout(): Promise<void> {
-    this.log('Logout');
+    this.log("Logout");
 
     try {
       // Call logout endpoint (clears refresh cookie)
       await this.request({
         url: `${this.config.baseURL}/auth/logout`,
-        method: 'POST',
+        method: "POST",
       });
     } catch (error) {
       // Logout even if API call fails
-      this.log('Logout API call failed', error);
+      this.log("Logout API call failed", error);
     } finally {
       this.clearSession();
     }
   }
 
-   /**
+  /**
    * ⭐ NEW: Try to restore session from refresh cookie
    */
   private async tryRestoreSession(): Promise<void> {
     try {
-      this.log('Attempting to restore session from refresh cookie');
-      
+      this.log("Attempting to restore session from refresh cookie");
+
       // Try to refresh - uses httpOnly cookie
       await this.refreshOnce();
-      
-      this.log('Session restored successfully');
+
+      this.log("Session restored successfully");
     } catch (error) {
       // No valid refresh cookie - that's OK
-      this.log('No valid session to restore');
+      console.error(error);
+      this.log("No valid session to restore");
     }
   }
 
@@ -161,17 +162,16 @@ export class FortKnoxClient {
     }
   }
 
-
   /**
    * Get current user
    */
   async getCurrentUser(): Promise<User> {
     await this.waitForInit(); // ← Add this line
-    this.log('Get current user');
+    this.log("Get current user");
 
     const response = await this.request({
       url: `${this.config.baseURL}/users/me`,
-      method: 'GET',
+      method: "GET",
     });
 
     if (!response.ok) {
@@ -185,7 +185,10 @@ export class FortKnoxClient {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return !!this.state.accessToken && !isTokenExpired(this.state, this.config.refreshMargin);
+    return (
+      !!this.state.accessToken &&
+      !isTokenExpired(this.state, this.config.refreshMargin)
+    );
   }
 
   /**
@@ -206,7 +209,7 @@ export class FortKnoxClient {
   async request(req: TransportRequest): Promise<TransportResponse> {
     // If currently refreshing, queue this request
     if (this.state.isRefreshing) {
-      this.log('Request queued (refresh in progress)', req.url);
+      this.log("Request queued (refresh in progress)", req.url);
       return this.queueRequestDuringRefresh(req);
     }
 
@@ -218,26 +221,29 @@ export class FortKnoxClient {
 
     // If 401 and we have a token, try to refresh
     if (response.status === 401 && this.state.accessToken) {
-      this.log('Got 401, attempting refresh', req.url);
-      
+      this.log("Got 401, attempting refresh", req.url);
+
       try {
         await this.refresh();
-        
+
         // Retry original request with new token
         const retryRequest = this.addAuthHeaders(req);
         const retryResponse = await this.transport(retryRequest);
-        
+
         if (retryResponse.status === 401) {
           // Still 401 after refresh - session is dead
-          this.log('Still 401 after refresh - session expired');
+          this.log("Still 401 after refresh - session expired");
           this.clearSession();
-          throw new AuthErrorClass('SESSION_EXPIRED', 'Your session has expired. Please log in again.');
+          throw new AuthErrorClass(
+            "SESSION_EXPIRED",
+            "Your session has expired. Please log in again.",
+          );
         }
-        
+
         return retryResponse;
       } catch (error) {
         // Refresh failed
-        this.log('Refresh failed', error);
+        this.log("Refresh failed", error);
         this.clearSession();
         throw error;
       }
@@ -251,21 +257,21 @@ export class FortKnoxClient {
    */
   private addAuthHeaders(req: TransportRequest): TransportRequest {
     const headers = {
-      'Content-Type': 'application/json',
-      'X-Tenant-ID': this.config.tenant,
-      'Authorization': '', // Placeholder
+      "Content-Type": "application/json",
+      "X-Tenant-ID": this.config.tenant,
+      Authorization: "", // Placeholder
       ...req.headers,
     };
 
     // Add access token if available
     if (this.state.accessToken) {
-      headers['Authorization'] = `Bearer ${this.state.accessToken}`;
+      headers["Authorization"] = `Bearer ${this.state.accessToken}`;
     }
 
     return {
       ...req,
       headers,
-      credentials: 'include', // Always send cookies
+      credentials: "include", // Always send cookies
     };
   }
 
@@ -280,12 +286,12 @@ export class FortKnoxClient {
   private async refresh(): Promise<void> {
     // If already refreshing, wait for that refresh
     if (this.state.isRefreshing && this.state.refreshPromise) {
-      this.log('Refresh already in progress, waiting...');
+      this.log("Refresh already in progress, waiting...");
       return this.state.refreshPromise;
     }
 
     this.state.isRefreshing = true;
-    this.log('Starting token refresh');
+    this.log("Starting token refresh");
 
     this.state.refreshPromise = this.refreshWithRetry();
 
@@ -294,7 +300,7 @@ export class FortKnoxClient {
     } finally {
       this.state.isRefreshing = false;
       this.state.refreshPromise = undefined;
-      
+
       // Process queued requests
       this.processQueuedRequests();
     }
@@ -310,23 +316,30 @@ export class FortKnoxClient {
     while (attempt < this.config.maxRefreshRetries) {
       try {
         await this.refreshOnce();
-        this.log('Token refresh successful');
+        this.log("Token refresh successful");
         return;
       } catch (error) {
         lastError = error;
         attempt++;
-        
+
         if (attempt < this.config.maxRefreshRetries) {
           const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-          this.log(`Refresh attempt ${attempt} failed, retrying in ${delay}ms`, error);
+          this.log(
+            `Refresh attempt ${attempt} failed, retrying in ${delay}ms`,
+            error,
+          );
           await this.sleep(delay);
         }
       }
     }
 
     // All retries failed
-    this.log('All refresh attempts failed', lastError);
-    throw new AuthErrorClass('REFRESH_FAILED', 'Failed to refresh token', lastError);
+    this.log("All refresh attempts failed", lastError);
+    throw new AuthErrorClass(
+      "REFRESH_FAILED",
+      "Failed to refresh token",
+      lastError,
+    );
   }
 
   /**
@@ -336,26 +349,33 @@ export class FortKnoxClient {
   private async refreshOnce(): Promise<void> {
     const response = await this.transport({
       url: `${this.config.baseURL}/auth/refresh`,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-Tenant-ID': this.config.tenant,
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
       },
-      credentials: 'include', // This sends the refresh cookie
+      credentials: "include", // This sends the refresh cookie
     });
 
     if (!response.ok) {
-      throw new AuthErrorClass('REFRESH_FAILED', 'Refresh failed', response.data);
+      throw new AuthErrorClass(
+        "REFRESH_FAILED",
+        "Refresh failed",
+        response.data,
+      );
     }
 
     // Update access token
     const newToken = response.data.accessToken;
     if (!newToken) {
-      throw new AuthErrorClass('REFRESH_FAILED', 'No access token in refresh response');
+      throw new AuthErrorClass(
+        "REFRESH_FAILED",
+        "No access token in refresh response",
+      );
     }
 
     setAccessToken(this.state, newToken);
-    this.emit({ type: 'token_refreshed', accessToken: newToken });
+    this.emit({ type: "token_refreshed", accessToken: newToken });
     this.config.onTokenRefreshed(newToken);
   }
 
@@ -366,7 +386,9 @@ export class FortKnoxClient {
   /**
    * Queue a request during token refresh
    */
-  private queueRequestDuringRefresh(req: TransportRequest): Promise<TransportResponse> {
+  private queueRequestDuringRefresh(
+    req: TransportRequest,
+  ): Promise<TransportResponse> {
     return new Promise((resolve, reject) => {
       queueRequest(this.state, {
         request: req,
@@ -403,13 +425,16 @@ export class FortKnoxClient {
    * Clear local session state
    */
   private clearSession(): void {
-    this.log('Clearing session');
-    
+    this.log("Clearing session");
+
     clearAccessToken(this.state);
-    rejectPendingRequests(this.state, new AuthErrorClass('SESSION_EXPIRED', 'Session expired'));
-    
-    this.emit({ type: 'logout' });
-    this.emit({ type: 'session_expired' });
+    rejectPendingRequests(
+      this.state,
+      new AuthErrorClass("SESSION_EXPIRED", "Session expired"),
+    );
+
+    this.emit({ type: "logout" });
+    this.emit({ type: "session_expired" });
     this.config.onLogout();
   }
 
@@ -422,7 +447,7 @@ export class FortKnoxClient {
    */
   on(listener: AuthEventListener): () => void {
     this.listeners.push(listener);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.listeners.indexOf(listener);
@@ -440,7 +465,7 @@ export class FortKnoxClient {
       try {
         listener(event);
       } catch (error) {
-        console.error('Error in auth event listener:', error);
+        console.error("Error in auth event listener:", error);
       }
     });
   }
@@ -454,15 +479,15 @@ export class FortKnoxClient {
    */
   private createError(response: TransportResponse): AuthError {
     const data = response.data;
-    
+
     const code = data?.code || this.statusToErrorCode(response.status);
-    const message = data?.message || response.statusText || 'Request failed';
-    
+    const message = data?.message || response.statusText || "Request failed";
+
     const error = new AuthErrorClass(code, message, data);
-    
-    this.emit({ type: 'error', error });
+
+    this.emit({ type: "error", error });
     this.config.onError(error);
-    
+
     return error;
   }
 
@@ -471,11 +496,16 @@ export class FortKnoxClient {
    */
   private statusToErrorCode(status: number): any {
     switch (status) {
-      case 401: return 'UNAUTHORIZED';
-      case 403: return 'FORBIDDEN';
-      case 404: return 'USER_NOT_FOUND';
-      case 429: return 'RATE_LIMIT_EXCEEDED';
-      default: return 'UNKNOWN_ERROR';
+      case 401:
+        return "UNAUTHORIZED";
+      case 403:
+        return "FORBIDDEN";
+      case 404:
+        return "USER_NOT_FOUND";
+      case 429:
+        return "RATE_LIMIT_EXCEEDED";
+      default:
+        return "UNKNOWN_ERROR";
     }
   }
 
@@ -491,7 +521,7 @@ export class FortKnoxClient {
    */
   private log(...args: any[]): void {
     if (this.config.debug) {
-      console.log('[FortKnox]', ...args);
+      console.log("[FortKnox]", ...args);
     }
   }
 }
