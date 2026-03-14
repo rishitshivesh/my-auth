@@ -430,18 +430,15 @@ export class AuthService {
       return;
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenHash = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
       {
-        passwordResetToken: resetTokenHash,
-        passwordResetExpiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        passwordResetToken: otpHash,
+        passwordResetExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
       },
     );
 
@@ -455,17 +452,17 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // Send password reset email
-    await this.emailService.sendPasswordResetEmail(user, resetToken);
+    // Send password reset OTP email
+    await this.emailService.sendPasswordResetOtpEmail(user, otp);
 
-    console.log("Password reset token:", resetToken); // For development
+    console.log("Password reset OTP:", otp); // For development
   }
 
   /**
    * Reset password with token (TENANT SCOPED)
    */
-  async resetPassword(tenantId: string, token: string, newPassword: string) {
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  async resetPassword(tenantId: string, otp: string, newPassword: string) {
+    const tokenHash = crypto.createHash("sha256").update(otp).digest("hex");
 
     const user = await this.userRepository
       .createQueryBuilder("user")

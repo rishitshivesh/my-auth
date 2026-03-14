@@ -75,9 +75,9 @@ export class ForgotPasswordDto {
  * Reset Password DTO
  */
 export class ResetPasswordDto {
-  @ApiProperty({ example: "reset-token-here" })
+  @ApiProperty({ example: "123456", description: "6-digit OTP from email" })
   @IsString()
-  token!: string;
+  otp!: string;
 
   @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
   @IsString()

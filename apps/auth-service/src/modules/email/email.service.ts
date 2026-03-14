@@ -288,6 +288,34 @@ export class EmailService {
   }
 
   /**
+   * Send password reset OTP email
+   */
+  async sendPasswordResetOtpEmail(
+    user: User,
+    otp: string,
+  ): Promise<boolean> {
+    const branding = await this.getTenantBranding(user.tenantId);
+
+    const html = await this.renderTemplate("otp", {
+      userName: user.firstName || user.email.split("@")[0],
+      userEmail: user.email,
+      code: otp,
+      expiresIn: "15 minutes",
+      purpose: "password reset",
+      ...branding,
+    });
+
+    return this.sendEmail({
+      to: user.email,
+      subject: "Your password reset code",
+      html,
+      tenantId: user.tenantId,
+      userId: user.id,
+      emailType: "password_reset_otp",
+    });
+  }
+
+  /**
    * Send password changed confirmation
    */
   async sendPasswordChangedEmail(user: User): Promise<boolean> {

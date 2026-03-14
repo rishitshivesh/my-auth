@@ -193,7 +193,7 @@ export class AuthController {
 
     await this.authService.resetPassword(
       tenantId,
-      resetPasswordDto.token,
+      resetPasswordDto.otp,
       resetPasswordDto.password,
     );
     return { message: "Password reset successfully" };
