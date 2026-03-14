@@ -3648,6 +3648,29 @@
           "Sessions"
         ]
       }
+    },
+    "/dashboard": {
+      "get": {
+        "operationId": "DashboardController_getOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get dashboard overview for current user",
+        "tags": [
+          "Dashboard"
+        ]
+      }
     }
   },
   "info": {
@@ -3924,9 +3947,10 @@
       "ResetPasswordDto": {
         "type": "object",
         "properties": {
-          "token": {
+          "otp": {
             "type": "string",
-            "example": "reset-token-here"
+            "example": "123456",
+            "description": "6-digit OTP from email"
           },
           "password": {
             "type": "string",
@@ -3934,7 +3958,7 @@
           }
         },
         "required": [
-          "token",
+          "otp",
           "password"
         ]
       },
