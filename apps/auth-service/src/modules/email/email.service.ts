@@ -345,19 +345,19 @@ export class EmailService {
     magicLinkToken: string,
   ): Promise<boolean> {
     const branding = await this.getTenantBranding(user.tenantId);
-    const magicLinkUrl = `${this.configService.get<string>("FRONTEND_URL")}/auth/magic-link?token=${magicLinkToken}`;
+    const magicLinkUrl = `${this.configService.get<string>("FRONTEND_URL")}/u/magic-link?token=${magicLinkToken}`;
 
     const html = await this.renderTemplate("magic-link", {
       userName: user.firstName || user.email.split("@")[0],
       userEmail: user.email,
       actionUrl: magicLinkUrl,
-      expiresIn: "15 minutes",
+      expiresIn: "10 minutes",
       ...branding,
     });
 
     return this.sendEmail({
       to: user.email,
-      subject: "Your magic link to sign in",
+      subject: `Your sign-in link for ${branding.tenantName}`,
       html,
       tenantId: user.tenantId,
       userId: user.id,
