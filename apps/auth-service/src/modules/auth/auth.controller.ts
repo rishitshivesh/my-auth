@@ -29,6 +29,8 @@ import {
   RefreshTokenDto,
   LoginIntentRequestDto,
   LoginIntentResponseDto,
+  SendMagicLinkDto,
+  VerifyMagicLinkDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { type Request, type Response } from "express";
@@ -638,8 +640,58 @@ export class AuthController {
   }
 
   /**
+   * Send magic link sign-in email
+   */
+  @Post("magic-link/send")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Send magic link sign-in email" })
+  @ApiResponse({ status: 200, description: "Magic link sent (or silently ignored if user not found)" })
+  async sendMagicLink(
+    @Req() req: Request,
+    @Body() dto: SendMagicLinkDto,
+  ) {
+    const tenantId = req.tenantId!;
+    await this.authService.sendMagicLink(tenantId, dto.email);
+    return { status: 200, data: { message: "If an account exists, a magic link has been sent." } };
+  }
+
+  /**
+   * Verify magic link token and create session
+   */
+  @Post("magic-link/verify")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Verify magic link token" })
+  @ApiResponse({ status: 200, description: "Authentication successful" })
+  async verifyMagicLink(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto: VerifyMagicLinkDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const tenantId = req.tenantId!;
+    const { accessToken, refreshToken } = await this.authService.verifyMagicLink(
+      tenantId,
+      dto.token,
+      ip,
+      userAgent || "unknown",
+    );
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      domain: req.hostname,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+
+    return { status: 200, data: { accessToken } };
+  }
+
+  /**
    * Login Intent - Check what auth methods are available for an email
-   * 
+   *
    * This is step 1 of the email-first login flow
    */
   @Post('login-intent')

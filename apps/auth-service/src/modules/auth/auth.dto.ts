@@ -273,3 +273,15 @@ export class LoginIntentResponseDto {
   })
   branding?: LoginBrandingDto;
 }
+
+export class SendMagicLinkDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class VerifyMagicLinkDto {
+  @ApiProperty({ description: 'Raw magic link token from email URL' })
+  @IsString()
+  token!: string;
+}
