@@ -32,6 +32,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, "microsoft") {
       scope: ["openid", "email", "profile"],
       tenant: "common", // Support personal + work accounts
       passReqToCallback: true,
+      state: false, // We manage state ourselves (base64url JSON)
     });
 
     this.logger.log("MicrosoftStrategy initialized");

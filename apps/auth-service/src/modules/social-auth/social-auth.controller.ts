@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Body,
   Query,
   Req,
   Res,
@@ -10,8 +11,11 @@ import {
   HttpCode,
   HttpStatus,
   Delete,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
@@ -20,7 +24,11 @@ import { Protected } from "../../common/decorators/protected.decorator";
 @ApiTags("Social Authentication")
 @Controller("auth/social")
 export class SocialAuthController {
-  constructor(private readonly socialAuthService: SocialAuthService) {}
+  constructor(
+    private readonly socialAuthService: SocialAuthService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // ============================================================
   // GOOGLE OAUTH
@@ -29,14 +37,26 @@ export class SocialAuthController {
   /**
    * Initiate Google OAuth flow
    *
-   * GET /auth/social/google/login?tenantId=xxx
+   * GET /auth/social/google/login?tenant_id=xxx&return_url=https://app.example.com
    */
   @Get("google/login")
-  @UseGuards(AuthGuard("google"))
   @ApiOperation({ summary: "Login with Google" })
-  @ApiQuery({ name: "tenantId", required: true })
-  googleLogin(@Req() req: Request) {
-    // Passport handles redirect
+  @ApiQuery({ name: "tenant_id", required: true })
+  @ApiQuery({ name: "return_url", required: false })
+  googleLogin(@Req() req: Request, @Res() res: Response) {
+    const tenantId = (req.query.tenant_id as string) || req.tenantId!;
+    const returnUrl = (req.query.return_url as string) || "";
+    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+
+    const params = new URLSearchParams({
+      client_id: this.configService.getOrThrow("INTERNAL_GOOGLE_CLIENT_ID"),
+      redirect_uri: this.configService.getOrThrow("INTERNAL_GOOGLE_CALLBACK_URL"),
+      response_type: "code",
+      scope: "openid email profile",
+      access_type: "offline",
+      state,
+    });
+    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
   }
 
   /**
@@ -59,11 +79,21 @@ export class SocialAuthController {
    * Initiate GitHub OAuth flow
    */
   @Get("github/login")
-  @UseGuards(AuthGuard("github"))
   @ApiOperation({ summary: "Login with GitHub" })
-  @ApiQuery({ name: "tenantId", required: true })
-  githubLogin(@Req() req: Request) {
-    // Passport handles redirect
+  @ApiQuery({ name: "tenant_id", required: true })
+  @ApiQuery({ name: "return_url", required: false })
+  githubLogin(@Req() req: Request, @Res() res: Response) {
+    const tenantId = (req.query.tenant_id as string) || req.tenantId!;
+    const returnUrl = (req.query.return_url as string) || "";
+    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+
+    const params = new URLSearchParams({
+      client_id: this.configService.getOrThrow("INTERNAL_GITHUB_CLIENT_ID"),
+      redirect_uri: this.configService.getOrThrow("INTERNAL_GITHUB_CALLBACK_URL"),
+      scope: "user:email",
+      state,
+    });
+    return res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
   }
 
   /**
@@ -84,11 +114,25 @@ export class SocialAuthController {
    * Initiate Microsoft OAuth flow
    */
   @Get("microsoft/login")
-  @UseGuards(AuthGuard("microsoft"))
   @ApiOperation({ summary: "Login with Microsoft" })
-  @ApiQuery({ name: "tenantId", required: true })
-  microsoftLogin(@Req() req: Request) {
-    // Passport handles redirect
+  @ApiQuery({ name: "tenant_id", required: true })
+  @ApiQuery({ name: "return_url", required: false })
+  microsoftLogin(@Req() req: Request, @Res() res: Response) {
+    const tenantId = (req.query.tenant_id as string) || req.tenantId!;
+    const returnUrl = (req.query.return_url as string) || "";
+    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+
+    const params = new URLSearchParams({
+      client_id: this.configService.getOrThrow("INTERNAL_MICROSOFT_CLIENT_ID"),
+      redirect_uri: this.configService.getOrThrow("INTERNAL_MICROSOFT_CALLBACK_URL"),
+      response_type: "code",
+      scope: "openid email profile User.Read",
+      response_mode: "query",
+      state,
+    });
+    return res.redirect(
+      `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`,
+    );
   }
 
   /**
@@ -106,18 +150,34 @@ export class SocialAuthController {
   // ============================================================
 
   /**
-   * Handle OAuth callback for all providers
+   * Handle OAuth callback for all providers — state-relay (Approach C)
    */
   private async handleSocialCallback(req: any, res: Response) {
     const profile: SocialProfile = req.user;
-    const tenantId = req.query.tenantId || req.session?.tenantId;
 
-    if (!tenantId) {
-      return res.redirect(`/error?message=Missing tenant ID`);
+    // Decode our base64url state from query param
+    let tenantId: string;
+    let returnUrl: string;
+    try {
+      const stateRaw = req.query.state as string;
+      const stateObj = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
+      tenantId = stateObj.tenantId;
+      returnUrl = stateObj.returnUrl || "";
+    } catch {
+      return res.redirect("/error?message=Invalid+state+parameter");
     }
 
+    if (!tenantId) {
+      return res.redirect("/error?message=Missing+tenant+ID");
+    }
+
+    // Validate returnUrl to prevent open redirect
+    const portalUrl = this.configService.get("PORTAL_URL") || "http://localhost:3000";
+    const allowedOrigins = [portalUrl, "http://localhost:3000", "http://localhost:3001"];
+    const isSafeReturn = !returnUrl || allowedOrigins.some((o) => returnUrl.startsWith(o));
+    const safeReturnUrl = isSafeReturn ? returnUrl : portalUrl;
+
     try {
-      // Handle callback via service
       const result = await this.socialAuthService.handleCallback({
         tenantId,
         profile,
@@ -125,32 +185,62 @@ export class SocialAuthController {
         userAgent: req.headers["user-agent"] || "unknown",
       });
 
-      if (result.type === "success") {
-        // Success! Redirect to app with tokens
-        const redirectUrl = new URL(
-          process.env.PORTAL_URL || "http://localhost:3000",
-        );
-        redirectUrl.searchParams.set("access_token", result.accessToken);
-        redirectUrl.searchParams.set("refresh_token", result.refreshToken);
-
-        return res.redirect(redirectUrl.toString());
-      }
-
       if (result.type === "link_required") {
-        // Account linking required
-        const linkUrl = new URL(
-          `${process.env.INTERNAL_AUTH_SERVICE_URL}/link-required`,
+        return res.redirect(
+          `${safeReturnUrl}/u/link-required?email=${encodeURIComponent(result.email)}&provider=${result.provider}`,
         );
-        linkUrl.searchParams.set("email", result.email);
-        linkUrl.searchParams.set("provider", result.provider);
-        linkUrl.searchParams.set("message", result.message);
-
-        return res.redirect(linkUrl.toString());
       }
-    } catch (error: any) {
-      return res.redirect(
-        `/error?message=${encodeURIComponent(error.message)}`,
+
+      // Set refresh cookie (same pattern as regular login)
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        domain: req.hostname,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: "/",
+      });
+
+      // Create short-lived completion token (60s, one-time use by the portal)
+      const completionToken = this.jwtService.sign(
+        { accessToken: result.accessToken, type: "social_completion" },
+        { secret: this.configService.get("JWT_SECRET"), expiresIn: "60s" },
       );
+
+      return res.redirect(`${safeReturnUrl}/u/auth/callback?ct=${completionToken}`);
+    } catch (error: any) {
+      return res.redirect(`${safeReturnUrl}/u/login?error=${encodeURIComponent(error.message)}`);
+    }
+  }
+
+  // ============================================================
+  // CLAIM SESSION (Approach C relay)
+  // ============================================================
+
+  /**
+   * Claim social session using completion token
+   *
+   * POST /auth/social/claim-session { ct: completionToken }
+   * Returns { accessToken } — refresh token is already in httpOnly cookie
+   */
+  @Post("claim-session")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Claim social session using completion token" })
+  @ApiResponse({ status: 200, description: "Access token returned" })
+  @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
+  async claimSession(@Body() body: { ct: string }) {
+    try {
+      const payload = this.jwtService.verify(body.ct, {
+        secret: this.configService.get("JWT_SECRET"),
+      });
+
+      if (payload.type !== "social_completion") {
+        throw new Error("Invalid token type");
+      }
+
+      return { status: 200, data: { accessToken: payload.accessToken } };
+    } catch {
+      throw new UnauthorizedException("Invalid or expired completion token");
     }
   }
 

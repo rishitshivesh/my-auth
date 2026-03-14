@@ -28,7 +28,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
         "INTERNAL_GOOGLE_CALLBACK_URL",
       ),
       scope: ["openid", "email", "profile"],
-      passReqToCallback: true, // Pass request to validate()
+      passReqToCallback: true,
+      state: false, // We manage state ourselves (base64url JSON)
     });
 
     this.logger.log("GoogleStrategy initialized");
