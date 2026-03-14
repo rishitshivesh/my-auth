@@ -3,11 +3,10 @@
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { useEmailAuthFlow } from "@/hooks/use-email-auth-flow"
-import { getAuthConfig } from "@/lib/auth-config"
 import { EmailStep } from "./email-step"
 import { MethodSelectionStep } from "./method-selection-step"
 import { CredentialsStep } from "./credentials-step"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useAuth } from "@fortknox/sdk"
 
 interface StepBasedAuthFlowProps {
@@ -17,12 +16,8 @@ interface StepBasedAuthFlowProps {
 export function StepBasedAuthFlow({ primaryColor = "#6366f1" }: StepBasedAuthFlowProps) {
   const router = useRouter()
   const flow = useEmailAuthFlow();
-  const { login, user } = useAuth();
-  const [passwordPolicy, setPasswordPolicy] = useState<any>(null)
-
-  useEffect(() => {
-    getAuthConfig().then((config) => setPasswordPolicy(config.passwordPolicy))
-  }, [])
+  const { login } = useAuth();
+  const [passwordPolicy] = useState<any>(null)
 
   const handleEmailSubmit = async (email: string) => {
     try {
@@ -35,14 +30,13 @@ export function StepBasedAuthFlow({ primaryColor = "#6366f1" }: StepBasedAuthFlo
   const handleCredentialsSubmit = async (email: string, password?: string) => {
     try {
       await login({ email, password });
-
-    if (user) {
-        console.log("User logged in:", user);
-    }
-      // TODO: Redirect to dashboard or requested page
-      // router.push("/dashboard")
-    } catch (err) {
-      console.error("[v0] Credentials submission error:", err)
+      router.push("/dashboard");
+    } catch (err: any) {
+      if (err?.message === "MFA_REQUIRED") {
+        router.push("/u/mfa");
+        return;
+      }
+      console.error("[FortKnox] Login error:", err);
     }
   }
 
