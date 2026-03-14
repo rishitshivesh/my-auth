@@ -624,19 +624,31 @@ export class AuthController {
   })
   async finishWebAuthnLogin(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Body() dto: { email: string; response: any },
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
 
-    return this.authService.finishWebAuthnLogin({
+    const result = await this.authService.finishWebAuthnLogin({
       tenantId,
       email: dto.email,
       webauthnResponse: dto.response,
       ip,
       userAgent,
     });
+
+    res.cookie("refreshToken", result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      domain: req.hostname,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+
+    return { status: 200, data: { accessToken: result.accessToken } };
   }
 
   /**

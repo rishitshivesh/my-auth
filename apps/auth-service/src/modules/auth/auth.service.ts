@@ -1091,36 +1091,30 @@ export class AuthService {
       throw new UnauthorizedException("Account is disabled");
     }
 
-    // Generate tokens (same as normal login)
-    const familyId = uuidv4();
-    const refreshToken = crypto.randomBytes(32).toString("hex");
-    const refreshTokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
+    // Create session using SessionService (consistent with password login)
     const session = await this.sessionService.createSession({
       userId: user.id,
       tenantId,
       email: user.email,
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
       ipAddress: ip,
       userAgent,
       deviceId,
     });
 
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId,
+      userId: user.id,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress: ip,
+      userAgent,
+      deviceId,
+      expiresInDays: 30,
+    });
+
     const accessToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId,
-        sessionId: session.id,
-      },
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
+      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
     // Log successful login
@@ -1131,11 +1125,7 @@ export class AuthService {
       severity: "info",
       ipAddress: ip,
       userAgent,
-      metadata: {
-        sessionId: session.id,
-        familyId,
-        authMethod: "webauthn",
-      },
+      metadata: { sessionId: session.id, authMethod: "webauthn" },
     });
 
     console.log(`✅ WebAuthn login successful for ${user.email}`);
