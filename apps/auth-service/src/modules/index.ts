@@ -6,6 +6,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 import { SessionModule } from "@/modules/session/session.module";
+import { DashboardModule } from "@/modules/dashboard/dashboard.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -17,6 +18,7 @@ import { ScheduleModule } from "@nestjs/schedule";
     RbacModule,
     MfaModule,
     SessionModule,
+    DashboardModule,
     ScheduleModule.forRoot(),
   ],
 })
