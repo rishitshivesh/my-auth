@@ -459,6 +459,96 @@ export class AuthService {
   }
 
   /**
+   * Send magic link sign-in email (TENANT SCOPED)
+   */
+  async sendMagicLink(tenantId: string, email: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { email, tenantId } });
+
+    // Don't reveal if user exists
+    if (!user) return;
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    await this.userRepository.update(
+      { id: user.id, tenantId },
+      {
+        magicLinkToken: tokenHash,
+        magicLinkExpiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      },
+    );
+
+    await this.emailService.sendMagicLinkEmail(user, rawToken);
+
+    console.log("Magic link token (dev):", rawToken);
+  }
+
+  /**
+   * Verify magic link token and create session (TENANT SCOPED)
+   */
+  async verifyMagicLink(
+    tenantId: string,
+    rawToken: string,
+    ip: string,
+    userAgent: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.magicLinkToken")
+      .where("user.magicLinkToken = :tokenHash", { tokenHash })
+      .andWhere("user.tenantId = :tenantId", { tenantId })
+      .andWhere("user.magicLinkExpiresAt > :now", { now: new Date() })
+      .getOne();
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid or expired magic link");
+    }
+
+    // Clear the token (one-time use)
+    await this.userRepository.update(
+      { id: user.id, tenantId },
+      { magicLinkToken: undefined, magicLinkExpiresAt: undefined },
+    );
+
+    const session = await this.sessionService.createSession({
+      userId: user.id,
+      tenantId,
+      email: user.email,
+      ipAddress: ip,
+      userAgent,
+    });
+
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId,
+      userId: user.id,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress: ip,
+      userAgent,
+      expiresInDays: 30,
+    });
+
+    const accessToken = this.jwtService.sign(
+      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
+    );
+
+    await this.logSecurityEvent({
+      tenantId,
+      userId: user.id,
+      eventType: "login_success",
+      severity: "info",
+      ipAddress: ip,
+      userAgent,
+      metadata: { authMethod: "magic_link", sessionId: session.id },
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  /**
    * Reset password with token (TENANT SCOPED)
    */
   async resetPassword(tenantId: string, otp: string, newPassword: string) {
