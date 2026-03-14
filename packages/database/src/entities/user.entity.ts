@@ -222,6 +222,23 @@ export class User extends BaseEntity {
   passwordResetExpiresAt?: Date;
 
   @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "magic_link_token",
+    select: false,
+    comment: "SHA-256 hash of the magic link token",
+  })
+  magicLinkToken?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "magic_link_expires_at",
+  })
+  magicLinkExpiresAt?: Date;
+
+  @Column({
     type: "jsonb",
     default: {},
     comment: "Additional user metadata",
