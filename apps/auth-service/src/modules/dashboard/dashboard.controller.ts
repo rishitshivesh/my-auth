@@ -2,8 +2,9 @@ import { Controller, Get, Request } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
-import { User, Session, MfaSettings } from "@repo/database";
+import { User, Session } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
+import { MfaService } from "@/modules/mfa/mfa.service";
 
 @ApiTags("Dashboard")
 @Controller("dashboard")
@@ -14,8 +15,7 @@ export class DashboardController {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
-    @InjectRepository(MfaSettings)
-    private readonly mfaRepository: Repository<MfaSettings>,
+    private readonly mfaService: MfaService,
   ) {}
 
   @Get()
@@ -24,22 +24,13 @@ export class DashboardController {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
-    const [user, mfaSettings] = await Promise.all([
+    const [user, mfaStatus, activeSessions] = await Promise.all([
       this.userRepository.findOne({ where: { id: userId, tenantId } }),
-      this.mfaRepository
-        .createQueryBuilder("mfa")
-        .addSelect("mfa.backupCodes")
-        .where("mfa.userId = :userId AND mfa.tenantId = :tenantId", {
-          userId,
-          tenantId,
-        })
-        .getOne(),
+      this.mfaService.getMfaStatus(userId, tenantId),
+      this.sessionRepository.count({
+        where: { userId, tenantId, revokedAt: IsNull() },
+      }),
     ]);
-
-    // Count active sessions — revokedAt IS NULL means session is active
-    const activeSessions = await this.sessionRepository.count({
-      where: { userId, tenantId, revokedAt: IsNull() },
-    });
 
     return {
       user: {
@@ -55,12 +46,7 @@ export class DashboardController {
         primaryAuthMethod: user?.primaryAuthMethod,
         status: user?.status,
       },
-      mfa: {
-        enabled: mfaSettings?.totpEnabled ?? false,
-        totpEnabled: mfaSettings?.totpEnabled ?? false,
-        emailOtpEnabled: mfaSettings?.emailEnabled ?? false,
-        backupCodesCount: mfaSettings?.backupCodes?.length ?? 0,
-      },
+      mfa: mfaStatus,
       stats: {
         activeSessions,
         lastLoginAt: user?.lastLoginAt,

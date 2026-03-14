@@ -1,59 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useAuth } from "@fortknox/sdk"
 import { Skeleton } from "@repo/ui"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
-import { authClient } from "@/app/layout"
+import { useDashboard } from "@/lib/queries"
 import { ShieldAlert, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 
-interface DashboardData {
-  user: {
-    id: string
-    email: string
-    firstName?: string
-    lastName?: string
-    emailVerified: boolean
-    lastLoginAt?: string
-    createdAt: string
-    primaryAuthMethod: string
-    status: string
-  }
-  mfa: {
-    enabled: boolean
-    totpEnabled: boolean
-    emailOtpEnabled: boolean
-    backupCodesCount: number
-  }
-  stats: {
-    activeSessions: number
-    lastLoginAt?: string
-  }
-}
-
 export default function DashboardPage() {
   const { user } = useAuth()
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    authClient
-      .request({ url: "http://localhost:4000/dashboard", method: "GET" })
-      .then((res) => {
-        if (res.ok) setData(res.data?.data)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+  const { data, isLoading } = useDashboard()
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <DashboardSidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Topbar */}
         <header className="flex items-center border-b border-border bg-card px-8 py-4">
           <div>
             <h1 className="text-lg font-semibold text-foreground">
@@ -68,7 +31,7 @@ export default function DashboardPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-6">
               <Skeleton className="h-16 w-full rounded-xl" />
               <div className="grid grid-cols-3 gap-4">
@@ -147,7 +110,6 @@ export default function DashboardPage() {
 
               {/* Details + Quick Actions */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* Account details */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="text-sm font-semibold text-foreground mb-4">Account Details</h2>
                   <div className="space-y-3">
@@ -155,14 +117,11 @@ export default function DashboardPage() {
                       { label: "Email", value: data?.user?.email },
                       {
                         label: "Name",
-                        value: [data?.user?.firstName, data?.user?.lastName]
-                          .filter(Boolean)
-                          .join(" ") || "—",
+                        value:
+                          [data?.user?.firstName, data?.user?.lastName].filter(Boolean).join(" ") ||
+                          "—",
                       },
-                      {
-                        label: "Email Verified",
-                        value: data?.user?.emailVerified ? "Yes" : "No",
-                      },
+                      { label: "Email Verified", value: data?.user?.emailVerified ? "Yes" : "No" },
                       {
                         label: "Member Since",
                         value: data?.user?.createdAt
@@ -170,10 +129,7 @@ export default function DashboardPage() {
                           : "—",
                       },
                     ].map((row) => (
-                      <div
-                        key={row.label}
-                        className="flex items-center justify-between text-sm"
-                      >
+                      <div key={row.label} className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">{row.label}</span>
                         <span className="font-medium text-foreground">{row.value}</span>
                       </div>
@@ -181,7 +137,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Quick actions */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h2>
                   <div className="space-y-2">

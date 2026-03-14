@@ -203,6 +203,13 @@ export class FortKnoxClient {
   }
 
   /**
+   * Get the configured base URL
+   */
+  getBaseURL(): string {
+    return this.config.baseURL;
+  }
+
+  /**
    * Get current user
    */
   async getCurrentUser(): Promise<User> {
