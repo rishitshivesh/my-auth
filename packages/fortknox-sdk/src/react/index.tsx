@@ -26,6 +26,8 @@ interface AuthContextValue {
   loginIntent: (params: { email: string }) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (otp: string, password: string) => Promise<void>;
 
   // Client
   client: FortKnoxClient;
@@ -153,6 +155,26 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
+  const forgotPassword = async (email: string) => {
+    try {
+      setError(null);
+      await client.forgotPassword(email);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  const resetPassword = async (otp: string, password: string) => {
+    try {
+      setError(null);
+      await client.resetPassword(otp, password);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  };
+
   const value: AuthContextValue = {
     user,
     isLoading,
@@ -161,6 +183,8 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     login,
     logout,
     refreshUser,
+    forgotPassword,
+    resetPassword,
     client,
     loginIntent,
   };

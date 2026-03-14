@@ -116,6 +116,46 @@ export class FortKnoxClient {
   }
 
   /**
+   * Request password reset OTP
+   */
+  async forgotPassword(email: string): Promise<void> {
+    this.log("Forgot password request", { email });
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/forgot-password`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { email },
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+  }
+
+  /**
+   * Reset password with OTP
+   */
+  async resetPassword(otp: string, password: string): Promise<void> {
+    this.log("Reset password with OTP");
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/reset-password`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { otp, password },
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+  }
+
+  /**
    * Logout - clear session
    */
   async logout(): Promise<void> {
@@ -366,7 +406,7 @@ export class FortKnoxClient {
     }
 
     // Update access token
-    const newToken = response.data.accessToken;
+    const newToken = response.data?.data?.accessToken;
     if (!newToken) {
       throw new AuthErrorClass(
         "REFRESH_FAILED",
