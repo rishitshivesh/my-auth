@@ -128,15 +128,10 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
   const loginIntent = async ({ email }: { email: string }) => {
     try {
       setError(null);
-      setIsLoading(true);
-
-      const result = await client.loginIntent(email);
-      return result;
+      return await client.loginIntent(email);
     } catch (err) {
       setError(err as Error);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 

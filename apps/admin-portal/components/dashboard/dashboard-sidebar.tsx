@@ -8,6 +8,7 @@ import {
   AppWindow,
   Shield,
   User,
+  Settings,
   LogOut,
   ChevronRight,
   Lock,
@@ -18,6 +19,7 @@ const navItems = [
   { label: "Applications",  href: "/dashboard/applications", icon: AppWindow },
   { label: "Security",      href: "/dashboard/security",     icon: Shield },
   { label: "Profile",       href: "/dashboard/profile",      icon: User },
+  { label: "Settings",      href: "/dashboard/settings",     icon: Settings },
 ]
 
 function cn(...classes: (string | boolean | undefined | null)[]) {

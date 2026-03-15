@@ -36,3 +36,15 @@ export interface TotpSetupData {
   qrCode: string;
   backupCodes: string[];
 }
+
+export interface SocialProviderConfig {
+  provider: string;
+  enabled: boolean;
+  clientId: string | null;
+  hasSecret: boolean;
+}
+
+export interface TenantSettings {
+  featureFlags: Record<string, boolean>;
+  socialProviders: SocialProviderConfig[];
+}
