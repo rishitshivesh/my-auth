@@ -277,34 +277,76 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
   };
 
   const startPasskeyRegistration = async (): Promise<any> => {
-    return client.startPasskeyRegistration();
+    try {
+      setError(null);
+      return await client.startPasskeyRegistration();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const finishPasskeyRegistration = async (
     registrationResponse: any,
     deviceName?: string,
   ): Promise<{ credentialId: string }> => {
-    return client.finishPasskeyRegistration(registrationResponse, deviceName);
+    try {
+      setError(null);
+      return await client.finishPasskeyRegistration(registrationResponse, deviceName);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const listPasskeys = async (): Promise<any[]> => {
-    return client.listPasskeys();
+    try {
+      setError(null);
+      return await client.listPasskeys();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const deletePasskey = async (credentialId: string): Promise<void> => {
-    return client.deletePasskey(credentialId);
+    try {
+      setError(null);
+      return await client.deletePasskey(credentialId);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const getSocialConnections = async (): Promise<any[]> => {
-    return client.getSocialConnections();
+    try {
+      setError(null);
+      return await client.getSocialConnections();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const unlinkSocialAccount = async (provider: string): Promise<void> => {
-    return client.unlinkSocialAccount(provider);
+    try {
+      setError(null);
+      return await client.unlinkSocialAccount(provider);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const initiateSocialLinking = async (provider: string): Promise<void> => {
-    return client.initiateSocialLinking(provider);
+    try {
+      setError(null);
+      return await client.initiateSocialLinking(provider);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
   };
 
   const value: AuthContextValue = {
