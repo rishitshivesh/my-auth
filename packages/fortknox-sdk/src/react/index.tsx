@@ -29,6 +29,14 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (otp: string, password: string) => Promise<void>;
 
+  // New auth methods
+  initiateSocialLogin: (provider: string) => void;
+  claimSocialSession: (ct: string) => Promise<void>;
+  sendMagicLink: (email: string) => Promise<void>;
+  verifyMagicLink: (token: string) => Promise<void>;
+  startPasskeyLogin: (email: string) => Promise<any>;
+  finishPasskeyLogin: (email: string, assertion: any) => Promise<void>;
+
   // Client
   client: FortKnoxClient;
 }
@@ -175,6 +183,75 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
+  const initiateSocialLogin = (provider: string) => {
+    client.initiateSocialLogin(provider);
+  };
+
+  const claimSocialSession = async (ct: string) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.claimSocialSession(ct);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendMagicLink = async (email: string) => {
+    try {
+      setError(null);
+      await client.sendMagicLink(email);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  const verifyMagicLink = async (token: string) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.verifyMagicLink(token);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startPasskeyLogin = async (email: string): Promise<any> => {
+    try {
+      setError(null);
+      return await client.startPasskeyLogin(email);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  };
+
+  const finishPasskeyLogin = async (email: string, assertion: any): Promise<void> => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.finishPasskeyLogin(email, assertion);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value: AuthContextValue = {
     user,
     isLoading,
@@ -187,6 +264,12 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     resetPassword,
     client,
     loginIntent,
+    initiateSocialLogin,
+    claimSocialSession,
+    sendMagicLink,
+    verifyMagicLink,
+    startPasskeyLogin,
+    finishPasskeyLogin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
