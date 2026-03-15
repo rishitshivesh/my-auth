@@ -9,6 +9,7 @@ import { EnhancedPasswordInput } from "./enhanced-password-input"
 import { MagicLinkForm } from "./magic-link-form"
 import { PasskeyLoginButton } from "./passkey-login-button"
 import type { PasswordPolicy } from "@/lib/auth-config"
+import { useAuth } from "@fortknox/sdk"
 
 interface CredentialsStepProps {
   email: string
@@ -32,6 +33,7 @@ export function CredentialsStep({
   primaryColor = "#6366f1",
 }: CredentialsStepProps) {
   const [password, setPassword] = useState("")
+  const { initiateSocialLogin } = useAuth()
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -150,17 +152,17 @@ export function CredentialsStep({
           >
             <div className="p-4 rounded-lg bg-muted/50 border border-muted text-center">
               <p className="text-sm font-medium text-foreground mb-2">
-                Redirecting to {method.replace("social-", "")}...
+                Continue with {method.replace("social-", "")}
               </p>
-              <p className="text-xs text-muted-foreground">You'll be redirected to complete authentication</p>
+              <p className="text-xs text-muted-foreground">You'll be redirected to sign in securely</p>
             </div>
             <Button
-              onClick={() => onSubmit(email)}
+              onClick={() => initiateSocialLogin(method.replace("social-", ""))}
               disabled={loading}
               className="w-full"
               style={primaryColor ? { backgroundColor: primaryColor } : undefined}
             >
-              {loading ? "Connecting..." : "Continue with provider"}
+              {loading ? "Connecting..." : `Continue with ${method.replace("social-", "")}`}
             </Button>
           </motion.div>
         )}
