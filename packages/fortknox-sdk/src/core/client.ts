@@ -176,9 +176,14 @@ export class FortKnoxClient {
     }
 
     const accessToken =
-      response.data?.data?.accessToken || response.data?.accessToken;
+      response.data?.data?.data?.accessToken ||
+      response.data?.data?.accessToken ||
+      response.data?.accessToken;
     if (!accessToken) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in MFA verify response");
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "No access token in MFA verify response",
+      );
     }
 
     setAccessToken(this.state, accessToken);
@@ -191,7 +196,9 @@ export class FortKnoxClient {
    */
   initiateSocialLogin(provider: string): void {
     if (typeof window === "undefined") {
-      throw new Error("initiateSocialLogin is only available in browser environments");
+      throw new Error(
+        "initiateSocialLogin is only available in browser environments",
+      );
     }
     const returnUrl = encodeURIComponent(window.location.origin);
     window.location.href = `${this.config.baseURL}/auth/social/${provider}/login?tenant_id=${this.config.tenant}&return_url=${returnUrl}`;
@@ -216,9 +223,13 @@ export class FortKnoxClient {
       throw this.createError(response);
     }
 
-    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    const accessToken =
+      response.data?.data?.accessToken || response.data?.accessToken;
     if (!accessToken) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in claim-session response");
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "No access token in claim-session response",
+      );
     }
 
     setAccessToken(this.state, accessToken);
@@ -264,9 +275,15 @@ export class FortKnoxClient {
       throw this.createError(response);
     }
 
-    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    const accessToken =
+      response.data?.data?.data?.accessToken ||
+      response.data?.data?.accessToken ||
+      response.data?.accessToken;
     if (!accessToken) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in magic-link verify response");
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "No access token in magic-link verify response",
+      );
     }
 
     setAccessToken(this.state, accessToken);
@@ -306,14 +323,68 @@ export class FortKnoxClient {
       throw this.createError(response);
     }
 
-    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    const accessToken =
+      response.data?.data?.accessToken || response.data?.accessToken;
     if (!accessToken) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in passkey login response");
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "No access token in passkey login response",
+      );
     }
 
     setAccessToken(this.state, accessToken);
     this.emit({ type: "token_refreshed", accessToken });
     this.config.onTokenRefreshed(accessToken);
+  }
+
+  // ── Passkey Registration & Management ──────────────────────────────
+
+  async startPasskeyRegistration(): Promise<any> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/mfa/webauthn/register/start`,
+      method: "POST",
+      body: {},
+    });
+    if (!response.ok) throw this.createError(response);
+    return response.data?.data || response.data;
+  }
+
+  async finishPasskeyRegistration(
+    registrationResponse: any,
+    deviceName?: string,
+  ): Promise<{ credentialId: string }> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/mfa/webauthn/register/finish`,
+      method: "POST",
+      body: { response: registrationResponse, deviceName },
+    });
+    if (!response.ok) throw this.createError(response);
+    return response.data?.data || response.data;
+  }
+
+  async listPasskeys(): Promise<
+    Array<{
+      id: string;
+      deviceName?: string;
+      createdAt: string;
+      lastUsedAt?: string;
+      transports: string[];
+    }>
+  > {
+    const response = await this.request({
+      url: `${this.config.baseURL}/mfa/webauthn/credentials`,
+      method: "GET",
+    });
+    if (!response.ok) throw this.createError(response);
+    return response.data?.data?.credentials || response.data?.credentials || [];
+  }
+
+  async deletePasskey(credentialId: string): Promise<void> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/mfa/webauthn/credentials/${credentialId}`,
+      method: "DELETE",
+    });
+    if (!response.ok) throw this.createError(response);
   }
 
   /**
