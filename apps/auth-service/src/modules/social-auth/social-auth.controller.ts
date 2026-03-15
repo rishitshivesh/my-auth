@@ -348,8 +348,8 @@ export class SocialAuthController {
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
-      client_id: this.configService.get<string>("GOOGLE_CLIENT_ID", ""),
-      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/google/callback`,
+      client_id: this.configService.getOrThrow<string>("INTERNAL_GOOGLE_CLIENT_ID"),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/google/callback`,
       response_type: "code",
       scope: "email profile",
       state,
@@ -373,8 +373,8 @@ export class SocialAuthController {
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
-      client_id: this.configService.get<string>("GITHUB_CLIENT_ID", ""),
-      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/github/callback`,
+      client_id: this.configService.getOrThrow<string>("INTERNAL_GITHUB_CLIENT_ID"),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/github/callback`,
       response_type: "code",
       scope: "user:email",
       state,
@@ -402,8 +402,8 @@ export class SocialAuthController {
       "common",
     );
     const params = new URLSearchParams({
-      client_id: this.configService.get<string>("MICROSOFT_CLIENT_ID", ""),
-      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/microsoft/callback`,
+      client_id: this.configService.getOrThrow<string>("INTERNAL_MICROSOFT_CLIENT_ID"),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/microsoft/callback`,
       response_type: "code",
       scope: "openid email profile",
       state,

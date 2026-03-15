@@ -696,6 +696,7 @@ export class SocialAuthService {
     // Idempotent — if already linked, succeed silently
     const existing = await this.socialConnectionRepository.findOne({
       where: {
+        userId,
         tenantId,
         provider: profile.provider,
         providerId: profile.providerId,
