@@ -392,6 +392,58 @@ export class FortKnoxClient {
     if (!response.ok) throw this.createError(response);
   }
 
+  // ── Social Connections & Account Linking ───────────────────────────
+
+  /** Get all linked social accounts for the current user */
+  async getSocialConnections(): Promise<
+    Array<{
+      id: string;
+      provider: string;
+      email: string;
+      displayName: string;
+      avatarUrl?: string;
+      primary: boolean;
+      lastUsedAt?: string;
+      createdAt: string;
+    }>
+  > {
+    const response = await this.request({
+      url: `${this.config.baseURL}/social/connections`,
+      method: "GET",
+    });
+    if (!response.ok) throw this.createError(response);
+    return response.data?.data?.connections || response.data?.connections || [];
+  }
+
+  /** Unlink a social account from the current user */
+  async unlinkSocialAccount(provider: string): Promise<void> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/social/connections/${provider}`,
+      method: "DELETE",
+    });
+    if (!response.ok) throw this.createError(response);
+  }
+
+  /**
+   * Initiate social account linking for an already-authenticated user.
+   * Fetches a short-lived link token then navigates the browser to the
+   * OAuth flow so the backend can associate the callback with this user.
+   */
+  async initiateSocialLinking(provider: string): Promise<void> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/social/link/token`,
+      method: "POST",
+    });
+    if (!response.ok) throw this.createError(response);
+    const linkToken =
+      response.data?.data?.linkToken || response.data?.linkToken;
+    if (!linkToken) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No link token in response");
+    }
+    // Full page navigation — OAuth requires a browser redirect, not fetch
+    window.location.href = `${this.config.baseURL}/social/link/${provider}?lt=${linkToken}`;
+  }
+
   /**
    * Logout - clear session
    */
