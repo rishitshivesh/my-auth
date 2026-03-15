@@ -40,6 +40,17 @@ interface AuthContextValue {
   startPasskeyLogin: (email: string) => Promise<any>;
   finishPasskeyLogin: (email: string, assertion: any) => Promise<void>;
 
+  // Passkey management
+  startPasskeyRegistration: () => Promise<any>;
+  finishPasskeyRegistration: (response: any, deviceName?: string) => Promise<{ credentialId: string }>;
+  listPasskeys: () => Promise<any[]>;
+  deletePasskey: (credentialId: string) => Promise<void>;
+
+  // Social account linking
+  getSocialConnections: () => Promise<any[]>;
+  unlinkSocialAccount: (provider: string) => Promise<void>;
+  initiateSocialLinking: (provider: string) => Promise<void>;
+
   // Client
   client: FortKnoxClient;
 }
@@ -265,6 +276,37 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
+  const startPasskeyRegistration = async (): Promise<any> => {
+    return client.startPasskeyRegistration();
+  };
+
+  const finishPasskeyRegistration = async (
+    registrationResponse: any,
+    deviceName?: string,
+  ): Promise<{ credentialId: string }> => {
+    return client.finishPasskeyRegistration(registrationResponse, deviceName);
+  };
+
+  const listPasskeys = async (): Promise<any[]> => {
+    return client.listPasskeys();
+  };
+
+  const deletePasskey = async (credentialId: string): Promise<void> => {
+    return client.deletePasskey(credentialId);
+  };
+
+  const getSocialConnections = async (): Promise<any[]> => {
+    return client.getSocialConnections();
+  };
+
+  const unlinkSocialAccount = async (provider: string): Promise<void> => {
+    return client.unlinkSocialAccount(provider);
+  };
+
+  const initiateSocialLinking = async (provider: string): Promise<void> => {
+    return client.initiateSocialLinking(provider);
+  };
+
   const value: AuthContextValue = {
     user,
     isLoading,
@@ -284,6 +326,13 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     verifyMagicLink,
     startPasskeyLogin,
     finishPasskeyLogin,
+    startPasskeyRegistration,
+    finishPasskeyRegistration,
+    listPasskeys,
+    deletePasskey,
+    getSocialConnections,
+    unlinkSocialAccount,
+    initiateSocialLinking,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
