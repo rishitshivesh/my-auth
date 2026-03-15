@@ -154,6 +154,50 @@ export class SocialAuthController {
    */
   private async handleSocialCallback(req: any, res: Response) {
     const profile: SocialProfile = req.user;
+    const strategy = profile.provider;
+
+    // Detect link mode (authenticated user linking a social account)
+    const rawState = (req.query as any).state as string | undefined;
+    if (rawState) {
+      let parsedState: any = {};
+      try {
+        parsedState = JSON.parse(Buffer.from(rawState, "base64url").toString());
+      } catch {
+        // Not our state format — fall through to normal flow
+      }
+
+      if (parsedState.mode === "link" && parsedState.userId) {
+        const rawProfile = (req as any).user;
+        await this.socialAuthService.handleLinkCallback({
+          userId: parsedState.userId,
+          tenantId: parsedState.tenantId,
+          profile: {
+            provider: strategy,
+            providerId:
+              rawProfile.id || rawProfile.sub || rawProfile.providerId,
+            email:
+              rawProfile.email || rawProfile.emails?.[0]?.value,
+            displayName:
+              rawProfile.displayName ||
+              rawProfile.name ||
+              rawProfile.login ||
+              rawProfile.username,
+            avatarUrl:
+              rawProfile.photos?.[0]?.value ||
+              rawProfile.avatar_url ||
+              rawProfile.picture,
+            accessToken: rawProfile.accessToken || "",
+          },
+        });
+        const adminPortalUrl = this.configService.get<string>(
+          "ADMIN_PORTAL_URL",
+          "http://localhost:3000",
+        );
+        return res.redirect(
+          `${adminPortalUrl}/u/auth/callback?mode=link&provider=${strategy}`,
+        );
+      }
+    }
 
     // Decode our base64url state from query param
     let tenantId: string;
@@ -272,6 +316,101 @@ export class SocialAuthController {
         `/error?message=${encodeURIComponent(error.message)}`,
       );
     }
+  }
+
+  // ============================================================
+  // ACCOUNT LINKING (authenticated users)
+  // ============================================================
+
+  @Post("link/token")
+  @Protected()
+  @HttpCode(HttpStatus.OK)
+  async getLinkToken(@Req() req: any) {
+    const { userId, tenantId } = req.user;
+    const result = await this.socialAuthService.createLinkToken(
+      userId,
+      tenantId,
+    );
+    return { status: 200, data: result };
+  }
+
+  @Get("link/google")
+  async linkGoogle(
+    @Query("lt") linkToken: string,
+    @Res() res: Response,
+  ) {
+    const payload = this.socialAuthService.verifyLinkToken(linkToken);
+    const state = Buffer.from(
+      JSON.stringify({
+        mode: "link",
+        userId: payload.userId,
+        tenantId: payload.tenantId,
+      }),
+    ).toString("base64url");
+    const params = new URLSearchParams({
+      client_id: this.configService.get<string>("GOOGLE_CLIENT_ID", ""),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/google/callback`,
+      response_type: "code",
+      scope: "email profile",
+      state,
+    });
+    return res.redirect(
+      `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+    );
+  }
+
+  @Get("link/github")
+  async linkGithub(
+    @Query("lt") linkToken: string,
+    @Res() res: Response,
+  ) {
+    const payload = this.socialAuthService.verifyLinkToken(linkToken);
+    const state = Buffer.from(
+      JSON.stringify({
+        mode: "link",
+        userId: payload.userId,
+        tenantId: payload.tenantId,
+      }),
+    ).toString("base64url");
+    const params = new URLSearchParams({
+      client_id: this.configService.get<string>("GITHUB_CLIENT_ID", ""),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/github/callback`,
+      response_type: "code",
+      scope: "user:email",
+      state,
+    });
+    return res.redirect(
+      `https://github.com/login/oauth/authorize?${params}`,
+    );
+  }
+
+  @Get("link/microsoft")
+  async linkMicrosoft(
+    @Query("lt") linkToken: string,
+    @Res() res: Response,
+  ) {
+    const payload = this.socialAuthService.verifyLinkToken(linkToken);
+    const state = Buffer.from(
+      JSON.stringify({
+        mode: "link",
+        userId: payload.userId,
+        tenantId: payload.tenantId,
+      }),
+    ).toString("base64url");
+    const msTenant = this.configService.get<string>(
+      "MICROSOFT_TENANT_ID",
+      "common",
+    );
+    const params = new URLSearchParams({
+      client_id: this.configService.get<string>("MICROSOFT_CLIENT_ID", ""),
+      redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/social/microsoft/callback`,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+    });
+    return res.redirect(
+      `https://login.microsoftonline.com/${msTenant}/oauth2/v2.0/authorize?${params}`,
+    );
   }
 
   // ============================================================

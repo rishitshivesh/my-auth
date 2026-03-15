@@ -3,6 +3,7 @@ import {
   Logger,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -650,5 +651,78 @@ export class SocialAuthService {
     metadata?: any;
   }): Promise<void> {
     await this.securityEventRepository.save(params);
+  }
+
+  /**
+   * Create a short-lived link token for authenticated social account linking.
+   * The token encodes userId + tenantId and expires in 60 seconds.
+   */
+  async createLinkToken(
+    userId: string,
+    tenantId: string,
+  ): Promise<{ linkToken: string }> {
+    const linkToken = this.jwtService.sign(
+      { userId, tenantId, mode: "link" },
+      { expiresIn: "60s" },
+    );
+    return { linkToken };
+  }
+
+  /**
+   * Verify and decode a link token. Throws UnauthorizedException if invalid/expired.
+   */
+  verifyLinkToken(token: string): { userId: string; tenantId: string } {
+    try {
+      return this.jwtService.verify(token) as {
+        userId: string;
+        tenantId: string;
+      };
+    } catch {
+      throw new UnauthorizedException("Invalid or expired link token");
+    }
+  }
+
+  /**
+   * Directly link a social account to an already-authenticated user.
+   * Called when the OAuth callback detects state.mode === "link".
+   */
+  async handleLinkCallback(params: {
+    userId: string;
+    tenantId: string;
+    profile: SocialProfile;
+  }): Promise<{ provider: string }> {
+    const { userId, tenantId, profile } = params;
+
+    // Idempotent — if already linked, succeed silently
+    const existing = await this.socialConnectionRepository.findOne({
+      where: {
+        tenantId,
+        provider: profile.provider,
+        providerId: profile.providerId,
+      },
+    });
+    if (existing) {
+      return { provider: profile.provider };
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    const connection = this.socialConnectionRepository.create({
+      userId,
+      tenantId,
+      provider: profile.provider,
+      providerId: profile.providerId,
+      email: profile.email,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      primary: false,
+    });
+    await this.socialConnectionRepository.save(connection);
+
+    this.logger.log(`Linked ${profile.provider} account for user ${userId}`);
+    return { provider: profile.provider };
   }
 }
