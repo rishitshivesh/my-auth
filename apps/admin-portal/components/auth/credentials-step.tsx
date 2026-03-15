@@ -22,6 +22,30 @@ interface CredentialsStepProps {
   primaryColor?: string
 }
 
+function MagicLinkFormWrapper({ email, primaryColor }: { email: string; primaryColor: string }) {
+  const { sendMagicLink } = useAuth()
+  const [stage, setStage] = useState<"request" | "sent" | "expired">("request")
+
+  const handleSubmit = async (inputEmail: string) => {
+    await sendMagicLink(inputEmail)
+    setStage("sent")
+  }
+
+  const handleResend = async () => {
+    await sendMagicLink(email)
+  }
+
+  return (
+    <MagicLinkForm
+      stage={stage}
+      email={email}
+      onSubmit={handleSubmit}
+      onResend={handleResend}
+      primaryColor={primaryColor}
+    />
+  )
+}
+
 export function CredentialsStep({
   email,
   method,
@@ -120,7 +144,7 @@ export function CredentialsStep({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <MagicLinkForm email={email} onSubmit={handleMagicLinkSubmit} primaryColor={primaryColor} />
+            <MagicLinkFormWrapper email={email} primaryColor={primaryColor} />
           </motion.div>
         )}
 
