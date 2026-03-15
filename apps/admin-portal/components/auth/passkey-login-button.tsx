@@ -4,15 +4,16 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button, Alert, AlertDescription } from "@repo/ui"
 import { Key, Loader } from "lucide-react"
+import { useAuth } from "@fortknox/sdk"
 
 interface PasskeyLoginButtonProps {
-  onAuthenticate?: (credential: any) => void
+  email: string
   primaryColor?: string
-  loading?: boolean
 }
 
-export function PasskeyLoginButton({ onAuthenticate, primaryColor = "#6366f1", loading: l }: PasskeyLoginButtonProps) {
-  const [loading, setLoading] = useState(l)
+export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyLoginButtonProps) {
+  const { startPasskeyLogin, finishPasskeyLogin } = useAuth()
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handlePasskeyLogin = async () => {
@@ -20,28 +21,29 @@ export function PasskeyLoginButton({ onAuthenticate, primaryColor = "#6366f1", l
     setError(null)
 
     try {
-      // Mock WebAuthn API call
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys are not supported on this device")
+        throw new Error("Passkeys are not supported on this device or browser")
       }
 
-      // Simulate passkey challenge
-      const mockCredential = {
-        id: "mock-credential-123",
-        type: "public-key",
-        response: {
-          clientJSON: JSON.stringify({
-            challenge: "mock-challenge",
-            origin: window.location.origin,
-          }),
-        },
-      }
+      // Step 1: Get challenge from server
+      const options = await startPasskeyLogin(email)
 
-      if (onAuthenticate) {
-        await onAuthenticate(mockCredential)
+      // Step 2: Trigger browser's native passkey prompt
+      const { startAuthentication } = await import("@simplewebauthn/browser")
+      const assertion = await startAuthentication(options)
+
+      // Step 3: Verify with server — sets session
+      await finishPasskeyLogin(email, assertion)
+
+      // Step 4: Redirect to dashboard
+      window.location.href = "/dashboard"
+    } catch (err: any) {
+      // User cancelled the WebAuthn prompt (NotAllowedError) — don't show error
+      if (err?.name === "NotAllowedError") {
+        setError(null)
+      } else {
+        setError(err?.message || "Failed to authenticate with passkey")
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to authenticate with passkey")
     } finally {
       setLoading(false)
     }
@@ -54,17 +56,20 @@ export function PasskeyLoginButton({ onAuthenticate, primaryColor = "#6366f1", l
           type="button"
           onClick={handlePasskeyLogin}
           disabled={loading}
-          className="w-full bg-transparent border"
+          className="w-full"
           variant="outline"
+          style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
         >
-          <Key className="mr-2 h-4 w-4" />
           {loading ? (
             <>
               <Loader className="mr-2 h-4 w-4 animate-spin" />
               Waiting for passkey...
             </>
           ) : (
-            "Login with Passkey"
+            <>
+              <Key className="mr-2 h-4 w-4" />
+              Sign in with Passkey
+            </>
           )}
         </Button>
       </motion.div>

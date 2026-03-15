@@ -173,7 +173,7 @@ export function MultiOptionLogin({
               Use your registered passkey (fingerprint, face ID, or device PIN) to sign in
             </div>
 
-            <PasskeyLoginButton onAuthenticate={onPasskeySubmit} primaryColor={primaryColor} />
+            <PasskeyLoginButton email={email} primaryColor={primaryColor} />
 
             {email && <input type="hidden" value={email} />}
           </motion.div>

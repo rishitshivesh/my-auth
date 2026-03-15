@@ -64,10 +64,6 @@ export function CredentialsStep({
     await onSubmit(email, password)
   }
 
-  const handleMagicLinkSubmit = async (magicEmail: string) => {
-    await onSubmit(magicEmail)
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -161,7 +157,7 @@ export function CredentialsStep({
               Use your registered passkey (fingerprint, face ID, or device PIN) to sign in
             </div>
 
-            <PasskeyLoginButton onAuthenticate={() => onSubmit(email)} primaryColor={primaryColor} loading={loading} />
+            <PasskeyLoginButton email={email} primaryColor={primaryColor} />
           </motion.div>
         )}
 
