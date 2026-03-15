@@ -96,10 +96,13 @@ export class MfaService {
     tenantId: string,
     token: string,
   ): Promise<{ backupCodes: string[] }> {
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId },
-      select: ["id", "totpSecret", "totpEnabled"], // Include secret
-    });
+    // addSelect() is required to load select:false columns in TypeORM 0.3.x
+    const mfaSettings = await this.mfaRepository
+      .createQueryBuilder("mfa")
+      .addSelect("mfa.totpSecret")
+      .where("mfa.userId = :userId", { userId })
+      .andWhere("mfa.tenantId = :tenantId", { tenantId })
+      .getOne();
 
     if (!mfaSettings || !mfaSettings.totpSecret) {
       throw new BadRequestException(
@@ -148,10 +151,13 @@ export class MfaService {
     tenantId: string,
     token: string,
   ): Promise<boolean> {
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId, totpEnabled: true },
-      select: ["id", "totpSecret"],
-    });
+    const mfaSettings = await this.mfaRepository
+      .createQueryBuilder("mfa")
+      .addSelect("mfa.totpSecret")
+      .where("mfa.userId = :userId", { userId })
+      .andWhere("mfa.tenantId = :tenantId", { tenantId })
+      .andWhere("mfa.totpEnabled = :enabled", { enabled: true })
+      .getOne();
 
     if (!mfaSettings || !mfaSettings.totpSecret) {
       throw new BadRequestException("TOTP not enabled for this user");
@@ -229,10 +235,12 @@ export class MfaService {
     tenantId: string,
     code: string,
   ): Promise<boolean> {
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId },
-      select: ["id", "backupCodes"],
-    });
+    const mfaSettings = await this.mfaRepository
+      .createQueryBuilder("mfa")
+      .addSelect("mfa.backupCodes")
+      .where("mfa.userId = :userId", { userId })
+      .andWhere("mfa.tenantId = :tenantId", { tenantId })
+      .getOne();
 
     if (!mfaSettings || !mfaSettings.backupCodes) {
       throw new BadRequestException("No backup codes available");
