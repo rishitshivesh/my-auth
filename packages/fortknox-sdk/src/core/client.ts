@@ -176,7 +176,6 @@ export class FortKnoxClient {
     }
 
     const accessToken =
-      response.data?.data?.data?.accessToken ||
       response.data?.data?.accessToken ||
       response.data?.accessToken;
     if (!accessToken) {
@@ -276,7 +275,6 @@ export class FortKnoxClient {
     }
 
     const accessToken =
-      response.data?.data?.data?.accessToken ||
       response.data?.data?.accessToken ||
       response.data?.accessToken;
     if (!accessToken) {
@@ -339,16 +337,17 @@ export class FortKnoxClient {
 
   // ── Passkey Registration & Management ──────────────────────────────
 
+  /** Start WebAuthn passkey registration — returns challenge options for the browser */
   async startPasskeyRegistration(): Promise<any> {
     const response = await this.request({
       url: `${this.config.baseURL}/mfa/webauthn/register/start`,
       method: "POST",
-      body: {},
     });
     if (!response.ok) throw this.createError(response);
     return response.data?.data || response.data;
   }
 
+  /** Finish WebAuthn passkey registration — verifies and stores the credential */
   async finishPasskeyRegistration(
     registrationResponse: any,
     deviceName?: string,
@@ -359,9 +358,14 @@ export class FortKnoxClient {
       body: { response: registrationResponse, deviceName },
     });
     if (!response.ok) throw this.createError(response);
-    return response.data?.data || response.data;
+    const data = response.data?.data || response.data;
+    if (!data?.credentialId) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No credentialId in registration response");
+    }
+    return data as { credentialId: string };
   }
 
+  /** List all registered passkeys for the current user */
   async listPasskeys(): Promise<
     Array<{
       id: string;
@@ -379,6 +383,7 @@ export class FortKnoxClient {
     return response.data?.data?.credentials || response.data?.credentials || [];
   }
 
+  /** Delete a registered passkey by credential ID */
   async deletePasskey(credentialId: string): Promise<void> {
     const response = await this.request({
       url: `${this.config.baseURL}/mfa/webauthn/credentials/${credentialId}`,
