@@ -120,3 +120,37 @@ export function useUpdateSocialProvider() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "settings"] }),
   });
 }
+
+// ── Passkey Management ─────────────────────────────────────────────
+
+export function useListPasskeys() {
+  return useQuery({
+    queryKey: ["passkeys"],
+    queryFn: () => authClient.listPasskeys(),
+  });
+}
+
+export function useDeletePasskey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) => authClient.deletePasskey(credentialId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["passkeys"] }),
+  });
+}
+
+// ── Social Connections ─────────────────────────────────────────────
+
+export function useSocialConnections() {
+  return useQuery({
+    queryKey: ["social-connections"],
+    queryFn: () => authClient.getSocialConnections(),
+  });
+}
+
+export function useUnlinkSocialAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: string) => authClient.unlinkSocialAccount(provider),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["social-connections"] }),
+  });
+}
