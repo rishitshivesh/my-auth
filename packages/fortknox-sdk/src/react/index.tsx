@@ -29,6 +29,9 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (otp: string, password: string) => Promise<void>;
 
+  // MFA
+  verifyMfaLogin: (tempToken: string, code: string) => Promise<void>;
+
   // New auth methods
   initiateSocialLogin: (provider: string) => void;
   claimSocialSession: (ct: string) => Promise<void>;
@@ -178,6 +181,21 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
+  const verifyMfaLogin = async (tempToken: string, code: string) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.verifyMfaLogin(tempToken, code);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const initiateSocialLogin = (provider: string) => {
     client.initiateSocialLogin(provider);
   };
@@ -259,6 +277,7 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     resetPassword,
     client,
     loginIntent,
+    verifyMfaLogin,
     initiateSocialLogin,
     claimSocialSession,
     sendMagicLink,

@@ -439,6 +439,7 @@ export class AuthController {
   })
   async verifyMfa(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Body() dto: VerifyMfaDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -446,13 +447,24 @@ export class AuthController {
     const tenantId = req.tenantId!;
 
     try {
-      return await this.authService.verifyMfa(
+      const result = await this.authService.verifyMfa(
         tenantId,
         dto.tempToken,
         dto.code,
         ip,
         userAgent,
       );
+
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        domain: req.hostname,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: "/",
+      });
+
+      return { status: 200, data: { accessToken: result.accessToken, message: result.message } };
     } catch (error: any) {
       console.error("❌ MFA verification failed:", error.message);
 

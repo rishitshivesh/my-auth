@@ -156,6 +156,37 @@ export class FortKnoxClient {
   }
 
   /**
+   * Verify TOTP code during MFA login step.
+   * tempToken is the short-lived token returned by /auth/login when mfaRequired=true.
+   */
+  async verifyMfaLogin(tempToken: string, code: string): Promise<void> {
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/mfa/verify`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { tempToken, code },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    const accessToken =
+      response.data?.data?.accessToken || response.data?.accessToken;
+    if (!accessToken) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in MFA verify response");
+    }
+
+    setAccessToken(this.state, accessToken);
+    this.emit({ type: "token_refreshed", accessToken });
+    this.config.onTokenRefreshed(accessToken);
+  }
+
+  /**
    * Initiate social login — redirects the browser to the OAuth provider
    */
   initiateSocialLogin(provider: string): void {
