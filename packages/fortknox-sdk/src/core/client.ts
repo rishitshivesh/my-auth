@@ -156,6 +156,136 @@ export class FortKnoxClient {
   }
 
   /**
+   * Initiate social login — redirects the browser to the OAuth provider
+   */
+  initiateSocialLogin(provider: string): void {
+    if (typeof window === "undefined") {
+      throw new Error("initiateSocialLogin is only available in browser environments");
+    }
+    const returnUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${this.config.baseURL}/auth/social/${provider}/login?tenant_id=${this.config.tenant}&return_url=${returnUrl}`;
+  }
+
+  /**
+   * Claim a social session using the completion token from /u/auth/callback?ct=...
+   */
+  async claimSocialSession(completionToken: string): Promise<void> {
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/social/claim-session`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { ct: completionToken },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    if (!accessToken) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in claim-session response");
+    }
+
+    setAccessToken(this.state, accessToken);
+    this.emit({ type: "token_refreshed", accessToken });
+    this.config.onTokenRefreshed(accessToken);
+  }
+
+  /**
+   * Send a magic link sign-in email
+   */
+  async sendMagicLink(email: string): Promise<void> {
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/magic-link/send`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { email },
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+  }
+
+  /**
+   * Verify a magic link token and establish session
+   */
+  async verifyMagicLink(token: string): Promise<void> {
+    const response = await this.transport({
+      url: `${this.config.baseURL}/auth/magic-link/verify`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": this.config.tenant,
+      },
+      body: { token },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    if (!accessToken) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in magic-link verify response");
+    }
+
+    setAccessToken(this.state, accessToken);
+    this.emit({ type: "token_refreshed", accessToken });
+    this.config.onTokenRefreshed(accessToken);
+  }
+
+  /**
+   * Start WebAuthn (passkey) authentication — returns challenge options for the browser
+   */
+  async startPasskeyLogin(email: string): Promise<any> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/auth/webauthn/login/start`,
+      method: "POST",
+      body: { email },
+    });
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    return response.data?.data || response.data;
+  }
+
+  /**
+   * Finish WebAuthn (passkey) authentication with the browser assertion
+   */
+  async finishPasskeyLogin(email: string, assertion: any): Promise<void> {
+    const response = await this.request({
+      url: `${this.config.baseURL}/auth/webauthn/login/finish`,
+      method: "POST",
+      body: { email, response: assertion },
+      credentials: "include",
+    } as any);
+
+    if (!response.ok) {
+      throw this.createError(response);
+    }
+
+    const accessToken = response.data?.data?.accessToken || response.data?.accessToken;
+    if (!accessToken) {
+      throw new AuthErrorClass("UNKNOWN_ERROR", "No access token in passkey login response");
+    }
+
+    setAccessToken(this.state, accessToken);
+    this.emit({ type: "token_refreshed", accessToken });
+    this.config.onTokenRefreshed(accessToken);
+  }
+
+  /**
    * Logout - clear session
    */
   async logout(): Promise<void> {
