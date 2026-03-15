@@ -48,3 +48,22 @@ export interface TenantSettings {
   featureFlags: Record<string, boolean>;
   socialProviders: SocialProviderConfig[];
 }
+
+export interface PasskeyCredential {
+  id: string;
+  deviceName?: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  transports: string[];
+}
+
+export interface SocialConnection {
+  id: string;
+  provider: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+  primary: boolean;
+  lastUsedAt?: string;
+  createdAt: string;
+}

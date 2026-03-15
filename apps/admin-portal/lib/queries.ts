@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings } from "./types";
+import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection } from "./types";
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -124,7 +124,7 @@ export function useUpdateSocialProvider() {
 // ── Passkey Management ─────────────────────────────────────────────
 
 export function useListPasskeys() {
-  return useQuery({
+  return useQuery<PasskeyCredential[]>({
     queryKey: ["passkeys"],
     queryFn: () => authClient.listPasskeys(),
   });
@@ -132,7 +132,7 @@ export function useListPasskeys() {
 
 export function useDeletePasskey() {
   const qc = useQueryClient();
-  return useMutation({
+  return useMutation<void, Error, string>({
     mutationFn: (credentialId: string) => authClient.deletePasskey(credentialId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["passkeys"] }),
   });
@@ -141,7 +141,7 @@ export function useDeletePasskey() {
 // ── Social Connections ─────────────────────────────────────────────
 
 export function useSocialConnections() {
-  return useQuery({
+  return useQuery<SocialConnection[]>({
     queryKey: ["social-connections"],
     queryFn: () => authClient.getSocialConnections(),
   });
@@ -149,7 +149,7 @@ export function useSocialConnections() {
 
 export function useUnlinkSocialAccount() {
   const qc = useQueryClient();
-  return useMutation({
+  return useMutation<void, Error, string>({
     mutationFn: (provider: string) => authClient.unlinkSocialAccount(provider),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["social-connections"] }),
   });
