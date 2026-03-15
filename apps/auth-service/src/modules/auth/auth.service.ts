@@ -185,22 +185,15 @@ export class AuthService {
   > {
     const { tenantId, email, password, ip, userAgent } = data;
 
-    // Find user
-    const user = await this.userRepository.findOne({
-      where: { email, tenantId },
-      relations: ["tenant"],
-      select: {
-        id: true,
-        email: true,
-        passwordHash: true, // ← Force select this hidden field
-        firstName: true,
-        lastName: true,
-        emailVerified: true,
-        tenantId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    // Find user — use QueryBuilder to avoid TypeORM 0.3.x DISTINCT pagination bug
+    // with findOne+select(object form)+relations that causes pg "insufficient data" errors
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash") // Force-select the hidden field
+      .leftJoinAndSelect("user.tenant", "tenant")
+      .where("user.email = :email", { email })
+      .andWhere("user.tenantId = :tenantId", { tenantId })
+      .getOne();
 
     console.log("🔍 Login attempt:", { email, tenantId, userFound: !!user }); // ← ADD
 
