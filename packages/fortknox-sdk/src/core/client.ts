@@ -441,6 +441,12 @@ export class FortKnoxClient {
       throw new AuthErrorClass("UNKNOWN_ERROR", "No link token in response");
     }
     // Full page navigation — OAuth requires a browser redirect, not fetch
+    if (typeof window === "undefined") {
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "initiateSocialLinking is only available in browser environments",
+      );
+    }
     window.location.href = `${this.config.baseURL}/social/link/${provider}?lt=${linkToken}`;
   }
 
