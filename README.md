@@ -1,364 +1,376 @@
-# 🏰 Fort Knox Authentication System
+# Fort Knox Authentication System
 
-**Enterprise-grade, multi-tenant authentication system built with NestJS, TypeORM, and Redis**
-
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-10-red)](https://nestjs.com/)
+Enterprise-grade, multi-tenant authentication platform built with NestJS, TypeORM, PostgreSQL, and Redis.
 
 ---
 
-## 🚀 Features
+## What is Fort Knox?
 
-### ✅ Core Authentication
-- [x] Email/Password authentication with Argon2id hashing
-- [x] JWT + Refresh Token implementation
-- [x] Multi-tenant architecture
-- [x] Session management with device tracking
-- [ ] Social login (Google, GitHub, Microsoft)
-- [ ] SAML 2.0 enterprise SSO
-- [ ] OAuth 2.0 / OIDC server
-
-### 🔐 Security
-- [x] Rate limiting (Sliding Window + Token Bucket)
-- [x] Brute force protection
-- [x] AES-256-GCM field-level encryption
-- [ ] Account lockout with exponential backoff
-- [ ] Security headers (Helmet.js)
-- [ ] CSRF protection
-- [ ] IP whitelisting/blacklisting
-
-### 🔑 Multi-Factor Authentication (MFA)
-- [ ] TOTP (Google Authenticator, Authy)
-- [ ] SMS OTP via Twilio
-- [ ] Email OTP / Magic Links
-- [ ] WebAuthn / FIDO2 (hardware keys, biometrics)
-- [ ] Backup codes
-
-### 👥 User & Tenant Management
-- [x] Multi-tenant isolation
-- [x] Custom domain support
-- [ ] Role-Based Access Control (RBAC)
-- [ ] Hierarchical permissions
-- [ ] User invitation system
-- [ ] Bulk user provisioning
-- [ ] SCIM 2.0 user directory sync
-
-### 📊 Admin Dashboard
-- [ ] User management UI
-- [ ] Analytics & reporting
-- [ ] Security events monitoring
-- [ ] Tenant configuration
-- [ ] Branding customization
-
-### 🔧 Developer Tools
-- [ ] JavaScript/TypeScript SDK
-- [ ] Python SDK
-- [ ] Go SDK
-- [ ] API documentation (Swagger/OpenAPI)
-- [ ] Webhook system
-- [ ] Developer portal
+Fort Knox is a self-hosted authentication service and SDK. It handles everything from basic email/password login to OAuth2 server, passkeys, TOTP, social login, RBAC, and multi-tenant isolation — so your applications do not have to.
 
 ---
 
-## 📦 Project Structure
+## Current State
+
+### Implemented and production-ready
+
+| System | Status | Notes |
+|---|---|---|
+| Email/password auth | Done | Argon2id, brute-force protection, password history |
+| JWT + refresh tokens | Done | 15m access / 30d refresh, token rotation, reuse detection |
+| Session management | Done | Redis cache + PostgreSQL, device tracking, 15m cleanup cron |
+| Magic link login | Done | Token-based, single-use, 15m TTL |
+| Multi-tenancy | Done | Full row-level isolation by `tenant_id` on every table |
+| TOTP MFA | Done | QR code setup, 10 backup codes, 2-window time step |
+| WebAuthn / passkeys | Done | Registration + authentication via `@simplewebauthn/server` v13 |
+| Email OTP MFA | Done | Request + verify endpoints, 10m TTL |
+| Backup codes | Done | SHA-256 hashed, 10 per user, one-time use |
+| Social login | Done | Google, GitHub, Microsoft via Passport.js |
+| Social account linking | Done | Link/unlink with email-collision detection |
+| OAuth2 server | Done | Authorization code (+ PKCE), refresh token, client credentials |
+| OIDC | Done | Discovery, JWKS, UserInfo, ID tokens, introspection, revocation |
+| RBAC | Done | Roles, permissions, user-role assignments with expiry |
+| Admin portal | Done | Next.js 15 dashboard — profile, security, sessions, passkeys, social connections |
+| fortknox-sdk | Done | React hooks, Next.js SSR helpers, Node M2M client, Web helpers |
+| Tenant branding | Done | Per-tenant logo, colors, company name, support links |
+| Security event log | Done | 37 event types across all flows |
+| Email delivery | Done | SMTP (Nodemailer) + AWS SES, auto-detected by config |
+
+### Known gaps / planned work
+
+| Gap | Detail |
+|---|---|
+| SMS OTP | Entity fields exist, no implementation |
+| Tenant admin dashboard metrics | Shows hardcoded mock values — no real DB queries behind them |
+| WebAuthn challenge storage | In-memory Map — must move to Redis before multi-instance deploy |
+| SAML 2.0 | Not started |
+| SCIM provisioning | Not started |
+
+---
+
+## Monorepo Layout
 
 ```
-fort-knox/
+my-auth/
 ├── apps/
-│   ├── auth-service/          # NestJS authentication microservice
-│   ├── admin-portal/          # Next.js admin dashboard
-│   ├── api-gateway/           # API gateway service
-│   └── webhook-service/       # Webhook delivery system
+│   ├── auth-service/          # NestJS backend — all auth logic
+│   └── admin-portal/          # Next.js 15 frontend dashboard
 ├── packages/
-│   ├── security/              # Security utilities (encryption, hashing, rate limiting)
-│   ├── shared/                # Shared types, constants, DTOs
-│   ├── database/              # TypeORM entities, migrations
-│   ├── sdk-js/                # JavaScript/TypeScript SDK
-│   └── ui/                    # shadcn/ui components
-├── tools/
-│   ├── scripts/               # Deployment scripts
-│   └── docker/                # Docker configurations
-├── turbo.json                 # Turborepo configuration
-├── docker-compose.yml         # Local development services
+│   ├── database/              # TypeORM entities + migrations
+│   ├── security/              # Argon2, AES-256-GCM, rate limiter
+│   ├── fortknox-sdk/          # Multi-platform client SDK
+│   ├── shared/                # Shared types, DTOs, constants
+│   └── ui/                    # shadcn/ui component library
+├── docs/
+│   ├── plans/                 # Implementation plans
+│   └── fortknox/              # Developer guides
+├── turbo.json
 └── package.json
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-### Backend
-- **Framework:** NestJS (Node.js + TypeScript)
-- **Database:** PostgreSQL 16
-- **ORM:** TypeORM
-- **Cache:** Redis 7
-- **Queue:** Bull (Redis-based)
-
-### Frontend
-- **Framework:** Next.js 14 (App Router)
-- **UI:** shadcn/ui + Tailwind CSS
-- **State:** React Query
-
-### Security
-- **Password Hashing:** Argon2id
-- **Encryption:** AES-256-GCM
-- **JWT:** jsonwebtoken
-- **Rate Limiting:** Redis-based sliding window
-
-### DevOps
-- **Containerization:** Docker
-- **Orchestration:** Kubernetes
-- **CI/CD:** GitHub Actions
-- **Monitoring:** Prometheus + Grafana
-- **Logging:** ELK Stack
+| Layer | Technology |
+|---|---|
+| Backend framework | NestJS 11, TypeScript 5.7 |
+| Database | PostgreSQL 16, TypeORM 0.3 |
+| Cache | Redis 7, ioredis 5 |
+| Scheduling | @nestjs/schedule (cron) |
+| Password hashing | Argon2id |
+| Token format | JWT (access) + opaque random hex (refresh) |
+| Encryption | AES-256-GCM |
+| WebAuthn | @simplewebauthn/server v13.2.2 |
+| Social auth | Passport.js (google-oauth20, github, microsoft) |
+| Frontend | Next.js 15, React 19, Tailwind CSS, shadcn/ui |
+| Build | Turborepo, tsup |
+| Package manager | Yarn workspaces |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-- Node.js >= 20.0.0
-- Docker & Docker Compose
-- PostgreSQL 16 (or use Docker)
-- Redis 7 (or use Docker)
 
-### 1. Clone Repository
+- Node.js 20+
+- PostgreSQL 16
+- Redis 7
+- Yarn
+
+### 1. Install
+
 ```bash
-git clone https://github.com/your-org/fort-knox.git
-cd fort-knox
+git clone <repo>
+cd my-auth
+yarn install
 ```
 
-### 2. Install Dependencies
+### 2. Configure auth-service
+
 ```bash
-npm install
+cp apps/auth-service/.env.example apps/auth-service/.env
 ```
 
-### 3. Start Infrastructure (Docker)
-```bash
-npm run docker:dev
-```
+Minimum required variables:
 
-This starts:
-- PostgreSQL on `localhost:5432`
-- Redis on `localhost:6379`
-- pgAdmin on `localhost:5050`
-- Redis Commander on `localhost:8081`
-- Mailhog on `localhost:8025`
-
-### 4. Environment Variables
-Create `.env` files in each app:
-
-**apps/auth-service/.env:**
 ```env
 # Database
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=fortknox
-DATABASE_PASSWORD=fortknox_dev_password
-DATABASE_NAME=fortknox_auth
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_DATABASE=fort_knox
 
 # Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=fortknox_redis_password
 
-# JWT
-JWT_SECRET=your-super-secret-jwt-key-change-this
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this
+# JWT — change in production
+JWT_SECRET=change-me-in-production
 
-# Encryption
-ENCRYPTION_KEY=your-256-bit-encryption-master-key
+# URLs
+FRONTEND_URL=http://localhost:3000
+PORTAL_URL=http://localhost:3000
+AUTH_SERVICE_URL=http://localhost:4000
+BASE_URL=http://localhost:4000
 
-# Application
-PORT=3001
-NODE_ENV=development
+# WebAuthn
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_ORIGIN=http://localhost:3000
+
+# Email (SMTP or SES — at least one required)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+EMAIL_FROM=noreply@fortknox.local
 ```
 
-### 5. Run Database Migrations
+### 3. Run migrations
+
 ```bash
 cd apps/auth-service
-npm run db:migrate
-npm run db:seed
+yarn db:migrate
 ```
 
-### 6. Start Development Servers
-```bash
-# Start all apps in watch mode
-npm run dev
-
-# Or start specific app
-npm run dev --filter=auth-service
-```
-
----
-
-## 📚 API Documentation
-
-Once the auth-service is running, access Swagger docs at:
-```
-http://localhost:3001/api/docs
-```
-
-### Key Endpoints
-
-#### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login
-- `POST /auth/refresh` - Refresh access token
-- `POST /auth/logout` - Logout
-- `POST /auth/forgot-password` - Request password reset
-- `POST /auth/reset-password` - Reset password
-
-#### User Management
-- `GET /users/me` - Get current user
-- `PATCH /users/me` - Update current user
-- `POST /users/change-password` - Change password
-
-#### MFA
-- `POST /mfa/totp/setup` - Setup TOTP
-- `POST /mfa/totp/verify` - Verify TOTP code
-- `POST /mfa/backup-codes` - Generate backup codes
-
----
-
-## 🔐 Security Best Practices
-
-### Implemented
-✅ **Password Security**
-- Argon2id hashing (OWASP recommended)
-- Password strength validation
-- Password history (prevent reuse)
-
-✅ **Session Security**
-- Device fingerprinting
-- IP tracking
-- Concurrent session limits
-
-✅ **Rate Limiting**
-- Per-IP rate limiting
-- Per-user rate limiting
-- Distributed rate limiting (Redis)
-
-✅ **Encryption**
-- AES-256-GCM for sensitive data
-- HMAC signatures for webhooks
-- Encrypted fields in database
-
-### Planned
-🔄 **Additional Security Measures**
-- WAF (Web Application Firewall)
-- DDoS protection
-- Penetration testing
-- Security audits
-- Compliance certifications (SOC 2, ISO 27001)
-
----
-
-## 🧪 Testing
+### 4. Start
 
 ```bash
-# Run all tests
-npm run test
+# All apps
+yarn dev
 
-# Run tests with coverage
-npm run test:cov
+# Auth service only
+yarn dev --filter=auth-service
 
-# Run E2E tests
-npm run test:e2e
+# Admin portal only
+yarn dev --filter=admin-portal
+```
 
-# Run specific test suite
-npm run test --filter=auth-service
+Auth service runs on `http://localhost:4000`.
+Admin portal runs on `http://localhost:3000`.
+
+---
+
+## API Overview
+
+Full documentation in [docs/fortknox/](docs/fortknox/).
+
+### Authentication
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register` | — | Create account |
+| POST | `/auth/login` | — | Email/password login |
+| POST | `/auth/login-intent` | — | Check auth methods for email |
+| POST | `/auth/logout` | JWT | Revoke session |
+| POST | `/auth/refresh` | Cookie | Rotate refresh token |
+| GET | `/auth/me` | JWT | Current user + session |
+| POST | `/auth/forgot-password` | — | Send reset OTP |
+| POST | `/auth/reset-password` | — | Apply new password |
+| POST | `/auth/verify-email` | — | Verify email address |
+| POST | `/auth/magic-link/send` | — | Send magic link |
+| POST | `/auth/magic-link/verify` | — | Login via magic link |
+| POST | `/auth/mfa/verify` | — | Complete MFA (TOTP) |
+| POST | `/auth/mfa/verify-backup` | — | Complete MFA (backup code) |
+| POST | `/auth/webauthn/login/start` | — | WebAuthn challenge |
+| POST | `/auth/webauthn/login/finish` | — | WebAuthn verify + login |
+
+### MFA (all require JWT)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/mfa/status` | Current MFA configuration |
+| POST | `/mfa/setup/totp` | Generate TOTP QR + backup codes |
+| POST | `/mfa/verify/totp` | Enable TOTP |
+| DELETE | `/mfa/totp` | Disable TOTP |
+| POST | `/mfa/backup-codes/regenerate` | New backup codes |
+| POST | `/mfa/request-email-otp` | Send OTP email |
+| POST | `/mfa/verify-email-otp` | Verify OTP email |
+| POST | `/mfa/webauthn/register/start` | Passkey registration challenge |
+| POST | `/mfa/webauthn/register/finish` | Complete passkey registration |
+| GET | `/mfa/webauthn/credentials` | List registered passkeys |
+| DELETE | `/mfa/webauthn/credentials/:id` | Remove passkey |
+
+### OAuth2 / OIDC
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/.well-known/openid-configuration` | OIDC discovery |
+| GET | `/oauth/jwks` | Public keys |
+| GET | `/oauth/authorize` | Authorization code flow |
+| POST | `/oauth/token` | Token exchange (code, refresh, client_credentials) |
+| GET | `/oauth/userinfo` | OIDC user claims |
+| POST | `/oauth/introspect` | Token introspection |
+| POST | `/oauth/revoke` | Token revocation |
+| POST | `/oauth/clients` | Create OAuth client |
+
+### Social Auth
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/auth/social/google/login` | Google login redirect |
+| GET | `/auth/social/github/login` | GitHub login redirect |
+| GET | `/auth/social/microsoft/login` | Microsoft login redirect |
+| POST | `/auth/social/claim-session` | Claim token after redirect |
+| GET | `/auth/social/connections` | Linked accounts |
+| DELETE | `/auth/social/connections/:provider` | Unlink account |
+
+### Sessions (all require JWT)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/sessions/active` | Active devices |
+| DELETE | `/sessions/:id` | Revoke session |
+| DELETE | `/sessions/all/other` | Logout other devices |
+| DELETE | `/sessions/all` | Logout all devices |
+
+---
+
+## Environment Variables Reference
+
+### Required
+
+```env
+DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE
+REDIS_HOST, REDIS_PORT
+JWT_SECRET
+FRONTEND_URL, PORTAL_URL, AUTH_SERVICE_URL, BASE_URL
+WEBAUTHN_RP_ID, WEBAUTHN_ORIGIN
+EMAIL_FROM
+```
+
+### Email (one of)
+
+```env
+# SMTP
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+
+# AWS SES
+AWS_SES_REGION, AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY
+```
+
+### Social providers (each optional — enables that provider)
+
+```env
+INTERNAL_GOOGLE_CLIENT_ID, INTERNAL_GOOGLE_CLIENT_SECRET, INTERNAL_GOOGLE_CALLBACK_URL
+INTERNAL_GITHUB_CLIENT_ID, INTERNAL_GITHUB_CLIENT_SECRET, INTERNAL_GITHUB_CALLBACK_URL
+INTERNAL_MICROSOFT_CLIENT_ID, INTERNAL_MICROSOFT_CLIENT_SECRET, INTERNAL_MICROSOFT_CALLBACK_URL
+MICROSOFT_TENANT_ID   # default: "common"
 ```
 
 ---
 
-## 📊 Performance Targets
+## Testing
 
-| Metric | Target | Current |
-|--------|--------|---------|
-| Uptime | 99.99% | TBD |
-| Auth Latency | <100ms | TBD |
-| Throughput | 10,000 req/s | TBD |
-| Test Coverage | >80% | TBD |
+```bash
+# Auth service unit tests
+cd apps/auth-service && yarn test
 
----
+# With coverage
+cd apps/auth-service && yarn test:cov
 
-## 🗺️ Roadmap
+# E2E
+cd apps/auth-service && yarn test:e2e
+```
 
-### Phase 1: Security Hardening ✅ (In Progress)
-- [x] Argon2id password hashing
-- [x] Rate limiting
-- [x] Field-level encryption
-- [ ] Security headers
-- [ ] CSRF protection
-
-### Phase 2: MFA (Weeks 2-3)
-- [ ] TOTP implementation
-- [ ] SMS OTP
-- [ ] Email OTP / Magic Links
-- [ ] WebAuthn / FIDO2
-
-### Phase 3: OAuth 2.0 & Social Login (Weeks 3-4)
-- [ ] OAuth 2.0 server
-- [ ] OIDC support
-- [ ] Google OAuth
-- [ ] GitHub OAuth
-- [ ] Microsoft OAuth
-
-### Phase 4: Enterprise SSO (Weeks 4-5)
-- [ ] SAML 2.0
-- [ ] SCIM 2.0 provisioning
-- [ ] Azure AD integration
-
-### Phase 5: RBAC & Permissions (Weeks 5-6)
-- [ ] Hierarchical roles
-- [ ] Fine-grained permissions
-- [ ] Role inheritance
-
-### Phase 6: Admin Dashboard (Weeks 9-11)
-- [ ] User management UI
-- [ ] Analytics dashboard
-- [ ] Security monitoring
-- [ ] Tenant configuration
+Current test coverage: session management (5 tests — cleanup, revocation, token reuse).
 
 ---
 
-## 🤝 Contributing
+## Database Migrations
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+```bash
+cd apps/auth-service
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+yarn db:migrate          # run pending
+yarn db:migrate:revert   # revert last
+yarn db:migrate:show     # show status
+yarn db:migrate:generate MigrationName  # generate from entity diff
+```
 
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Migrations live in `packages/database/src/migrations/`.
 
 ---
 
-## 🙏 Acknowledgments
+## SDK Usage
 
-- [NestJS](https://nestjs.com/) - Progressive Node.js framework
-- [TypeORM](https://typeorm.io/) - ORM for TypeScript
-- [shadcn/ui](https://ui.shadcn.com/) - Re-usable components
-- [Argon2](https://github.com/P-H-C/phc-winner-argon2) - Password hashing
-- OWASP for security best practices
+```typescript
+import { createWebClient } from '@fortknox/sdk/web';
+import { FortKnoxProvider, useAuth } from '@fortknox/sdk/react';
+
+const client = createWebClient({
+  baseURL: 'https://auth.yourapp.com',
+  tenant: 'your-tenant-slug',
+});
+
+function App() {
+  return (
+    <FortKnoxProvider client={client}>
+      <YourApp />
+    </FortKnoxProvider>
+  );
+}
+
+function LoginButton() {
+  const { login, user, isAuthenticated } = useAuth();
+
+  return isAuthenticated
+    ? <p>Hello {user?.firstName}</p>
+    : <button onClick={() => login({ email, password })}>Login</button>;
+}
+```
+
+Full SDK reference: [docs/fortknox/09-sdk.md](docs/fortknox/09-sdk.md)
 
 ---
 
-## 📞 Support
+## Documentation
 
-- 📧 Email: support@fortknox.dev
-- 💬 Discord: [Join our community](https://discord.gg/fortknox)
-- 📖 Docs: [docs.fortknox.dev](https://docs.fortknox.dev)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-org/fort-knox/issues)
+[docs/fortknox/](docs/fortknox/) contains the full developer guide:
+
+- [01 — Architecture](docs/fortknox/01-architecture.md)
+- [02 — Authentication Flows](docs/fortknox/02-authentication.md)
+- [03 — Session Management](docs/fortknox/03-session-management.md)
+- [04 — Multi-Factor Authentication](docs/fortknox/04-mfa.md)
+- [05 — OAuth2 & OIDC Server](docs/fortknox/05-oauth2-oidc.md)
+- [06 — Social Authentication](docs/fortknox/06-social-auth.md)
+- [07 — RBAC](docs/fortknox/07-rbac.md)
+- [08 — Multi-Tenancy](docs/fortknox/08-multi-tenancy.md)
+- [09 — SDK Reference](docs/fortknox/09-sdk.md)
+- [10 — Security Events](docs/fortknox/10-security-events.md)
 
 ---
 
-**Built with ❤️ by Rishit Shivesh**
+## Recent Changes
+
+**2026-03-16 — Session Management Hardening**
+- Added `application_id` FK column to sessions table (nullable, references `oauth_clients`)
+- Added partial index on `(expires_at) WHERE revoked_at IS NULL AND deleted_at IS NULL`
+- Implemented `cleanupExpiredSessions()` — single transaction soft-deletes expired sessions and revokes their refresh tokens
+- Added 15-minute cron job in `TokenCleanupService`
+- Hardened `revokeSession()` to null `refreshTokenHash` on logout
+- Same null applied to both `revokeAllUserSessions()` paths
+- 5 regression tests
+
+---
+
+Built by Rishit Shivesh
