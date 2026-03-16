@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull } from "typeorm";
+import { Repository, IsNull, LessThan, In } from "typeorm";
 import { Session, OAuthRefreshToken } from "@repo/database";
 import * as geoip from "geoip-lite";
 import { UAParser } from "ua-parser-js";
@@ -338,6 +338,56 @@ export class SessionManagementService {
       locationBreakdown,
       lastActivity: lastActivity!,
     };
+  }
+
+  /**
+   * Cleanup expired sessions
+   *
+   * Soft-deletes sessions that have passed their expiry date and haven't
+   * been revoked yet, and revokes their associated refresh tokens.
+   */
+  async cleanupExpiredSessions(): Promise<{
+    sessionsCleanedUp: number;
+    tokensRevoked: number;
+  }> {
+    const now = new Date();
+
+    const expired = await this.sessionRepository.find({
+      where: {
+        expiresAt: LessThan(now),
+        revokedAt: IsNull(),
+        deletedAt: IsNull(),
+      },
+      select: ["id"],
+    });
+
+    if (expired.length === 0) {
+      return { sessionsCleanedUp: 0, tokensRevoked: 0 };
+    }
+
+    const ids = expired.map((s) => s.id);
+    let tokensRevoked = 0;
+
+    await this.sessionRepository.manager.transaction(async (manager) => {
+      await manager.softDelete(Session, ids);
+
+      const result = await manager.update(
+        OAuthRefreshToken,
+        { sessionId: In(ids), revokedAt: IsNull() },
+        {
+          revokedAt: now,
+          revokedReason: "session_expired_cleanup",
+        },
+      );
+      tokensRevoked = result.affected ?? 0;
+    });
+
+    this.logger.log("Expired session cleanup complete", {
+      sessionsCleanedUp: ids.length,
+      tokensRevoked,
+    });
+
+    return { sessionsCleanedUp: ids.length, tokensRevoked };
   }
 
   /**
