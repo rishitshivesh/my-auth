@@ -1920,6 +1920,134 @@
         ]
       }
     },
+    "/sessions/active": {
+      "get": {
+        "description": "List all active sessions/devices for the current user",
+        "operationId": "SessionController_getActiveSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of active sessions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get active sessions",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/analytics": {
+      "get": {
+        "operationId": "SessionController_getSessionAnalytics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get session analytics",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/{sessionId}": {
+      "delete": {
+        "description": "Logout from a specific device/session",
+        "operationId": "SessionController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revoke a session",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all/other": {
+      "delete": {
+        "description": "Revoke all sessions except the current one",
+        "operationId": "SessionController_revokeAllOtherSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all other devices",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all": {
+      "delete": {
+        "description": "Revoke all sessions including the current one",
+        "operationId": "SessionController_revokeAllSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all devices",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
     "/oauth/authorize": {
       "get": {
         "description": "Initiate OAuth2 authorization code flow. User must be logged in.",
@@ -3577,134 +3705,6 @@
         "summary": "Delete WebAuthn credential",
         "tags": [
           "MFA"
-        ]
-      }
-    },
-    "/sessions/active": {
-      "get": {
-        "description": "List all active sessions/devices for the current user",
-        "operationId": "SessionController_getActiveSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of active sessions"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Get active sessions",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/analytics": {
-      "get": {
-        "operationId": "SessionController_getSessionAnalytics",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Get session analytics",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/{sessionId}": {
-      "delete": {
-        "description": "Logout from a specific device/session",
-        "operationId": "SessionController_revokeSession",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Revoke a session",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/all/other": {
-      "delete": {
-        "description": "Revoke all sessions except the current one",
-        "operationId": "SessionController_revokeAllOtherSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Logout all other devices",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/all": {
-      "delete": {
-        "description": "Revoke all sessions including the current one",
-        "operationId": "SessionController_revokeAllSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Logout all devices",
-        "tags": [
-          "Sessions"
         ]
       }
     },
