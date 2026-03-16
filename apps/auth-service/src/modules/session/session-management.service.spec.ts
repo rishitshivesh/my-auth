@@ -90,3 +90,57 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
     expect(mockSessionRepo.manager.transaction).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test suite 2 — revokeSession logout hardening
+// ---------------------------------------------------------------------------
+
+import { SessionService } from "@/common/service/session.service";
+import { RedisService } from "@/common/service/redis.service";
+import { ConfigService } from "@nestjs/config";
+
+describe("SessionService.revokeSession() logout hardening", () => {
+  let sessionService: SessionService;
+
+  const mockSessionRepo = {
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+  };
+
+  const mockRedis = {
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockConfig = {
+    get: jest.fn().mockReturnValue(604800),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        SessionService,
+        { provide: getRepositoryToken(Session), useValue: mockSessionRepo },
+        { provide: RedisService, useValue: mockRedis },
+        { provide: ConfigService, useValue: mockConfig },
+      ],
+    }).compile();
+
+    sessionService = module.get(SessionService);
+  });
+
+  it("sets revokedAt, nulls refreshTokenHash, and deletes the Redis key", async () => {
+    await sessionService.revokeSession("tenant-1", "sess-1", "user_logout");
+
+    expect(mockSessionRepo.update).toHaveBeenCalledWith(
+      { id: "sess-1", tenantId: "tenant-1" },
+      expect.objectContaining({
+        revokedAt: expect.any(Date),
+        revokedReason: "user_logout",
+        refreshTokenHash: null,
+      }),
+    );
+
+    expect(mockRedis.delete).toHaveBeenCalledWith("tenant-1", "session", "sess-1");
+  });
+});

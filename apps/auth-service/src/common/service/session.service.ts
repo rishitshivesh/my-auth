@@ -181,6 +181,7 @@ export class SessionService {
       {
         revokedAt: new Date(),
         revokedReason: reason,
+        refreshTokenHash: null as unknown as string,
       },
     );
 
