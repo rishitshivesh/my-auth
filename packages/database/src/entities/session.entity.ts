@@ -133,4 +133,12 @@ export class Session extends BaseEntity {
     name: "revoked_reason",
   })
   revokedReason?: string;
+
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "application_id",
+    comment: "OAuth client that initiated this session (nullable)",
+  })
+  applicationId?: string;
 }
