@@ -10,11 +10,16 @@ export class AddSessionApplicationId1773620000000 implements MigrationInterface 
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "sessions"
-      ADD CONSTRAINT "FK_sessions_application_id"
-      FOREIGN KEY ("application_id")
-      REFERENCES "oauth_clients"("id")
-      ON DELETE SET NULL
+      DO $$
+      BEGIN
+        ALTER TABLE "sessions"
+        ADD CONSTRAINT "FK_sessions_application_id"
+        FOREIGN KEY ("application_id")
+        REFERENCES "oauth_clients"("id")
+        ON DELETE SET NULL;
+      EXCEPTION WHEN duplicate_object THEN
+        NULL;
+      END $$
     `);
 
     await queryRunner.query(`
