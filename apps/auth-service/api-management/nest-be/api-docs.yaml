@@ -1665,6 +1665,65 @@
         ]
       }
     },
+    "/auth/magic-link/send": {
+      "post": {
+        "operationId": "AuthController_sendMagicLink",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMagicLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Magic link sent (or silently ignored if user not found)"
+          }
+        },
+        "summary": "Send magic link sign-in email",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/magic-link/verify": {
+      "post": {
+        "operationId": "AuthController_verifyMagicLink",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyMagicLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful"
+          }
+        },
+        "summary": "Verify magic link token",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/auth/login-intent": {
       "post": {
         "description": "\n      Check what authentication methods are available for a given email address.\n      This is the first step in the email-first login flow.\n      \n      Returns:\n      - Whether the user exists\n      - Available authentication methods (password, magic link, passkey, social)\n      - Whether MFA is required\n      - Preferred authentication method\n      - Tenant branding information\n      \n      Use this to dynamically show the appropriate login options to the user.\n    ",
@@ -3671,6 +3730,82 @@
           "Dashboard"
         ]
       }
+    },
+    "/dashboard/tenant-settings": {
+      "get": {
+        "operationId": "DashboardController_getTenantSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get tenant login method settings",
+        "tags": [
+          "Dashboard"
+        ]
+      },
+      "patch": {
+        "operationId": "DashboardController_updateTenantSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Update tenant feature flags for login methods",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/tenant-settings/social/{provider}": {
+      "patch": {
+        "operationId": "DashboardController_updateSocialProvider",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Enable/disable and configure a social provider for this tenant",
+        "tags": [
+          "Dashboard"
+        ]
+      }
     }
   },
   "info": {
@@ -3960,6 +4095,30 @@
         "required": [
           "otp",
           "password"
+        ]
+      },
+      "SendMagicLinkDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "VerifyMagicLinkDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Raw magic link token from email URL"
+          }
+        },
+        "required": [
+          "token"
         ]
       },
       "LoginIntentRequestDto": {

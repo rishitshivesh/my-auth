@@ -176,6 +176,7 @@ export class FortKnoxClient {
     }
 
     const accessToken =
+      response.data?.data?.data?.accessToken ||
       response.data?.data?.accessToken ||
       response.data?.accessToken;
     if (!accessToken) {
@@ -275,6 +276,7 @@ export class FortKnoxClient {
     }
 
     const accessToken =
+      response.data?.data?.data?.accessToken ||
       response.data?.data?.accessToken ||
       response.data?.accessToken;
     if (!accessToken) {
@@ -360,7 +362,10 @@ export class FortKnoxClient {
     if (!response.ok) throw this.createError(response);
     const data = response.data?.data || response.data;
     if (!data?.credentialId) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No credentialId in registration response");
+      throw new AuthErrorClass(
+        "UNKNOWN_ERROR",
+        "No credentialId in registration response",
+      );
     }
     return data as { credentialId: string };
   }
