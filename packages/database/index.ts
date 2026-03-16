@@ -40,6 +40,9 @@ export { Tenant } from "./src/entities/tenant.entity";
 export { User } from "./src/entities/user.entity";
 export { Session } from "./src/entities/session.entity";
 export { MfaSettings } from "./src/entities/mfa-settings.entity";
-export { SecurityEvent } from "./src/entities/security-event.entity";
+export {
+  SecurityEvent,
+  SecurityEventType,
+} from "./src/entities/security-event.entity";
 export { Role } from "./src/entities/role.entity";
 export { Permission } from "./src/entities/permission.entity";

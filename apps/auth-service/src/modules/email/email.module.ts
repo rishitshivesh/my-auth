@@ -8,19 +8,22 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
-import { SecurityEvent, Tenant } from "@repo/database";
+import { Tenant } from "@repo/database";
 import { EmailService } from "./email.service";
 import { EmailController } from "./email.controller";
 import { NodeMailerProvider } from "./providers/nodemailer.provider";
 import { SESProvider } from "./providers/ses.provider";
+import { SecurityEventModule } from "@/common/service/security-event.module";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([SecurityEvent, Tenant]),
+    TypeOrmModule.forFeature([Tenant]),
+    SecurityEventModule,
   ],
   controllers: [EmailController],
-  providers: [EmailService, NodeMailerProvider, SESProvider],
+  providers: [EmailService, SecurityEventService, NodeMailerProvider, SESProvider],
   exports: [EmailService],
 })
 export class EmailModule {}

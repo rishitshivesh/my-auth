@@ -3,7 +3,6 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   User,
   Session,
-  SecurityEvent,
   UserRole,
   Role,
   RolePermission,
@@ -15,6 +14,8 @@ import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 import { RoleService } from "@/modules/rbac/services/role.service";
 import { PermissionService } from "@/modules/rbac/services/permission.service";
+import { SecurityEventModule } from "@/common/service/security-event.module";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 /**
  * User Module
@@ -31,16 +32,16 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     TypeOrmModule.forFeature([
       User,
       Session,
-      SecurityEvent,
       UserRole,
       Role,
       RolePermission,
       UserRole,
       Permission,
     ]),
+    SecurityEventModule,
   ],
   controllers: [UserController],
-  providers: [UserService, RbacService, RoleService, PermissionService],
+  providers: [UserService, SecurityEventService, RbacService, RoleService, PermissionService],
   exports: [UserService],
 })
 export class UserModule {}

@@ -8,7 +8,8 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { MfaSettings, User } from "@repo/database";
+import { MfaSettings, User, SecurityEventType } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import * as speakeasy from "speakeasy";
 import * as QRCode from "qrcode";
 import * as crypto from "crypto";
@@ -30,6 +31,7 @@ export class MfaService {
     private mfaRepository: Repository<MfaSettings>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   // ============================================================
@@ -140,6 +142,15 @@ export class MfaService {
 
     console.log(`✅ TOTP MFA enabled for user ${userId}`);
 
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.TOTP_ENABLED,
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
+
     return { backupCodes };
   }
 
@@ -198,6 +209,15 @@ export class MfaService {
     await this.mfaRepository.save(mfaSettings);
 
     console.log(`✅ TOTP MFA disabled for user ${userId}`);
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.TOTP_DISABLED,
+      severity: "warning",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+    });
   }
 
   // ============================================================

@@ -12,11 +12,14 @@ import { ConfigService } from "@nestjs/config";
 import {
   User,
   Session,
-  SecurityEvent,
   Tenant,
   OAuthRefreshToken,
   UserSocialConnection,
+  SecurityEventType,
 } from "@repo/database";
+import {
+  SecurityEventService,
+} from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
@@ -45,8 +48,6 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
-    @InjectRepository(SecurityEvent)
-    private readonly securityEventRepository: Repository<SecurityEvent>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(OAuthRefreshToken)
@@ -62,6 +63,7 @@ export class AuthService {
     private readonly mfaService: MfaService,
     private readonly webauthnService: WebAuthnService,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   /**
@@ -106,9 +108,9 @@ export class AuthService {
 
     if (existingUser) {
       // Log failed registration attempt (tenant-scoped)
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         tenantId: data.tenantId,
-        eventType: "REGISTRATION_FAILED",
+        eventType: SecurityEventType.REGISTRATION_FAILED,
         severity: "warning",
         ipAddress: data.ip,
         userAgent: data.userAgent,
@@ -140,10 +142,11 @@ export class AuthService {
     const savedUser = await this.userRepository.save(user);
 
     // Log successful registration (tenant-scoped)
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId: savedUser.id,
       tenantId: savedUser.tenantId,
-      eventType: "USER_CREATED",
+      actorEmail: savedUser.email,
+      eventType: SecurityEventType.USER_REGISTERED,
       severity: "info",
       ipAddress: data.ip,
       userAgent: data.userAgent,
@@ -198,13 +201,13 @@ export class AuthService {
     console.log("🔍 Login attempt:", { email, tenantId, userFound: !!user }); // ← ADD
 
     if (!user) {
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         tenantId,
-        eventType: "login_failed",
+        eventType: SecurityEventType.LOGIN_FAILED,
         severity: "critical",
         ipAddress: ip,
         userAgent,
-        metadata: { email, reason: "user_not_found" },
+        metadata: { reason: "user_not_found" },
       });
       throw new UnauthorizedException("Invalid email or password");
     }
@@ -230,14 +233,17 @@ export class AuthService {
 
     if (!isValid) {
       await this.bruteForceService.recordFailedAttempt(user, tenantId, ip);
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         tenantId,
         userId: user.id,
-        eventType: "login_failed",
+        actorEmail: user.email,
+        eventType: SecurityEventType.LOGIN_FAILED,
         severity: "critical",
         ipAddress: ip,
         userAgent,
-        metadata: { email, reason: "invalid_password", password },
+        // NOTE: `password` is intentionally omitted — sanitizeMetadata strips it
+        // anyway, but we never pass sensitive values in the first place.
+        metadata: { reason: "invalid_password" },
       });
       throw new UnauthorizedException("Invalid email or password");
     }
@@ -280,10 +286,11 @@ export class AuthService {
       console.log(`🔐 MFA required for user ${user.email}`);
 
       // Log MFA challenge
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         tenantId,
         userId: user.id,
-        eventType: "mfa_challenge_sent",
+        actorEmail: user.email,
+        eventType: SecurityEventType.MFA_CHALLENGE_SENT,
         severity: "info",
         ipAddress: ip,
         userAgent,
@@ -344,13 +351,16 @@ export class AuthService {
     console.log("✅ Access token generated");
 
     // Step 4: Log successful login
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId: data.tenantId,
       userId: user.id,
-      eventType: "login_success",
+      actorEmail: user.email,
+      eventType: SecurityEventType.LOGIN_SUCCESS,
       severity: "info",
       ipAddress: data.ip,
       userAgent: data.userAgent,
+      resourceId: session.id,
+      resourceType: "session",
       metadata: {
         sessionId: session.id,
         authMethod: "password",
@@ -396,13 +406,15 @@ export class AuthService {
     );
 
     // Log logout
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId,
       userId,
       userAgent,
-      eventType: "logout",
+      eventType: SecurityEventType.LOGOUT,
       severity: "info",
       ipAddress: ip,
+      resourceId: sessionId,
+      resourceType: "session",
       metadata: { sessionId },
     });
   }
@@ -436,10 +448,11 @@ export class AuthService {
     );
 
     // Log password reset request
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId: user.id,
       tenantId: user.tenantId,
-      eventType: "PASSWORD_RESET_REQUESTED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.PASSWORD_RESET_REQUESTED,
       severity: "info",
       ipAddress: ip,
       userAgent: "system",
@@ -528,13 +541,16 @@ export class AuthService {
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId,
       userId: user.id,
-      eventType: "login_success",
+      actorEmail: user.email,
+      eventType: SecurityEventType.LOGIN_SUCCESS,
       severity: "info",
       ipAddress: ip,
       userAgent,
+      resourceId: session.id,
+      resourceType: "session",
       metadata: { authMethod: "magic_link", sessionId: session.id },
     });
 
@@ -601,10 +617,11 @@ export class AuthService {
     );
 
     // Log password reset
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId: user.id,
       tenantId: user.tenantId,
-      eventType: "PASSWORD_RESET_COMPLETED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.PASSWORD_RESET_COMPLETED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -652,10 +669,11 @@ export class AuthService {
       },
     );
 
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId: user.id,
       tenantId: user.tenantId,
-      eventType: "EMAIL_VERIFIED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.EMAIL_VERIFIED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -709,13 +727,30 @@ export class AuthService {
     userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     // Use OAuthRefreshTokenService for rotation
-    const { accessTokenPayload, newToken } =
-      await this.oauthRefreshTokenService.rotateRefreshToken({
+    let accessTokenPayload: any;
+    let newToken: string;
+
+    try {
+      ({ accessTokenPayload, newToken } =
+        await this.oauthRefreshTokenService.rotateRefreshToken({
+          tenantId,
+          token: refreshToken,
+          ipAddress: ip,
+          userAgent,
+        }));
+    } catch (err: unknown) {
+      this.securityEventService.log({
         tenantId,
-        token: refreshToken,
+        eventType: SecurityEventType.TOKEN_ROTATION_FAILED,
+        severity: "warning",
         ipAddress: ip,
         userAgent,
+        metadata: {
+          reason: err instanceof Error ? err.message : "unknown",
+        },
       });
+      throw err;
+    }
 
     // Generate new access token
     const accessToken = this.jwtService.sign(accessTokenPayload, {
@@ -724,13 +759,15 @@ export class AuthService {
     });
 
     // Log token refresh
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId,
       userId: accessTokenPayload.sub,
-      eventType: "token_refreshed",
+      eventType: SecurityEventType.TOKEN_REFRESHED,
       severity: "info",
       ipAddress: ip,
       userAgent,
+      resourceId: accessTokenPayload.sessionId,
+      resourceType: "session",
       metadata: {
         sessionId: accessTokenPayload.sessionId,
       },
@@ -1066,14 +1103,15 @@ export class AuthService {
     );
 
     if (!verified) {
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         tenantId,
         userId: user.id,
-        eventType: "login_failed",
+        actorEmail: user.email,
+        eventType: SecurityEventType.PASSKEY_AUTH_FAILED,
         severity: "warning",
         ipAddress: ip,
         userAgent,
-        metadata: { email, reason: "webauthn_verification_failed" },
+        metadata: { reason: "webauthn_verification_failed" },
       });
 
       throw new UnauthorizedException("WebAuthn verification failed");
@@ -1110,14 +1148,17 @@ export class AuthService {
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
-    // Log successful login
-    await this.logSecurityEvent({
+    // Log successful passkey login
+    this.securityEventService.log({
       tenantId,
       userId: user.id,
-      eventType: "login_success",
+      actorEmail: user.email,
+      eventType: SecurityEventType.PASSKEY_AUTH_SUCCESS,
       severity: "info",
       ipAddress: ip,
       userAgent,
+      resourceId: session.id,
+      resourceType: "session",
       metadata: { sessionId: session.id, authMethod: "webauthn" },
     });
 
@@ -1336,27 +1377,5 @@ export class AuthService {
     return false;
   }
 
-  /**
-   * Log security event (TENANT SCOPED) - PRIVATE METHOD
-   */
-  private async logSecurityEvent(data: {
-    userId?: string;
-    tenantId: string; // ← Now REQUIRED!
-    eventType: string;
-    severity: "info" | "warning" | "critical";
-    ipAddress: string;
-    ip?: string;
-    userAgent: string;
-    metadata?: Record<string, any>;
-  }) {
-    await this.securityEventRepository.save({
-      tenantId: data.tenantId, // ← Always set tenant
-      userId: data.userId,
-      eventType: data.eventType,
-      severity: data.severity,
-      ipAddress: data.ipAddress || data.ip,
-      userAgent: data.userAgent,
-      metadata: data.metadata || {},
-    });
-  }
 }
+

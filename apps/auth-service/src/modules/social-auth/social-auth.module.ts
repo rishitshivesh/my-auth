@@ -7,7 +7,6 @@ import {
   UserSocialConnection,
   TenantSocialProvider,
   SocialLinkRequest,
-  SecurityEvent,
   Session,
   OAuthRefreshToken,
 } from "@repo/database";
@@ -19,6 +18,8 @@ import { MicrosoftStrategy } from "./strategies/microsoft.strategy";
 import { TokenEncryptionService } from "@/modules/auth/oauth-token-encryption.service";
 import { SessionService } from "@/common/service/session.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { SecurityEventModule } from "@/common/service/security-event.module";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 @Module({
   imports: [
@@ -27,10 +28,10 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
       UserSocialConnection,
       TenantSocialProvider,
       SocialLinkRequest,
-      SecurityEvent,
       Session,
       OAuthRefreshToken,
     ]),
+    SecurityEventModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -43,6 +44,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
   controllers: [SocialAuthController],
   providers: [
     SocialAuthService,
+    SecurityEventService,
     GoogleStrategy,
     GitHubStrategy,
     MicrosoftStrategy,

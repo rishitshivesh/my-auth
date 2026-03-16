@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
-import { User } from "@repo/database";
+import { User, SecurityEventType } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 @Injectable()
 export class BruteForceService {
@@ -12,6 +13,7 @@ export class BruteForceService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   /**
@@ -61,6 +63,25 @@ export class BruteForceService {
       `❌ Failed login attempt ${user.failedLoginAttempts}/${this.MAX_ATTEMPTS} for ${user.email}`,
     );
 
+    // Emit brute-force threshold event when approaching the lockout limit
+    // (fires one attempt before the final lock so analysts see the build-up)
+    if (user.failedLoginAttempts === this.MAX_ATTEMPTS - 1) {
+      this.securityEventService.log({
+        userId: user.id,
+        tenantId,
+        actorEmail: user.email,
+        eventType: SecurityEventType.BRUTE_FORCE_THRESHOLD,
+        severity: "warning",
+        ipAddress: ipAddress ?? "0.0.0.0",
+        userAgent: "system",
+        metadata: {
+          attempts: user.failedLoginAttempts,
+          maxAttempts: this.MAX_ATTEMPTS,
+          attemptsUntilLock: 1,
+        },
+      });
+    }
+
     // Lock account after max attempts
     if (user.failedLoginAttempts >= this.MAX_ATTEMPTS) {
       user.lockedUntil = new Date(Date.now() + this.LOCKOUT_DURATION);
@@ -69,6 +90,20 @@ export class BruteForceService {
       console.log(
         `🔒 Account locked for user ${user.email} until ${user.lockedUntil}`,
       );
+
+      this.securityEventService.log({
+        userId: user.id,
+        tenantId,
+        actorEmail: user.email,
+        eventType: SecurityEventType.USER_LOCKED,
+        severity: "critical",
+        ipAddress: ipAddress ?? "0.0.0.0",
+        userAgent: "system",
+        metadata: {
+          attempts: user.failedLoginAttempts,
+          lockedUntil: user.lockedUntil,
+        },
+      });
 
       // TODO: Send email notification about account lock
       // await this.emailService.sendAccountLockedEmail(user);
