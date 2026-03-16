@@ -358,7 +358,7 @@ export class SessionManagementService {
         revokedAt: IsNull(),
         deletedAt: IsNull(),
       },
-      select: ["id"],
+      select: { id: true },
     });
 
     if (expired.length === 0) {

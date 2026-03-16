@@ -1,6 +1,7 @@
 // apps/auth-service/src/modules/session/session-management.service.spec.ts
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
+import { In } from "typeorm";
 import { Session, OAuthRefreshToken } from "@repo/database";
 import { SessionManagementService } from "./session-management.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
@@ -72,9 +73,10 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
     expect(mockManager.softDelete).toHaveBeenCalledWith(Session, ["sess-expired-pending"]);
     expect(mockManager.update).toHaveBeenCalledWith(
       OAuthRefreshToken,
-      expect.objectContaining({ sessionId: expect.anything() }),
+      expect.objectContaining({ sessionId: In(["sess-expired-pending"]) }),
       expect.objectContaining({ revokedReason: "session_expired_cleanup" }),
     );
+    expect(result.tokensRevoked).toBe(2);
   });
 
   it("returns zeros and skips the transaction when no sessions are expired", async () => {
