@@ -4,6 +4,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { SessionManagementService } from "@/modules/session/session-management.service";
 
 /**
  * TokenCleanupService
@@ -20,6 +21,7 @@ export class TokenCleanupService {
 
   constructor(
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    private readonly sessionManagementService: SessionManagementService,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
   ) {}
@@ -120,6 +122,34 @@ export class TokenCleanupService {
       }
     } catch (error: any) {
       this.logger.error("❌ Hourly token cleanup failed", {
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * 15-minute session cleanup
+   *
+   * Soft-deletes expired sessions and revokes their refresh tokens.
+   */
+  @Cron("*/15 * * * *", {
+    name: "session-cleanup-15m",
+    timeZone: "UTC",
+  })
+  async fifteenMinuteSessionCleanup() {
+    this.logger.debug("🧹 Starting 15-minute session cleanup...");
+
+    try {
+      const { sessionsCleanedUp, tokensRevoked } =
+        await this.sessionManagementService.cleanupExpiredSessions();
+
+      if (sessionsCleanedUp > 0) {
+        this.logger.log(
+          `15m session cleanup: removed ${sessionsCleanedUp} sessions, revoked ${tokensRevoked} tokens`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.error("❌ 15-minute session cleanup failed", {
         error: error.message,
       });
     }

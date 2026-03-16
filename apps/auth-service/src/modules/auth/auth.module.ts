@@ -31,6 +31,7 @@ import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
+import { SessionModule } from "@/modules/session/session.module";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
     UserModule,
     EmailModule,
     GuardsModule,
+    SessionModule,
     ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
