@@ -6,20 +6,22 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Input, Label, Alert, AlertDescription, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@repo/ui"
 import { Key, CheckCircle2 } from "lucide-react"
+import { useAuth } from "@fortknox/sdk"
 
 interface PasskeyRegisterModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onRegister?: (passkey: any) => void
+  onSuccess?: () => void
   primaryColor?: string
 }
 
 export function PasskeyRegisterModal({
   open,
   onOpenChange,
-  onRegister,
+  onSuccess,
   primaryColor = "#6366f1",
 }: PasskeyRegisterModalProps) {
+  const { client } = useAuth()
   const [step, setStep] = useState<"name" | "register" | "success">("name")
   const [deviceName, setDeviceName] = useState("")
   const [loading, setLoading] = useState(false)
@@ -28,7 +30,6 @@ export function PasskeyRegisterModal({
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (deviceName.trim()) {
-      setStep("register")
       handleRegister()
     }
   }
@@ -36,28 +37,49 @@ export function PasskeyRegisterModal({
   const handleRegister = async () => {
     setLoading(true)
     setError(null)
+    setStep("register")
 
     try {
       if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys are not supported on this device")
+        throw new Object({ name: "NotSupportedError", message: "Your browser does not support passkeys" })
       }
 
-      // Mock WebAuthn registration
-      const mockPasskey = {
-        id: Math.random().toString(36),
-        name: deviceName,
-        created: new Date().toLocaleDateString(),
-        lastUsed: null,
-        device: "iPhone 14 Pro",
+      // Step 1: Get registration options from server
+      const options = await client.startPasskeyRegistration()
+
+      // Step 2: Invoke the browser's native credential API
+      let registrationResponse: any
+      try {
+        const { startRegistration } = await import("@simplewebauthn/browser")
+        registrationResponse = await startRegistration({ optionsJSON: options })
+      } catch (browserErr: any) {
+        if (browserErr?.name === "NotAllowedError") {
+          setError("Registration cancelled")
+          setStep("name")
+          return
+        }
+        if (
+          browserErr?.name === "NotSupportedError" ||
+          browserErr?.name === "SecurityError"
+        ) {
+          setError("Your browser does not support passkeys")
+          setStep("name")
+          return
+        }
+        throw browserErr
       }
 
-      // Simulate delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Step 3: Finish registration on server
+      await client.finishPasskeyRegistration(
+        registrationResponse,
+        deviceName.trim() || undefined,
+      )
 
       setStep("success")
 
-      if (onRegister) {
-        await onRegister(mockPasskey)
+      // Step 4: Notify parent and close
+      if (onSuccess) {
+        onSuccess()
       }
 
       setTimeout(() => {
@@ -65,16 +87,25 @@ export function PasskeyRegisterModal({
         setStep("name")
         setDeviceName("")
       }, 2000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to register passkey")
+    } catch (err: any) {
+      setError(err?.message || "Failed to register passkey")
       setStep("name")
     } finally {
       setLoading(false)
     }
   }
 
+  const handleClose = () => {
+    if (!loading) {
+      onOpenChange(false)
+      setStep("name")
+      setDeviceName("")
+      setError(null)
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <AnimatePresence mode="wait">
           {step === "name" && (
@@ -101,7 +132,6 @@ export function PasskeyRegisterModal({
                     placeholder="e.g., iPhone 14 Pro, MacBook Pro"
                     value={deviceName}
                     onChange={(e) => setDeviceName(e.target.value)}
-                    required
                     autoFocus
                   />
                 </div>
@@ -116,13 +146,13 @@ export function PasskeyRegisterModal({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => onOpenChange(false)}
+                    onClick={handleClose}
                     className="flex-1"
                     disabled={loading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={!deviceName.trim()}>
+                  <Button type="submit" className="flex-1" disabled={loading}>
                     Continue
                   </Button>
                 </div>
@@ -150,7 +180,7 @@ export function PasskeyRegisterModal({
               </div>
               <div className="text-center space-y-2">
                 <p className="font-medium">Complete passkey registration</p>
-                <p className="text-sm text-muted-foreground">Use your device's face/fingerprint or PIN to confirm</p>
+                <p className="text-sm text-muted-foreground">Use your device&apos;s face/fingerprint or PIN to confirm</p>
               </div>
             </motion.div>
           )}

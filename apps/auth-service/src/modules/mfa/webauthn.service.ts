@@ -4,8 +4,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { MfaSettings, User } from "@repo/database";
+import { Repository, DataSource } from "typeorm";
+import { MfaSettings, User, WebAuthnCredential } from "@repo/database";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -20,21 +20,13 @@ import type {
 } from "@simplewebauthn/server";
 import { ConfigService } from "@nestjs/config";
 import { type AuthenticatorTransportFuture } from "@simplewebauthn/server";
+import { RedisService } from "@/common/service/redis.service";
 
-// Store challenges temporarily (use Redis in production!)
-interface ChallengeEntry {
-  challenge: string;
-  expiresAt: Date;
-}
-
-const encoder = new TextEncoder();
+const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
+const CHALLENGE_RESOURCE = "webauthn_challenge";
 
 @Injectable()
 export class WebAuthnService {
-  // In-memory store for challenges (replace with Redis!)
-  private challenges = new Map<string, ChallengeEntry>();
-
-  // WebAuthn configuration
   private readonly rpName = "Fort Knox";
   private readonly rpID: string;
   private readonly origin: string;
@@ -44,22 +36,64 @@ export class WebAuthnService {
     private mfaRepository: Repository<MfaSettings>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(WebAuthnCredential)
+    private credentialRepository: Repository<WebAuthnCredential>,
     private configService: ConfigService,
+    private redisService: RedisService,
+    private dataSource: DataSource,
   ) {
-    // Get from environment
     this.rpID = this.configService.get("WEBAUTHN_RP_ID") || "localhost";
     this.origin =
       this.configService.get("WEBAUTHN_ORIGIN") || "http://localhost:3000";
-
-    // Cleanup expired challenges every 5 minutes
-    setInterval(() => this.cleanupExpiredChallenges(), 5 * 60 * 1000);
   }
+
+  // ── Challenge helpers ──────────────────────────────────────────────────────
+
+  private challengeIdentifier(userId: string, type: "register" | "authenticate"): string {
+    return `${userId}:${type}`;
+  }
+
+  private async storeChallenge(
+    tenantId: string,
+    userId: string,
+    type: "register" | "authenticate",
+    challenge: string,
+  ): Promise<void> {
+    await this.redisService.set(
+      tenantId,
+      CHALLENGE_RESOURCE,
+      this.challengeIdentifier(userId, type),
+      challenge,
+      CHALLENGE_TTL_SECONDS,
+    );
+  }
+
+  /**
+   * Retrieve and immediately delete the challenge (single-use guarantee).
+   * Returns null if not found (expired or never set).
+   */
+  private async consumeChallenge(
+    tenantId: string,
+    userId: string,
+    type: "register" | "authenticate",
+  ): Promise<string | null> {
+    const identifier = this.challengeIdentifier(userId, type);
+    const challenge = await this.redisService.get<string>(
+      tenantId,
+      CHALLENGE_RESOURCE,
+      identifier,
+    );
+    // Always delete — even when null, this is a no-op in Redis
+    await this.redisService.delete(tenantId, CHALLENGE_RESOURCE, identifier);
+    return challenge;
+  }
+
+  // ── Registration ───────────────────────────────────────────────────────────
 
   /**
    * Start WebAuthn registration (generate options)
    */
   async startRegistration(userId: string, tenantId: string): Promise<any> {
-    // Get user
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
@@ -68,54 +102,41 @@ export class WebAuthnService {
       throw new NotFoundException("User not found");
     }
 
-    // Get or create MFA settings
+    // Ensure mfa_settings row exists
     let mfaSettings = await this.mfaRepository.findOne({
       where: { userId, tenantId },
     });
 
     if (!mfaSettings) {
-      mfaSettings = this.mfaRepository.create({
-        userId,
-        tenantId,
-        webauthnCredentials: [],
-      });
+      mfaSettings = this.mfaRepository.create({ userId, tenantId });
       await this.mfaRepository.save(mfaSettings);
     }
 
-    // Get existing credentials (to exclude them)
-    const existingCredentials = mfaSettings.webauthnCredentials.map((cred) => ({
-      id: cred.id,
-      type: "public-key" as const,
-    }));
+    // Fetch existing credentials to exclude from registration
+    const existingCredentials = await this.credentialRepository.find({
+      where: { userId, tenantId },
+      select: ["credentialId"],
+    });
 
-    // Generate registration options
     const options = await generateRegistrationOptions({
       rpName: this.rpName,
       rpID: this.rpID,
-      userID: encoder.encode(userId),
+      userID: Buffer.from(userId),
       userName: user.email,
       userDisplayName: `${user.firstName} ${user.lastName}`,
-
-      // Don't prompt for password
       attestationType: "none",
-
-      // Exclude existing credentials
-      excludeCredentials: existingCredentials,
-
-      // Authenticator selection
+      excludeCredentials: existingCredentials.map((c) => ({
+        id: c.credentialId,
+        type: "public-key" as const,
+      })),
       authenticatorSelection: {
         residentKey: "preferred",
         userVerification: "preferred",
-        authenticatorAttachment: "platform", // Prefer platform authenticators (Face ID, Touch ID)
+        authenticatorAttachment: "platform",
       },
     });
 
-    // Store challenge (expires in 5 minutes)
-    const key = `${userId}:${tenantId}:register`;
-    this.challenges.set(key, {
-      challenge: options.challenge,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    });
+    await this.storeChallenge(tenantId, userId, "register", options.challenge);
 
     console.log("🔐 WebAuthn registration started for", user.email);
 
@@ -131,26 +152,21 @@ export class WebAuthnService {
     response: RegistrationResponseJSON,
     deviceName?: string,
   ): Promise<{ credentialId: string }> {
-    // Get stored challenge
-    const key = `${userId}:${tenantId}:register`;
-    const challengeEntry = this.challenges.get(key);
+    const challenge = await this.consumeChallenge(tenantId, userId, "register");
 
-    if (!challengeEntry) {
-      throw new BadRequestException("No registration in progress");
+    if (!challenge) {
+      throw new BadRequestException({
+        message: "Registration challenge expired or not found",
+        error: "WEBAUTHN_CHALLENGE_EXPIRED",
+      });
     }
 
-    if (challengeEntry.expiresAt < new Date()) {
-      this.challenges.delete(key);
-      throw new BadRequestException("Registration challenge expired");
-    }
-
-    // Verify registration response
     let verification: VerifiedRegistrationResponse;
 
     try {
       verification = await verifyRegistrationResponse({
         response,
-        expectedChallenge: challengeEntry.challenge,
+        expectedChallenge: challenge,
         expectedOrigin: this.origin,
         expectedRPID: this.rpID,
       });
@@ -163,80 +179,57 @@ export class WebAuthnService {
       throw new BadRequestException("Registration verification failed");
     }
 
-    // Delete used challenge
-    this.challenges.delete(key);
-
-    // Get MFA settings
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId },
-    });
-
-    if (!mfaSettings) {
-      throw new NotFoundException("MFA settings not found");
-    }
-
-    // Store credential
     const { credential } = verification.registrationInfo;
+    const { publicKey, id: credentialID, counter } = credential;
 
-    const {
-      publicKey: credentialPublicKey,
-      id: credentialID,
-      counter,
-    } = credential;
-
-    const newCredential = {
-      id: Buffer.from(credentialID).toString("base64url"),
-      publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
+    const newCredential = this.credentialRepository.create({
+      userId,
+      tenantId,
+      credentialId: credentialID,
+      publicKey: Buffer.from(publicKey),
       counter,
       deviceName: deviceName || "Unnamed Device",
-      createdAt: new Date(),
+      transports: (response.response.transports as string[]) || [],
       lastUsedAt: new Date(),
-      transports: response.response.transports || [],
-    };
+    });
 
-    mfaSettings.webauthnCredentials.push(newCredential);
-    mfaSettings.webauthnEnabled = true;
+    await this.credentialRepository.save(newCredential);
 
-    await this.mfaRepository.save(mfaSettings);
+    // Mark webauthn as enabled on mfa_settings
+    await this.mfaRepository.update({ userId, tenantId }, { webauthnEnabled: true });
 
-    console.log("✅ WebAuthn credential registered:", newCredential.id);
+    console.log("✅ WebAuthn credential registered:", credentialID);
 
-    return { credentialId: newCredential.id };
+    return { credentialId: credentialID };
   }
+
+  // ── Authentication ─────────────────────────────────────────────────────────
 
   /**
    * Start WebAuthn authentication (generate options)
    */
   async startAuthentication(userId: string, tenantId: string): Promise<any> {
-    // Get MFA settings
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId, webauthnEnabled: true },
+    const credentials = await this.credentialRepository.find({
+      where: { userId, tenantId },
     });
 
-    if (!mfaSettings || mfaSettings.webauthnCredentials.length === 0) {
+    if (credentials.length === 0) {
       throw new BadRequestException("WebAuthn not enabled for this user");
     }
 
-    // Get user's credentials
-    const allowCredentials = mfaSettings.webauthnCredentials.map((cred) => ({
-      id: cred.id,
+    const allowCredentials = credentials.map((cred) => ({
+      id: cred.credentialId,
       type: "public-key" as const,
       transports: cred.transports as AuthenticatorTransportFuture[] | undefined,
     }));
 
-    // Generate authentication options
     const options = await generateAuthenticationOptions({
       rpID: this.rpID,
       allowCredentials,
       userVerification: "preferred",
     });
 
-    // Store challenge (expires in 5 minutes)
-    const key = `${userId}:${tenantId}:authenticate`;
-    this.challenges.set(key, {
-      challenge: options.challenge,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    });
+    await this.storeChallenge(tenantId, userId, "authenticate", options.challenge);
 
     console.log("🔐 WebAuthn authentication started for user:", userId);
 
@@ -251,52 +244,36 @@ export class WebAuthnService {
     tenantId: string,
     response: AuthenticationResponseJSON,
   ): Promise<boolean> {
-    // Get stored challenge
-    const key = `${userId}:${tenantId}:authenticate`;
-    const challengeEntry = this.challenges.get(key);
+    const challenge = await this.consumeChallenge(tenantId, userId, "authenticate");
 
-    if (!challengeEntry) {
-      throw new BadRequestException("No authentication in progress");
+    if (!challenge) {
+      throw new BadRequestException({
+        message: "Authentication challenge expired or not found",
+        error: "WEBAUTHN_CHALLENGE_EXPIRED",
+      });
     }
 
-    if (challengeEntry.expiresAt < new Date()) {
-      this.challenges.delete(key);
-      throw new BadRequestException("Authentication challenge expired");
-    }
+    const credentialId = response.rawId ?? response.id;
 
-    // Get MFA settings
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId, webauthnEnabled: true },
+    const credential = await this.credentialRepository.findOne({
+      where: { userId, tenantId, credentialId },
     });
-
-    if (!mfaSettings) {
-      throw new BadRequestException("WebAuthn not enabled");
-    }
-
-    // Find the credential
-    const credentialId = Buffer.from(response.rawId, "base64url").toString(
-      "base64url",
-    );
-    const credential = mfaSettings.webauthnCredentials.find(
-      (cred) => cred.id === credentialId,
-    );
 
     if (!credential) {
       throw new BadRequestException("Credential not found");
     }
 
-    // Verify authentication response
     let verification: VerifiedAuthenticationResponse;
 
     try {
       verification = await verifyAuthenticationResponse({
         response,
-        expectedChallenge: challengeEntry.challenge,
+        expectedChallenge: challenge,
         expectedOrigin: this.origin,
         expectedRPID: this.rpID,
         credential: {
-          id: credential.id,
-          publicKey: Buffer.from(credential.publicKey, "base64url"),
+          id: credential.credentialId,
+          publicKey: credential.publicKey,
           counter: credential.counter,
         },
       });
@@ -309,19 +286,37 @@ export class WebAuthnService {
       throw new BadRequestException("Authentication verification failed");
     }
 
-    // Delete used challenge
-    this.challenges.delete(key);
+    const newCounter = verification.authenticationInfo.newCounter;
+    const oldCounter = credential.counter;
 
-    // Update credential counter and last used
-    credential.counter = verification.authenticationInfo.newCounter;
-    credential.lastUsedAt = new Date();
+    // Atomic counter update — prevents replay attacks
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .update(WebAuthnCredential)
+      .set({ counter: newCounter, lastUsedAt: new Date() })
+      .where("id = :id AND counter = :oldCounter", {
+        id: credential.id,
+        oldCounter,
+      })
+      .execute();
 
-    await this.mfaRepository.save(mfaSettings);
+    if (!result.affected || result.affected === 0) {
+      console.error(
+        "❌ WebAuthn counter rollback detected for credential:",
+        credential.credentialId,
+      );
+      throw new BadRequestException({
+        message: "Counter rollback detected — possible replay attack",
+        error: "WEBAUTHN_REPLAY_DETECTED",
+      });
+    }
 
-    console.log("✅ WebAuthn authentication verified:", credential.id);
+    console.log("✅ WebAuthn authentication verified:", credential.credentialId);
 
     return true;
   }
+
+  // ── Credential Management ─────────────────────────────────────────────────
 
   /**
    * List user's WebAuthn credentials
@@ -338,16 +333,13 @@ export class WebAuthnService {
       transports: string[];
     }>
   > {
-    const mfaSettings = await this.mfaRepository.findOne({
+    const credentials = await this.credentialRepository.find({
       where: { userId, tenantId },
+      order: { createdAt: "ASC" },
     });
 
-    if (!mfaSettings) {
-      return [];
-    }
-
-    return mfaSettings.webauthnCredentials.map((cred) => ({
-      id: cred.id,
+    return credentials.map((cred) => ({
+      id: cred.credentialId,
       deviceName: cred.deviceName || "Unnamed Device",
       createdAt: cred.createdAt,
       lastUsedAt: cred.lastUsedAt,
@@ -363,45 +355,28 @@ export class WebAuthnService {
     tenantId: string,
     credentialId: string,
   ): Promise<void> {
-    const mfaSettings = await this.mfaRepository.findOne({
+    const credential = await this.credentialRepository.findOne({
+      where: { userId, tenantId, credentialId },
+    });
+
+    if (!credential) {
+      throw new NotFoundException("Credential not found");
+    }
+
+    await this.credentialRepository.remove(credential);
+
+    // Disable webauthn flag if no credentials remain
+    const remaining = await this.credentialRepository.count({
       where: { userId, tenantId },
     });
 
-    if (!mfaSettings) {
-      throw new NotFoundException("MFA settings not found");
+    if (remaining === 0) {
+      await this.mfaRepository.update(
+        { userId, tenantId },
+        { webauthnEnabled: false },
+      );
     }
-
-    // Remove credential
-    mfaSettings.webauthnCredentials = mfaSettings.webauthnCredentials.filter(
-      (cred) => cred.id !== credentialId,
-    );
-
-    // Disable WebAuthn if no credentials left
-    if (mfaSettings.webauthnCredentials.length === 0) {
-      mfaSettings.webauthnEnabled = false;
-    }
-
-    await this.mfaRepository.save(mfaSettings);
 
     console.log("🗑️ WebAuthn credential deleted:", credentialId);
-  }
-
-  /**
-   * Cleanup expired challenges
-   */
-  private cleanupExpiredChallenges(): void {
-    const now = new Date();
-    let cleaned = 0;
-
-    for (const [key, entry] of this.challenges.entries()) {
-      if (entry.expiresAt < now) {
-        this.challenges.delete(key);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} expired WebAuthn challenges`);
-    }
   }
 }

@@ -14,6 +14,7 @@ export * from "./src/entities/session.entity";
 
 // Security
 export * from "./src/entities/mfa-settings.entity";
+export * from "./src/entities/webauthn-credential.entity";
 export * from "./src/entities/security-event.entity";
 
 // RBAC
