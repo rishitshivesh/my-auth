@@ -6,6 +6,7 @@ import {
   Session,
   Tenant,
   User,
+  WebAuthnCredential,
 } from "@repo/database";
 import { MfaController } from "./mfa.controller";
 import { MfaService } from "./mfa.service";
@@ -15,6 +16,7 @@ import { UserService } from "@/modules/user/user.service";
 import { EmailModule } from "@/modules/email/email.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { RedisService } from "@/common/service/redis.service";
 
 /**
  * MFA Module
@@ -23,7 +25,7 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
  * - TOTP (Google Authenticator, Authy, etc.)
  * - Backup codes
  * - MFA status management
- * - Future: SMS, Email, WebAuthn
+ * - WebAuthn / Passkeys
  */
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
       SecurityEvent,
       Tenant,
       Session,
+      WebAuthnCredential,
     ]),
     EmailModule,
     UserModule,
@@ -44,6 +47,7 @@ import { WebAuthnService } from "@/modules/mfa/webauthn.service";
     EmailService,
     UserService,
     WebAuthnService,
+    RedisService,
   ],
   exports: [MfaService], // Export for use in AuthService
 })

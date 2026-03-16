@@ -487,9 +487,9 @@ export class FortKnoxClient {
 
       this.log("Session restored successfully");
     } catch (error) {
-      // No valid refresh cookie - that's OK
-      console.error(error);
-      this.log("No valid session to restore");
+      // No valid refresh cookie — this is expected on first load or after magic-link
+      // landing before a session has been established. Do not surface to console.
+      this.log("No valid session to restore", error);
     }
   }
 

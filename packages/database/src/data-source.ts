@@ -7,6 +7,7 @@ import { Tenant } from "./entities/tenant.entity";
 import { User } from "./entities/user.entity";
 import { Session } from "./entities/session.entity";
 import { MfaSettings } from "./entities/mfa-settings.entity";
+import { WebAuthnCredential } from "./entities/webauthn-credential.entity";
 import { SecurityEvent } from "./entities/security-event.entity";
 import { Role } from "./entities/role.entity";
 import { Permission } from "./entities/permission.entity";
@@ -44,6 +45,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Tenant,
     Session,
     MfaSettings,
+    WebAuthnCredential,
     SecurityEvent,
     Role,
     Permission,

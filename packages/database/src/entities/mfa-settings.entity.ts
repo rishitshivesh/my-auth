@@ -107,22 +107,6 @@ export class MfaSettings extends BaseEntity {
   })
   webauthnEnabled!: boolean;
 
-  @Column({
-    type: "jsonb",
-    default: [],
-    name: "webauthn_credentials",
-    comment: "Registered WebAuthn/FIDO2 credentials",
-  })
-  webauthnCredentials!: Array<{
-    id: string;
-    publicKey: string;
-    counter: number;
-    deviceName?: string;
-    transports?: string[];
-    lastUsedAt: Date;
-    createdAt: Date;
-  }>;
-
   // Backup Codes
   @Column({
     type: "jsonb",
