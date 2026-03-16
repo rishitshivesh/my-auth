@@ -150,7 +150,6 @@ describe("SessionService.revokeSession() logout hardening", () => {
 // ---------------------------------------------------------------------------
 
 import { UnauthorizedException } from "@nestjs/common";
-import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 
 describe("OAuthRefreshTokenService — double-use of refresh token is rejected", () => {
   let refreshSvc: OAuthRefreshTokenService;
