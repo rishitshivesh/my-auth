@@ -144,3 +144,73 @@ describe("SessionService.revokeSession() logout hardening", () => {
     expect(mockRedis.delete).toHaveBeenCalledWith("tenant-1", "session", "sess-1");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test suite 3 — refresh token double-use rejection
+// ---------------------------------------------------------------------------
+
+import { UnauthorizedException } from "@nestjs/common";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+
+describe("OAuthRefreshTokenService — double-use of refresh token is rejected", () => {
+  let refreshSvc: OAuthRefreshTokenService;
+
+  const usedToken = {
+    id: "token-1",
+    tokenHash: "doesnotmatter",
+    familyId: "family-1",
+    tenantId: "tenant-1",
+    userId: "user-1",
+    sessionId: "sess-1",
+    clientId: null,
+    scope: null,
+    usedAt: new Date(Date.now() - 5000), // already marked as used
+    revokedAt: undefined,
+    expiresAt: new Date(Date.now() + 86400000),
+    session: { revokedAt: undefined },
+    user: { email: "user@example.com" },
+  };
+
+  const mockTokenRepo = {
+    findOne: jest.fn().mockResolvedValue(usedToken),
+    save: jest.fn(),
+    update: jest.fn().mockResolvedValue({ affected: 2 }),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockTokenRepo.findOne.mockResolvedValue(usedToken);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OAuthRefreshTokenService,
+        { provide: getRepositoryToken(OAuthRefreshToken), useValue: mockTokenRepo },
+      ],
+    }).compile();
+
+    refreshSvc = module.get(OAuthRefreshTokenService);
+  });
+
+  it("throws UnauthorizedException when the same token is used twice", async () => {
+    await expect(
+      refreshSvc.rotateRefreshToken({
+        tenantId: "tenant-1",
+        token: "any-raw-token",
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it("revokes the entire token family when reuse is detected", async () => {
+    await expect(
+      refreshSvc.rotateRefreshToken({
+        tenantId: "tenant-1",
+        token: "any-raw-token",
+      }),
+    ).rejects.toThrow();
+
+    expect(mockTokenRepo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ familyId: "family-1" }),
+      expect.objectContaining({ revokedReason: "family_revoked_reuse_detection" }),
+    );
+  });
+});
