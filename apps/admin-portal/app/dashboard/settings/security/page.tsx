@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Shield, Key, Smartphone, Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@repo/ui";
 import { startRegistration } from "@simplewebauthn/browser";
+import type { RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { useMfaStatus, useListPasskeys, useDeletePasskey } from "@/lib/queries";
 import { useAuth } from "@fortknox/sdk";
 import type { PasskeyCredential } from "@/lib/types";
@@ -17,9 +18,10 @@ export default function SecuritySettingsPage() {
   const { client } = useAuth();
 
   const [addingPasskey, setAddingPasskey] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState("");
   const [showNameModal, setShowNameModal] = useState(false);
-  const [pendingRegistration, setPendingRegistration] = useState<any>(null);
+  const [pendingRegistration, setPendingRegistration] = useState<RegistrationResponseJSON | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -69,10 +71,13 @@ export default function SecuritySettingsPage() {
 
   const handleDeletePasskey = async (credentialId: string) => {
     try {
+      setDeletingId(credentialId);
       await deletePasskey.mutateAsync(credentialId);
       flash("Passkey removed");
     } catch (err: any) {
       flash(err?.message || "Failed to delete passkey", true);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -195,7 +200,7 @@ export default function SecuritySettingsPage() {
                 </div>
                 <button
                   onClick={() => handleDeletePasskey(pk.id)}
-                  disabled={deletePasskey.isPending}
+                  disabled={deletingId === pk.id}
                   className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
                   aria-label={`Delete passkey ${pk.deviceName || pk.id}`}
                 >
@@ -246,6 +251,7 @@ export default function SecuritySettingsPage() {
                 onClick={() => {
                   setShowNameModal(false);
                   setPendingRegistration(null);
+                  setDeviceName("");
                 }}
               >
                 Cancel
