@@ -26,7 +26,9 @@ export class HardenSecurityEventAudit1735500000000
         ADD COLUMN IF NOT EXISTS resource_type  VARCHAR(50);
     `);
 
-    console.log("  ✅ Added actor_email, application_id, resource_id, resource_type");
+    console.log(
+      "  ✅ Added actor_email, application_id, resource_id, resource_type",
+    );
 
     // ── 2. Change tenant_id FK: CASCADE → SET NULL ────────────────────────
     //
@@ -35,8 +37,7 @@ export class HardenSecurityEventAudit1735500000000
     //  b) Drop it.
     //  c) Recreate it with ON DELETE SET NULL.
 
-    const fkRows: Array<{ constraint_name: string }> =
-      await queryRunner.query(`
+    const fkRows: Array<{ constraint_name: string }> = await queryRunner.query(`
         SELECT tc.constraint_name
         FROM   information_schema.table_constraints    tc
         JOIN   information_schema.key_column_usage     kcu
@@ -51,7 +52,7 @@ export class HardenSecurityEventAudit1735500000000
       `);
 
     if (fkRows.length > 0) {
-      const fkName = fkRows[0].constraint_name;
+      const fkName = fkRows[0]?.constraint_name;
       console.log(`  ⚙️  Dropping existing tenant_id FK: ${fkName}`);
       await queryRunner.query(
         `ALTER TABLE security_events DROP CONSTRAINT "${fkName}";`,

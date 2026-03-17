@@ -11,29 +11,29 @@
  */
 
 // Shared types — re-exported so consumers only need @fortknox/sdk
-export * from '@fortknox/types';
+// export * from '@fortknox/types';
 
 // Core exports
-export { FortKnoxClient, AuthError } from './core';
+export { FortKnoxClient, AuthError } from "./core";
 export type {
   FortKnoxConfig,
   LoginCredentials,
   LoginResponse,
   AuthEvent,
   AuthEventListener,
-} from './core';
+} from "./core";
 
 // Convenience re-exports from web
-export { 
+export {
   createWebClient,
   getTenantFromSubdomain,
   getSocialLoginUrl,
   redirectToSocialLogin,
-} from './web';
+} from "./web";
 
-export * from './core/client';
-export * from './core/types';
-export * from './web/index';
-export * from './react/index';
-export * from './next/index';
-export * from './node/index';
+export * from "./core/client";
+export * from "./core/types";
+export * from "./web/index";
+export * from "./react/index";
+export * from "./next/index";
+export * from "./node/index";

@@ -1590,6 +1590,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@fortknox/sdk@workspace:packages/fortknox-sdk"
   dependencies:
+    "@fortknox/types": "npm:*"
     "@types/node": "npm:^20.11.5"
     "@types/react": "npm:^18.2.48"
     "@types/react-dom": "npm:^18.2.18"
@@ -1608,6 +1609,14 @@ __metadata:
       optional: true
     react-dom:
       optional: true
+  languageName: unknown
+  linkType: soft
+
+"@fortknox/types@npm:*, @fortknox/types@workspace:packages/fortknox-types":
+  version: 0.0.0-use.local
+  resolution: "@fortknox/types@workspace:packages/fortknox-types"
+  dependencies:
+    typescript: "npm:^5.3.3"
   languageName: unknown
   linkType: soft
 
