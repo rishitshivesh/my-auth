@@ -12,6 +12,7 @@ import {
   UserRole,
   UserSocialConnection,
   TenantSocialProvider,
+  SecurityEvent,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -47,6 +48,7 @@ import { SessionModule } from "@/modules/session/session.module";
       UserRole,
       UserSocialConnection,
       TenantSocialProvider,
+      SecurityEvent,
     ]),
     SecurityEventModule,
     UserModule,

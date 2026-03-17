@@ -526,8 +526,8 @@ export class SocialAuthService {
       userId: linkRequest.userId,
       eventType: SecurityEventType.SOCIAL_ACCOUNT_LINKED,
       severity: "info",
-      ipAddress: linkRequest.ipAddress,
-      userAgent: linkRequest.userAgent,
+      ipAddress: linkRequest.ipAddress ?? "",
+      userAgent: linkRequest.userAgent ?? "",
       metadata: {
         provider: linkRequest.provider,
       },

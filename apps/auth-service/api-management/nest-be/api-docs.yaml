@@ -159,7 +159,7 @@
           "TenantBranding"
         ]
       },
-      "patch": {
+      "put": {
         "operationId": "TenantBrandingController_updateBranding",
         "parameters": [],
         "requestBody": {
@@ -190,12 +190,12 @@
         ]
       }
     },
-    "/tenants/current/branding/reset": {
-      "patch": {
-        "operationId": "TenantBrandingController_resetBranding",
+    "/tenants/current/branding/logo": {
+      "post": {
+        "operationId": "TenantBrandingController_uploadLogo",
         "parameters": [],
         "responses": {
-          "200": {
+          "201": {
             "description": ""
           }
         },
@@ -212,37 +212,32 @@
         ]
       }
     },
+    "/tenants/{slug}/branding/public": {
+      "get": {
+        "operationId": "PublicBrandingController_getBrandingPublic",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PublicBranding"
+        ]
+      }
+    },
     "/stats/system": {
       "get": {
         "operationId": "StatsController_getSystemStats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Stats"
-        ]
-      }
-    },
-    "/stats/throughput": {
-      "get": {
-        "operationId": "StatsController_getThroughput",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Stats"
-        ]
-      }
-    },
-    "/stats/increment": {
-      "get": {
-        "operationId": "StatsController_incrementRequestCount",
         "parameters": [],
         "responses": {
           "200": {
@@ -3775,6 +3770,116 @@
         ]
       }
     },
+    "/dashboard/tenant-metrics": {
+      "get": {
+        "operationId": "DashboardController_getTenantMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get aggregate metrics for this tenant",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/tenant-activity": {
+      "get": {
+        "operationId": "DashboardController_getTenantActivity",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get recent security events for this tenant",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/api-call-trend": {
+      "get": {
+        "operationId": "DashboardController_getApiCallTrend",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get daily API call counts for this tenant",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/dashboard/auth-breakdown": {
+      "get": {
+        "operationId": "DashboardController_getAuthBreakdown",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get authentication method breakdown for this tenant",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/dashboard/tenant-settings/social/{provider}": {
       "patch": {
         "operationId": "DashboardController_updateSocialProvider",
@@ -3836,66 +3941,52 @@
       "TenantBrandingDto": {
         "type": "object",
         "properties": {
+          "primaryColor": {
+            "type": "string",
+            "description": "Primary brand color in hex format",
+            "example": "#6366f1",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
           "logoUrl": {
             "type": "string",
             "description": "URL to the company logo image",
             "example": "https://cdn.example.com/logo.png"
           },
-          "faviconUrl": {
+          "fontFamily": {
             "type": "string",
-            "description": "URL to the favicon image",
-            "example": "https://cdn.example.com/favicon.ico"
+            "description": "Font family (must be from the approved list)",
+            "example": "Inter",
+            "enum": [
+              "Inter",
+              "Roboto",
+              "Open Sans",
+              "Lato",
+              "Poppins",
+              "Montserrat",
+              "Nunito",
+              "Source Sans Pro",
+              "Raleway",
+              "Ubuntu",
+              "system-ui"
+            ]
           },
-          "primaryColor": {
+          "headerWeight": {
             "type": "string",
-            "description": "Primary brand color in hex format",
-            "example": "#0066FF",
-            "pattern": "^#[0-9A-Fa-f]{6}$"
+            "description": "Header font weight",
+            "enum": [
+              "regular",
+              "bold"
+            ],
+            "example": "bold"
           },
-          "backgroundColor": {
+          "backgroundStyle": {
             "type": "string",
-            "description": "Background color in hex format",
-            "example": "#FFFFFF",
-            "pattern": "^#[0-9A-Fa-f]{6}$"
-          },
-          "textColor": {
-            "type": "string",
-            "description": "Text color in hex format",
-            "example": "#000000",
-            "pattern": "^#[0-9A-Fa-f]{6}$"
-          },
-          "buttonColor": {
-            "type": "string",
-            "description": "Button background color in hex format",
-            "example": "#0066FF",
-            "pattern": "^#[0-9A-Fa-f]{6}$"
-          },
-          "buttonTextColor": {
-            "type": "string",
-            "description": "Button text color in hex format",
-            "example": "#FFFFFF",
-            "pattern": "^#[0-9A-Fa-f]{6}$"
-          },
-          "companyName": {
-            "type": "string",
-            "description": "Company display name",
-            "example": "Acme Corporation",
-            "maxLength": 255
-          },
-          "supportEmail": {
-            "type": "string",
-            "description": "Support email address",
-            "example": "support@acme.com"
-          },
-          "privacyPolicyUrl": {
-            "type": "string",
-            "description": "URL to privacy policy page",
-            "example": "https://acme.com/privacy"
-          },
-          "termsOfServiceUrl": {
-            "type": "string",
-            "description": "URL to terms of service page",
-            "example": "https://acme.com/terms"
+            "description": "Background style for the login page",
+            "enum": [
+              "solid",
+              "gradient"
+            ],
+            "example": "solid"
           }
         }
       },

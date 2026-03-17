@@ -7,6 +7,7 @@ import {
   Role,
   RolePermission,
   Permission,
+  SecurityEvent,
 } from "@repo/database";
 import { UserController } from "./user.controller";
 import { UserService } from "./user.service";
@@ -37,11 +38,18 @@ import { SecurityEventService } from "@/common/service/security-event.service";
       RolePermission,
       UserRole,
       Permission,
+      SecurityEvent,
     ]),
     SecurityEventModule,
   ],
   controllers: [UserController],
-  providers: [UserService, SecurityEventService, RbacService, RoleService, PermissionService],
+  providers: [
+    UserService,
+    SecurityEventService,
+    RbacService,
+    RoleService,
+    PermissionService,
+  ],
   exports: [UserService],
 })
 export class UserModule {}

@@ -6,7 +6,12 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
-import { User, Session, SecurityEventType } from "@repo/database";
+import {
+  User,
+  Session,
+  SecurityEventType,
+  SecurityEvent,
+} from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 
@@ -26,6 +31,8 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
     private readonly securityEventService: SecurityEventService,
   ) {}
 
@@ -737,9 +744,7 @@ export class UserService {
 
     return csv;
   }
-
 }
-
 
 /**
  * Pagination options for listing users

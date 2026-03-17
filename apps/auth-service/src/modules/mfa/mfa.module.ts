@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   MfaSettings,
+  SecurityEvent,
   Session,
   Tenant,
   User,
@@ -36,6 +37,7 @@ import { SecurityEventService } from "@/common/service/security-event.service";
       Tenant,
       Session,
       WebAuthnCredential,
+      SecurityEvent,
     ]),
     SecurityEventModule,
     EmailModule,

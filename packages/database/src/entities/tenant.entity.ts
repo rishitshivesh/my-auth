@@ -4,7 +4,7 @@ import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { TenantSocialProvider } from "./tenant-social-providers.entity";
 
-export interface TenantBranding {
+export interface TenantBrandingConfig {
   logoUrl?: string;          // Company logo URL
   faviconUrl?: string;        // Favicon URL
   primaryColor?: string;      // #0066FF
@@ -73,7 +73,7 @@ export class Tenant extends BaseEntity {
     type: 'jsonb',
     nullable: true,
   })
-  branding?: TenantBranding;
+  branding?: TenantBrandingConfig;
 
   @Column({
     type: "boolean",

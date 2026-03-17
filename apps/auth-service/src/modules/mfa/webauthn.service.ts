@@ -287,7 +287,7 @@ export class WebAuthnService {
         expectedRPID: this.rpID,
         credential: {
           id: credential.credentialId,
-          publicKey: credential.publicKey,
+          publicKey: new Uint8Array(credential.publicKey),
           counter: credential.counter,
         },
       });
