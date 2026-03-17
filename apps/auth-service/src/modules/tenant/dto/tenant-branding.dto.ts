@@ -1,7 +1,5 @@
 /**
  * Tenant Branding DTOs
- * 
- * Data transfer objects with Swagger documentation
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -10,18 +8,28 @@ import {
   IsString,
   IsUrl,
   IsEmail,
+  IsIn,
   Matches,
   MaxLength,
 } from 'class-validator';
+import { FONT_FAMILY_ALLOWLIST } from '@repo/database';
 
-/**
- * Tenant Branding DTO
- */
 export class TenantBrandingDto {
+  @ApiPropertyOptional({
+    description: 'Primary brand color in hex format',
+    example: '#6366f1',
+    pattern: '^#[0-9A-Fa-f]{6}$',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^#[0-9A-Fa-f]{6}$/, {
+    message: 'primaryColor must be a valid 6-digit hex color (e.g., #6366f1)',
+  })
+  primaryColor?: string;
+
   @ApiPropertyOptional({
     description: 'URL to the company logo image',
     example: 'https://cdn.example.com/logo.png',
-    type: String,
   })
   @IsOptional()
   @IsUrl({}, { message: 'logoUrl must be a valid URL' })
@@ -29,179 +37,58 @@ export class TenantBrandingDto {
   logoUrl?: string;
 
   @ApiPropertyOptional({
-    description: 'URL to the favicon image',
-    example: 'https://cdn.example.com/favicon.ico',
-    type: String,
-  })
-  @IsOptional()
-  @IsUrl({}, { message: 'faviconUrl must be a valid URL' })
-  @MaxLength(500)
-  faviconUrl?: string;
-
-  @ApiPropertyOptional({
-    description: 'Primary brand color in hex format',
-    example: '#0066FF',
-    pattern: '^#[0-9A-Fa-f]{6}$',
+    description: 'Font family (must be from the approved list)',
+    example: 'Inter',
+    enum: FONT_FAMILY_ALLOWLIST,
   })
   @IsOptional()
   @IsString()
-  @Matches(/^#[0-9A-Fa-f]{6}$/, {
-    message: 'primaryColor must be a valid hex color (e.g., #0066FF)',
+  @IsIn([...FONT_FAMILY_ALLOWLIST], {
+    message: `fontFamily must be one of: ${FONT_FAMILY_ALLOWLIST.join(', ')}`,
   })
-  primaryColor?: string;
+  fontFamily?: string;
 
   @ApiPropertyOptional({
-    description: 'Background color in hex format',
-    example: '#FFFFFF',
-    pattern: '^#[0-9A-Fa-f]{6}$',
+    description: 'Header font weight',
+    enum: ['regular', 'bold'],
+    example: 'bold',
   })
   @IsOptional()
-  @IsString()
-  @Matches(/^#[0-9A-Fa-f]{6}$/, {
-    message: 'backgroundColor must be a valid hex color',
+  @IsIn(['regular', 'bold'], {
+    message: 'headerWeight must be "regular" or "bold"',
   })
-  backgroundColor?: string;
+  headerWeight?: 'regular' | 'bold';
 
   @ApiPropertyOptional({
-    description: 'Text color in hex format',
-    example: '#000000',
-    pattern: '^#[0-9A-Fa-f]{6}$',
+    description: 'Background style for the login page',
+    enum: ['solid', 'gradient'],
+    example: 'solid',
   })
   @IsOptional()
-  @IsString()
-  @Matches(/^#[0-9A-Fa-f]{6}$/, {
-    message: 'textColor must be a valid hex color',
+  @IsIn(['solid', 'gradient'], {
+    message: 'backgroundStyle must be "solid" or "gradient"',
   })
-  textColor?: string;
-
-  @ApiPropertyOptional({
-    description: 'Button background color in hex format',
-    example: '#0066FF',
-    pattern: '^#[0-9A-Fa-f]{6}$',
-  })
-  @IsOptional()
-  @IsString()
-  @Matches(/^#[0-9A-Fa-f]{6}$/, {
-    message: 'buttonColor must be a valid hex color',
-  })
-  buttonColor?: string;
-
-  @ApiPropertyOptional({
-    description: 'Button text color in hex format',
-    example: '#FFFFFF',
-    pattern: '^#[0-9A-Fa-f]{6}$',
-  })
-  @IsOptional()
-  @IsString()
-  @Matches(/^#[0-9A-Fa-f]{6}$/, {
-    message: 'buttonTextColor must be a valid hex color',
-  })
-  buttonTextColor?: string;
-
-  @ApiPropertyOptional({
-    description: 'Company display name',
-    example: 'Acme Corporation',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  companyName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Support email address',
-    example: 'support@acme.com',
-  })
-  @IsOptional()
-  @IsEmail({}, { message: 'supportEmail must be a valid email address' })
-  supportEmail?: string;
-
-  @ApiPropertyOptional({
-    description: 'URL to privacy policy page',
-    example: 'https://acme.com/privacy',
-  })
-  @IsOptional()
-  @IsUrl({}, { message: 'privacyPolicyUrl must be a valid URL' })
-  @MaxLength(500)
-  privacyPolicyUrl?: string;
-
-  @ApiPropertyOptional({
-    description: 'URL to terms of service page',
-    example: 'https://acme.com/terms',
-  })
-  @IsOptional()
-  @IsUrl({}, { message: 'termsOfServiceUrl must be a valid URL' })
-  @MaxLength(500)
-  termsOfServiceUrl?: string;
+  backgroundStyle?: 'solid' | 'gradient';
 }
 
-/**
- * Branding Response
- */
 export class BrandingResponse {
-  @ApiPropertyOptional({
-    description: 'URL to the company logo image',
-    example: 'https://cdn.example.com/logo.png',
-  })
+  @ApiProperty({ description: 'Primary brand color', example: '#6366f1' })
+  primaryColor!: string;
+
+  @ApiPropertyOptional({ description: 'Logo URL', example: 'https://cdn.example.com/logo.png' })
   logoUrl?: string;
 
-  @ApiPropertyOptional({
-    description: 'URL to the favicon image',
-    example: 'https://cdn.example.com/favicon.ico',
-  })
-  faviconUrl?: string;
+  @ApiProperty({ description: 'Font family', example: 'Inter' })
+  fontFamily!: string;
 
-  @ApiProperty({
-    description: 'Primary brand color in hex format',
-    example: '#0066FF',
-  })
-  primaryColor: string;
+  @ApiProperty({ description: 'Header weight', example: 'bold', enum: ['regular', 'bold'] })
+  headerWeight!: 'regular' | 'bold';
 
-  @ApiProperty({
-    description: 'Background color in hex format',
-    example: '#FFFFFF',
-  })
-  backgroundColor: string;
+  @ApiProperty({ description: 'Background style', example: 'solid', enum: ['solid', 'gradient'] })
+  backgroundStyle!: 'solid' | 'gradient';
+}
 
-  @ApiProperty({
-    description: 'Text color in hex format',
-    example: '#000000',
-  })
-  textColor: string;
-
-  @ApiProperty({
-    description: 'Button background color in hex format',
-    example: '#0066FF',
-  })
-  buttonColor: string;
-
-  @ApiProperty({
-    description: 'Button text color in hex format',
-    example: '#FFFFFF',
-  })
-  buttonTextColor: string;
-
-  @ApiPropertyOptional({
-    description: 'Company display name',
-    example: 'Acme Corporation',
-  })
-  companyName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Support email address',
-    example: 'support@acme.com',
-  })
-  supportEmail?: string;
-
-  @ApiPropertyOptional({
-    description: 'URL to privacy policy page',
-    example: 'https://acme.com/privacy',
-  })
-  privacyPolicyUrl?: string;
-
-  @ApiPropertyOptional({
-    description: 'URL to terms of service page',
-    example: 'https://acme.com/terms',
-  })
-  termsOfServiceUrl?: string;
+export class LogoUploadResponse {
+  @ApiProperty({ description: 'Public URL of the uploaded logo' })
+  logoUrl!: string;
 }

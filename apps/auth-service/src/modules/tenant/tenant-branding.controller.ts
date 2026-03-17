@@ -1,160 +1,153 @@
-
 /**
  * Tenant Branding Controller
- * 
- * Manage tenant branding settings
+ *
+ * GET  /tenants/current/branding        – return branding (or defaults)
+ * PUT  /tenants/current/branding        – upsert branding, write audit event
+ * POST /tenants/current/branding/logo   – upload logo (multipart/form-data)
  */
 
 import {
   Controller,
   Get,
-  Patch,
+  Put,
+  Post,
   Body,
+  Param,
   Req,
-  UseGuards,
   BadRequestException,
+  UnsupportedMediaTypeException,
+  PayloadTooLargeException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { TenantService } from './tenant.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { TenantBrandingService } from './tenant-branding.service';
 import { Protected } from '@/common/decorators/protected.decorator';
-import { BrandingResponse, TenantBrandingDto } from './dto/tenant-branding.dto';
+import {
+  BrandingResponse,
+  LogoUploadResponse,
+  TenantBrandingDto,
+} from './dto/tenant-branding.dto';
+import { SecurityEventService } from '@/common/service/security-event.service';
+import { SecurityEventType } from '@repo/database';
+
+const LOGO_MAX_BYTES = 500 * 1024; // 500 KB
+const ALLOWED_MIME = new Set(['image/png', 'image/svg+xml', 'image/jpeg']);
 
 @Controller('tenants/current/branding')
 @Protected()
 export class TenantBrandingController {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(
+    private readonly brandingService: TenantBrandingService,
+    private readonly securityEvents: SecurityEventService,
+  ) {}
 
-  /**
-   * Get current tenant's branding
-   * GET /tenants/current/branding
-   */
+  /** GET /tenants/current/branding */
   @Get()
   async getBranding(@Req() req: any): Promise<BrandingResponse> {
-    const tenantId = req.tenantId!;
-
-    console.log('📋 Get branding:', { tenantId });
-
-    const tenant = await this.tenantService.getTenantById(tenantId);
-
-    if (!tenant) {
-      throw new BadRequestException('Tenant not found');
-    }
-
-    return tenant.branding as BrandingResponse || this.getDefaultBranding();
+    const tenantId: string = req.tenantId!;
+    return this.brandingService.getBranding(tenantId);
   }
 
-  /**
-   * Update current tenant's branding
-   * PATCH /tenants/current/branding
-   */
-  @Patch()
+  /** PUT /tenants/current/branding */
+  @Put()
   async updateBranding(
     @Req() req: any,
     @Body() dto: TenantBrandingDto,
   ): Promise<BrandingResponse> {
-    const tenantId = req.tenantId!;
-    const userId = req.user.sub; // From JWT
+    const tenantId: string = req.tenantId!;
+    const userId: string = req.user?.sub;
 
-    console.log('🎨 Update branding:', { tenantId, userId, updates: dto });
+    const result = await this.brandingService.upsertBranding(tenantId, dto);
 
-    // Validate color formats
-    this.validateBranding(dto);
-
-    // Update branding
-    const updatedTenant = await this.tenantService.updateBranding(
+    this.securityEvents.log({
       tenantId,
-      dto,
-    );
+      userId,
+      eventType: SecurityEventType.BRANDING_UPDATED,
+      severity: 'info',
+      ipAddress: req.ip ?? '0.0.0.0',
+      userAgent: req.headers['user-agent'] ?? 'unknown',
+      actorEmail: req.user?.email,
+      resourceId: tenantId,
+      resourceType: 'tenant_branding',
+      metadata: {
+        primaryColor: dto.primaryColor,
+        fontFamily: dto.fontFamily,
+        headerWeight: dto.headerWeight,
+        backgroundStyle: dto.backgroundStyle,
+      },
+    });
 
-    console.log('✅ Branding updated');
-
-    return updatedTenant.branding as BrandingResponse || this.getDefaultBranding();
+    return result;
   }
 
-  /**
-   * Reset branding to defaults
-   * DELETE /tenants/current/branding
-   */
-  @Patch('reset')
-  async resetBranding(@Req() req: any): Promise<BrandingResponse> {
-    const tenantId = req.tenantId!;
-
-    console.log('🔄 Reset branding:', { tenantId });
-
-    const defaultBranding = this.getDefaultBranding();
-
-    const updatedTenant = await this.tenantService.updateBranding(
-      tenantId,
-      defaultBranding,
-    );
-
-    console.log('✅ Branding reset to defaults');
-
-    return updatedTenant.branding as BrandingResponse || defaultBranding;
-  }
-
-  /**
-   * Validate branding data
-   */
-  private validateBranding(dto: TenantBrandingDto): void {
-    // Validate color formats (hex)
-    const colorFields = [
-      'primaryColor',
-      'backgroundColor',
-      'textColor',
-      'buttonColor',
-      'buttonTextColor',
-    ];
-
-    for (const field of colorFields) {
-      const value = dto[field as keyof TenantBrandingDto];
-      if (value && typeof value === 'string') {
-        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
-          throw new BadRequestException(
-            `${field} must be a valid hex color (e.g., #0066FF)`,
+  /** POST /tenants/current/branding/logo */
+  @Post('logo')
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      limits: { fileSize: LOGO_MAX_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (ALLOWED_MIME.has(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new UnsupportedMediaTypeException(
+              'Logo must be image/png, image/jpeg, or image/svg+xml',
+            ),
+            false,
           );
         }
-      }
+      },
+    }),
+  )
+  async uploadLogo(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ): Promise<LogoUploadResponse> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded. Use field name "logo".');
     }
 
-    // Validate URLs
-    const urlFields = ['logoUrl', 'faviconUrl', 'privacyPolicyUrl', 'termsOfServiceUrl'];
-
-    for (const field of urlFields) {
-      const value = dto[field as keyof TenantBrandingDto];
-      if (value && typeof value === 'string') {
-        try {
-          new URL(value);
-        } catch {
-          throw new BadRequestException(`${field} must be a valid URL`);
-        }
-      }
+    if (file.size > LOGO_MAX_BYTES) {
+      throw new PayloadTooLargeException('Logo must be 500 KB or smaller');
     }
 
-    // Validate email
-    if (dto.supportEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(dto.supportEmail)) {
-        throw new BadRequestException('supportEmail must be a valid email');
-      }
-    }
+    const tenantId: string = req.tenantId!;
+    const logoUrl = await this.brandingService.storeLogo(
+      tenantId,
+      file.buffer,
+      file.mimetype,
+    );
+
+    this.securityEvents.log({
+      tenantId,
+      userId: req.user?.sub,
+      eventType: SecurityEventType.BRANDING_UPDATED,
+      severity: 'info',
+      ipAddress: req.ip ?? '0.0.0.0',
+      userAgent: req.headers['user-agent'] ?? 'unknown',
+      actorEmail: req.user?.email,
+      resourceId: tenantId,
+      resourceType: 'tenant_branding',
+      metadata: { logoUploaded: true, mimeType: file.mimetype, sizeBytes: file.size },
+    });
+
+    return { logoUrl };
   }
+}
 
-  /**
-   * Get default branding
-   */
-  private getDefaultBranding(): BrandingResponse {
-    return {
-      logoUrl: undefined,
-      faviconUrl: undefined,
-      primaryColor: '#0066FF',
-      backgroundColor: '#FFFFFF',
-      textColor: '#000000',
-      buttonColor: '#0066FF',
-      buttonTextColor: '#FFFFFF',
-      companyName: undefined,
-      supportEmail: undefined,
-      privacyPolicyUrl: undefined,
-      termsOfServiceUrl: undefined,
-    };
+/**
+ * Public branding endpoint — no authentication required.
+ * Used by the hosted login page to fetch branding by tenant slug.
+ *
+ * GET /tenants/:slug/branding/public
+ */
+@Controller('tenants')
+export class PublicBrandingController {
+  constructor(private readonly brandingService: TenantBrandingService) {}
+
+  @Get(':slug/branding/public')
+  getBrandingPublic(@Param('slug') slug: string): Promise<BrandingResponse> {
+    return this.brandingService.getBrandingBySlug(slug);
   }
 }

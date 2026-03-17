@@ -21,6 +21,7 @@ import { UserRole } from "./entities/user-role.entity";
 import { SocialLinkRequest } from "./entities/social-link-request.entity";
 import { TenantSocialProvider } from "./entities/tenant-social-providers.entity";
 import { UserSocialConnection } from "./entities/user-social-connections.entity";
+import { TenantBranding } from "./entities/tenant-branding.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -60,6 +61,7 @@ export const dataSourceOptions: DataSourceOptions = {
     UserSocialConnection,
     UserRole,
     User,
+    TenantBranding,
   ],
 
   // Migrations
