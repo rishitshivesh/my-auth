@@ -1,10 +1,11 @@
-import { Controller, Get, Patch, Param, Body, Request } from "@nestjs/common";
+import { Controller, Get, Patch, Param, Body, Request, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { User, Session, Tenant, TenantSocialProvider } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { DashboardService } from "./dashboard.service";
 
 @ApiTags("Dashboard")
 @Controller("dashboard")
@@ -20,6 +21,7 @@ export class DashboardController {
     @InjectRepository(TenantSocialProvider)
     private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly mfaService: MfaService,
+    private readonly dashboardService: DashboardService,
   ) {}
 
   @Get()
@@ -95,6 +97,39 @@ export class DashboardController {
     );
 
     return { message: "Settings updated" };
+  }
+
+  @Get("tenant-metrics")
+  @ApiOperation({ summary: "Get aggregate metrics for this tenant" })
+  async getTenantMetrics(@Request() req: any) {
+    return this.dashboardService.getTenantMetrics(req.tenantId!);
+  }
+
+  @Get("tenant-activity")
+  @ApiOperation({ summary: "Get recent security events for this tenant" })
+  async getTenantActivity(
+    @Request() req: any,
+    @Query("limit") limitStr?: string,
+  ) {
+    const limit = limitStr ? Math.min(parseInt(limitStr, 10) || 20, 100) : 20;
+    return this.dashboardService.getTenantActivity(req.tenantId!, limit);
+  }
+
+  @Get("api-call-trend")
+  @ApiOperation({ summary: "Get daily API call counts for this tenant" })
+  async getApiCallTrend(
+    @Request() req: any,
+    @Query("days") daysStr?: string,
+  ) {
+    const raw = parseInt(daysStr ?? "7", 10);
+    const days = ([7, 14, 30].includes(raw) ? raw : 7) as 7 | 14 | 30;
+    return this.dashboardService.getApiCallTrend(req.tenantId!, days);
+  }
+
+  @Get("auth-breakdown")
+  @ApiOperation({ summary: "Get authentication method breakdown for this tenant" })
+  async getAuthBreakdown(@Request() req: any) {
+    return this.dashboardService.getAuthMethodBreakdown(req.tenantId!);
   }
 
   @Patch("tenant-settings/social/:provider")
