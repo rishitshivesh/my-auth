@@ -21,6 +21,12 @@ export function createAuthState(): AuthState {
   };
 }
 
+// Access token is intentionally stored in module memory only.
+// It is never written to localStorage, sessionStorage, or any
+// JS-accessible cookie. Loss of the token on page refresh is
+// intentional — the httpOnly refresh token cookie is used to
+// silently re-issue a new access token via getAccessToken().
+
 /**
  * Set access token and parse expiration
  */

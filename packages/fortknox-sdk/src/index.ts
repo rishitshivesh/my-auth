@@ -1,7 +1,7 @@
 /**
  * Fort Knox SDK - Main Entry Point
- * 
- * Convenience exports for common use cases
+ *
+ * Convenience exports for common use cases.
  * For specific environments, use the submodules:
  * - @fortknox/sdk/core  (pure logic)
  * - @fortknox/sdk/web   (browser)
@@ -10,12 +10,13 @@
  * - @fortknox/sdk/node  (server-to-server)
  */
 
+// Shared types — re-exported so consumers only need @fortknox/sdk
+export * from '@fortknox/types';
+
 // Core exports
 export { FortKnoxClient, AuthError } from './core';
 export type {
   FortKnoxConfig,
-  User,
-  Session,
   LoginCredentials,
   LoginResponse,
   AuthEvent,

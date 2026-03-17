@@ -539,9 +539,19 @@ export class FortKnoxClient {
   }
 
   /**
-   * Get current access token (or undefined)
+   * Get current access token, silently refreshing if expired.
+   *
+   * Serialized: concurrent calls while a refresh is in-flight all await the
+   * same this.state.refreshPromise rather than issuing duplicate requests.
    */
-  getAccessToken(): string | undefined {
+  async getAccessToken(): Promise<string | undefined> {
+    if (isTokenExpired(this.state, this.config.refreshMargin)) {
+      try {
+        await this.refresh();
+      } catch {
+        return undefined;
+      }
+    }
     return this.state.accessToken;
   }
 
