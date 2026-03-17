@@ -3,15 +3,17 @@ interface AuthHeroProps {
   subtitle?: string
   backgroundImage?: string
   primaryColor?: string
+  /** Pre-computed background value (gradient or solid color). Overrides primaryColor if set. */
+  background?: string
 }
 
-export function AuthHero({ title, subtitle, backgroundImage, primaryColor = "#6366f1" }: AuthHeroProps) {
+export function AuthHero({ title, subtitle, backgroundImage, primaryColor = "#6366f1", background }: AuthHeroProps) {
   return (
     <div
       className="hidden flex-col justify-between bg-cover bg-center p-8 lg:flex"
       style={{
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundColor: primaryColor,
+        background: background ?? primaryColor,
       }}
     >
       <div className="flex items-center gap-3">

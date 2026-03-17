@@ -101,3 +101,30 @@ export interface AuthBreakdown {
   apple: number;
   passkey: number;
 }
+
+export type HeaderWeight = "regular" | "bold";
+export type BackgroundStyle = "solid" | "gradient";
+
+export const FONT_FAMILY_OPTIONS = [
+  "Inter",
+  "Roboto",
+  "Open Sans",
+  "Lato",
+  "Poppins",
+  "Montserrat",
+  "Nunito",
+  "Source Sans Pro",
+  "Raleway",
+  "Ubuntu",
+  "system-ui",
+] as const;
+
+export type FontFamily = (typeof FONT_FAMILY_OPTIONS)[number];
+
+export interface BrandingConfig {
+  primaryColor: string;
+  logoUrl?: string;
+  fontFamily: string;
+  headerWeight: HeaderWeight;
+  backgroundStyle: BackgroundStyle;
+}

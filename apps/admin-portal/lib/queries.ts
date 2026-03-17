@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown } from "./types";
+import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig } from "./types";
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -210,5 +210,67 @@ export function useAuthBreakdown() {
       if (!res.ok) throw new Error("Failed to fetch auth breakdown");
       return res.data.data;
     },
+  });
+}
+
+// ── Tenant Branding ──────────────────────────────────────────
+
+export function useBranding() {
+  return useQuery<BrandingConfig>({
+    queryKey: ["tenant", "branding"],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl("/tenants/current/branding"),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch branding");
+      return res.data.data;
+    },
+  });
+}
+
+export function useUpdateBranding() {
+  const qc = useQueryClient();
+  return useMutation<BrandingConfig, Error, Partial<BrandingConfig>>({
+    mutationFn: async (body) => {
+      const res = await authClient.request({
+        url: apiUrl("/tenants/current/branding"),
+        method: "PUT",
+        body,
+      });
+      if (!res.ok) {
+        const msg =
+          res.data?.message ??
+          res.data?.error ??
+          "Failed to save branding";
+        throw new Error(Array.isArray(msg) ? msg.join("; ") : msg);
+      }
+      return res.data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
+  });
+}
+
+export function useUploadLogo() {
+  const qc = useQueryClient();
+  return useMutation<{ logoUrl: string }, Error, File>({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const res = await fetch(
+        `${authClient.getBaseURL()}/tenants/current/branding/logo`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.message ?? "Logo upload failed");
+      }
+      return json.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
   });
 }
