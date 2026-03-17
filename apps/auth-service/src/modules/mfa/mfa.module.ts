@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   MfaSettings,
-  SecurityEvent,
   Session,
   Tenant,
   User,
@@ -17,6 +16,8 @@ import { EmailModule } from "@/modules/email/email.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { RedisService } from "@/common/service/redis.service";
+import { SecurityEventModule } from "@/common/service/security-event.module";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 /**
  * MFA Module
@@ -32,17 +33,18 @@ import { RedisService } from "@/common/service/redis.service";
     TypeOrmModule.forFeature([
       MfaSettings,
       User,
-      SecurityEvent,
       Tenant,
       Session,
       WebAuthnCredential,
     ]),
+    SecurityEventModule,
     EmailModule,
     UserModule,
   ],
   controllers: [MfaController],
   providers: [
     MfaService,
+    SecurityEventService,
     EmailOtpService,
     EmailService,
     UserService,

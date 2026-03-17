@@ -6,7 +6,8 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
-import { User, Session, SecurityEvent } from "@repo/database";
+import { User, Session, SecurityEventType } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 
 /**
@@ -25,8 +26,7 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
-    @InjectRepository(SecurityEvent)
-    private readonly securityEventRepository: Repository<SecurityEvent>,
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   /**
@@ -82,10 +82,11 @@ export class UserService {
     await this.userRepository.save(user);
 
     // Log profile update
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId,
       tenantId: user.tenantId,
-      eventType: "USER_UPDATED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.USER_UPDATED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -125,10 +126,11 @@ export class UserService {
       );
 
       if (!isValid) {
-        await this.logSecurityEvent({
+        this.securityEventService.log({
           userId,
           tenantId: user.tenantId,
-          eventType: "PASSWORD_CHANGE_FAILED",
+          actorEmail: user.email,
+          eventType: SecurityEventType.PASSWORD_CHANGE_FAILED,
           severity: "warning",
           ipAddress: "0.0.0.0",
           userAgent: "system",
@@ -177,10 +179,11 @@ export class UserService {
     });
 
     // Log password change
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId,
       tenantId: user.tenantId,
-      eventType: "PASSWORD_CHANGED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.PASSWORD_CHANGED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -239,12 +242,15 @@ export class UserService {
       revokedReason: "manual_revocation",
     });
 
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId,
-      eventType: "SESSION_REVOKED",
+      tenantId,
+      eventType: SecurityEventType.SESSION_REVOKED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
+      resourceId: sessionId,
+      resourceType: "session",
       metadata: { sessionId },
     });
   }
@@ -261,9 +267,10 @@ export class UserService {
       },
     );
 
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId,
-      eventType: "ALL_SESSIONS_REVOKED",
+      tenantId,
+      eventType: SecurityEventType.ALL_SESSIONS_REVOKED,
       severity: "info",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -318,10 +325,11 @@ export class UserService {
     );
 
     if (!isValid) {
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         userId,
         tenantId: user.tenantId,
-        eventType: "ACCOUNT_DELETION_FAILED",
+        actorEmail: user.email,
+        eventType: SecurityEventType.USER_DELETION_FAILED,
         severity: "warning",
         ipAddress: "0.0.0.0",
         userAgent: "system",
@@ -344,10 +352,11 @@ export class UserService {
     );
 
     // Log account deletion
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       userId,
       tenantId: user.tenantId,
-      eventType: "ACCOUNT_DELETED",
+      actorEmail: user.email,
+      eventType: SecurityEventType.USER_DELETED,
       severity: "critical",
       ipAddress: "0.0.0.0",
       userAgent: "system",
@@ -383,10 +392,11 @@ export class UserService {
     if (newAttempts >= 5) {
       update.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         userId,
         tenantId: user.tenantId,
-        eventType: "ACCOUNT_LOCKED",
+        actorEmail: user.email,
+        eventType: SecurityEventType.USER_LOCKED,
         severity: "critical",
         ipAddress: "0.0.0.0",
         userAgent: "system",
@@ -658,10 +668,13 @@ export class UserService {
 
     // Log security event for each user
     for (const user of users) {
-      await this.logSecurityEvent({
+      this.securityEventService.log({
         userId: user.id,
         tenantId,
-        eventType: isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+        actorEmail: user.email,
+        eventType: isActive
+          ? SecurityEventType.USER_ACTIVATED
+          : SecurityEventType.USER_DEACTIVATED,
         severity: "info",
         ipAddress: "0.0.0.0",
         userAgent: "system",
@@ -725,29 +738,8 @@ export class UserService {
     return csv;
   }
 
-  /**
-   * Log security event
-   */
-  private async logSecurityEvent(data: {
-    userId?: string;
-    tenantId?: string;
-    eventType: string;
-    severity: "info" | "warning" | "critical";
-    ipAddress: string;
-    userAgent: string;
-    metadata?: Record<string, any>;
-  }) {
-    await this.securityEventRepository.save({
-      userId: data.userId,
-      tenantId: data.tenantId,
-      eventType: data.eventType,
-      severity: data.severity,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      metadata: data.metadata || {},
-    });
-  }
 }
+
 
 /**
  * Pagination options for listing users

@@ -12,7 +12,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { User, Tenant, SecurityEvent } from "@repo/database";
+import { User, Tenant, SecurityEventType } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import * as Handlebars from "handlebars";
 import * as fs from "fs";
 import * as path from "path";
@@ -28,8 +29,7 @@ export class EmailService {
 
   constructor(
     private readonly configService: ConfigService,
-    @InjectRepository(SecurityEvent)
-    private readonly securityEventRepository: Repository<SecurityEvent>,
+    private readonly securityEventService: SecurityEventService,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
   ) {
@@ -414,7 +414,7 @@ export class EmailService {
   /**
    * Log email event to security_events table
    */
-  private async logEmailEvent(data: {
+  private logEmailEvent(data: {
     tenantId: string;
     userId?: string;
     emailType: string;
@@ -422,28 +422,22 @@ export class EmailService {
     provider: string;
     success: boolean;
     duration: number;
-  }): Promise<void> {
-    try {
-      await this.securityEventRepository.save({
-        tenantId: data.tenantId,
-        userId: data.userId,
-        eventType: "email_sent",
-        severity: data.success ? "info" : "warning",
-        ipAddress: "0.0.0.0",
-        userAgent: "email-service",
-        metadata: {
-          emailType: data.emailType,
-          recipient: data.recipient,
-          provider: data.provider,
-          success: data.success,
-          duration: data.duration,
-        },
-      });
-    } catch (error: any) {
-      this.logger.error(
-        `Failed to log email event: ${error.message}`,
-        error.stack,
-      );
-    }
+  }): void {
+    this.securityEventService.log({
+      tenantId: data.tenantId,
+      userId: data.userId,
+      eventType: SecurityEventType.EMAIL_SENT,
+      severity: data.success ? "info" : "warning",
+      ipAddress: "0.0.0.0",
+      userAgent: "email-service",
+      metadata: {
+        emailType: data.emailType,
+        // recipient email is retained for audit traceability — not a secret
+        recipient: data.recipient,
+        provider: data.provider,
+        success: data.success,
+        duration: data.duration,
+      },
+    });
   }
 }

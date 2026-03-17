@@ -5,7 +5,8 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
-import { MfaSettings, User, WebAuthnCredential } from "@repo/database";
+import { MfaSettings, User, WebAuthnCredential, SecurityEventType } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -41,6 +42,7 @@ export class WebAuthnService {
     private configService: ConfigService,
     private redisService: RedisService,
     private dataSource: DataSource,
+    private readonly securityEventService: SecurityEventService,
   ) {
     this.rpID = this.configService.get("WEBAUTHN_RP_ID") || "localhost";
     this.origin =
@@ -199,6 +201,18 @@ export class WebAuthnService {
     await this.mfaRepository.update({ userId, tenantId }, { webauthnEnabled: true });
 
     console.log("✅ WebAuthn credential registered:", credentialID);
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.PASSKEY_REGISTERED,
+      severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+      resourceId: credentialID,
+      resourceType: "passkey",
+      metadata: { deviceName: deviceName || "Unnamed Device" },
+    });
 
     return { credentialId: credentialID };
   }
@@ -378,5 +392,16 @@ export class WebAuthnService {
     }
 
     console.log("🗑️ WebAuthn credential deleted:", credentialId);
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.PASSKEY_REMOVED,
+      severity: "warning",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
+      resourceId: credentialId,
+      resourceType: "passkey",
+    });
   }
 }

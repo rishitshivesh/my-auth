@@ -5,7 +5,6 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import {
   User,
   Session,
-  SecurityEvent,
   Tenant,
   MfaSettings,
   WebAuthnCredential,
@@ -16,6 +15,8 @@ import {
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
+import { SecurityEventModule } from "@/common/service/security-event.module";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PasswordService } from "@repo/security";
@@ -39,7 +40,6 @@ import { SessionModule } from "@/modules/session/session.module";
     TypeOrmModule.forFeature([
       User,
       Session,
-      SecurityEvent,
       Tenant,
       MfaSettings,
       WebAuthnCredential,
@@ -48,6 +48,7 @@ import { SessionModule } from "@/modules/session/session.module";
       UserSocialConnection,
       TenantSocialProvider,
     ]),
+    SecurityEventModule,
     UserModule,
     EmailModule,
     GuardsModule,
@@ -68,6 +69,7 @@ import { SessionModule } from "@/modules/session/session.module";
   controllers: [AuthController],
   providers: [
     AuthService,
+    SecurityEventService,
     PasswordService,
     JwtStrategy,
     JwtAuthGuard,

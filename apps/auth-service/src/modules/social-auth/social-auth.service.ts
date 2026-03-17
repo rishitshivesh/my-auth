@@ -15,8 +15,9 @@ import {
   TenantSocialProvider,
   SocialLinkRequest,
   Session,
-  SecurityEvent,
+  SecurityEventType,
 } from "@repo/database";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import { TokenEncryptionService } from "../auth/oauth-token-encryption.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
@@ -64,8 +65,7 @@ export class SocialAuthService {
     private readonly tenantProviderRepository: Repository<TenantSocialProvider>,
     @InjectRepository(SocialLinkRequest)
     private readonly linkRequestRepository: Repository<SocialLinkRequest>,
-    @InjectRepository(SecurityEvent)
-    private readonly securityEventRepository: Repository<SecurityEvent>,
+    private readonly securityEventService: SecurityEventService,
     private readonly tokenEncryptionService: TokenEncryptionService,
     private readonly sessionService: SessionService,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
@@ -244,13 +244,16 @@ export class SocialAuthService {
     });
 
     // Log security event
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId: connection.tenantId,
       userId: user.id,
-      eventType: "social_login_success",
+      actorEmail: user.email,
+      eventType: SecurityEventType.SOCIAL_LOGIN_SUCCESS,
       severity: "info",
       ipAddress,
       userAgent,
+      resourceId: session.id,
+      resourceType: "session",
       metadata: {
         provider: profile.provider,
         sessionId: session.id,
@@ -373,13 +376,16 @@ export class SocialAuthService {
     );
 
     // Log security event
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId,
       userId: user.id,
-      eventType: "user_created_social",
+      actorEmail: user.email,
+      eventType: SecurityEventType.SOCIAL_USER_CREATED,
       severity: "info",
       ipAddress,
       userAgent,
+      resourceId: session.id,
+      resourceType: "session",
       metadata: {
         provider: profile.provider,
         sessionId: session.id,
@@ -515,10 +521,10 @@ export class SocialAuthService {
     });
 
     // Log security event
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId: linkRequest.tenantId,
       userId: linkRequest.userId,
-      eventType: "social_account_linked",
+      eventType: SecurityEventType.SOCIAL_ACCOUNT_LINKED,
       severity: "info",
       ipAddress: linkRequest.ipAddress,
       userAgent: linkRequest.userAgent,
@@ -588,11 +594,13 @@ export class SocialAuthService {
     await this.socialConnectionRepository.delete(connection.id);
 
     // Log security event
-    await this.logSecurityEvent({
+    this.securityEventService.log({
       tenantId,
       userId,
-      eventType: "social_account_unlinked",
+      eventType: SecurityEventType.SOCIAL_ACCOUNT_UNLINKED,
       severity: "info",
+      ipAddress: "0.0.0.0",
+      userAgent: "system",
       metadata: {
         provider,
       },
@@ -636,21 +644,6 @@ export class SocialAuthService {
         lastUsedAt: "DESC",
       },
     });
-  }
-
-  /**
-   * Log security event
-   */
-  private async logSecurityEvent(params: {
-    tenantId: string;
-    userId?: string;
-    eventType: string;
-    severity: "info" | "warning" | "critical";
-    ipAddress?: string;
-    userAgent?: string;
-    metadata?: any;
-  }): Promise<void> {
-    await this.securityEventRepository.save(params);
   }
 
   /**
