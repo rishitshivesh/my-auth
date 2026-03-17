@@ -415,10 +415,21 @@ export function useUser() {
  */
 export function useSession() {
   const { isAuthenticated, isLoading, client } = useAuth();
+  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    client.getAccessToken().then((token) => {
+      if (!cancelled) setAccessToken(token);
+    }).catch(() => {
+      if (!cancelled) setAccessToken(undefined);
+    });
+    return () => { cancelled = true; };
+  }, [client, isAuthenticated]);
 
   return {
     isAuthenticated,
     isLoading,
-    accessToken: client.getAccessToken(),
+    accessToken,
   };
 }

@@ -1,8 +1,14 @@
 /**
  * Fort Knox SDK - Core Types
- * 
- * These types are used across all adapters (web, node, next, react)
+ *
+ * These types are used across all adapters (web, node, next, react).
+ * Shared base types (User, Session, SecurityEventType, and UI types) live in
+ * @fortknox/types and are re-exported here so SDK consumers need only one import.
  */
+
+// Re-export shared types so internal SDK modules can import from './types'
+// and external consumers can import from '@fortknox/sdk' without knowing about @fortknox/types.
+export type { User, Session, SecurityEventType } from '@fortknox/types';
 
 // ============================================================
 // TRANSPORT ABSTRACTION
@@ -91,50 +97,6 @@ export interface FortKnoxConfig {
 }
 
 // ============================================================
-// USER & SESSION
-// ============================================================
-
-export interface User {
-  id: string;
-  tenantId: string;
-  email: string;
-  emailVerified: boolean;
-  phone?: string;
-  phoneVerified: boolean;
-  firstName?: string;
-  lastName?: string;
-  displayName?: string;
-  avatarUrl?: string;
-  primaryAuthMethod: 'password' | 'google' | 'github' | 'microsoft';
-  mfaEnabled: boolean;
-  status: 'active' | 'suspended' | 'deleted';
-  lastLoginAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Session {
-  id: string;
-  userId: string;
-  tenantId: string;
-  deviceInfo?: {
-    userAgent?: string;
-    browser?: string;
-    os?: string;
-    device?: string;
-  };
-  ipAddress?: string;
-  location?: {
-    city?: string;
-    country?: string;
-  };
-  current: boolean;
-  expiresAt: Date;
-  lastActivityAt: Date;
-  createdAt: Date;
-}
-
-// ============================================================
 // AUTHENTICATION
 // ============================================================
 
@@ -207,6 +169,7 @@ export type AuthErrorCode =
   | 'INVALID_TOKEN'
   | 'TOKEN_EXPIRED'
   | 'SESSION_EXPIRED'
+  | 'SESSION_REVOKED'
   | 'MFA_REQUIRED'
   | 'MFA_INVALID_CODE'
   | 'UNAUTHORIZED'
@@ -214,6 +177,12 @@ export type AuthErrorCode =
   | 'RATE_LIMIT_EXCEEDED'
   | 'NETWORK_ERROR'
   | 'REFRESH_FAILED'
+  | 'REFRESH_TOKEN_REUSE'
+  | 'WEBAUTHN_CHALLENGE_EXPIRED'
+  | 'WEBAUTHN_REPLAY_DETECTED'
+  | 'PASSKEY_NOT_SUPPORTED'
+  | 'PASSKEY_REGISTRATION_CANCELLED'
+  | 'PASSKEY_AUTH_CANCELLED'
   | 'UNKNOWN_ERROR';
 
 // ============================================================
