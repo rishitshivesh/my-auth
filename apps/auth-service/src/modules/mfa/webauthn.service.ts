@@ -22,9 +22,12 @@ import type {
 import { ConfigService } from "@nestjs/config";
 import { type AuthenticatorTransportFuture } from "@simplewebauthn/server";
 import { RedisService } from "@/common/service/redis.service";
+import * as crypto from "crypto";
 
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
-const CHALLENGE_RESOURCE = "webauthn_challenge";
+// Redis resource namespaces
+const REG_CHALLENGE_RESOURCE = "passkey:challenge:reg";
+const AUTH_CHALLENGE_RESOURCE = "passkey:challenge:auth";
 
 @Injectable()
 export class WebAuthnService {
@@ -51,42 +54,75 @@ export class WebAuthnService {
 
   // ── Challenge helpers ──────────────────────────────────────────────────────
 
-  private challengeIdentifier(userId: string, type: "register" | "authenticate"): string {
-    return `${userId}:${type}`;
-  }
-
-  private async storeChallenge(
+  /**
+   * Store registration challenge keyed by userId.
+   * Key pattern (via RedisService): passkey:challenge:reg:{userId}
+   */
+  private async storeRegistrationChallenge(
     tenantId: string,
     userId: string,
-    type: "register" | "authenticate",
     challenge: string,
   ): Promise<void> {
     await this.redisService.set(
       tenantId,
-      CHALLENGE_RESOURCE,
-      this.challengeIdentifier(userId, type),
+      REG_CHALLENGE_RESOURCE,
+      userId,
       challenge,
       CHALLENGE_TTL_SECONDS,
     );
   }
 
   /**
-   * Retrieve and immediately delete the challenge (single-use guarantee).
-   * Returns null if not found (expired or never set).
+   * Retrieve and immediately delete the registration challenge (single-use).
    */
-  private async consumeChallenge(
+  private async consumeRegistrationChallenge(
     tenantId: string,
     userId: string,
-    type: "register" | "authenticate",
   ): Promise<string | null> {
-    const identifier = this.challengeIdentifier(userId, type);
     const challenge = await this.redisService.get<string>(
       tenantId,
-      CHALLENGE_RESOURCE,
-      identifier,
+      REG_CHALLENGE_RESOURCE,
+      userId,
     );
-    // Always delete — even when null, this is a no-op in Redis
-    await this.redisService.delete(tenantId, CHALLENGE_RESOURCE, identifier);
+    // Always delete — even when null (no-op), guarantees single-use
+    await this.redisService.delete(tenantId, REG_CHALLENGE_RESOURCE, userId);
+    return challenge;
+  }
+
+  /**
+   * Store authentication challenge keyed by an opaque sessionNonce.
+   * Key pattern: passkey:challenge:auth:{sessionNonce}
+   * Using a nonce rather than userId prevents user enumeration and supports
+   * concurrent auth attempts from the same user.
+   */
+  private async storeAuthChallenge(
+    tenantId: string,
+    sessionNonce: string,
+    challenge: string,
+  ): Promise<void> {
+    await this.redisService.set(
+      tenantId,
+      AUTH_CHALLENGE_RESOURCE,
+      sessionNonce,
+      challenge,
+      CHALLENGE_TTL_SECONDS,
+    );
+  }
+
+  /**
+   * Retrieve and immediately delete the authentication challenge (single-use).
+   */
+  private async consumeAuthChallenge(
+    tenantId: string,
+    sessionNonce: string,
+  ): Promise<string | null> {
+    const challenge = await this.redisService.get<string>(
+      tenantId,
+      AUTH_CHALLENGE_RESOURCE,
+      sessionNonce,
+    );
+    // Always delete — ensures single-use even on failure
+    await this.redisService.delete(tenantId, AUTH_CHALLENGE_RESOURCE, sessionNonce);
     return challenge;
   }
 
@@ -138,7 +174,7 @@ export class WebAuthnService {
       },
     });
 
-    await this.storeChallenge(tenantId, userId, "register", options.challenge);
+    await this.storeRegistrationChallenge(tenantId, userId, options.challenge);
 
     console.log("🔐 WebAuthn registration started for", user.email);
 
@@ -154,7 +190,7 @@ export class WebAuthnService {
     response: RegistrationResponseJSON,
     deviceName?: string,
   ): Promise<{ credentialId: string }> {
-    const challenge = await this.consumeChallenge(tenantId, userId, "register");
+    const challenge = await this.consumeRegistrationChallenge(tenantId, userId);
 
     if (!challenge) {
       throw new BadRequestException({
@@ -220,9 +256,19 @@ export class WebAuthnService {
   // ── Authentication ─────────────────────────────────────────────────────────
 
   /**
-   * Start WebAuthn authentication (generate options)
+   * Start WebAuthn authentication (generate options + opaque sessionNonce).
+   *
+   * The challenge is stored in Redis keyed by a random sessionNonce (NOT the
+   * userId) so the nonce can be returned to the client without exposing the
+   * user's identity, and concurrent auth attempts from the same user do not
+   * collide.
+   *
+   * Returns: { options, sessionNonce }
    */
-  async startAuthentication(userId: string, tenantId: string): Promise<any> {
+  async startAuthentication(
+    userId: string,
+    tenantId: string,
+  ): Promise<{ options: any; sessionNonce: string }> {
     const credentials = await this.credentialRepository.find({
       where: { userId, tenantId },
     });
@@ -243,22 +289,30 @@ export class WebAuthnService {
       userVerification: "preferred",
     });
 
-    await this.storeChallenge(tenantId, userId, "authenticate", options.challenge);
+    // Generate an opaque nonce — this is what the client will echo back in /verify
+    const sessionNonce = crypto.randomBytes(16).toString("hex");
+
+    await this.storeAuthChallenge(tenantId, sessionNonce, options.challenge);
 
     console.log("🔐 WebAuthn authentication started for user:", userId);
 
-    return options;
+    return { options, sessionNonce };
   }
 
   /**
-   * Finish WebAuthn authentication (verify response)
+   * Finish WebAuthn authentication (verify response).
+   *
+   * @param sessionNonce - Opaque nonce returned by startAuthentication(); used
+   *                       to look up the single-use challenge in Redis.
    */
   async finishAuthentication(
     userId: string,
     tenantId: string,
     response: AuthenticationResponseJSON,
+    sessionNonce: string,
   ): Promise<boolean> {
-    const challenge = await this.consumeChallenge(tenantId, userId, "authenticate");
+    // Consume challenge by nonce — deleted from Redis regardless of outcome
+    const challenge = await this.consumeAuthChallenge(tenantId, sessionNonce);
 
     if (!challenge) {
       throw new BadRequestException({

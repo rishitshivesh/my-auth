@@ -12,7 +12,7 @@ interface PasskeyLoginButtonProps {
 }
 
 export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyLoginButtonProps) {
-  const { startPasskeyLogin, finishPasskeyLogin } = useAuth()
+  const { authenticateWithPasskey } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,21 +25,12 @@ export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyL
         throw new Error("Passkeys are not supported on this device or browser")
       }
 
-      // Step 1: Get challenge from server
-      const options = await startPasskeyLogin(email)
+      await authenticateWithPasskey(email)
 
-      // Step 2: Trigger browser's native passkey prompt
-      const { startAuthentication } = await import("@simplewebauthn/browser")
-      const assertion = await startAuthentication(options)
-
-      // Step 3: Verify with server — sets session
-      await finishPasskeyLogin(email, assertion)
-
-      // Step 4: Redirect to dashboard
       window.location.href = "/dashboard"
     } catch (err: any) {
-      // User cancelled the WebAuthn prompt (NotAllowedError) — don't show error
-      if (err?.name === "NotAllowedError") {
+      // User cancelled the WebAuthn prompt — don't show error
+      if (err?.code === "PASSKEY_AUTH_CANCELLED" || err?.name === "NotAllowedError") {
         setError(null)
       } else {
         setError(err?.message || "Failed to authenticate with passkey")

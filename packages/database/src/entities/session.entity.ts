@@ -10,7 +10,7 @@ import { User } from "./user.entity";
 @Index(["tenantId", "refreshTokenHash"]) // ← Add tenant index
 @Index(["tenantId", "revokedAt"]) // ← Add tenant index
 @Index(["tokenHash"], { unique: true })
-@Index(["expiresAt"])
+@Index(["expiresAt", "revokedAt"]) // ← Composite index for cleanup query performance
 @Index(["refreshTokenFamilyId"]) // ← Add this index
 export class Session extends BaseEntity {
   // ✅ ADD THIS - Tenant ID (denormalized for performance)
@@ -36,6 +36,16 @@ export class Session extends BaseEntity {
   })
   tokenHash!: string;
 
+  // Hashed access token — never store raw JWTs
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    name: "access_token_hash",
+    comment: "SHA-256 hash of the last issued access token",
+  })
+  accessTokenHash?: string;
+
   // ✅ ADD THIS - For refresh token rotation
   @Column({
     type: "varchar",
@@ -45,6 +55,15 @@ export class Session extends BaseEntity {
     comment: "Hashed refresh token",
   })
   refreshTokenHash?: string;
+
+  // Expiry of the current refresh token (updated on every rotation)
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "refresh_expires_at",
+    comment: "Expiry of the active refresh token",
+  })
+  refreshExpiresAt?: Date;
 
   // ✅ ADD THIS - For token rotation + reuse detection
   @Column({
@@ -105,6 +124,15 @@ export class Session extends BaseEntity {
     default: () => "CURRENT_TIMESTAMP",
   })
   lastActivity!: Date;
+
+  // Timestamp updated specifically when a refresh token rotation occurs
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "last_used_at",
+    comment: "Set to NOW() on every successful refresh token rotation",
+  })
+  lastUsedAt?: Date;
 
   @Column({
     type: "timestamp with time zone",

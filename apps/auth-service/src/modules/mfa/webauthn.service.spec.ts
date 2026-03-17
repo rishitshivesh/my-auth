@@ -6,6 +6,7 @@ import { MfaSettings, User, WebAuthnCredential } from "@repo/database";
 import { WebAuthnService } from "./webauthn.service";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@/common/service/redis.service";
+import { SecurityEventService } from "@/common/service/security-event.service";
 
 // ── Minimal stubs ──────────────────────────────────────────────────────────
 
@@ -75,6 +76,10 @@ const mockDataSource = {
   createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilderUpdate),
 };
 
+const mockSecurityEventService = {
+  log: jest.fn(),
+};
+
 const mockConfigService = {
   get: jest.fn((key: string, def?: any) => {
     if (key === "WEBAUTHN_RP_ID") return "localhost";
@@ -100,6 +105,7 @@ describe("WebAuthnService", () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: getDataSourceToken(), useValue: mockDataSource },
+        { provide: SecurityEventService, useValue: mockSecurityEventService },
       ],
     }).compile();
 
@@ -146,8 +152,8 @@ describe("WebAuthnService", () => {
       expect(mockRedisService.delete).toHaveBeenCalledTimes(1);
       expect(mockRedisService.delete).toHaveBeenCalledWith(
         "tenant-1",
-        "webauthn_challenge",
-        "user-1:register",
+        "passkey:challenge:reg",
+        "user-1",
       );
     });
 
@@ -164,6 +170,7 @@ describe("WebAuthnService", () => {
 
     it("deletes the auth challenge from Redis after finishAuthentication (success path)", async () => {
       const challenge = "auth-challenge-xyz";
+      const sessionNonce = "opaque-nonce-hex-32chars";
       mockRedisService.get.mockResolvedValueOnce(challenge);
       mockRedisService.delete.mockResolvedValue(undefined);
 
@@ -175,14 +182,14 @@ describe("WebAuthnService", () => {
         service.finishAuthentication("user-1", "tenant-1", {
           rawId: "cred-id-base64url",
           id: "cred-id-base64url",
-        } as any),
+        } as any, sessionNonce),
       ).rejects.toThrow();
 
-      // Challenge must still have been consumed
+      // Challenge must still have been consumed (keyed by nonce, not userId)
       expect(mockRedisService.delete).toHaveBeenCalledWith(
         "tenant-1",
-        "webauthn_challenge",
-        "user-1:authenticate",
+        "passkey:challenge:auth",
+        sessionNonce,
       );
     });
   });
@@ -208,7 +215,7 @@ describe("WebAuthnService", () => {
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.finishAuthentication("user-1", "tenant-1", {} as any),
+        service.finishAuthentication("user-1", "tenant-1", {} as any, "some-nonce"),
       ).rejects.toMatchObject({
         response: {
           error: "WEBAUTHN_CHALLENGE_EXPIRED",
@@ -282,7 +289,7 @@ describe("WebAuthnService", () => {
       // Verify that 0-affected triggers WEBAUTHN_REPLAY_DETECTED
       // by calling finishAuthentication and catching the error
       await expect(
-        service.finishAuthentication("user-1", "tenant-1", fakeResponse as any),
+        service.finishAuthentication("user-1", "tenant-1", fakeResponse as any, "some-nonce"),
       ).rejects.toThrow(BadRequestException);
     });
   });

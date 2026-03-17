@@ -44,32 +44,10 @@ export function PasskeyRegisterModal({
         throw new Object({ name: "NotSupportedError", message: "Your browser does not support passkeys" })
       }
 
-      // Step 1: Get registration options from server
-      const options = await client.startPasskeyRegistration()
+      // Step 1: Get options from server and invoke browser credential API
+      const registrationResponse = await client.startPasskeyRegistration()
 
-      // Step 2: Invoke the browser's native credential API
-      let registrationResponse: any
-      try {
-        const { startRegistration } = await import("@simplewebauthn/browser")
-        registrationResponse = await startRegistration({ optionsJSON: options })
-      } catch (browserErr: any) {
-        if (browserErr?.name === "NotAllowedError") {
-          setError("Registration cancelled")
-          setStep("name")
-          return
-        }
-        if (
-          browserErr?.name === "NotSupportedError" ||
-          browserErr?.name === "SecurityError"
-        ) {
-          setError("Your browser does not support passkeys")
-          setStep("name")
-          return
-        }
-        throw browserErr
-      }
-
-      // Step 3: Finish registration on server
+      // Step 2: Finish registration on server
       await client.finishPasskeyRegistration(
         registrationResponse,
         deviceName.trim() || undefined,

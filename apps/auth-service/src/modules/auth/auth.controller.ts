@@ -637,7 +637,7 @@ export class AuthController {
   async finishWebAuthnLogin(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() dto: { email: string; response: any },
+    @Body() dto: { email: string; response: any; sessionNonce: string },
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -647,6 +647,7 @@ export class AuthController {
       tenantId,
       email: dto.email,
       webauthnResponse: dto.response,
+      sessionNonce: dto.sessionNonce,
       ip,
       userAgent,
     });
