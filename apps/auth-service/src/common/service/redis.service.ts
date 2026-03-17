@@ -151,4 +151,45 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildKey(tenantId, resource, identifier);
     await this.client.expire(key, ttl);
   }
+
+  /**
+   * Increment integer counter and return new value
+   */
+  async incr(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<number> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    return this.client.incr(key);
+  }
+
+  /**
+   * Set expiry as an absolute Unix timestamp (seconds since epoch)
+   */
+  async expireAtTimestamp(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+    unixTimestamp: number,
+  ): Promise<void> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    await this.client.expireat(key, unixTimestamp);
+  }
+
+  /**
+   * Read multiple daily api_call counters for a tenant.
+   * Returns counts in the same order as the provided dates array.
+   */
+  async getDailyApiCallCounts(
+    tenantId: string,
+    dates: string[],
+  ): Promise<number[]> {
+    if (dates.length === 0) return [];
+    const keys = dates.map((date) =>
+      this.buildKey(tenantId, "api_calls", date),
+    );
+    const values = await this.client.mget(...keys);
+    return values.map((v) => (v ? parseInt(v, 10) : 0));
+  }
 }

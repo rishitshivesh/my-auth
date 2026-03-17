@@ -67,3 +67,37 @@ export interface SocialConnection {
   lastUsedAt?: string;
   createdAt: string;
 }
+
+export interface TenantMetrics {
+  totalUsers: number;
+  activeSessions: number;
+  totalApplications: number;
+  mfaAdoptionRate: number;
+  activeApiKeys: number;
+}
+
+export interface ActivityEvent {
+  id: string;
+  eventType: string;
+  actorEmail?: string;
+  ipAddress: string;
+  location?: string;
+  createdAt: string;
+  severity: "info" | "warning" | "critical";
+  resourceType?: string;
+  resourceId?: string;
+}
+
+export interface TrendPoint {
+  date: string;
+  count: number;
+}
+
+export interface AuthBreakdown {
+  emailPassword: number;
+  google: number;
+  github: number;
+  microsoft: number;
+  apple: number;
+  passkey: number;
+}

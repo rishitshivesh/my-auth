@@ -9,16 +9,4 @@ export class StatsController {
   getSystemStats() {
     return this.statsService.getSystemStats();
   }
-
-  @Get('throughput')
-  getThroughput() {
-    return this.statsService.getThroughput();
-  }
-
-  // Middleware or interceptor can be added to increment the request count
-  @Get('increment')
-  incrementRequestCount() {
-    this.statsService.incrementRequestCount();
-    return { message: 'Request count incremented' };
-  }
 }
