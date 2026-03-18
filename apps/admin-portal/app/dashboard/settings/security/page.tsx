@@ -2,26 +2,50 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, Smartphone, Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Key, Smartphone, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@repo/ui";
-import { startRegistration } from "@simplewebauthn/browser";
-import type { RegistrationResponseJSON } from "@simplewebauthn/browser";
 import { useMfaStatus, useListPasskeys, useDeletePasskey } from "@/lib/queries";
-import { useAuth } from "@fortknox/sdk";
 import type { PasskeyCredential } from "@/lib/types";
+import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+    if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
+    if (diffDay < 30) return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
+    return formatDate(dateStr);
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { data: mfaData, isLoading: mfaLoading } = useMfaStatus();
   const { data: passkeys = [], isLoading: passkeysLoading, refetch: refetchPasskeys } = useListPasskeys();
-  const deletePasskey = useDeletePasskey();
-  const { client } = useAuth();
+  const deletePasskeyMutation = useDeletePasskey();
 
-  const [addingPasskey, setAddingPasskey] = useState(false);
+  const [showPasskeyModal, setShowPasskeyModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deviceName, setDeviceName] = useState("");
-  const [showNameModal, setShowNameModal] = useState(false);
-  const [pendingRegistration, setPendingRegistration] = useState<RegistrationResponseJSON | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -31,51 +55,13 @@ export default function SecuritySettingsPage() {
     setTimeout(() => { setSuccessMsg(null); setError(null); }, 3000);
   };
 
-  const handleStartAddPasskey = async () => {
-    try {
-      setAddingPasskey(true);
-      setError(null);
-      const options = await client.startPasskeyRegistration();
-      const registrationResponse = await startRegistration({ optionsJSON: options });
-      setPendingRegistration(registrationResponse);
-      setDeviceName("");
-      setShowNameModal(true);
-    } catch (err: any) {
-      if (err?.name !== "NotAllowedError") {
-        flash(err?.message || "Failed to start passkey registration", true);
-      }
-    } finally {
-      setAddingPasskey(false);
-    }
-  };
-
-  const handleFinishAddPasskey = async () => {
-    if (!pendingRegistration) return;
-    try {
-      setAddingPasskey(true);
-      await client.finishPasskeyRegistration(
-        pendingRegistration,
-        deviceName.trim() || undefined,
-      );
-      setShowNameModal(false);
-      setPendingRegistration(null);
-      setDeviceName("");
-      flash("Passkey added successfully");
-      refetchPasskeys();
-    } catch (err: any) {
-      flash(err?.message || "Failed to save passkey", true);
-    } finally {
-      setAddingPasskey(false);
-    }
-  };
-
   const handleDeletePasskey = async (credentialId: string) => {
     try {
       setDeletingId(credentialId);
-      await deletePasskey.mutateAsync(credentialId);
+      await deletePasskeyMutation.mutateAsync(credentialId);
       flash("Passkey removed");
     } catch (err: any) {
-      flash(err?.message || "Failed to delete passkey", true);
+      flash(err?.message || "Failed to remove passkey", true);
     } finally {
       setDeletingId(null);
     }
@@ -83,18 +69,7 @@ export default function SecuritySettingsPage() {
 
   const handleManageTotp = () => router.push("/u/mfa/setup");
 
-  // useMfaStatus queryFn already unwraps res.data.data, so mfaData is MfaStatus directly
   const totpEnabled = mfaData?.methods?.includes("totp") ?? false;
-
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString("en-US", {
-        month: "short", day: "numeric", year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -190,22 +165,29 @@ export default function SecuritySettingsPage() {
                   <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {pk.deviceName || "Passkey"}
+                      {pk.deviceName ?? "Unknown device"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Added {formatDate(pk.createdAt)}
-                      {pk.lastUsedAt ? ` · Last used ${formatDate(pk.lastUsedAt)}` : ""}
+                      {" · "}
+                      {pk.lastUsedAt ? `Last used ${formatRelativeTime(pk.lastUsedAt)}` : "Never used"}
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleDeletePasskey(pk.id)}
                   disabled={deletingId === pk.id}
-                  className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                  aria-label={`Delete passkey ${pk.deviceName || pk.id}`}
+                  className="text-muted-foreground hover:text-destructive transition-colors text-xs"
+                  aria-label={`Remove passkey ${pk.deviceName ?? pk.id}`}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                  {deletingId === pk.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "Remove"
+                  )}
+                </Button>
               </li>
             ))}
           </ul>
@@ -218,51 +200,24 @@ export default function SecuritySettingsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleStartAddPasskey}
-          disabled={addingPasskey}
+          onClick={() => setShowPasskeyModal(true)}
           className="gap-2"
         >
-          <Plus className="h-4 w-4" />
-          {addingPasskey ? "Registering..." : "Add a passkey"}
+          <Key className="h-4 w-4" />
+          Add passkey
         </Button>
       </section>
 
-      {/* Device Name Modal */}
-      {showNameModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl space-y-4 mx-4">
-            <h3 className="font-semibold text-foreground">Name your passkey</h3>
-            <p className="text-sm text-muted-foreground">
-              Give this passkey a name so you can identify it later (e.g. &quot;iPhone Face ID&quot;).
-            </p>
-            <input
-              type="text"
-              placeholder="e.g. iPhone Face ID (optional)"
-              value={deviceName}
-              onChange={(e) => setDeviceName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleFinishAddPasskey()}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowNameModal(false);
-                  setPendingRegistration(null);
-                  setDeviceName("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleFinishAddPasskey} disabled={addingPasskey}>
-                {addingPasskey ? "Saving..." : "Save passkey"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TODO: Sessions section — FIX D: implement active sessions list via API */}
+
+      <PasskeyRegisterModal
+        open={showPasskeyModal}
+        onOpenChange={setShowPasskeyModal}
+        onSuccess={() => {
+          refetchPasskeys();
+          flash("Passkey added successfully");
+        }}
+      />
     </div>
   );
 }
