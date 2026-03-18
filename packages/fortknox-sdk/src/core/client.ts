@@ -292,7 +292,9 @@ export class FortKnoxClient {
   }
 
   /**
-   * Start WebAuthn (passkey) authentication — returns challenge options for the browser
+   * Start WebAuthn (passkey) authentication.
+   * Returns the raw server response which includes both WebAuthn options and
+   * the opaque `sessionNonce` required by `finishPasskeyLogin`.
    */
   async startPasskeyLogin(email: string): Promise<any> {
     const response = await this.request({
@@ -309,13 +311,20 @@ export class FortKnoxClient {
   }
 
   /**
-   * Finish WebAuthn (passkey) authentication with the browser assertion
+   * Finish WebAuthn (passkey) authentication with the browser assertion.
+   *
+   * @param sessionNonce - Opaque nonce returned by `startPasskeyLogin()`; the
+   *   server uses it to retrieve the single-use challenge from Redis.
    */
-  async finishPasskeyLogin(email: string, assertion: any): Promise<void> {
+  async finishPasskeyLogin(
+    email: string,
+    assertion: any,
+    sessionNonce: string,
+  ): Promise<void> {
     const response = await this.request({
       url: `${this.config.baseURL}/auth/webauthn/login/finish`,
       method: "POST",
-      body: { email, response: assertion },
+      body: { email, response: assertion, sessionNonce },
       credentials: "include",
     } as any);
 
@@ -337,16 +346,106 @@ export class FortKnoxClient {
     this.config.onTokenRefreshed(accessToken);
   }
 
+  /**
+   * Complete passkey authentication in one step (browser-side orchestration).
+   *
+   * 1. Fetches WebAuthn options + sessionNonce from the server.
+   * 2. Calls `startAuthentication(options)` from `@simplewebauthn/browser`.
+   * 3. Verifies the assertion with the server and establishes a session.
+   *
+   * Throws `AuthError` with code `PASSKEY_AUTH_CANCELLED` if the user cancels
+   * or if the browser does not support WebAuthn.
+   */
+  async authenticateWithPasskey(email: string): Promise<void> {
+    if (typeof window === "undefined") {
+      throw new AuthErrorClass(
+        "PASSKEY_NOT_SUPPORTED",
+        "authenticateWithPasskey is only available in browser environments",
+      );
+    }
+
+    // Step 1: Get options + nonce from server
+    const serverData = await this.startPasskeyLogin(email);
+    const { sessionNonce, ...optionsJSON } = serverData;
+
+    // Step 2: Invoke the browser's native WebAuthn API
+    let assertion: any;
+    try {
+      const { startAuthentication } = await import(
+        "@simplewebauthn/browser" as any
+      );
+      assertion = await startAuthentication({ optionsJSON });
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
+        throw new AuthErrorClass(
+          "PASSKEY_AUTH_CANCELLED",
+          "Passkey authentication was cancelled",
+        );
+      }
+      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
+        throw new AuthErrorClass(
+          "PASSKEY_NOT_SUPPORTED",
+          "This browser or device does not support passkeys",
+        );
+      }
+      throw err;
+    }
+
+    // Step 3: Verify with server (establishes session, sets access token)
+    await this.finishPasskeyLogin(email, assertion, sessionNonce);
+  }
+
   // ── Passkey Registration & Management ──────────────────────────────
 
-  /** Start WebAuthn passkey registration — returns challenge options for the browser */
+  /**
+   * Register a new passkey credential.
+   *
+   * 1. Fetches WebAuthn registration options from the server.
+   * 2. Calls `startRegistration(options)` from `@simplewebauthn/browser`
+   *    to invoke the device's authenticator.
+   * 3. Returns the browser's `RegistrationResponseJSON` for use with
+   *    `finishPasskeyRegistration()`.
+   *
+   * Throws `AuthError` with code `PASSKEY_REGISTRATION_CANCELLED` if the
+   * user dismisses the prompt or if the browser API is unavailable.
+   */
   async startPasskeyRegistration(): Promise<any> {
-    const response = await this.request({
+    if (typeof window === "undefined") {
+      throw new AuthErrorClass(
+        "PASSKEY_NOT_SUPPORTED",
+        "startPasskeyRegistration is only available in browser environments",
+      );
+    }
+
+    // Step 1: Fetch registration options from server
+    const optionsResponse = await this.request({
       url: `${this.config.baseURL}/mfa/webauthn/register/start`,
       method: "POST",
     });
-    if (!response.ok) throw this.createError(response);
-    return response.data?.data || response.data;
+    if (!optionsResponse.ok) throw this.createError(optionsResponse);
+    const optionsJSON = optionsResponse.data?.data || optionsResponse.data;
+
+    // Step 2: Invoke the browser's native WebAuthn API
+    try {
+      const { startRegistration } = await import(
+        "@simplewebauthn/browser" as any
+      );
+      return await startRegistration({ optionsJSON });
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
+        throw new AuthErrorClass(
+          "PASSKEY_REGISTRATION_CANCELLED",
+          "Passkey registration was cancelled",
+        );
+      }
+      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
+        throw new AuthErrorClass(
+          "PASSKEY_REGISTRATION_CANCELLED",
+          "This browser or device does not support passkeys",
+        );
+      }
+      throw err;
+    }
   }
 
   /** Finish WebAuthn passkey registration — verifies and stores the credential */

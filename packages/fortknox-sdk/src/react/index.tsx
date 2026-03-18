@@ -38,7 +38,8 @@ interface AuthContextValue {
   sendMagicLink: (email: string) => Promise<void>;
   verifyMagicLink: (token: string) => Promise<void>;
   startPasskeyLogin: (email: string) => Promise<any>;
-  finishPasskeyLogin: (email: string, assertion: any) => Promise<void>;
+  finishPasskeyLogin: (email: string, assertion: any, sessionNonce: string) => Promise<void>;
+  authenticateWithPasskey: (email: string) => Promise<void>;
 
   // Passkey management
   startPasskeyRegistration: () => Promise<any>;
@@ -261,11 +262,26 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const finishPasskeyLogin = async (email: string, assertion: any): Promise<void> => {
+  const finishPasskeyLogin = async (email: string, assertion: any, sessionNonce: string): Promise<void> => {
     try {
       setError(null);
       setIsLoading(true);
-      await client.finishPasskeyLogin(email, assertion);
+      await client.finishPasskeyLogin(email, assertion, sessionNonce);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const authenticateWithPasskey = async (email: string): Promise<void> => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.authenticateWithPasskey(email);
       const currentUser = await client.getCurrentUser();
       setUser(currentUser);
     } catch (err) {
@@ -368,6 +384,7 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
     verifyMagicLink,
     startPasskeyLogin,
     finishPasskeyLogin,
+    authenticateWithPasskey,
     startPasskeyRegistration,
     finishPasskeyRegistration,
     listPasskeys,

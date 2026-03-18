@@ -389,12 +389,13 @@ export class AuthService {
     userAgent: string,
     ip: string,
   ): Promise<void> {
-    // Revoke session
+    // Revoke session and invalidate refresh token hash so it can never be reused
     await this.sessionRepository.update(
       { id: sessionId, tenantId },
       {
         revokedAt: new Date(),
         revokedReason: "user_logout",
+        refreshTokenHash: null as unknown as string,
       },
     );
 
@@ -758,6 +759,24 @@ export class AuthService {
       expiresIn: "15m",
     });
 
+    // Update session: new refresh token hash + expiry + lastUsedAt
+    if (accessTokenPayload.sessionId) {
+      const newRefreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const newRefreshTokenHash = crypto
+        .createHash("sha256")
+        .update(newToken)
+        .digest("hex");
+      await this.sessionRepository.update(
+        { id: accessTokenPayload.sessionId, tenantId },
+        {
+          refreshTokenHash: newRefreshTokenHash,
+          refreshExpiresAt: newRefreshExpiresAt,
+          lastUsedAt: new Date(),
+          lastActivity: new Date(),
+        },
+      );
+    }
+
     // Log token refresh
     this.securityEventService.log({
       tenantId,
@@ -1048,9 +1067,16 @@ export class AuthService {
   // ADD THESE METHODS TO AuthService
 
   /**
-   * Start WebAuthn authentication (passwordless login)
+   * Start WebAuthn authentication (passwordless login).
+   *
+   * Returns WebAuthn options AND an opaque sessionNonce. The client must echo
+   * the nonce back when calling finishWebAuthnLogin so the server can retrieve
+   * the single-use challenge from Redis.
    */
-  async startWebAuthnLogin(tenantId: string, email: string): Promise<any> {
+  async startWebAuthnLogin(
+    tenantId: string,
+    email: string,
+  ): Promise<{ sessionNonce: string; [key: string]: any }> {
     // Find user
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
@@ -1061,29 +1087,34 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    // Generate authentication options via WebAuthnService
-    const options = await this.webauthnService.startAuthentication(
+    // Generate authentication options via WebAuthnService (returns options + nonce)
+    const { options, sessionNonce } = await this.webauthnService.startAuthentication(
       user.id,
       tenantId,
     );
 
     console.log(`🔑 WebAuthn login started for ${email}`);
 
-    return options;
+    // Spread options so the response shape is flat: { sessionNonce, challenge, ... }
+    return { ...options, sessionNonce };
   }
 
   /**
-   * Finish WebAuthn authentication and create session
+   * Finish WebAuthn authentication and create session.
+   *
+   * @param data.sessionNonce - Opaque nonce returned by startWebAuthnLogin();
+   *                            required to retrieve the single-use challenge.
    */
   async finishWebAuthnLogin(data: {
     tenantId: string;
     email: string;
     webauthnResponse: any;
+    sessionNonce: string;
     ip: string;
     userAgent: string;
     deviceId?: string;
   }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
-    const { tenantId, email, webauthnResponse, ip, userAgent, deviceId } = data;
+    const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
     const user = await this.userRepository.findOne({
@@ -1095,11 +1126,12 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    // Verify WebAuthn response
+    // Verify WebAuthn response (passes nonce so service can look up challenge)
     const verified = await this.webauthnService.finishAuthentication(
       user.id,
       tenantId,
       webauthnResponse,
+      sessionNonce,
     );
 
     if (!verified) {
