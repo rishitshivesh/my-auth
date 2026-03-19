@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { PortalLayout } from "@/components/layouts/portal-layout"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -8,161 +8,117 @@ import { MFASettings } from "@/components/portal/mfa-settings"
 import { TrustedDeviceCard, type TrustedDevice } from "@/components/portal/trusted-device-card"
 import { ActiveSessions, type Session } from "@/components/portal/active-sessions"
 import { AuditLogList, type AuditEvent } from "@/components/portal/audit-log-list"
-import { getAuthConfig, type AuthConfig } from "@/lib/auth-config"
+import { Skeleton } from "@repo/ui"
+import { useMfaStatus, useActiveSessions, useRevokeSession, useRevokeAllOtherSessions, useTenantActivity } from "@/lib/queries"
+import type { ActiveSessionDto } from "@/lib/types"
+import { formatRelativeTime, formatEventDescription } from "@/lib/utils"
 
-const mockMFAMethods = [
-  {
-    id: "totp",
-    name: "Authenticator App",
-    type: "totp" as const,
-    enabled: true,
-    verified: true,
-    lastUpdated: "2 weeks ago",
-  },
-  { id: "email-otp", name: "Email Code", type: "email-otp" as const, enabled: false, verified: false },
-  {
-    id: "backup-codes",
-    name: "Backup Codes",
-    type: "backup-codes" as const,
-    enabled: true,
-    verified: true,
-    lastUpdated: "1 month ago",
-  },
-  { id: "passkey", name: "Passkey", type: "passkey" as const, enabled: false, verified: false },
-]
-
-const mockTrustedDevices: TrustedDevice[] = [
-  {
-    id: "1",
-    name: "MacBook Pro",
-    type: "desktop",
-    os: "macOS Ventura",
-    lastActive: "Today at 2:30 PM",
-    location: "San Francisco, CA",
-    isCurrent: true,
-  },
-  {
-    id: "2",
-    name: "iPhone 14",
-    type: "phone",
-    os: "iOS 17",
-    lastActive: "Yesterday at 6:45 PM",
-    location: "San Francisco, CA",
-    isCurrent: false,
-  },
-]
-
-const mockSessions: Session[] = [
-  {
-    id: "1",
-    device: "MacBook Pro",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    browser: "Chrome on macOS",
-    lastActive: "Just now",
-    isCurrent: true,
-  },
-  {
-    id: "2",
-    device: "iPhone 14",
-    location: "San Francisco, CA",
-    ipAddress: "203.0.113.42",
-    browser: "Safari on iOS",
-    lastActive: "2 hours ago",
-    isCurrent: false,
-  },
-  {
-    id: "3",
-    device: "Unknown",
-    location: "New York, NY",
-    ipAddress: "198.51.100.89",
-    browser: "Chrome on Windows",
-    lastActive: "3 days ago",
-    isCurrent: false,
-  },
-]
-
-const mockAuditEvents: AuditEvent[] = [
-  {
-    id: "1",
-    type: "device_login",
-    title: "New device login",
-    description: "Signed in from a new device",
-    timestamp: "Today at 2:30 PM",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "2",
-    type: "mfa_challenge",
-    title: "MFA verified",
-    description: "Successfully verified with authenticator app",
-    timestamp: "Today at 2:29 PM",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "3",
-    type: "magic_link_sent",
-    title: "Magic link sent",
-    description: "Magic link authentication request",
-    timestamp: "Yesterday at 6:45 PM",
-    location: "San Francisco, CA",
-    ipAddress: "203.0.113.42",
-    device: "iPhone 14",
-    status: "success",
-  },
-  {
-    id: "4",
-    type: "password_changed",
-    title: "Password changed",
-    description: "Account password was updated",
-    timestamp: "1 week ago",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "5",
-    type: "device_login",
-    title: "Failed login attempt",
-    description: "Multiple failed login attempts detected",
-    timestamp: "2 days ago",
-    location: "New York, NY",
-    ipAddress: "198.51.100.89",
-    device: "Unknown",
-    status: "suspicious",
-  },
-]
+// Trusted devices have no backend endpoint yet — kept as empty placeholder
+const TRUSTED_DEVICES: TrustedDevice[] = []
 
 export default function SecurityPage({ params }: { params: { slug: string } }) {
-  const [config, setConfig] = useState<AuthConfig | null>(null)
-  const [removedDevices, setRemovedDevices] = useState<string[]>([])
-  const [revokedSessions, setRevokedSessions] = useState<string[]>([])
+  const { data: mfaData, isLoading: mfaLoading } = useMfaStatus()
+  const {
+    data: rawSessions = [],
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+  } = useActiveSessions()
+  const {
+    data: activity = [],
+    isLoading: activityLoading,
+    isError: activityError,
+  } = useTenantActivity(10)
 
-  useEffect(() => {
-    getAuthConfig().then(setConfig)
-  }, [])
+  const revokeSessionMutation = useRevokeSession()
+  const revokeAllOtherMutation = useRevokeAllOtherSessions()
+
+  const [removedDevices, setRemovedDevices] = useState<string[]>([])
+
+  // Map API shape to the Session shape expected by <ActiveSessions>
+  const sessions: Session[] = (rawSessions as ActiveSessionDto[]).map((s) => ({
+    id: s.id,
+    device: s.deviceInfo?.device ?? s.deviceInfo?.type ?? "Unknown",
+    browser: `${s.deviceInfo?.browser ?? "Unknown"} on ${s.deviceInfo?.os ?? "Unknown"}`,
+    location:
+      [s.location?.city, s.location?.country].filter(Boolean).join(", ") ||
+      "Unknown location",
+    ipAddress: s.ipAddress ?? "Unknown",
+    lastActive: formatRelativeTime(s.lastActivity),
+    isCurrent: s.isCurrent,
+  }))
+
+  // Map MFA status to MFASettings method list
+  const mfaMethods = mfaData
+    ? [
+        {
+          id: "totp",
+          name: "Authenticator App",
+          type: "totp" as const,
+          enabled: mfaData.methods.includes("totp"),
+          verified: mfaData.methods.includes("totp"),
+        },
+        {
+          id: "email-otp",
+          name: "Email Code",
+          type: "email-otp" as const,
+          enabled: mfaData.methods.includes("email_otp") || mfaData.methods.includes("email-otp"),
+          verified: mfaData.methods.includes("email_otp") || mfaData.methods.includes("email-otp"),
+        },
+        {
+          id: "backup-codes",
+          name: "Backup Codes",
+          type: "backup-codes" as const,
+          enabled: (mfaData.backupCodesRemaining ?? 0) > 0,
+          verified: (mfaData.backupCodesRemaining ?? 0) > 0,
+        },
+        {
+          id: "passkey",
+          name: "Passkey",
+          type: "passkey" as const,
+          enabled: mfaData.methods.includes("passkey") || mfaData.methods.includes("webauthn"),
+          verified: mfaData.methods.includes("passkey") || mfaData.methods.includes("webauthn"),
+        },
+      ]
+    : []
+
+  // Map ActivityEvent → AuditEvent for AuditLogList component
+  const auditEvents: AuditEvent[] = activity.map((e) => ({
+    id: e.id,
+    // Map eventType to closest AuditEvent type union; fall back to device_login
+    type: (() => {
+      if (e.eventType.includes("mfa")) return "mfa_challenge" as const
+      if (e.eventType.includes("passkey")) return "passkey_used" as const
+      if (e.eventType.includes("password")) return "password_changed" as const
+      if (e.eventType.includes("revoke")) return "token_revoked" as const
+      if (e.eventType.includes("magic_link")) return "magic_link_sent" as const
+      return "device_login" as const
+    })(),
+    title: formatEventDescription(e.eventType),
+    description: formatEventDescription(e.eventType),
+    timestamp: formatRelativeTime(e.createdAt),
+    location: e.location ?? "Unknown",
+    ipAddress: e.ipAddress ?? "Unknown",
+    device: "Unknown",
+    status: (() => {
+      if (e.severity === "critical") return "suspicious" as const
+      if (e.eventType.includes("failed") || e.eventType.includes("locked")) return "failed" as const
+      return "success" as const
+    })(),
+  }))
 
   const handleRemoveDevice = (deviceId: string) => {
     setRemovedDevices([...removedDevices, deviceId])
   }
 
   const handleRevokeSession = (sessionId: string) => {
-    setRevokedSessions([...revokedSessions, sessionId])
+    revokeSessionMutation.mutate(sessionId)
   }
 
   const handleRevokeAllSessions = () => {
-    setRevokedSessions(mockSessions.map((s) => s.id))
+    revokeAllOtherMutation.mutate()
   }
 
-  const activeTrustedDevices = mockTrustedDevices.filter((d) => !removedDevices.includes(d.id))
-  const activeSessions = mockSessions.filter((s) => !revokedSessions.includes(s.id))
+  const activeTrustedDevices = TRUSTED_DEVICES.filter((d) => !removedDevices.includes(d.id))
 
   return (
     <PortalLayout
@@ -176,40 +132,76 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
         {/* Multi-Factor Authentication */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Multi-Factor Authentication</h3>
-          {config && (
+          {mfaLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : mfaData ? (
             <MFASettings
-              methods={mockMFAMethods}
+              methods={mfaMethods}
               primaryColor="#6366f1"
               onToggle={(methodId, enabled) => console.log("Toggle MFA:", { methodId, enabled })}
               onRegenerateCodes={() => console.log("Regenerate backup codes")}
             />
+          ) : (
+            <p className="text-sm text-muted-foreground">Failed to load MFA settings.</p>
           )}
         </div>
 
         {/* Trusted Devices */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Trusted Devices</h3>
-          <div className="space-y-3">
-            {activeTrustedDevices.map((device) => (
-              <TrustedDeviceCard key={device.id} device={device} onRemove={handleRemoveDevice} />
-            ))}
-          </div>
+          {activeTrustedDevices.length > 0 ? (
+            <div className="space-y-3">
+              {activeTrustedDevices.map((device) => (
+                <TrustedDeviceCard key={device.id} device={device} onRemove={handleRemoveDevice} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No trusted devices.</p>
+          )}
         </div>
 
         {/* Active Sessions */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
-          <ActiveSessions
-            sessions={activeSessions}
-            onRevoke={handleRevokeSession}
-            onRevokeAll={handleRevokeAllSessions}
-          />
+          {sessionsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : sessionsError ? (
+            <p className="text-sm text-destructive">Failed to load sessions.</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No active sessions.</p>
+          ) : (
+            <ActiveSessions
+              sessions={sessions}
+              onRevoke={handleRevokeSession}
+              onRevokeAll={handleRevokeAllSessions}
+            />
+          )}
         </div>
 
         {/* Security Events */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Security Events</h3>
-          <AuditLogList events={mockAuditEvents} />
+          {activityLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : activityError ? (
+            <p className="text-sm text-destructive">Failed to load security events.</p>
+          ) : auditEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recent security events.</p>
+          ) : (
+            <AuditLogList events={auditEvents} />
+          )}
         </div>
 
         {/* Password & Security Policies */}
@@ -220,7 +212,7 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
               <Label>Minimum Password Length</Label>
               <select className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground">
                 <option>6 characters</option>
-                <option selected>8 characters</option>
+                <option>8 characters</option>
                 <option>12 characters</option>
                 <option>16 characters</option>
               </select>
@@ -230,7 +222,7 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
               <Label>Session Timeout</Label>
               <select className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground">
                 <option>15 minutes</option>
-                <option selected>30 minutes</option>
+                <option>30 minutes</option>
                 <option>1 hour</option>
                 <option>24 hours</option>
               </select>
