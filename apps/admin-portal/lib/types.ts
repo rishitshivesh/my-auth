@@ -102,6 +102,30 @@ export interface AuthBreakdown {
   passkey: number;
 }
 
+export interface ActiveSessionDto {
+  id: string;
+  deviceInfo: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    type?: string;
+  };
+  location?: {
+    city?: string;
+    country?: string;
+    timezone?: string;
+  };
+  ipAddress?: string;
+  lastActivity: string;
+  createdAt: string;
+  isCurrent: boolean;
+  tokenFamily: {
+    familyId: string;
+    tokensInFamily: number;
+    lastUsed: string;
+  };
+}
+
 export type HeaderWeight = "regular" | "bold";
 export type BackgroundStyle = "solid" | "gradient";
 
