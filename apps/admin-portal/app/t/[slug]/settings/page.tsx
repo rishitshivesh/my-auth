@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Button } from "@repo/ui";
+import { Input } from "@repo/ui";
+import { Label } from "@repo/ui";
 
 export default function SettingsPage({ params }: { params: { slug: string } }) {
   return (
@@ -12,11 +12,16 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
       pageTitle="Settings"
       pageSubtitle="Manage your tenant settings"
       currentPath={`/t/${params.slug}/settings`}
-      primaryAction={{ label: "Save Changes", onClick: () => console.log("Save settings") }}
+      primaryAction={{
+        label: "Save Changes",
+        onClick: () => console.log("Save settings"),
+      }}
     >
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-6 text-lg font-semibold text-foreground">Tenant Information</h3>
+          <h3 className="mb-6 text-lg font-semibold text-foreground">
+            Tenant Information
+          </h3>
 
           <div className="space-y-4">
             <div>
@@ -42,7 +47,9 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-6 text-lg font-semibold text-foreground">Danger Zone</h3>
+          <h3 className="mb-6 text-lg font-semibold text-foreground">
+            Danger Zone
+          </h3>
 
           <div className="space-y-3">
             <Button
@@ -52,11 +59,12 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
               Delete Tenant
             </Button>
             <p className="text-xs text-muted-foreground">
-              Once you delete your tenant, there is no going back. Please be certain.
+              Once you delete your tenant, there is no going back. Please be
+              certain.
             </p>
           </div>
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }

@@ -1,14 +1,23 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { MFASettings } from "@/components/portal/mfa-settings"
-import { TrustedDeviceCard, type TrustedDevice } from "@/components/portal/trusted-device-card"
-import { ActiveSessions, type Session } from "@/components/portal/active-sessions"
-import { AuditLogList, type AuditEvent } from "@/components/portal/audit-log-list"
-import { getAuthConfig, type AuthConfig } from "@/lib/auth-config"
+import { useState, useEffect } from "react";
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Button } from "@repo/ui";
+import { Label } from "@repo/ui";
+import { MFASettings } from "@/components/portal/mfa-settings";
+import {
+  TrustedDeviceCard,
+  type TrustedDevice,
+} from "@/components/portal/trusted-device-card";
+import {
+  ActiveSessions,
+  type Session,
+} from "@/components/portal/active-sessions";
+import {
+  AuditLogList,
+  type AuditEvent,
+} from "@/components/portal/audit-log-list";
+import { getAuthConfig, type AuthConfig } from "@/lib/auth-config";
 
 const mockMFAMethods = [
   {
@@ -19,7 +28,13 @@ const mockMFAMethods = [
     verified: true,
     lastUpdated: "2 weeks ago",
   },
-  { id: "email-otp", name: "Email Code", type: "email-otp" as const, enabled: false, verified: false },
+  {
+    id: "email-otp",
+    name: "Email Code",
+    type: "email-otp" as const,
+    enabled: false,
+    verified: false,
+  },
   {
     id: "backup-codes",
     name: "Backup Codes",
@@ -28,8 +43,14 @@ const mockMFAMethods = [
     verified: true,
     lastUpdated: "1 month ago",
   },
-  { id: "passkey", name: "Passkey", type: "passkey" as const, enabled: false, verified: false },
-]
+  {
+    id: "passkey",
+    name: "Passkey",
+    type: "passkey" as const,
+    enabled: false,
+    verified: false,
+  },
+];
 
 const mockTrustedDevices: TrustedDevice[] = [
   {
@@ -50,7 +71,7 @@ const mockTrustedDevices: TrustedDevice[] = [
     location: "San Francisco, CA",
     isCurrent: false,
   },
-]
+];
 
 const mockSessions: Session[] = [
   {
@@ -80,7 +101,7 @@ const mockSessions: Session[] = [
     lastActive: "3 days ago",
     isCurrent: false,
   },
-]
+];
 
 const mockAuditEvents: AuditEvent[] = [
   {
@@ -138,31 +159,35 @@ const mockAuditEvents: AuditEvent[] = [
     device: "Unknown",
     status: "suspicious",
   },
-]
+];
 
 export default function SecurityPage({ params }: { params: { slug: string } }) {
-  const [config, setConfig] = useState<AuthConfig | null>(null)
-  const [removedDevices, setRemovedDevices] = useState<string[]>([])
-  const [revokedSessions, setRevokedSessions] = useState<string[]>([])
+  const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [removedDevices, setRemovedDevices] = useState<string[]>([]);
+  const [revokedSessions, setRevokedSessions] = useState<string[]>([]);
 
   useEffect(() => {
-    getAuthConfig().then(setConfig)
-  }, [])
+    getAuthConfig().then(setConfig);
+  }, []);
 
   const handleRemoveDevice = (deviceId: string) => {
-    setRemovedDevices([...removedDevices, deviceId])
-  }
+    setRemovedDevices([...removedDevices, deviceId]);
+  };
 
   const handleRevokeSession = (sessionId: string) => {
-    setRevokedSessions([...revokedSessions, sessionId])
-  }
+    setRevokedSessions([...revokedSessions, sessionId]);
+  };
 
   const handleRevokeAllSessions = () => {
-    setRevokedSessions(mockSessions.map((s) => s.id))
-  }
+    setRevokedSessions(mockSessions.map((s) => s.id));
+  };
 
-  const activeTrustedDevices = mockTrustedDevices.filter((d) => !removedDevices.includes(d.id))
-  const activeSessions = mockSessions.filter((s) => !revokedSessions.includes(s.id))
+  const activeTrustedDevices = mockTrustedDevices.filter(
+    (d) => !removedDevices.includes(d.id),
+  );
+  const activeSessions = mockSessions.filter(
+    (s) => !revokedSessions.includes(s.id),
+  );
 
   return (
     <PortalLayout
@@ -170,17 +195,24 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
       pageTitle="Security"
       pageSubtitle="Manage your account security and authentication methods"
       currentPath={`/t/${params.slug}/security`}
-      primaryAction={{ label: "Save Settings", onClick: () => console.log("Save security") }}
+      primaryAction={{
+        label: "Save Settings",
+        onClick: () => console.log("Save security"),
+      }}
     >
       <div className="space-y-8">
         {/* Multi-Factor Authentication */}
         <div>
-          <h3 className="text-lg font-semibold mb-4">Multi-Factor Authentication</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Multi-Factor Authentication
+          </h3>
           {config && (
             <MFASettings
               methods={mockMFAMethods}
               primaryColor="#6366f1"
-              onToggle={(methodId, enabled) => console.log("Toggle MFA:", { methodId, enabled })}
+              onToggle={(methodId, enabled) =>
+                console.log("Toggle MFA:", { methodId, enabled })
+              }
               onRegenerateCodes={() => console.log("Regenerate backup codes")}
             />
           )}
@@ -191,7 +223,11 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
           <h3 className="text-lg font-semibold mb-4">Trusted Devices</h3>
           <div className="space-y-3">
             {activeTrustedDevices.map((device) => (
-              <TrustedDeviceCard key={device.id} device={device} onRemove={handleRemoveDevice} />
+              <TrustedDeviceCard
+                key={device.id}
+                device={device}
+                onRemove={handleRemoveDevice}
+              />
             ))}
           </div>
         </div>
@@ -214,7 +250,9 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
 
         {/* Password & Security Policies */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-6">Password & Security Policies</h3>
+          <h3 className="text-lg font-semibold mb-6">
+            Password & Security Policies
+          </h3>
           <div className="space-y-4">
             <div>
               <Label>Minimum Password Length</Label>
@@ -237,15 +275,31 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-              <input type="checkbox" id="https" defaultChecked className="w-4 h-4" />
-              <Label htmlFor="https" className="flex-1 cursor-pointer font-normal">
+              <input
+                type="checkbox"
+                id="https"
+                defaultChecked
+                className="w-4 h-4"
+              />
+              <Label
+                htmlFor="https"
+                className="flex-1 cursor-pointer font-normal"
+              >
                 Require HTTPS for all communications
               </Label>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-              <input type="checkbox" id="device-trust" defaultChecked className="w-4 h-4" />
-              <Label htmlFor="device-trust" className="flex-1 cursor-pointer font-normal">
+              <input
+                type="checkbox"
+                id="device-trust"
+                defaultChecked
+                className="w-4 h-4"
+              />
+              <Label
+                htmlFor="device-trust"
+                className="flex-1 cursor-pointer font-normal"
+              >
                 Enable trusted device feature
               </Label>
             </div>
@@ -254,7 +308,9 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
 
         {/* Danger Zone */}
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-          <h3 className="text-lg font-semibold mb-4 text-destructive">Danger Zone</h3>
+          <h3 className="text-lg font-semibold mb-4 text-destructive">
+            Danger Zone
+          </h3>
           <div className="space-y-3">
             <Button
               variant="outline"
@@ -274,5 +330,5 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }
