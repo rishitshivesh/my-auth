@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig } from "./types";
+import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig, ActiveSessionDto } from "./types";
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -210,6 +210,50 @@ export function useAuthBreakdown() {
       if (!res.ok) throw new Error("Failed to fetch auth breakdown");
       return res.data.data;
     },
+  });
+}
+
+// ── Session Management ────────────────────────────────────────
+
+export function useActiveSessions() {
+  return useQuery<ActiveSessionDto[]>({
+    queryKey: ["sessions", "active"],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl("/sessions/active"),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch active sessions");
+      return res.data.data;
+    },
+  });
+}
+
+export function useRevokeSession() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: async (sessionId: string) => {
+      const res = await authClient.request({
+        url: apiUrl(`/sessions/${sessionId}`),
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to revoke session");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
+  });
+}
+
+export function useRevokeAllOtherSessions() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl("/sessions/all/other"),
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to revoke all other sessions");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
   });
 }
 

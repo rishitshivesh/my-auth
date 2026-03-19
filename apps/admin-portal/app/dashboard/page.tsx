@@ -10,7 +10,7 @@ import { formatDistanceToNow } from "date-fns"
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { data, isLoading } = useDashboard()
+  const { data, isLoading, isError } = useDashboard()
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -31,7 +31,11 @@ export default function DashboardPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {isLoading ? (
+          {isError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+              Failed to load dashboard data. Please refresh the page.
+            </div>
+          ) : isLoading ? (
             <div className="space-y-6">
               <Skeleton className="h-16 w-full rounded-xl" />
               <div className="grid grid-cols-3 gap-4">

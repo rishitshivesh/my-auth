@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, Smartphone, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Key, Smartphone, Loader2, CheckCircle, XCircle, Globe, LogOut } from "lucide-react";
 import { Button } from "@repo/ui";
-import { useMfaStatus, useListPasskeys, useDeletePasskey } from "@/lib/queries";
-import type { PasskeyCredential } from "@/lib/types";
+import { useMfaStatus, useListPasskeys, useDeletePasskey, useActiveSessions, useRevokeSession, useRevokeAllOtherSessions } from "@/lib/queries";
+import type { PasskeyCredential, ActiveSessionDto } from "@/lib/types";
 import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
+import { formatRelativeTime } from "@/lib/utils";
 
 function formatDate(dateStr: string): string {
   try {
@@ -42,10 +43,14 @@ export default function SecuritySettingsPage() {
   const router = useRouter();
   const { data: mfaData, isLoading: mfaLoading } = useMfaStatus();
   const { data: passkeys = [], isLoading: passkeysLoading, refetch: refetchPasskeys } = useListPasskeys();
+  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError } = useActiveSessions();
+  const revokeSessionMutation = useRevokeSession();
+  const revokeAllOtherMutation = useRevokeAllOtherSessions();
   const deletePasskeyMutation = useDeletePasskey();
 
   const [showPasskeyModal, setShowPasskeyModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -53,6 +58,27 @@ export default function SecuritySettingsPage() {
     if (isError) setError(msg);
     else setSuccessMsg(msg);
     setTimeout(() => { setSuccessMsg(null); setError(null); }, 3000);
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    try {
+      setRevokingId(sessionId);
+      await revokeSessionMutation.mutateAsync(sessionId);
+      flash("Session revoked");
+    } catch (err: unknown) {
+      flash((err as Error)?.message || "Failed to revoke session", true);
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const handleRevokeAllOther = async () => {
+    try {
+      await revokeAllOtherMutation.mutateAsync();
+      flash("All other sessions revoked");
+    } catch (err: unknown) {
+      flash((err as Error)?.message || "Failed to revoke sessions", true);
+    }
   };
 
   const handleDeletePasskey = async (credentialId: string) => {
@@ -208,7 +234,98 @@ export default function SecuritySettingsPage() {
         </Button>
       </section>
 
-      {/* TODO: Sessions section — FIX D: implement active sessions list via API */}
+      {/* Sessions Section */}
+      <section className="rounded-xl border border-border p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Globe className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground">Active Sessions</h2>
+              <p className="text-xs text-muted-foreground">
+                Devices currently signed in to your account
+              </p>
+            </div>
+          </div>
+          {!sessionsLoading && sessions.filter((s) => !s.isCurrent).length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRevokeAllOther}
+              disabled={revokeAllOtherMutation.isPending}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
+            >
+              {revokeAllOtherMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <LogOut className="h-3 w-3 mr-1" />
+              )}
+              Revoke all others
+            </Button>
+          )}
+        </div>
+
+        {sessionsLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : sessionsError ? (
+          <p className="text-sm text-destructive py-1">Failed to load sessions.</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-1">No active sessions found.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+            {(sessions as ActiveSessionDto[]).map((session) => (
+              <li
+                key={session.id}
+                className="flex items-center justify-between px-4 py-3 bg-background gap-4"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-foreground">
+                        {`${session.deviceInfo?.browser ?? 'Unknown'} on ${session.deviceInfo?.os ?? 'Unknown'}`}
+                      </p>
+                      {session.isCurrent && (
+                        <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                          Current session
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {session.ipAddress ?? 'Unknown IP'}
+                      {session.location?.city ? ` · ${session.location.city}` : ''}
+                      {session.location?.country ? `, ${session.location.country}` : ''}
+                      {' · '}
+                      {formatRelativeTime(session.lastActivity)}
+                    </p>
+                  </div>
+                </div>
+                {!session.isCurrent && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevokeSession(session.id)}
+                    disabled={revokingId === session.id}
+                    className="text-muted-foreground hover:text-destructive transition-colors text-xs shrink-0"
+                    aria-label="Revoke this session"
+                  >
+                    {revokingId === session.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Revoke"
+                    )}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <PasskeyRegisterModal
         open={showPasskeyModal}
