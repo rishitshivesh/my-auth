@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import {
   usePlatformSettings,
   useUpdatePlatformSettings,
@@ -11,45 +10,14 @@ import {
   type TeamMember,
 } from '@/lib/admin-queries'
 import { formatRelativeTime } from '@/lib/utils'
+import { withAdmin } from '@/lib/with-admin'
+import { AdminSidebar } from '@/components/admin-sidebar'
+import { usePortalBranding, useUpdatePortalBranding } from '@/lib/portal-queries'
+import type { PortalBranding } from '@/lib/portal-queries'
 
-const TABS = ['general', 'team'] as const
+const TABS = ['general', 'branding', 'team'] as const
 type Tab = (typeof TABS)[number]
 
-function AdminSidebar() {
-  return (
-    <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Fort Knox</p>
-          <p className="text-xs text-muted-foreground">Superadmin</p>
-        </div>
-      </div>
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {[
-          { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
-          { label: 'Tenants', href: '/tenants', icon: '🏢' },
-          { label: 'Users', href: '/users', icon: '👥' },
-          { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
-          { label: 'Settings', href: '/settings', icon: '⚙' },
-        ].map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              item.href === '/settings'
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-          >
-            <span className="text-base">{item.icon}</span>
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-    </aside>
-  )
-}
 
 function GeneralSettings() {
   const { data: settings, isLoading } = usePlatformSettings()
@@ -318,7 +286,167 @@ function TeamSettings() {
   )
 }
 
-export default function SettingsPage() {
+const FONT_OPTIONS = ['Inter', 'Geist', 'Roboto', 'System Default'] as const
+
+function BrandingSettings() {
+  const { data: branding, isLoading } = usePortalBranding()
+  const { mutate: updateBranding, isPending, error: saveError } = useUpdatePortalBranding()
+
+  const [local, setLocal] = useState<Partial<PortalBranding>>({})
+  const [initialized, setInitialized] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  if (branding && !initialized) {
+    setLocal({
+      primaryColor: branding.primaryColor,
+      fontFamily: branding.fontFamily,
+      headerWeight: branding.headerWeight,
+    })
+    setInitialized(true)
+  }
+
+  const previewColor = local.primaryColor ?? branding?.primaryColor ?? '#6366f1'
+
+  const hasChanges = initialized && branding &&
+    JSON.stringify({
+      primaryColor: local.primaryColor,
+      fontFamily: local.fontFamily,
+      headerWeight: local.headerWeight,
+    }) !== JSON.stringify({
+      primaryColor: branding.primaryColor,
+      fontFamily: branding.fontFamily,
+      headerWeight: branding.headerWeight,
+    })
+
+  function handleSave() {
+    updateBranding(local, {
+      onSuccess: () => {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2500)
+      },
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+        <h2 className="text-sm font-semibold text-foreground">Portal Branding</h2>
+
+        {/* Primary color */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Primary Color</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={previewColor}
+              onChange={(e) => setLocal((p) => ({ ...p, primaryColor: e.target.value }))}
+              className="h-10 w-16 cursor-pointer rounded-lg border border-border bg-background p-0.5"
+            />
+            <input
+              type="text"
+              value={previewColor}
+              onChange={(e) => setLocal((p) => ({ ...p, primaryColor: e.target.value }))}
+              maxLength={7}
+              className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            {/* Live preview */}
+            <div className="flex items-center gap-3 ml-4">
+              <button
+                style={{ backgroundColor: previewColor }}
+                className="rounded-lg px-4 py-1.5 text-sm font-medium text-white"
+              >
+                Button
+              </button>
+              <a
+                href="#"
+                style={{ color: previewColor }}
+                className="text-sm font-medium underline"
+                onClick={(e) => e.preventDefault()}
+              >
+                Link
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Font family */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Font Family</label>
+          <select
+            value={local.fontFamily ?? branding?.fontFamily ?? 'Inter'}
+            onChange={(e) => setLocal((p) => ({ ...p, fontFamily: e.target.value }))}
+            className="w-full max-w-xs rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Header weight */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Header Weight</label>
+          <div className="flex items-center gap-4">
+            {(['regular', 'bold'] as const).map((w) => (
+              <label key={w} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="headerWeight"
+                  value={w}
+                  checked={(local.headerWeight ?? branding?.headerWeight) === w}
+                  onChange={() => setLocal((p) => ({ ...p, headerWeight: w }))}
+                  className="accent-primary"
+                />
+                <span className="text-sm text-foreground capitalize">{w}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Logo upload — placeholder */}
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">Logo</label>
+          <div className="flex h-24 w-full max-w-xs items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20">
+            <p className="text-xs text-muted-foreground">Upload — coming soon</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div>
+            {saved && (
+              <span className="text-xs text-emerald-600 font-medium">Saved</span>
+            )}
+            {saveError && (
+              <span className="text-xs text-destructive">{saveError.message}</span>
+            )}
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges || isPending}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {isPending && (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+            )}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SettingsPage() {
   const [tab, setTab] = useState<Tab>('general')
 
   return (
@@ -341,7 +469,7 @@ export default function SettingsPage() {
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {t === 'general' ? 'General' : 'Team'}
+                {t === 'general' ? 'General' : t === 'branding' ? 'Branding' : 'Team'}
               </button>
             ))}
           </div>
@@ -349,9 +477,12 @@ export default function SettingsPage() {
 
         <main className="flex-1 overflow-y-auto p-8">
           {tab === 'general' && <GeneralSettings />}
+          {tab === 'branding' && <BrandingSettings />}
           {tab === 'team' && <TeamSettings />}
         </main>
       </div>
     </div>
   )
 }
+
+export default withAdmin(SettingsPage)

@@ -3,14 +3,14 @@
 import { usePlatformMetrics, usePlatformActivity } from '@/lib/admin-queries'
 import { formatRelativeTime, formatEventDescription, getEventColor } from '@/lib/utils'
 import Link from 'next/link'
-import { useAuth } from '@fortknox/sdk'
+import { withAdmin } from '@/lib/with-admin'
+import { AdminSidebar } from '@/components/admin-sidebar'
 
 function MetricSkeleton() {
   return <div className="h-9 w-24 rounded-md bg-muted animate-pulse" />
 }
 
-export default function SuperAdminDashboard() {
-  const { user } = useAuth()
+function SuperAdminDashboard() {
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = usePlatformMetrics()
   const { data: activity, isLoading: activityLoading } = usePlatformActivity(20)
 
@@ -47,43 +47,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
-        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-            FK
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Fort Knox</p>
-            <p className="text-xs text-muted-foreground">Superadmin</p>
-          </div>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {[
-            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
-            { label: 'Tenants', href: '/tenants', icon: '🏢' },
-            { label: 'Users', href: '/users', icon: '👥' },
-            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
-            { label: 'Settings', href: '/settings', icon: '⚙' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                item.href === '/dashboard'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-            >
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="border-t border-border px-3 py-3">
-          <p className="truncate text-xs text-muted-foreground px-3">{user?.email}</p>
-        </div>
-      </aside>
+      <AdminSidebar />
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -213,3 +177,5 @@ export default function SuperAdminDashboard() {
     </div>
   )
 }
+
+export default withAdmin(SuperAdminDashboard)
