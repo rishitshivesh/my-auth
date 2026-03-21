@@ -1,54 +1,35 @@
-"use client"
+/**
+ * Superadmin Dashboard Layout — Server Component
+ *
+ * Enforces that only Fort Knox internal (fortknox-internal group) users
+ * can access /dashboard and its sub-routes.
+ */
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { verifyAdminSession, isSuperAdmin } from '@/lib/auth-guard'
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@fortknox/sdk"
-import { Skeleton } from "@repo/ui"
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const cookieStore = cookies()
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join('; ')
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { user, isLoading } = useAuth()
+  const user = await verifyAdminSession(cookieHeader)
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/u/login")
-    }
-  }, [user, isLoading, router])
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen bg-background">
-        <div className="w-64 border-r border-border bg-card p-4 space-y-4">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-5 w-40" />
-          <div className="space-y-1 pt-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col">
-          <div className="border-b border-border px-8 py-4 bg-card">
-            <Skeleton className="h-6 w-40" />
-          </div>
-          <div className="p-8 space-y-6">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <div className="grid grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-xl" />
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <Skeleton className="h-72 rounded-xl" />
-              <Skeleton className="h-72 rounded-xl" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  if (!user) {
+    redirect('/u/login')
   }
 
-  if (!user) return null
+  if (!isSuperAdmin(user)) {
+    // Authenticated but not a superadmin — send to their tenant portal
+    const slug = user.tenantSlug ?? ''
+    redirect(`/t/${slug}/dashboard`)
+  }
 
   return <>{children}</>
 }

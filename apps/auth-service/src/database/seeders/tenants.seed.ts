@@ -25,6 +25,23 @@ export async function seed() {
 
     const tenants = [
       {
+        name: "Fort Knox",
+        slug: "fortknox",
+        subdomain: "fortknox",
+        status: "active",
+        plan: "enterprise",
+        settings: {
+          platformName: "Fort Knox",
+        },
+        featureFlags: {
+          mfaRequired: true,
+          passwordlessEnabled: true,
+          socialProvidersEnabled: false,
+        },
+        isActive: true,
+        environment: "production",
+      },
+      {
         name: "Default Organization",
         slug: "default",
         subdomain: "default",
@@ -134,6 +151,24 @@ export async function seed() {
         isSystem: false,
       },
     ];
+
+    // Seed fortknox-internal role for the fortknox tenant only
+    const fortknoxTenant = allTenants.find((t) => t.slug === "fortknox");
+    if (fortknoxTenant) {
+      const existing = await roleRepo.findOne({
+        where: { name: "fortknox-internal", tenantId: fortknoxTenant.id },
+      });
+      if (!existing) {
+        const role = roleRepo.create({
+          name: "fortknox-internal",
+          description: "Fort Knox platform superadmin — grants access to the admin portal",
+          tenantId: fortknoxTenant.id,
+          isSystem: true,
+        });
+        await roleRepo.save(role);
+        console.log(`  ✅ Created role: fortknox/fortknox-internal`);
+      }
+    }
 
     for (const tenant of allTenants) {
       for (const roleData of systemRoles) {

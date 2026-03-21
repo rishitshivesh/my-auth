@@ -185,6 +185,7 @@ export class OAuthRefreshTokenService {
     });
 
     // Return payload for new access token
+    // groups and tenantSlug are resolved by AuthService.refreshToken using this payload
     const accessTokenPayload = {
       sub: storedToken.userId,
       email: storedToken.user.email,

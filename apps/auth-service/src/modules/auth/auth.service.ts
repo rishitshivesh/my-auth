@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull } from "typeorm";
+import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -15,6 +15,7 @@ import {
   Tenant,
   OAuthRefreshToken,
   UserSocialConnection,
+  UserRole,
   SecurityEventType,
 } from "@repo/database";
 import {
@@ -54,6 +55,8 @@ export class AuthService {
     private readonly oauthRefreshTokenRepository: Repository<OAuthRefreshToken>,
     @InjectRepository(UserSocialConnection)
     private readonly socialConnectionRepository: Repository<UserSocialConnection>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepository: Repository<UserRole>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -65,6 +68,43 @@ export class AuthService {
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly securityEventService: SecurityEventService,
   ) {}
+
+  /**
+   * Get role names (groups) for a user within a tenant
+   */
+  private async getUserGroups(userId: string, tenantId: string): Promise<string[]> {
+    const userRoles = await this.userRoleRepository.find({
+      where: { userId, tenantId },
+      relations: ['role'],
+    });
+    return userRoles.map((ur) => ur.role.name).filter(Boolean);
+  }
+
+  /**
+   * Build a complete JWT access token payload including groups and tenantSlug
+   */
+  private async buildAccessTokenPayload(
+    userId: string,
+    email: string,
+    tenantId: string,
+    sessionId: string,
+    tenant?: Tenant,
+  ): Promise<Record<string, any>> {
+    const [groups, resolvedTenant] = await Promise.all([
+      this.getUserGroups(userId, tenantId),
+      tenant
+        ? Promise.resolve(tenant)
+        : this.tenantRepository.findOne({ where: { id: tenantId } }),
+    ]);
+    return {
+      sub: userId,
+      email,
+      tenantId,
+      tenantSlug: resolvedTenant?.slug ?? '',
+      groups,
+      sessionId,
+    };
+  }
 
   /**
    * Register a new user (TENANT REQUIRED)
@@ -335,13 +375,15 @@ export class AuthService {
     console.log("✅ Refresh token created");
 
     // Step 3: Generate access token (NOW we have sessionId!)
+    const accessTokenPayloadData = await this.buildAccessTokenPayload(
+      user.id,
+      user.email,
+      data.tenantId,
+      session.id,
+      user.tenant,
+    );
     const accessToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: data.tenantId,
-        sessionId: session.id,
-      },
+      accessTokenPayloadData,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -537,8 +579,9 @@ export class AuthService {
       expiresInDays: 30,
     });
 
+    const magicLinkPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      magicLinkPayload,
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
@@ -753,8 +796,15 @@ export class AuthService {
       throw err;
     }
 
+    // Enrich payload with groups and tenantSlug
+    const enrichedPayload = await this.buildAccessTokenPayload(
+      accessTokenPayload.sub,
+      accessTokenPayload.email,
+      accessTokenPayload.tenantId,
+      accessTokenPayload.sessionId,
+    );
     // Generate new access token
-    const accessToken = this.jwtService.sign(accessTokenPayload, {
+    const accessToken = this.jwtService.sign(enrichedPayload, {
       secret: this.configService.get("JWT_SECRET"),
       expiresIn: "15m",
     });
@@ -961,13 +1011,9 @@ export class AuthService {
       userAgent: userAgent || "unknown",
     });
 
+    const mfaPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      {
-        sub: payload.sub,
-        email: payload.email,
-        tenantId,
-        sessionId: session.id,
-      },
+      mfaPayload,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -1033,13 +1079,9 @@ export class AuthService {
       userAgent: userAgent || "unknown",
     });
 
+    const backupPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      {
-        sub: payload.sub,
-        email: payload.email,
-        tenantId,
-        sessionId: session.id,
-      },
+      backupPayload,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -1175,8 +1217,9 @@ export class AuthService {
       expiresInDays: 30,
     });
 
+    const passkeyPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      passkeyPayload,
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
