@@ -81,10 +81,14 @@ export class AdminService {
   ) {}
 
   private async getFortKnoxTenant(): Promise<Tenant | null> {
-    return this.tenantRepository.findOne({ where: { slug: FORTKNOX_TENANT_SLUG } });
+    return this.tenantRepository.findOne({
+      where: { slug: FORTKNOX_TENANT_SLUG },
+    });
   }
 
-  private async getFortKnoxInternalRole(tenantId: string): Promise<Role | null> {
+  private async getFortKnoxInternalRole(
+    tenantId: string,
+  ): Promise<Role | null> {
     return this.roleRepository.findOne({
       where: { name: FORTKNOX_INTERNAL_ROLE, tenantId },
     });
@@ -187,7 +191,11 @@ export class AdminService {
     const [userCount, activeSessions, recentActivity] = await Promise.all([
       this.userRepository.count({ where: { tenantId: id } }),
       this.sessionRepository.count({
-        where: { tenantId: id, revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+        where: {
+          tenantId: id,
+          revokedAt: IsNull(),
+          expiresAt: MoreThan(new Date()),
+        },
       }),
       this.securityEventRepository.find({
         where: { tenantId: id },
@@ -245,7 +253,7 @@ export class AdminService {
     } as any);
     if (dto.plan) (tenant as any).plan = dto.plan;
 
-    const saved = await this.tenantRepository.save(tenant);
+    const saved: any = await this.tenantRepository.save(tenant);
     return this.getTenantById(saved.id);
   }
 
@@ -271,30 +279,65 @@ export class AdminService {
     await this.tenantRepository.delete({ id });
   }
 
-  async checkSlugAvailability(slug: string): Promise<{ available: boolean; reason?: string }> {
+  async checkSlugAvailability(
+    slug: string,
+  ): Promise<{ available: boolean; reason?: string }> {
     const RESERVED = [
-      "admin", "api", "auth", "www", "mail", "smtp", "fortknox",
-      "support", "help", "status", "billing", "dashboard", "login",
-      "logout", "signup", "register",
+      "admin",
+      "api",
+      "auth",
+      "www",
+      "mail",
+      "smtp",
+      "fortknox",
+      "support",
+      "help",
+      "status",
+      "billing",
+      "dashboard",
+      "login",
+      "logout",
+      "signup",
+      "register",
     ];
 
-    if (slug.length < 4) return { available: false, reason: "Slug must be at least 4 characters" };
-    if (slug.length > 63) return { available: false, reason: "Slug must be 63 characters or less" };
-    if (!/^[a-z0-9-]+$/.test(slug)) return { available: false, reason: "Only lowercase letters, numbers, and hyphens allowed" };
-    if (slug.startsWith("-") || slug.endsWith("-")) return { available: false, reason: "Slug cannot start or end with a hyphen" };
-    if (RESERVED.includes(slug)) return { available: false, reason: "This slug is reserved" };
+    if (slug.length < 4)
+      return { available: false, reason: "Slug must be at least 4 characters" };
+    if (slug.length > 63)
+      return { available: false, reason: "Slug must be 63 characters or less" };
+    if (!/^[a-z0-9-]+$/.test(slug))
+      return {
+        available: false,
+        reason: "Only lowercase letters, numbers, and hyphens allowed",
+      };
+    if (slug.startsWith("-") || slug.endsWith("-"))
+      return {
+        available: false,
+        reason: "Slug cannot start or end with a hyphen",
+      };
+    if (RESERVED.includes(slug))
+      return { available: false, reason: "This slug is reserved" };
 
     // Check Redis reservation
-    const reservationKey = `slug:reservation:${slug}`;
-    const reserved = await this.redisService.get(reservationKey).catch(() => null);
-    if (reserved) return { available: false, reason: "This slug is being claimed by another user" };
+    const reservationKey = `common:slug:reservation:${slug}`;
+    const reserved = await this.redisService
+      .get("", "", reservationKey)
+      .catch(() => null);
+    if (reserved)
+      return {
+        available: false,
+        reason: "This slug is being claimed by another user",
+      };
 
     // Check database
     const existing = await this.tenantRepository.findOne({ where: { slug } });
-    if (existing) return { available: false, reason: "This slug is already taken" };
+    if (existing)
+      return { available: false, reason: "This slug is already taken" };
 
     // Reserve for 5 minutes
-    await this.redisService.set(reservationKey, "pending", 300).catch(() => {});
+    await this.redisService
+      .set("", "", reservationKey, "pending", 300)
+      .catch(() => {});
 
     return { available: true };
   }
@@ -346,7 +389,9 @@ export class AdminService {
       where: { email, tenantId: fkTenant.id },
     });
     if (!user) {
-      throw new NotFoundException(`No user with email "${email}" found in the fortknox tenant`);
+      throw new NotFoundException(
+        `No user with email "${email}" found in the fortknox tenant`,
+      );
     }
 
     let role = await this.getFortKnoxInternalRole(fkTenant.id);
@@ -356,12 +401,12 @@ export class AdminService {
         description: "Fort Knox platform superadmin",
         tenantId: fkTenant.id,
         isSystem: true,
-      } as any);
-      role = await this.roleRepository.save(role);
+      } as any) as any;
+      role = await this.roleRepository.save(role as any);
     }
 
     const existing = await this.userRoleRepository.findOne({
-      where: { userId: user.id, roleId: role.id, tenantId: fkTenant.id },
+      where: { userId: user.id, roleId: role?.id, tenantId: fkTenant.id },
     });
     if (existing) {
       throw new ConflictException(`${email} is already a team member`);
@@ -369,7 +414,7 @@ export class AdminService {
 
     const userRole = this.userRoleRepository.create({
       userId: user.id,
-      roleId: role.id,
+      roleId: role?.id,
       tenantId: fkTenant.id,
     });
     await this.userRoleRepository.save(userRole);
@@ -408,13 +453,16 @@ export class AdminService {
       platformName: stored.platformName ?? "Fort Knox",
       smtpConfigured: !!(process.env.SMTP_HOST || stored.smtpHost),
       smtpHost: stored.smtpHost ?? process.env.SMTP_HOST ?? undefined,
-      supportEmail: stored.supportEmail ?? process.env.SUPPORT_EMAIL ?? undefined,
+      supportEmail:
+        stored.supportEmail ?? process.env.SUPPORT_EMAIL ?? undefined,
       allowPublicSignup: stored.allowPublicSignup ?? false,
       maintenanceMode: stored.maintenanceMode ?? false,
     };
   }
 
-  async updatePlatformSettings(dto: Partial<PlatformSettingsDto>): Promise<PlatformSettingsDto> {
+  async updatePlatformSettings(
+    dto: Partial<PlatformSettingsDto>,
+  ): Promise<PlatformSettingsDto> {
     const fkTenant = await this.getFortKnoxTenant();
     if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
 
@@ -424,10 +472,14 @@ export class AdminService {
     if (dto.platformName !== undefined) updated.platformName = dto.platformName;
     if (dto.smtpHost !== undefined) updated.smtpHost = dto.smtpHost;
     if (dto.supportEmail !== undefined) updated.supportEmail = dto.supportEmail;
-    if (dto.allowPublicSignup !== undefined) updated.allowPublicSignup = dto.allowPublicSignup;
-    if (dto.maintenanceMode !== undefined) updated.maintenanceMode = dto.maintenanceMode;
+    if (dto.allowPublicSignup !== undefined)
+      updated.allowPublicSignup = dto.allowPublicSignup;
+    if (dto.maintenanceMode !== undefined)
+      updated.maintenanceMode = dto.maintenanceMode;
 
-    await this.tenantRepository.update({ id: fkTenant.id }, { settings: updated } as any);
+    await this.tenantRepository.update({ id: fkTenant.id }, {
+      settings: updated,
+    } as any);
     return this.getPlatformSettings();
   }
 }

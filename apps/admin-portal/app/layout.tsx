@@ -14,7 +14,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const authClient = createWebClient({
   baseURL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000",
-  tenant: process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID || "",
+  tenant:
+    process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
+    process.env.FORTKNOX_TENANT_ID ||
+    "",
   debug: process.env.NODE_ENV === "development",
 });
 

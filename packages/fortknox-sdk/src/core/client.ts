@@ -645,7 +645,12 @@ export class FortKnoxClient {
     if (!this.state.accessToken) return null;
     try {
       const payload = JSON.parse(
-        atob(this.state.accessToken.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))
+        atob(
+          this.state.accessToken
+            .split(".")[1]!
+            .replace(/-/g, "+")
+            .replace(/_/g, "/"),
+        ),
       );
       return payload;
     } catch {
@@ -668,15 +673,16 @@ export class FortKnoxClient {
 
   isFortKnoxInternal(): boolean {
     const fortknoxTenantId =
-      typeof process !== 'undefined'
-        ? (process.env as any)?.NEXT_PUBLIC_FORTKNOX_TENANT_ID
+      typeof process !== "undefined"
+        ? (process.env as any)?.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
+          process.env.FORTKNOX_TENANT_ID
         : undefined;
     const claims = this.getTokenClaims();
     if (!claims) return false;
     const tenantMatches = fortknoxTenantId
       ? claims.tenantId === fortknoxTenantId
-      : claims.tenantSlug === 'fortknox';
-    return tenantMatches && this.isInGroup('fortknox-internal');
+      : claims.tenantSlug === "fortknox";
+    return tenantMatches && this.isInGroup("fortknox-internal");
   }
 
   /**

@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2026-03-18T04:05:30.883Z
+Generated: 2026-03-19T11:11:54.752Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -504,50 +504,52 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ================================================================================
 FILE: apps/admin-portal/app/auth/callback/page.tsx
-SIZE: 3.76 KB | LINES: 102
+SIZE: 4.15 KB | LINES: 124
 ================================================================================
 
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { PublicLayout } from "@/components/layouts/public-layout"
-import { Button } from "@repo/ui"
+import { useState, useEffect } from "react";
+import { PublicLayout } from "@/components/layouts/public-layout";
+import { Button } from "@repo/ui";
 
 export default function CallbackPage() {
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
-  const [message, setMessage] = useState("")
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading",
+  );
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     // Simulate OAuth callback processing
     const processCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search)
-      const code = searchParams.get("code")
-      const state = searchParams.get("state")
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
 
       if (!code) {
-        setStatus("error")
-        setMessage("No authorization code received")
-        return
+        setStatus("error");
+        setMessage("No authorization code received");
+        return;
       }
 
       try {
         // Simulate API call to exchange code for token
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        setStatus("success")
-        setMessage("Authentication successful! Redirecting...")
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        setStatus("success");
+        setMessage("Authentication successful! Redirecting...");
 
         // In a real app, would redirect to dashboard
         setTimeout(() => {
-          window.location.href = "/t/acme-corp/dashboard"
-        }, 2000)
+          window.location.href = "/t/acme-corp/dashboard";
+        }, 2000);
       } catch (error) {
-        setStatus("error")
-        setMessage("Failed to complete authentication")
+        setStatus("error");
+        setMessage("Failed to complete authentication");
       }
-    }
+    };
 
-    processCallback()
-  }, [])
+    processCallback();
+  }, []);
 
   return (
     <PublicLayout showNav={false}>
@@ -558,8 +560,12 @@ export default function CallbackPage() {
               <div className="flex justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Processing your login</h1>
-              <p className="text-muted-foreground">Please wait while we complete your authentication...</p>
+              <h1 className="text-2xl font-bold text-foreground">
+                Processing your login
+              </h1>
+              <p className="text-muted-foreground">
+                Please wait while we complete your authentication...
+              </p>
             </div>
           )}
 
@@ -573,11 +579,18 @@ export default function CallbackPage() {
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 </div>
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Authentication successful!</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                Authentication successful!
+              </h1>
               <p className="text-muted-foreground">{message}</p>
             </div>
           )}
@@ -592,21 +605,30 @@ export default function CallbackPage() {
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </div>
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Authentication failed</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                Authentication failed
+              </h1>
               <p className="text-muted-foreground">{message}</p>
               <div className="pt-4">
-                <Button onClick={() => (window.location.href = "/u/login")}>Back to login</Button>
+                <Button onClick={() => (window.location.href = "/u/login")}>
+                  Back to login
+                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
     </PublicLayout>
-  )
+  );
 }
 
 
@@ -766,7 +788,7 @@ export default function DashboardLoading() {
 
 ================================================================================
 FILE: apps/admin-portal/app/dashboard/page.tsx
-SIZE: 7.87 KB | LINES: 175
+SIZE: 8.11 KB | LINES: 179
 ================================================================================
 
 "use client"
@@ -781,7 +803,7 @@ import { formatDistanceToNow } from "date-fns"
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { data, isLoading } = useDashboard()
+  const { data, isLoading, isError } = useDashboard()
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -802,7 +824,11 @@ export default function DashboardPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {isLoading ? (
+          {isError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+              Failed to load dashboard data. Please refresh the page.
+            </div>
+          ) : isLoading ? (
             <div className="space-y-6">
               <Skeleton className="h-16 w-full rounded-xl" />
               <div className="grid grid-cols-3 gap-4">
@@ -1522,33 +1548,62 @@ export default function SettingsPage() {
 
 ================================================================================
 FILE: apps/admin-portal/app/dashboard/settings/security/page.tsx
-SIZE: 10.1 KB | LINES: 269
+SIZE: 13.2 KB | LINES: 341
 ================================================================================
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Key, Smartphone, Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Key, Smartphone, Loader2, CheckCircle, XCircle, Globe, LogOut } from "lucide-react";
 import { Button } from "@repo/ui";
-import { startRegistration } from "@simplewebauthn/browser";
-import type { RegistrationResponseJSON } from "@simplewebauthn/browser";
-import { useMfaStatus, useListPasskeys, useDeletePasskey } from "@/lib/queries";
-import { useAuth } from "@fortknox/sdk";
-import type { PasskeyCredential } from "@/lib/types";
+import { useMfaStatus, useListPasskeys, useDeletePasskey, useActiveSessions, useRevokeSession, useRevokeAllOtherSessions } from "@/lib/queries";
+import type { PasskeyCredential, ActiveSessionDto } from "@/lib/types";
+import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
+import { formatRelativeTime } from "@/lib/utils";
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin} minute${diffMin !== 1 ? 's' : ''} ago`;
+    if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? 's' : ''} ago`;
+    if (diffDay < 30) return `${diffDay} day${diffDay !== 1 ? 's' : ''} ago`;
+    return formatDate(dateStr);
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { data: mfaData, isLoading: mfaLoading } = useMfaStatus();
   const { data: passkeys = [], isLoading: passkeysLoading, refetch: refetchPasskeys } = useListPasskeys();
-  const deletePasskey = useDeletePasskey();
-  const { client } = useAuth();
+  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError } = useActiveSessions();
+  const revokeSessionMutation = useRevokeSession();
+  const revokeAllOtherMutation = useRevokeAllOtherSessions();
+  const deletePasskeyMutation = useDeletePasskey();
 
-  const [addingPasskey, setAddingPasskey] = useState(false);
+  const [showPasskeyModal, setShowPasskeyModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deviceName, setDeviceName] = useState("");
-  const [showNameModal, setShowNameModal] = useState(false);
-  const [pendingRegistration, setPendingRegistration] = useState<RegistrationResponseJSON | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -1558,51 +1613,34 @@ export default function SecuritySettingsPage() {
     setTimeout(() => { setSuccessMsg(null); setError(null); }, 3000);
   };
 
-  const handleStartAddPasskey = async () => {
+  const handleRevokeSession = async (sessionId: string) => {
     try {
-      setAddingPasskey(true);
-      setError(null);
-      const options = await client.startPasskeyRegistration();
-      const registrationResponse = await startRegistration({ optionsJSON: options });
-      setPendingRegistration(registrationResponse);
-      setDeviceName("");
-      setShowNameModal(true);
-    } catch (err: any) {
-      if (err?.name !== "NotAllowedError") {
-        flash(err?.message || "Failed to start passkey registration", true);
-      }
+      setRevokingId(sessionId);
+      await revokeSessionMutation.mutateAsync(sessionId);
+      flash("Session revoked");
+    } catch (err: unknown) {
+      flash((err as Error)?.message || "Failed to revoke session", true);
     } finally {
-      setAddingPasskey(false);
+      setRevokingId(null);
     }
   };
 
-  const handleFinishAddPasskey = async () => {
-    if (!pendingRegistration) return;
+  const handleRevokeAllOther = async () => {
     try {
-      setAddingPasskey(true);
-      await client.finishPasskeyRegistration(
-        pendingRegistration,
-        deviceName.trim() || undefined,
-      );
-      setShowNameModal(false);
-      setPendingRegistration(null);
-      setDeviceName("");
-      flash("Passkey added successfully");
-      refetchPasskeys();
-    } catch (err: any) {
-      flash(err?.message || "Failed to save passkey", true);
-    } finally {
-      setAddingPasskey(false);
+      await revokeAllOtherMutation.mutateAsync();
+      flash("All other sessions revoked");
+    } catch (err: unknown) {
+      flash((err as Error)?.message || "Failed to revoke sessions", true);
     }
   };
 
   const handleDeletePasskey = async (credentialId: string) => {
     try {
       setDeletingId(credentialId);
-      await deletePasskey.mutateAsync(credentialId);
+      await deletePasskeyMutation.mutateAsync(credentialId);
       flash("Passkey removed");
     } catch (err: any) {
-      flash(err?.message || "Failed to delete passkey", true);
+      flash(err?.message || "Failed to remove passkey", true);
     } finally {
       setDeletingId(null);
     }
@@ -1610,18 +1648,7 @@ export default function SecuritySettingsPage() {
 
   const handleManageTotp = () => router.push("/u/mfa/setup");
 
-  // useMfaStatus queryFn already unwraps res.data.data, so mfaData is MfaStatus directly
   const totpEnabled = mfaData?.methods?.includes("totp") ?? false;
-
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString("en-US", {
-        month: "short", day: "numeric", year: "numeric",
-      });
-    } catch {
-      return dateStr;
-    }
-  };
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -1717,22 +1744,29 @@ export default function SecuritySettingsPage() {
                   <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {pk.deviceName || "Passkey"}
+                      {pk.deviceName ?? "Unknown device"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Added {formatDate(pk.createdAt)}
-                      {pk.lastUsedAt ? ` · Last used ${formatDate(pk.lastUsedAt)}` : ""}
+                      {" · "}
+                      {pk.lastUsedAt ? `Last used ${formatRelativeTime(pk.lastUsedAt)}` : "Never used"}
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleDeletePasskey(pk.id)}
                   disabled={deletingId === pk.id}
-                  className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                  aria-label={`Delete passkey ${pk.deviceName || pk.id}`}
+                  className="text-muted-foreground hover:text-destructive transition-colors text-xs"
+                  aria-label={`Remove passkey ${pk.deviceName ?? pk.id}`}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                  {deletingId === pk.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "Remove"
+                  )}
+                </Button>
               </li>
             ))}
           </ul>
@@ -1745,51 +1779,115 @@ export default function SecuritySettingsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleStartAddPasskey}
-          disabled={addingPasskey}
+          onClick={() => setShowPasskeyModal(true)}
           className="gap-2"
         >
-          <Plus className="h-4 w-4" />
-          {addingPasskey ? "Registering..." : "Add a passkey"}
+          <Key className="h-4 w-4" />
+          Add passkey
         </Button>
       </section>
 
-      {/* Device Name Modal */}
-      {showNameModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl space-y-4 mx-4">
-            <h3 className="font-semibold text-foreground">Name your passkey</h3>
-            <p className="text-sm text-muted-foreground">
-              Give this passkey a name so you can identify it later (e.g. &quot;iPhone Face ID&quot;).
-            </p>
-            <input
-              type="text"
-              placeholder="e.g. iPhone Face ID (optional)"
-              value={deviceName}
-              onChange={(e) => setDeviceName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleFinishAddPasskey()}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowNameModal(false);
-                  setPendingRegistration(null);
-                  setDeviceName("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleFinishAddPasskey} disabled={addingPasskey}>
-                {addingPasskey ? "Saving..." : "Save passkey"}
-              </Button>
+      {/* Sessions Section */}
+      <section className="rounded-xl border border-border p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Globe className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground">Active Sessions</h2>
+              <p className="text-xs text-muted-foreground">
+                Devices currently signed in to your account
+              </p>
             </div>
           </div>
+          {!sessionsLoading && sessions.filter((s) => !s.isCurrent).length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRevokeAllOther}
+              disabled={revokeAllOtherMutation.isPending}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
+            >
+              {revokeAllOtherMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <LogOut className="h-3 w-3 mr-1" />
+              )}
+              Revoke all others
+            </Button>
+          )}
         </div>
-      )}
+
+        {sessionsLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : sessionsError ? (
+          <p className="text-sm text-destructive py-1">Failed to load sessions.</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-1">No active sessions found.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+            {(sessions as ActiveSessionDto[]).map((session) => (
+              <li
+                key={session.id}
+                className="flex items-center justify-between px-4 py-3 bg-background gap-4"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-foreground">
+                        {`${session.deviceInfo?.browser ?? 'Unknown'} on ${session.deviceInfo?.os ?? 'Unknown'}`}
+                      </p>
+                      {session.isCurrent && (
+                        <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                          Current session
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {session.ipAddress ?? 'Unknown IP'}
+                      {session.location?.city ? ` · ${session.location.city}` : ''}
+                      {session.location?.country ? `, ${session.location.country}` : ''}
+                      {' · '}
+                      {formatRelativeTime(session.lastActivity)}
+                    </p>
+                  </div>
+                </div>
+                {!session.isCurrent && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevokeSession(session.id)}
+                    disabled={revokingId === session.id}
+                    className="text-muted-foreground hover:text-destructive transition-colors text-xs shrink-0"
+                    aria-label="Revoke this session"
+                  >
+                    {revokingId === session.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Revoke"
+                    )}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <PasskeyRegisterModal
+        open={showPasskeyModal}
+        onOpenChange={setShowPasskeyModal}
+        onSuccess={() => {
+          refetchPasskeys();
+          flash("Passkey added successfully");
+        }}
+      />
     </div>
   );
 }
@@ -2263,22 +2361,22 @@ export default function ApplicationsPage({ params }: { params: { slug: string } 
 
 ================================================================================
 FILE: apps/admin-portal/app/t/[slug]/branding/page.tsx
-SIZE: 9.51 KB | LINES: 248
+SIZE: 10.32 KB | LINES: 301
 ================================================================================
 
-"use client"
+"use client";
 
-import { use, useEffect, useRef, useState } from "react"
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Input } from "@repo/ui"
-import { Label } from "@repo/ui"
-import { Button } from "@repo/ui"
-import { useBranding, useUpdateBranding, useUploadLogo } from "@/lib/queries"
-import { FONT_FAMILY_OPTIONS } from "@/lib/types"
-import type { BrandingConfig } from "@/lib/types"
+import { use, useEffect, useRef, useState } from "react";
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Input } from "@repo/ui";
+import { Label } from "@repo/ui";
+import { Button } from "@repo/ui";
+import { useBranding, useUpdateBranding, useUploadLogo } from "@/lib/queries";
+import { FONT_FAMILY_OPTIONS } from "@/lib/types";
+import type { BrandingConfig } from "@/lib/types";
 
 // ── Minimal toast ─────────────────────────────────────────────
-type ToastKind = "success" | "error"
+type ToastKind = "success" | "error";
 function Toast({ message, kind }: { message: string; kind: ToastKind }) {
   return (
     <div
@@ -2289,54 +2387,67 @@ function Toast({ message, kind }: { message: string; kind: ToastKind }) {
     >
       {kind === "success" ? "✓" : "✕"} {message}
     </div>
-  )
+  );
 }
 
-export default function BrandingPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params)
-  const { data: branding, isLoading } = useBranding()
-  const updateBranding = useUpdateBranding()
-  const uploadLogo = useUploadLogo()
+export default function BrandingPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = use(params);
+  const { data: branding, isLoading } = useBranding();
+  const updateBranding = useUpdateBranding();
+  const uploadLogo = useUploadLogo();
 
-  const [form, setForm] = useState<Partial<BrandingConfig>>({})
-  const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(null)
-  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [form, setForm] = useState<Partial<BrandingConfig>>({});
+  const [toast, setToast] = useState<{
+    message: string;
+    kind: ToastKind;
+  } | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Populate form once data arrives
   useEffect(() => {
     if (branding && Object.keys(form).length === 0) {
-      setForm(branding)
+      setForm(branding);
     }
-  }, [branding]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [branding]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function showToast(message: string, kind: ToastKind) {
-    setToast({ message, kind })
-    setTimeout(() => setToast(null), 4000)
+    setToast({ message, kind });
+    setTimeout(() => setToast(null), 4000);
   }
 
   async function handleSave() {
     try {
-      await updateBranding.mutateAsync(form)
-      showToast("Branding saved successfully", "success")
+      await updateBranding.mutateAsync(form);
+      showToast("Branding saved successfully", "success");
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Failed to save branding", "error")
+      showToast(
+        err instanceof Error ? err.message : "Failed to save branding",
+        "error",
+      );
     }
   }
 
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
     try {
-      const { logoUrl } = await uploadLogo.mutateAsync(file)
-      setForm((prev) => ({ ...prev, logoUrl }))
-      showToast("Logo uploaded", "success")
+      const { logoUrl } = await uploadLogo.mutateAsync(file);
+      setForm((prev) => ({ ...prev, logoUrl }));
+      showToast("Logo uploaded", "success");
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : "Logo upload failed", "error")
+      showToast(
+        err instanceof Error ? err.message : "Logo upload failed",
+        "error",
+      );
     }
   }
 
-  const isSaving = updateBranding.isPending
-  const primaryColor = form.primaryColor ?? "#6366f1"
+  const isSaving = updateBranding.isPending;
+  const primaryColor = form.primaryColor ?? "#6366f1";
 
   return (
     <PortalLayout
@@ -2344,14 +2455,19 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
       pageTitle="Branding"
       pageSubtitle="Customize the look and feel of your auth screens"
       currentPath={`/t/${slug}/branding`}
-      primaryAction={{ label: isSaving ? "Saving…" : "Save Changes", onClick: handleSave }}
+      primaryAction={{
+        label: isSaving ? "Saving…" : "Save Changes",
+        onClick: handleSave,
+      }}
     >
       {toast && <Toast message={toast.message} kind={toast.kind} />}
 
       <div className="space-y-6">
         {/* Logo & Colors */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-6 text-lg font-semibold text-foreground">Logo &amp; Colors</h3>
+          <h3 className="mb-6 text-lg font-semibold text-foreground">
+            Logo &amp; Colors
+          </h3>
 
           {isLoading ? (
             <div className="space-y-4 animate-pulse">
@@ -2367,7 +2483,9 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                   <Input
                     placeholder="https://example.com/logo.png"
                     value={form.logoUrl ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, logoUrl: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, logoUrl: e.target.value }))
+                    }
                   />
                   <Button
                     variant="outline"
@@ -2385,7 +2503,9 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                     onChange={handleLogoChange}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">PNG, JPG, or SVG · max 500 KB</p>
+                <p className="text-xs text-muted-foreground">
+                  PNG, JPG, or SVG · max 500 KB
+                </p>
               </div>
 
               {/* Primary Color */}
@@ -2396,13 +2516,17 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                     id="primary"
                     type="color"
                     value={primaryColor}
-                    onChange={(e) => setForm((p) => ({ ...p, primaryColor: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, primaryColor: e.target.value }))
+                    }
                     className="h-10 w-20"
                   />
                   <Input
                     placeholder="#6366f1"
                     value={primaryColor}
-                    onChange={(e) => setForm((p) => ({ ...p, primaryColor: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, primaryColor: e.target.value }))
+                    }
                     pattern="^#[0-9A-Fa-f]{6}$"
                   />
                 </div>
@@ -2414,11 +2538,15 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                 <select
                   id="fontFamily"
                   value={form.fontFamily ?? "Inter"}
-                  onChange={(e) => setForm((p) => ({ ...p, fontFamily: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, fontFamily: e.target.value }))
+                  }
                   className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
                 >
                   {FONT_FAMILY_OPTIONS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -2428,15 +2556,24 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                 <Label>Header Weight</Label>
                 <div className="flex gap-3">
                   {(["regular", "bold"] as const).map((w) => (
-                    <label key={w} className="flex items-center gap-2 cursor-pointer">
+                    <label
+                      key={w}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <input
                         type="radio"
                         name="headerWeight"
                         value={w}
                         checked={(form.headerWeight ?? "bold") === w}
-                        onChange={() => setForm((p) => ({ ...p, headerWeight: w }))}
+                        onChange={() =>
+                          setForm((p) => ({ ...p, headerWeight: w }))
+                        }
                       />
-                      <span className={`text-sm capitalize ${w === "bold" ? "font-bold" : "font-normal"}`}>{w}</span>
+                      <span
+                        className={`text-sm capitalize ${w === "bold" ? "font-bold" : "font-normal"}`}
+                      >
+                        {w}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -2447,13 +2584,18 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                 <Label>Background Style</Label>
                 <div className="flex gap-3">
                   {(["solid", "gradient"] as const).map((s) => (
-                    <label key={s} className="flex items-center gap-2 cursor-pointer">
+                    <label
+                      key={s}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <input
                         type="radio"
                         name="backgroundStyle"
                         value={s}
                         checked={(form.backgroundStyle ?? "solid") === s}
-                        onChange={() => setForm((p) => ({ ...p, backgroundStyle: s }))}
+                        onChange={() =>
+                          setForm((p) => ({ ...p, backgroundStyle: s }))
+                        }
                       />
                       <span className="text-sm capitalize">{s}</span>
                     </label>
@@ -2466,7 +2608,9 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
 
         {/* Preview */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-foreground">Preview</h3>
+          <h3 className="mb-4 text-lg font-semibold text-foreground">
+            Preview
+          </h3>
           <div
             className="flex h-64 items-center justify-center rounded-lg border-2 border-dashed border-border"
             style={{
@@ -2479,7 +2623,11 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
             <div className="text-center space-y-3">
               {form.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.logoUrl} alt="Logo preview" className="mx-auto h-12 object-contain" />
+                <img
+                  src={form.logoUrl}
+                  alt="Logo preview"
+                  className="mx-auto h-12 object-contain"
+                />
               ) : (
                 <div
                   className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg font-bold text-white text-lg"
@@ -2492,13 +2640,16 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
                 className={`text-base ${(form.fontFamily ?? "Inter") === "system-ui" ? "" : "font-sans"}`}
                 style={{
                   fontFamily: form.fontFamily ?? "Inter",
-                  fontWeight: (form.headerWeight ?? "bold") === "bold" ? 700 : 400,
+                  fontWeight:
+                    (form.headerWeight ?? "bold") === "bold" ? 700 : 400,
                   color: primaryColor,
                 }}
               >
                 Welcome back
               </p>
-              <p className="text-xs text-muted-foreground">Secured by Fort Knox</p>
+              <p className="text-xs text-muted-foreground">
+                Secured by Fort Knox
+              </p>
             </div>
           </div>
         </div>
@@ -2511,7 +2662,7 @@ export default function BrandingPage({ params }: { params: Promise<{ slug: strin
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }
 
 
@@ -2549,97 +2700,112 @@ export default function ConnectionsPage({ params }: { params: { slug: string } }
 
 ================================================================================
 FILE: apps/admin-portal/app/t/[slug]/dashboard/page.tsx
-SIZE: 9.39 KB | LINES: 250
+SIZE: 10.21 KB | LINES: 307
 ================================================================================
 
-"use client"
+"use client";
 
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Button } from "@repo/ui"
-import { Skeleton } from "@repo/ui"
-import { useTenantMetrics, useTenantActivity, useApiCallTrend } from "@/lib/queries"
-import { formatDistanceToNow } from "date-fns"
-import type { TrendPoint } from "@/lib/types"
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Skeleton, Button } from "@repo/ui";
+import {
+  useTenantMetrics,
+  useTenantActivity,
+  useApiCallTrend,
+} from "@/lib/queries";
+import { formatDistanceToNow } from "date-fns";
+import type { TrendPoint } from "@/lib/types";
+import { useParams } from "next/navigation";
 
 // ── Chart helpers ──────────────────────────────────────────────
 
-const CHART_W = 700
-const CHART_H = 200
-const CHART_PADDING = 10
+const CHART_W = 700;
+const CHART_H = 200;
+const CHART_PADDING = 10;
 
-function computeChartPaths(points: TrendPoint[]): { line: string; area: string } {
+function computeChartPaths(points: TrendPoint[]): {
+  line: string;
+  area: string;
+} {
   if (points.length === 0) {
-    return { line: "", area: "" }
+    return { line: "", area: "" };
   }
 
-  const maxCount = Math.max(1, ...points.map((p) => p.count))
-  const n = points.length
+  const maxCount = Math.max(1, ...points.map((p) => p.count));
+  const n = points.length;
 
   const coords = points.map((p, i) => {
-    const x = n === 1 ? CHART_W / 2 : (i / (n - 1)) * CHART_W
+    const x = n === 1 ? CHART_W / 2 : (i / (n - 1)) * CHART_W;
     const y =
-      CHART_PADDING +
-      (CHART_H - CHART_PADDING * 2) * (1 - p.count / maxCount)
-    return { x, y }
-  })
+      CHART_PADDING + (CHART_H - CHART_PADDING * 2) * (1 - p.count / maxCount);
+    return { x, y };
+  });
 
-  const lineParts = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)},${c.y.toFixed(1)}`)
-  const line = lineParts.join(" ")
+  const lineParts = coords.map(
+    (c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)},${c.y.toFixed(1)}`,
+  );
+  const line = lineParts.join(" ");
   const area =
     line +
-    ` L ${coords[coords.length - 1]!.x.toFixed(1)},${CHART_H} L ${coords[0]!.x.toFixed(1)},${CHART_H} Z`
+    ` L ${coords[coords.length - 1]!.x.toFixed(1)},${CHART_H} L ${coords[0]!.x.toFixed(1)},${CHART_H} Z`;
 
-  return { line, area }
+  return { line, area };
 }
 
 // ── Severity colour ────────────────────────────────────────────
 
 function severityClass(severity: string) {
-  if (severity === "critical") return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-  if (severity === "warning") return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+  if (severity === "critical")
+    return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+  if (severity === "warning")
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
 }
 
 function eventInitial(eventType: string): string {
-  return eventType.split(".")[0]?.charAt(0).toUpperCase() ?? "E"
+  return eventType.split(".")[0]?.charAt(0).toUpperCase() ?? "E";
 }
 
 // ── Page ──────────────────────────────────────────────────────
 
-export default function DashboardPage({ params }: { params: { slug: string } }) {
+export default function DashboardPage() {
   const {
     data: metrics,
     isLoading: metricsLoading,
     isError: metricsError,
-  } = useTenantMetrics()
+  } = useTenantMetrics();
+
+  const params = useParams();
 
   const {
     data: activity,
     isLoading: activityLoading,
     isError: activityError,
-  } = useTenantActivity(10)
+  } = useTenantActivity(10);
 
-  const {
-    data: trend,
-    isLoading: trendLoading,
-  } = useApiCallTrend(7)
+  const { data: trend, isLoading: trendLoading } = useApiCallTrend(7);
 
-  const { line: trendLine, area: trendArea } = computeChartPaths(trend ?? [])
+  const { line: trendLine, area: trendArea } = computeChartPaths(trend ?? []);
 
   const stats = [
     {
       label: "Total Users",
-      value: metricsLoading ? null : metrics?.totalUsers.toLocaleString() ?? "—",
+      value: metricsLoading
+        ? null
+        : (metrics?.totalUsers.toLocaleString() ?? "—"),
       change: null,
     },
     {
       label: "Active Sessions",
-      value: metricsLoading ? null : metrics?.activeSessions.toLocaleString() ?? "—",
+      value: metricsLoading
+        ? null
+        : (metrics?.activeSessions.toLocaleString() ?? "—"),
       change: null,
     },
     {
       label: "Applications",
-      value: metricsLoading ? null : metrics?.totalApplications.toLocaleString() ?? "—",
+      value: metricsLoading
+        ? null
+        : (metrics?.totalApplications.toLocaleString() ?? "—"),
       change: null,
     },
     {
@@ -2647,15 +2813,15 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
       value: metricsLoading
         ? null
         : metrics != null
-        ? `${Math.round(metrics.mfaAdoptionRate * 100)}%`
-        : "—",
+          ? `${Math.round(metrics.mfaAdoptionRate * 100)}%`
+          : "—",
       change: null,
     },
-  ]
+  ];
 
   return (
     <PortalLayout
-      tenantSlug={params.slug}
+      tenantSlug={params.slug as string}
       pageTitle="Dashboard"
       pageSubtitle="Overview of your Fort Knox tenant"
       currentPath={`/t/${params.slug}/dashboard`}
@@ -2669,12 +2835,17 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
         ) : (
           <div className="grid gap-4 md:grid-cols-4">
             {stats.map((stat) => (
-              <div key={stat.label} className="rounded-lg border border-border bg-card p-6">
+              <div
+                key={stat.label}
+                className="rounded-lg border border-border bg-card p-6"
+              >
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
                 {stat.value === null ? (
                   <Skeleton className="mt-2 h-9 w-24 rounded" />
                 ) : (
-                  <p className="mt-2 text-3xl font-bold text-foreground">{stat.value}</p>
+                  <p className="mt-2 text-3xl font-bold text-foreground">
+                    {stat.value}
+                  </p>
                 )}
               </div>
             ))}
@@ -2683,7 +2854,9 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
 
         {/* ── API call trend chart ── */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-foreground">API Call Trend (last 7 days)</h3>
+          <h3 className="mb-4 text-lg font-semibold text-foreground">
+            API Call Trend (last 7 days)
+          </h3>
           {trendLoading ? (
             <Skeleton className="h-[200px] w-full rounded" />
           ) : (
@@ -2695,15 +2868,26 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
             >
               <defs>
                 <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(99,102,241)" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="rgb(99,102,241)" stopOpacity="0" />
+                  <stop
+                    offset="0%"
+                    stopColor="rgb(99,102,241)"
+                    stopOpacity="0.3"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="rgb(99,102,241)"
+                    stopOpacity="0"
+                  />
                 </linearGradient>
               </defs>
-              {trendArea && (
-                <path d={trendArea} fill="url(#trendGradient)" />
-              )}
+              {trendArea && <path d={trendArea} fill="url(#trendGradient)" />}
               {trendLine && (
-                <path d={trendLine} fill="none" stroke="rgb(99,102,241)" strokeWidth="2" />
+                <path
+                  d={trendLine}
+                  fill="none"
+                  stroke="rgb(99,102,241)"
+                  strokeWidth="2"
+                />
               )}
               {(!trend || trend.every((p) => p.count === 0)) && (
                 <text
@@ -2725,10 +2909,14 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Recent Activity */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-lg font-semibold text-foreground">Recent Activity</h3>
+            <h3 className="mb-4 text-lg font-semibold text-foreground">
+              Recent Activity
+            </h3>
 
             {activityError ? (
-              <p className="text-sm text-muted-foreground">Failed to load activity.</p>
+              <p className="text-sm text-muted-foreground">
+                Failed to load activity.
+              </p>
             ) : activityLoading ? (
               <div className="space-y-4">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -2763,10 +2951,14 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
                         </span>
                       </div>
                       {event.actorEmail && (
-                        <p className="text-xs text-muted-foreground truncate">{event.actorEmail}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {event.actorEmail}
+                        </p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(event.createdAt), {
+                          addSuffix: true,
+                        })}
                         {event.location ? ` · ${event.location}` : ""}
                       </p>
                     </div>
@@ -2774,24 +2966,40 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No recent activity.</p>
+              <p className="text-sm text-muted-foreground">
+                No recent activity.
+              </p>
             )}
           </div>
 
           {/* Quick Actions */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-lg font-semibold text-foreground">Quick Actions</h3>
+            <h3 className="mb-4 text-lg font-semibold text-foreground">
+              Quick Actions
+            </h3>
             <div className="space-y-2">
-              <Button className="w-full justify-start bg-transparent" variant="outline">
+              <Button
+                className="w-full justify-start bg-transparent"
+                variant="outline"
+              >
                 Create new application
               </Button>
-              <Button className="w-full justify-start bg-transparent" variant="outline">
+              <Button
+                className="w-full justify-start bg-transparent"
+                variant="outline"
+              >
                 Manage users
               </Button>
-              <Button className="w-full justify-start bg-transparent" variant="outline">
+              <Button
+                className="w-full justify-start bg-transparent"
+                variant="outline"
+              >
                 Configure security settings
               </Button>
-              <Button className="w-full justify-start bg-transparent" variant="outline">
+              <Button
+                className="w-full justify-start bg-transparent"
+                variant="outline"
+              >
                 View audit logs
               </Button>
             </div>
@@ -2799,181 +3007,163 @@ export default function DashboardPage({ params }: { params: { slug: string } }) 
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }
 
 
 
 ================================================================================
 FILE: apps/admin-portal/app/t/[slug]/security/page.tsx
-SIZE: 8.71 KB | LINES: 279
+SIZE: 11.27 KB | LINES: 343
 ================================================================================
 
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Button } from "@repo/ui"
-import { Label } from "@repo/ui"
-import { MFASettings } from "@/components/portal/mfa-settings"
-import { TrustedDeviceCard, type TrustedDevice } from "@/components/portal/trusted-device-card"
-import { ActiveSessions, type Session } from "@/components/portal/active-sessions"
-import { AuditLogList, type AuditEvent } from "@/components/portal/audit-log-list"
-import { getAuthConfig, type AuthConfig } from "@/lib/auth-config"
+import { useState } from "react";
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Button } from "@repo/ui";
+import { Label } from "@repo/ui";
+import { MFASettings } from "@/components/portal/mfa-settings";
+import {
+  TrustedDeviceCard,
+  type TrustedDevice,
+} from "@/components/portal/trusted-device-card";
+import {
+  ActiveSessions,
+  type Session,
+} from "@/components/portal/active-sessions";
+import {
+  AuditLogList,
+  type AuditEvent,
+} from "@/components/portal/audit-log-list";
+import { Skeleton } from "@repo/ui";
+import {
+  useMfaStatus,
+  useActiveSessions,
+  useRevokeSession,
+  useRevokeAllOtherSessions,
+  useTenantActivity,
+} from "@/lib/queries";
+import type { ActiveSessionDto } from "@/lib/types";
+import { formatRelativeTime, formatEventDescription } from "@/lib/utils";
 
-const mockMFAMethods = [
-  {
-    id: "totp",
-    name: "Authenticator App",
-    type: "totp" as const,
-    enabled: true,
-    verified: true,
-    lastUpdated: "2 weeks ago",
-  },
-  { id: "email-otp", name: "Email Code", type: "email-otp" as const, enabled: false, verified: false },
-  {
-    id: "backup-codes",
-    name: "Backup Codes",
-    type: "backup-codes" as const,
-    enabled: true,
-    verified: true,
-    lastUpdated: "1 month ago",
-  },
-  { id: "passkey", name: "Passkey", type: "passkey" as const, enabled: false, verified: false },
-]
-
-const mockTrustedDevices: TrustedDevice[] = [
-  {
-    id: "1",
-    name: "MacBook Pro",
-    type: "desktop",
-    os: "macOS Ventura",
-    lastActive: "Today at 2:30 PM",
-    location: "San Francisco, CA",
-    isCurrent: true,
-  },
-  {
-    id: "2",
-    name: "iPhone 14",
-    type: "phone",
-    os: "iOS 17",
-    lastActive: "Yesterday at 6:45 PM",
-    location: "San Francisco, CA",
-    isCurrent: false,
-  },
-]
-
-const mockSessions: Session[] = [
-  {
-    id: "1",
-    device: "MacBook Pro",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    browser: "Chrome on macOS",
-    lastActive: "Just now",
-    isCurrent: true,
-  },
-  {
-    id: "2",
-    device: "iPhone 14",
-    location: "San Francisco, CA",
-    ipAddress: "203.0.113.42",
-    browser: "Safari on iOS",
-    lastActive: "2 hours ago",
-    isCurrent: false,
-  },
-  {
-    id: "3",
-    device: "Unknown",
-    location: "New York, NY",
-    ipAddress: "198.51.100.89",
-    browser: "Chrome on Windows",
-    lastActive: "3 days ago",
-    isCurrent: false,
-  },
-]
-
-const mockAuditEvents: AuditEvent[] = [
-  {
-    id: "1",
-    type: "device_login",
-    title: "New device login",
-    description: "Signed in from a new device",
-    timestamp: "Today at 2:30 PM",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "2",
-    type: "mfa_challenge",
-    title: "MFA verified",
-    description: "Successfully verified with authenticator app",
-    timestamp: "Today at 2:29 PM",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "3",
-    type: "magic_link_sent",
-    title: "Magic link sent",
-    description: "Magic link authentication request",
-    timestamp: "Yesterday at 6:45 PM",
-    location: "San Francisco, CA",
-    ipAddress: "203.0.113.42",
-    device: "iPhone 14",
-    status: "success",
-  },
-  {
-    id: "4",
-    type: "password_changed",
-    title: "Password changed",
-    description: "Account password was updated",
-    timestamp: "1 week ago",
-    location: "San Francisco, CA",
-    ipAddress: "192.168.1.100",
-    device: "MacBook Pro",
-    status: "success",
-  },
-  {
-    id: "5",
-    type: "device_login",
-    title: "Failed login attempt",
-    description: "Multiple failed login attempts detected",
-    timestamp: "2 days ago",
-    location: "New York, NY",
-    ipAddress: "198.51.100.89",
-    device: "Unknown",
-    status: "suspicious",
-  },
-]
+// Trusted devices have no backend endpoint yet — kept as empty placeholder
+const TRUSTED_DEVICES: TrustedDevice[] = [];
 
 export default function SecurityPage({ params }: { params: { slug: string } }) {
-  const [config, setConfig] = useState<AuthConfig | null>(null)
-  const [removedDevices, setRemovedDevices] = useState<string[]>([])
-  const [revokedSessions, setRevokedSessions] = useState<string[]>([])
+  const { data: mfaData, isLoading: mfaLoading } = useMfaStatus();
+  const {
+    data: rawSessions = [],
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+  } = useActiveSessions();
+  const {
+    data: activity = [],
+    isLoading: activityLoading,
+    isError: activityError,
+  } = useTenantActivity(10);
 
-  useEffect(() => {
-    getAuthConfig().then(setConfig)
-  }, [])
+  const revokeSessionMutation = useRevokeSession();
+  const revokeAllOtherMutation = useRevokeAllOtherSessions();
+
+  const [removedDevices, setRemovedDevices] = useState<string[]>([]);
+
+  // Map API shape to the Session shape expected by <ActiveSessions>
+  const sessions: Session[] = (rawSessions as ActiveSessionDto[]).map((s) => ({
+    id: s.id,
+    device: s.deviceInfo?.device ?? s.deviceInfo?.type ?? "Unknown",
+    browser: `${s.deviceInfo?.browser ?? "Unknown"} on ${s.deviceInfo?.os ?? "Unknown"}`,
+    location:
+      [s.location?.city, s.location?.country].filter(Boolean).join(", ") ||
+      "Unknown location",
+    ipAddress: s.ipAddress ?? "Unknown",
+    lastActive: formatRelativeTime(s.lastActivity),
+    isCurrent: s.isCurrent,
+  }));
+
+  // Map MFA status to MFASettings method list
+  const mfaMethods = mfaData
+    ? [
+        {
+          id: "totp",
+          name: "Authenticator App",
+          type: "totp" as const,
+          enabled: mfaData.methods.includes("totp"),
+          verified: mfaData.methods.includes("totp"),
+        },
+        {
+          id: "email-otp",
+          name: "Email Code",
+          type: "email-otp" as const,
+          enabled:
+            mfaData.methods.includes("email_otp") ||
+            mfaData.methods.includes("email-otp"),
+          verified:
+            mfaData.methods.includes("email_otp") ||
+            mfaData.methods.includes("email-otp"),
+        },
+        {
+          id: "backup-codes",
+          name: "Backup Codes",
+          type: "backup-codes" as const,
+          enabled: (mfaData.backupCodesRemaining ?? 0) > 0,
+          verified: (mfaData.backupCodesRemaining ?? 0) > 0,
+        },
+        {
+          id: "passkey",
+          name: "Passkey",
+          type: "passkey" as const,
+          enabled:
+            mfaData.methods.includes("passkey") ||
+            mfaData.methods.includes("webauthn"),
+          verified:
+            mfaData.methods.includes("passkey") ||
+            mfaData.methods.includes("webauthn"),
+        },
+      ]
+    : [];
+
+  // Map ActivityEvent → AuditEvent for AuditLogList component
+  const auditEvents: AuditEvent[] = activity.map((e) => ({
+    id: e.id,
+    // Map eventType to closest AuditEvent type union; fall back to device_login
+    type: (() => {
+      if (e.eventType.includes("mfa")) return "mfa_challenge" as const;
+      if (e.eventType.includes("passkey")) return "passkey_used" as const;
+      if (e.eventType.includes("password")) return "password_changed" as const;
+      if (e.eventType.includes("revoke")) return "token_revoked" as const;
+      if (e.eventType.includes("magic_link")) return "magic_link_sent" as const;
+      return "device_login" as const;
+    })(),
+    title: formatEventDescription(e.eventType),
+    description: formatEventDescription(e.eventType),
+    timestamp: formatRelativeTime(e.createdAt),
+    location: e.location ?? "Unknown",
+    ipAddress: e.ipAddress ?? "Unknown",
+    device: "Unknown",
+    status: (() => {
+      if (e.severity === "critical") return "suspicious" as const;
+      if (e.eventType.includes("failed") || e.eventType.includes("locked"))
+        return "failed" as const;
+      return "success" as const;
+    })(),
+  }));
 
   const handleRemoveDevice = (deviceId: string) => {
-    setRemovedDevices([...removedDevices, deviceId])
-  }
+    setRemovedDevices([...removedDevices, deviceId]);
+  };
 
   const handleRevokeSession = (sessionId: string) => {
-    setRevokedSessions([...revokedSessions, sessionId])
-  }
+    revokeSessionMutation.mutate(sessionId);
+  };
 
   const handleRevokeAllSessions = () => {
-    setRevokedSessions(mockSessions.map((s) => s.id))
-  }
+    revokeAllOtherMutation.mutate();
+  };
 
-  const activeTrustedDevices = mockTrustedDevices.filter((d) => !removedDevices.includes(d.id))
-  const activeSessions = mockSessions.filter((s) => !revokedSessions.includes(s.id))
+  const activeTrustedDevices = TRUSTED_DEVICES.filter(
+    (d) => !removedDevices.includes(d.id),
+  );
 
   return (
     <PortalLayout
@@ -2981,57 +3171,121 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
       pageTitle="Security"
       pageSubtitle="Manage your account security and authentication methods"
       currentPath={`/t/${params.slug}/security`}
-      primaryAction={{ label: "Save Settings", onClick: () => console.log("Save security") }}
+      primaryAction={{
+        label: "Save Settings",
+        onClick: () => console.log("Save security"),
+      }}
     >
       <div className="space-y-8">
         {/* Multi-Factor Authentication */}
         <div>
-          <h3 className="text-lg font-semibold mb-4">Multi-Factor Authentication</h3>
-          {config && (
+          <h3 className="text-lg font-semibold mb-4">
+            Multi-Factor Authentication
+          </h3>
+          {mfaLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-16 rounded-lg bg-muted animate-pulse"
+                />
+              ))}
+            </div>
+          ) : mfaData ? (
             <MFASettings
-              methods={mockMFAMethods}
+              methods={mfaMethods}
               primaryColor="#6366f1"
-              onToggle={(methodId, enabled) => console.log("Toggle MFA:", { methodId, enabled })}
+              onToggle={(methodId, enabled) =>
+                console.log("Toggle MFA:", { methodId, enabled })
+              }
               onRegenerateCodes={() => console.log("Regenerate backup codes")}
             />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Failed to load MFA settings.
+            </p>
           )}
         </div>
 
         {/* Trusted Devices */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Trusted Devices</h3>
-          <div className="space-y-3">
-            {activeTrustedDevices.map((device) => (
-              <TrustedDeviceCard key={device.id} device={device} onRemove={handleRemoveDevice} />
-            ))}
-          </div>
+          {activeTrustedDevices.length > 0 ? (
+            <div className="space-y-3">
+              {activeTrustedDevices.map((device) => (
+                <TrustedDeviceCard
+                  key={device.id}
+                  device={device}
+                  onRemove={handleRemoveDevice}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No trusted devices.</p>
+          )}
         </div>
 
         {/* Active Sessions */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
-          <ActiveSessions
-            sessions={activeSessions}
-            onRevoke={handleRevokeSession}
-            onRevokeAll={handleRevokeAllSessions}
-          />
+          {sessionsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-24 rounded-lg bg-muted animate-pulse"
+                />
+              ))}
+            </div>
+          ) : sessionsError ? (
+            <p className="text-sm text-destructive">Failed to load sessions.</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No active sessions.</p>
+          ) : (
+            <ActiveSessions
+              sessions={sessions}
+              onRevoke={handleRevokeSession}
+              onRevokeAll={handleRevokeAllSessions}
+            />
+          )}
         </div>
 
         {/* Security Events */}
         <div>
           <h3 className="text-lg font-semibold mb-4">Security Events</h3>
-          <AuditLogList events={mockAuditEvents} />
+          {activityLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-20 rounded-lg bg-muted animate-pulse"
+                />
+              ))}
+            </div>
+          ) : activityError ? (
+            <p className="text-sm text-destructive">
+              Failed to load security events.
+            </p>
+          ) : auditEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No recent security events.
+            </p>
+          ) : (
+            <AuditLogList events={auditEvents} />
+          )}
         </div>
 
         {/* Password & Security Policies */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-6">Password & Security Policies</h3>
+          <h3 className="text-lg font-semibold mb-6">
+            Password & Security Policies
+          </h3>
           <div className="space-y-4">
             <div>
               <Label>Minimum Password Length</Label>
               <select className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground">
                 <option>6 characters</option>
-                <option selected>8 characters</option>
+                <option>8 characters</option>
                 <option>12 characters</option>
                 <option>16 characters</option>
               </select>
@@ -3041,22 +3295,38 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
               <Label>Session Timeout</Label>
               <select className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground">
                 <option>15 minutes</option>
-                <option selected>30 minutes</option>
+                <option>30 minutes</option>
                 <option>1 hour</option>
                 <option>24 hours</option>
               </select>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-              <input type="checkbox" id="https" defaultChecked className="w-4 h-4" />
-              <Label htmlFor="https" className="flex-1 cursor-pointer font-normal">
+              <input
+                type="checkbox"
+                id="https"
+                defaultChecked
+                className="w-4 h-4"
+              />
+              <Label
+                htmlFor="https"
+                className="flex-1 cursor-pointer font-normal"
+              >
                 Require HTTPS for all communications
               </Label>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-              <input type="checkbox" id="device-trust" defaultChecked className="w-4 h-4" />
-              <Label htmlFor="device-trust" className="flex-1 cursor-pointer font-normal">
+              <input
+                type="checkbox"
+                id="device-trust"
+                defaultChecked
+                className="w-4 h-4"
+              />
+              <Label
+                htmlFor="device-trust"
+                className="flex-1 cursor-pointer font-normal"
+              >
                 Enable trusted device feature
               </Label>
             </div>
@@ -3065,7 +3335,9 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
 
         {/* Danger Zone */}
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-          <h3 className="text-lg font-semibold mb-4 text-destructive">Danger Zone</h3>
+          <h3 className="text-lg font-semibold mb-4 text-destructive">
+            Danger Zone
+          </h3>
           <div className="space-y-3">
             <Button
               variant="outline"
@@ -3085,22 +3357,22 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }
 
 
 
 ================================================================================
 FILE: apps/admin-portal/app/t/[slug]/settings/page.tsx
-SIZE: 2.16 KB | LINES: 63
+SIZE: 2.21 KB | LINES: 71
 ================================================================================
 
-"use client"
+"use client";
 
-import { PortalLayout } from "@/components/layouts/portal-layout"
-import { Button } from "@repo/ui"
-import { Input } from "@repo/ui"
-import { Label } from "@repo/ui"
+import { PortalLayout } from "@/components/layouts/portal-layout";
+import { Button } from "@repo/ui";
+import { Input } from "@repo/ui";
+import { Label } from "@repo/ui";
 
 export default function SettingsPage({ params }: { params: { slug: string } }) {
   return (
@@ -3109,11 +3381,16 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
       pageTitle="Settings"
       pageSubtitle="Manage your tenant settings"
       currentPath={`/t/${params.slug}/settings`}
-      primaryAction={{ label: "Save Changes", onClick: () => console.log("Save settings") }}
+      primaryAction={{
+        label: "Save Changes",
+        onClick: () => console.log("Save settings"),
+      }}
     >
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-6 text-lg font-semibold text-foreground">Tenant Information</h3>
+          <h3 className="mb-6 text-lg font-semibold text-foreground">
+            Tenant Information
+          </h3>
 
           <div className="space-y-4">
             <div>
@@ -3139,7 +3416,9 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-6 text-lg font-semibold text-foreground">Danger Zone</h3>
+          <h3 className="mb-6 text-lg font-semibold text-foreground">
+            Danger Zone
+          </h3>
 
           <div className="space-y-3">
             <Button
@@ -3149,13 +3428,14 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
               Delete Tenant
             </Button>
             <p className="text-xs text-muted-foreground">
-              Once you delete your tenant, there is no going back. Please be certain.
+              Once you delete your tenant, there is no going back. Please be
+              certain.
             </p>
           </div>
         </div>
       </div>
     </PortalLayout>
-  )
+  );
 }
 
 
@@ -5311,7 +5591,7 @@ export function MultiOptionLogin({
 
 ================================================================================
 FILE: apps/admin-portal/components/auth/passkey-login-button.tsx
-SIZE: 2.3 KB | LINES: 78
+SIZE: 3.82 KB | LINES: 125
 ================================================================================
 
 "use client"
@@ -5319,8 +5599,16 @@ SIZE: 2.3 KB | LINES: 78
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button, Alert, AlertDescription } from "@repo/ui"
-import { Key, Loader } from "lucide-react"
+import { Key, Loader2 } from "lucide-react"
 import { useAuth } from "@fortknox/sdk"
+
+type LoginStatus =
+  | 'idle'
+  | 'requesting_options'
+  | 'waiting_for_device'
+  | 'verifying'
+  | 'success'
+  | 'error'
 
 interface PasskeyLoginButtonProps {
   email: string
@@ -5328,33 +5616,72 @@ interface PasskeyLoginButtonProps {
 }
 
 export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyLoginButtonProps) {
-  const { authenticateWithPasskey } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { startPasskeyLogin, finishPasskeyLogin } = useAuth()
+  const [status, setStatus] = useState<LoginStatus>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const handlePasskeyLogin = async () => {
-    setLoading(true)
-    setError(null)
+    if (!window.PublicKeyCredential) {
+      setStatus('error')
+      setErrorMessage('Passkeys are not supported on this device or browser')
+      return
+    }
 
+    setErrorMessage(null)
+
+    // Step 1: get options from server
+    setStatus('requesting_options')
+    let serverData: any
     try {
-      if (!window.PublicKeyCredential) {
-        throw new Error("Passkeys are not supported on this device or browser")
-      }
+      serverData = await startPasskeyLogin(email)
+    } catch (err: any) {
+      setStatus('error')
+      setErrorMessage(err?.message || 'Failed to start passkey login')
+      return
+    }
 
-      await authenticateWithPasskey(email)
+    const { sessionNonce, ...optionsJSON } = serverData
 
-      window.location.href = "/dashboard"
+    // Step 2: invoke browser authenticator
+    setStatus('waiting_for_device')
+    let assertion: any
+    try {
+      const { startAuthentication } = await import('@simplewebauthn/browser')
+      assertion = await startAuthentication({ optionsJSON })
     } catch (err: any) {
       // User cancelled the WebAuthn prompt — don't show error
-      if (err?.code === "PASSKEY_AUTH_CANCELLED" || err?.name === "NotAllowedError") {
-        setError(null)
-      } else {
-        setError(err?.message || "Failed to authenticate with passkey")
+      if (err?.name === 'NotAllowedError') {
+        setStatus('idle')
+        return
       }
-    } finally {
-      setLoading(false)
+      setStatus('error')
+      if (err?.name === 'NotSupportedError') {
+        setErrorMessage('Your device does not support passkeys.')
+      } else {
+        setErrorMessage(err?.message || 'Something went wrong. Please try again.')
+      }
+      return
+    }
+
+    // Step 3: verify with server
+    setStatus('verifying')
+    try {
+      await finishPasskeyLogin(email, assertion, sessionNonce)
+      setStatus('success')
+      window.location.href = '/dashboard'
+    } catch (err: any) {
+      setStatus('error')
+      setErrorMessage(err?.message || 'Failed to authenticate with passkey')
     }
   }
+
+  const isLoading = status === 'requesting_options' || status === 'waiting_for_device' || status === 'verifying'
+
+  const loadingLabel = {
+    requesting_options: 'Contacting server...',
+    waiting_for_device: 'Waiting for passkey...',
+    verifying: 'Verifying...',
+  }[status as 'requesting_options' | 'waiting_for_device' | 'verifying'] ?? 'Sign in with Passkey'
 
   return (
     <div className="space-y-3">
@@ -5362,15 +5689,15 @@ export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyL
         <Button
           type="button"
           onClick={handlePasskeyLogin}
-          disabled={loading}
+          disabled={isLoading || status === 'success'}
           className="w-full"
           variant="outline"
           style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
         >
-          {loading ? (
+          {isLoading ? (
             <>
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
-              Waiting for passkey...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {loadingLabel}
             </>
           ) : (
             <>
@@ -5381,10 +5708,10 @@ export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyL
         </Button>
       </motion.div>
 
-      {error && (
+      {status === 'error' && errorMessage && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <Alert variant="destructive" className="bg-destructive/10 border-destructive/30">
-            <AlertDescription className="text-xs">{error}</AlertDescription>
+            <AlertDescription className="text-xs">{errorMessage}</AlertDescription>
           </Alert>
         </motion.div>
       )}
@@ -5396,7 +5723,7 @@ export function PasskeyLoginButton({ email, primaryColor = "#6366f1" }: PasskeyL
 
 ================================================================================
 FILE: apps/admin-portal/components/auth/passkey-register-modal.tsx
-SIZE: 6.4 KB | LINES: 197
+SIZE: 8.15 KB | LINES: 246
 ================================================================================
 
 "use client"
@@ -5405,9 +5732,17 @@ import type React from "react"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input, Label, Alert, AlertDescription, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@repo/ui"
-import { Key, CheckCircle2 } from "lucide-react"
+import { Button, Input, Label, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@repo/ui"
+import { Key, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import { useAuth } from "@fortknox/sdk"
+
+type RegistrationStatus =
+  | 'idle'
+  | 'requesting_options'
+  | 'waiting_for_device'
+  | 'verifying'
+  | 'success'
+  | 'error'
 
 interface PasskeyRegisterModalProps {
   open: boolean
@@ -5423,63 +5758,72 @@ export function PasskeyRegisterModal({
   primaryColor = "#6366f1",
 }: PasskeyRegisterModalProps) {
   const { client } = useAuth()
-  const [step, setStep] = useState<"name" | "register" | "success">("name")
+  const [status, setStatus] = useState<RegistrationStatus>('idle')
   const [deviceName, setDeviceName] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const isInProgress = status === 'requesting_options' || status === 'waiting_for_device' || status === 'verifying'
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (deviceName.trim()) {
-      handleRegister()
-    }
+    handleRegister()
   }
 
-  const handleRegister = async () => {
-    setLoading(true)
-    setError(null)
-    setStep("register")
-
+  async function handleRegister() {
+    // Step 1: get options from server via SDK client
+    // Calls POST /mfa/webauthn/register/start internally
+    setStatus('requesting_options')
+    let options: any
     try {
-      if (!window.PublicKeyCredential) {
-        throw new Object({ name: "NotSupportedError", message: "Your browser does not support passkeys" })
+      const res = await client.request({
+        url: `${client.getBaseURL()}/mfa/webauthn/register/start`,
+        method: 'POST',
+      })
+      if (!res.ok) {
+        throw new Error(res.data?.message || 'Failed to contact server')
       }
-
-      // Step 1: Get options from server and invoke browser credential API
-      const registrationResponse = await client.startPasskeyRegistration()
-
-      // Step 2: Finish registration on server
-      await client.finishPasskeyRegistration(
-        registrationResponse,
-        deviceName.trim() || undefined,
-      )
-
-      setStep("success")
-
-      // Step 4: Notify parent and close
-      if (onSuccess) {
-        onSuccess()
-      }
-
-      setTimeout(() => {
-        onOpenChange(false)
-        setStep("name")
-        setDeviceName("")
-      }, 2000)
+      options = res.data?.data || res.data
     } catch (err: any) {
-      setError(err?.message || "Failed to register passkey")
-      setStep("name")
-    } finally {
-      setLoading(false)
+      setStatus('error')
+      setErrorMessage(err.message || 'Failed to start registration')
+      return
+    }
+
+    // Step 2: browser credential API — THIS IS THE LINE THAT WAS MISSING
+    setStatus('waiting_for_device')
+    let registrationResponse: any
+    try {
+      const { startRegistration } = await import('@simplewebauthn/browser')
+      registrationResponse = await startRegistration({ optionsJSON: options })
+    } catch (err: any) {
+      setStatus('error')
+      if (err.name === 'NotAllowedError') {
+        setErrorMessage('Registration was cancelled.')
+      } else if (err.name === 'NotSupportedError') {
+        setErrorMessage('Your device does not support passkeys.')
+      } else {
+        setErrorMessage('Something went wrong. Please try again.')
+      }
+      return
+    }
+
+    // Step 3: verify with server via SDK
+    setStatus('verifying')
+    try {
+      await client.finishPasskeyRegistration(registrationResponse, deviceName.trim() || undefined)
+      setStatus('success')
+    } catch (err: any) {
+      setStatus('error')
+      setErrorMessage(err.message || 'Verification failed. Please try again.')
     }
   }
 
   const handleClose = () => {
-    if (!loading) {
+    if (!isInProgress) {
       onOpenChange(false)
-      setStep("name")
+      setStatus('idle')
       setDeviceName("")
-      setError(null)
+      setErrorMessage(null)
     }
   }
 
@@ -5487,9 +5831,9 @@ export function PasskeyRegisterModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <AnimatePresence mode="wait">
-          {step === "name" && (
+          {status === 'idle' && (
             <motion.div
-              key="name"
+              key="idle"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -5505,7 +5849,7 @@ export function PasskeyRegisterModal({
 
               <form onSubmit={handleNameSubmit} className="space-y-4 mt-6">
                 <div className="space-y-2">
-                  <Label htmlFor="device-name">Device Name</Label>
+                  <Label htmlFor="device-name">Device Name (optional)</Label>
                   <Input
                     id="device-name"
                     placeholder="e.g., iPhone 14 Pro, MacBook Pro"
@@ -5515,23 +5859,16 @@ export function PasskeyRegisterModal({
                   />
                 </div>
 
-                {error && (
-                  <Alert variant="destructive" className="bg-destructive/10 border-destructive/30">
-                    <AlertDescription className="text-xs">{error}</AlertDescription>
-                  </Alert>
-                )}
-
                 <div className="flex gap-2 pt-4">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleClose}
                     className="flex-1"
-                    disabled={loading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={loading}>
+                  <Button type="submit" className="flex-1">
                     Continue
                   </Button>
                 </div>
@@ -5539,9 +5876,9 @@ export function PasskeyRegisterModal({
             </motion.div>
           )}
 
-          {step === "register" && (
+          {isInProgress && (
             <motion.div
-              key="register"
+              key="in-progress"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -5549,22 +5886,21 @@ export function PasskeyRegisterModal({
               className="space-y-6 py-8"
             >
               <div className="flex justify-center">
-                <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2 }}
-                  className="p-4 rounded-full bg-primary/10"
-                >
-                  <Key className="h-8 w-8 text-primary" />
-                </motion.div>
+                <div className="p-4 rounded-full bg-primary/10">
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                </div>
               </div>
               <div className="text-center space-y-2">
-                <p className="font-medium">Complete passkey registration</p>
-                <p className="text-sm text-muted-foreground">Use your device&apos;s face/fingerprint or PIN to confirm</p>
+                <p className="font-medium">
+                  {status === 'requesting_options' && 'Contacting server...'}
+                  {status === 'waiting_for_device' && 'Check your device or browser prompt...'}
+                  {status === 'verifying' && 'Verifying with server...'}
+                </p>
               </div>
             </motion.div>
           )}
 
-          {step === "success" && (
+          {status === 'success' && (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -5584,9 +5920,49 @@ export function PasskeyRegisterModal({
                   </div>
                 </motion.div>
               </div>
-              <div className="text-center space-y-2">
-                <p className="font-medium">Passkey registered successfully</p>
-                <p className="text-sm text-muted-foreground">You can now use this device to sign in</p>
+              <div className="text-center space-y-4">
+                <p className="font-medium">Passkey added successfully!</p>
+                <Button
+                  onClick={() => {
+                    onSuccess?.()
+                    onOpenChange(false)
+                    setStatus('idle')
+                    setDeviceName("")
+                  }}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {status === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6 py-8"
+            >
+              <div className="flex justify-center">
+                <div className="p-4 rounded-full bg-destructive/10">
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                </div>
+              </div>
+              <div className="text-center space-y-4">
+                <p className="text-sm text-destructive">{errorMessage}</p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStatus('idle')
+                    setErrorMessage(null)
+                  }}
+                  className="w-full"
+                >
+                  Try again
+                </Button>
               </div>
             </motion.div>
           )}
@@ -5922,19 +6298,28 @@ export function SignupForm({ onSubmit, primaryColor }: SignupFormProps) {
 
 ================================================================================
 FILE: apps/admin-portal/components/auth/step-based-auth-flow.tsx
-SIZE: 2.56 KB | LINES: 92
+SIZE: 11.71 KB | LINES: 353
 ================================================================================
 
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEmailAuthFlow } from "@/hooks/use-email-auth-flow";
 import { EmailStep } from "./email-step";
 import { MethodSelectionStep } from "./method-selection-step";
 import { CredentialsStep } from "./credentials-step";
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@fortknox/sdk";
+import { Button } from "@repo/ui";
+import { ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+
+type LoginScreen =
+  | 'email'
+  | 'credentials'
+  | 'mfa_totp'
+  | 'mfa_email_otp'
+  | 'magic_link_sent'
 
 interface StepBasedAuthFlowProps {
   primaryColor?: string;
@@ -5945,7 +6330,7 @@ export function StepBasedAuthFlow({
 }: StepBasedAuthFlowProps) {
   const router = useRouter();
   const flow = useEmailAuthFlow();
-  const { client } = useAuth();
+  const { client, verifyMfaLogin } = useAuth();
   const [passwordPolicy] = useState<any>({
     minLength: 8,
     requireUppercase: true,
@@ -5953,28 +6338,280 @@ export function StepBasedAuthFlow({
     requireSpecialChars: true,
   });
 
+  // MFA inline state — tempToken is kept in React state only (not localStorage/cookie)
+  const [mfaTempToken, setMfaTempToken] = useState<string | null>(null);
+  const [mfaScreen, setMfaScreen] = useState<'totp' | 'email_otp' | null>(null);
+  const [mfaDigits, setMfaDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const mfaCode = mfaDigits.join("");
+
+  // Determine which top-level screen we are on
+  const activeLoginScreen: LoginScreen = (() => {
+    if (mfaScreen === 'totp') return 'mfa_totp';
+    if (mfaScreen === 'email_otp') return 'mfa_email_otp';
+    if (flow.step === 'email') return 'email';
+    return 'credentials'; // method-selection or credentials
+  })();
+
   const handleEmailSubmit = async (email: string) => {
     try {
       await flow.submitEmail(email);
     } catch (err) {
-      console.error("[v0] Email submission error:", err);
+      console.error("[StepBasedAuthFlow] Email submission error:", err);
     }
   };
 
   const handleCredentialsSubmit = async (email: string, password?: string) => {
     try {
       const result = await client.login({ email, password: password as string });
-      if (result.mfaRequired && (result as any).tempToken) {
-        sessionStorage.setItem("_fk_mfa_temp_token", (result as any).tempToken);
-        router.push("/u/mfa");
+
+      if (result.mfaRequired) {
+        // Store tempToken in local React state only — never in localStorage or cookie
+        const tempToken = (result as any).tempToken ?? null;
+        setMfaTempToken(tempToken);
+        const mfaMethod = (result as any).mfaMethod;
+        setMfaScreen(mfaMethod === 'email_otp' ? 'email_otp' : 'totp');
+        setMfaDigits(["", "", "", "", "", ""]);
+        setMfaError(null);
         return;
       }
+
       router.push("/dashboard");
     } catch (err: any) {
-      console.error("[FortKnox] Login error:", err);
+      console.error("[StepBasedAuthFlow] Login error:", err);
     }
   };
 
+  const handleMfaChange = (index: number, value: string) => {
+    // Handle paste of full code
+    if (value.length > 1) {
+      const cleaned = value.replace(/\D/g, "").slice(0, 6);
+      const next = [...mfaDigits];
+      for (let i = 0; i < 6; i++) next[i] = cleaned[i] ?? "";
+      setMfaDigits(next);
+      inputRefs.current[Math.min(cleaned.length, 5)]?.focus();
+      return;
+    }
+    const digit = value.replace(/\D/g, "");
+    const next = [...mfaDigits];
+    next[index] = digit;
+    setMfaDigits(next);
+    if (digit && index < 5) inputRefs.current[index + 1]?.focus();
+  };
+
+  const handleMfaKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !mfaDigits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleMfaSubmit = useCallback(async () => {
+    if (mfaCode.length !== 6 || mfaLoading || !mfaTempToken) return;
+    setMfaLoading(true);
+    setMfaError(null);
+    try {
+      await verifyMfaLogin(mfaTempToken, mfaCode);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setMfaError(err?.message || "Invalid code. Please try again.");
+      setMfaDigits(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+    } finally {
+      setMfaLoading(false);
+    }
+  }, [mfaCode, mfaLoading, mfaTempToken, verifyMfaLogin, router]);
+
+  // Auto-submit when all 6 digits are filled
+  useEffect(() => {
+    if (mfaCode.length === 6 && mfaScreen) handleMfaSubmit();
+  }, [mfaCode, mfaScreen, handleMfaSubmit]);
+
+  // MFA TOTP screen
+  if (activeLoginScreen === 'mfa_totp') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Verify your identity</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Enter the 6-digit code from your authenticator app
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+          <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
+          <div>
+            <p className="text-sm font-medium">Authenticator App</p>
+            <p className="text-xs text-muted-foreground">Use an app like Google Authenticator or Authy</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex gap-2 justify-center">
+            {mfaDigits.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => { inputRefs.current[i] = el; }}
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={digit}
+                onChange={(e) => handleMfaChange(i, e.target.value)}
+                onKeyDown={(e) => handleMfaKeyDown(i, e)}
+                onFocus={(e) => e.target.select()}
+                onPaste={(e) => {
+                  if (i === 0) {
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                    const next = [...mfaDigits];
+                    for (let j = 0; j < 6; j++) next[j] = pasted[j] ?? '';
+                    setMfaDigits(next);
+                    inputRefs.current[Math.min(pasted.length - 1, 5)]?.focus();
+                  }
+                }}
+                disabled={mfaLoading}
+                className={`
+                  h-14 w-12 rounded-xl border text-center text-xl font-semibold
+                  bg-background transition-all outline-none
+                  ${digit ? "border-primary text-foreground" : "border-border text-muted-foreground"}
+                  ${mfaLoading ? "opacity-50 cursor-not-allowed" : "focus:border-primary focus:ring-2 focus:ring-primary/20"}
+                `}
+              />
+            ))}
+          </div>
+
+          {mfaError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {mfaError}
+            </div>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={mfaCode.length !== 6 || mfaLoading}
+            style={{ backgroundColor: primaryColor }}
+            onClick={handleMfaSubmit}
+          >
+            {mfaLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify"
+            )}
+          </Button>
+
+          <button
+            type="button"
+            className="w-full text-center text-sm text-muted-foreground hover:text-foreground underline"
+            onClick={() => {
+              setMfaScreen(null);
+              setMfaTempToken(null);
+              setMfaDigits(["", "", "", "", "", ""]);
+              setMfaError(null);
+              flow.reset?.();
+            }}
+          >
+            Back to sign in
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // MFA Email OTP screen
+  if (activeLoginScreen === 'mfa_email_otp') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Check your email</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Enter the 6-digit code sent to {flow.email}
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex gap-2 justify-center">
+            {mfaDigits.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => { inputRefs.current[i] = el; }}
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={digit}
+                onChange={(e) => handleMfaChange(i, e.target.value)}
+                onKeyDown={(e) => handleMfaKeyDown(i, e)}
+                onFocus={(e) => e.target.select()}
+                disabled={mfaLoading}
+                className={`
+                  h-14 w-12 rounded-xl border text-center text-xl font-semibold
+                  bg-background transition-all outline-none
+                  ${digit ? "border-primary text-foreground" : "border-border text-muted-foreground"}
+                  ${mfaLoading ? "opacity-50 cursor-not-allowed" : "focus:border-primary focus:ring-2 focus:ring-primary/20"}
+                `}
+              />
+            ))}
+          </div>
+
+          {mfaError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {mfaError}
+            </div>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={mfaCode.length !== 6 || mfaLoading}
+            style={{ backgroundColor: primaryColor }}
+            onClick={handleMfaSubmit}
+          >
+            {mfaLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify"
+            )}
+          </Button>
+
+          <button
+            type="button"
+            className="w-full text-center text-sm text-muted-foreground hover:text-foreground underline"
+            onClick={() => {
+              setMfaScreen(null);
+              setMfaTempToken(null);
+              setMfaDigits(["", "", "", "", "", ""]);
+              setMfaError(null);
+              flow.reset?.();
+            }}
+          >
+            Back to sign in
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Normal login flow (email → method selection → credentials)
   return (
     <AnimatePresence mode="wait">
       {flow.step === "email" && (
@@ -8231,30 +8868,30 @@ export function MFASettings({ methods, primaryColor = "#6366f1", onToggle, onReg
 
 ================================================================================
 FILE: apps/admin-portal/components/portal/sidebar.tsx
-SIZE: 2.84 KB | LINES: 87
+SIZE: 3.06 KB | LINES: 108
 ================================================================================
 
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button, Input, Label } from "@repo/ui"
+import { useState } from "react";
+import Link from "next/link";
+import { Button, Input, Label } from "@repo/ui";
 
 interface SidebarItem {
-  label: string
-  href: string
-  icon: React.ReactNode
-  badge?: string | number
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  badge?: string | number;
 }
 
 interface SidebarProps {
-  items: SidebarItem[]
-  currentPath?: string
-  collapsed?: boolean
-  logoUrl?: string
-  tenantName?: string
+  items: SidebarItem[];
+  currentPath?: string;
+  collapsed?: boolean;
+  logoUrl?: string;
+  tenantName?: string;
 }
 
 export function Sidebar({
@@ -8264,7 +8901,7 @@ export function Sidebar({
   logoUrl,
   tenantName = "Fort Knox",
 }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(collapsed)
+  const [isCollapsed, setIsCollapsed] = useState(collapsed);
 
   return (
     <div
@@ -8281,44 +8918,65 @@ export function Sidebar({
             <span className="font-semibold truncate">{tenantName}</span>
           </div>
         )}
-        <Button variant="ghost" size="sm" onClick={() => setIsCollapsed(!isCollapsed)} className="h-8 w-8 p-0">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="h-8 w-8 p-0"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </Button>
       </div>
 
       <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-6">
         {items.map((item) => (
-          <Link key={item.href} href={item.href}>
-            <a
-              className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${
-                currentPath === item.href
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="h-5 w-5">{item.icon}</span>
-                {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
-              </div>
-              {!isCollapsed && item.badge && (
-                <span className="rounded-full bg-primary/20 px-2 py-1 text-xs font-medium text-primary">
-                  {item.badge}
-                </span>
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${
+              currentPath === item.href
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="h-5 w-5">{item.icon}</span>
+              {!isCollapsed && (
+                <span className="text-sm font-medium">{item.label}</span>
               )}
-            </a>
+            </div>
+            {!isCollapsed && item.badge && (
+              <span className="rounded-full bg-primary/20 px-2 py-1 text-xs font-medium text-primary">
+                {item.badge}
+              </span>
+            )}
           </Link>
         ))}
       </nav>
 
       <div className="border-t border-sidebar-border px-3 py-6">
-        <Button variant="outline" className="w-full justify-start bg-transparent" disabled={isCollapsed}>
+        <Button
+          variant="outline"
+          className="w-full justify-start bg-transparent"
+          disabled={isCollapsed}
+        >
           {!isCollapsed && "Sign out"}
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 
@@ -9002,12 +9660,12 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 
 ================================================================================
 FILE: apps/admin-portal/lib/queries.ts
-SIZE: 8.94 KB | LINES: 277
+SIZE: 10.35 KB | LINES: 321
 ================================================================================
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig } from "./types";
+import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig, ActiveSessionDto } from "./types";
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -9220,6 +9878,50 @@ export function useAuthBreakdown() {
   });
 }
 
+// ── Session Management ────────────────────────────────────────
+
+export function useActiveSessions() {
+  return useQuery<ActiveSessionDto[]>({
+    queryKey: ["sessions", "active"],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl("/sessions/active"),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch active sessions");
+      return res.data.data;
+    },
+  });
+}
+
+export function useRevokeSession() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: async (sessionId: string) => {
+      const res = await authClient.request({
+        url: apiUrl(`/sessions/${sessionId}`),
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to revoke session");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
+  });
+}
+
+export function useRevokeAllOtherSessions() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl("/sessions/all/other"),
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to revoke all other sessions");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
+  });
+}
+
 // ── Tenant Branding ──────────────────────────────────────────
 
 export function useBranding() {
@@ -9286,7 +9988,7 @@ export function useUploadLogo() {
 
 ================================================================================
 FILE: apps/admin-portal/lib/types.ts
-SIZE: 2.47 KB | LINES: 131
+SIZE: 2.88 KB | LINES: 155
 ================================================================================
 
 // Canonical MFA status shape — matches MfaService.getMfaStatus() exactly
@@ -9393,6 +10095,30 @@ export interface AuthBreakdown {
   passkey: number;
 }
 
+export interface ActiveSessionDto {
+  id: string;
+  deviceInfo: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    type?: string;
+  };
+  location?: {
+    city?: string;
+    country?: string;
+    timezone?: string;
+  };
+  ipAddress?: string;
+  lastActivity: string;
+  createdAt: string;
+  isCurrent: boolean;
+  tokenFamily: {
+    familyId: string;
+    tokensInFamily: number;
+    lastUsed: string;
+  };
+}
+
 export type HeaderWeight = "regular" | "bold";
 export type BackgroundStyle = "solid" | "gradient";
 
@@ -9418,6 +10144,80 @@ export interface BrandingConfig {
   fontFamily: string;
   headerWeight: HeaderWeight;
   backgroundStyle: BackgroundStyle;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/lib/utils.ts
+SIZE: 2.8 KB | LINES: 67
+================================================================================
+
+export function formatRelativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime()
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  if (diff < 2_592_000_000) return `${Math.floor(diff / 86_400_000)}d ago`
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric'
+  }).format(new Date(isoString))
+}
+
+export function formatEventDescription(
+  eventType: string,
+  metadata?: Record<string, unknown>
+): string {
+  const descriptions: Record<string, string> = {
+    'auth.login_success': 'Signed in successfully',
+    'auth.login_failed': 'Sign-in attempt failed',
+    'auth.logout': 'Signed out',
+    'auth.token_refreshed': 'Session token refreshed',
+    'auth.mfa_challenge_sent': 'MFA challenge sent',
+    'user.registered': 'Account created',
+    'user.updated': 'Profile updated',
+    'user.locked': 'Account locked',
+    'user.deleted': 'Account deleted',
+    'password.changed': 'Password changed',
+    'password.reset_requested': 'Password reset requested',
+    'password.reset_completed': 'Password reset completed',
+    'session.revoked': 'Session revoked',
+    'session.all_revoked': 'All sessions revoked',
+    'session.expired_cleanup': 'Expired sessions cleaned up',
+    'passkey.registered': 'Passkey added',
+    'passkey.removed': 'Passkey removed',
+    'passkey.auth_success': 'Signed in with passkey',
+    'passkey.auth_failed': 'Passkey authentication failed',
+    'mfa.totp_enabled': 'Two-factor authentication enabled',
+    'mfa.totp_disabled': 'Two-factor authentication disabled',
+    'social.login_success': 'Signed in with social provider',
+    'social.account_linked': 'Social account linked',
+    'social.account_unlinked': 'Social account unlinked',
+    'security.brute_force_threshold': 'Brute force threshold reached',
+    'api_key.created': 'API key created',
+    'api_key.revoked': 'API key revoked',
+    'api_key.rotated': 'API key rotated',
+    'branding.updated': 'Branding configuration updated',
+  }
+
+  if (descriptions[eventType]) return descriptions[eventType]
+
+  // Fallback: convert 'some.event_type' → 'Some event type'
+  return eventType
+    .replace(/\./g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/, c => c.toUpperCase())
+}
+
+export function getEventColor(eventType: string): string {
+  if (eventType.includes('failed') || eventType.includes('locked') ||
+      eventType.includes('brute_force')) return 'text-destructive'
+  if (eventType.includes('api_key') || eventType.includes('rotated'))
+    return 'text-amber-500'
+  if (eventType.includes('logout') || eventType.includes('revoked'))
+    return 'text-muted-foreground'
+  if (eventType.includes('passkey')) return 'text-purple-500'
+  return 'text-primary'
 }
 
 
@@ -55514,7 +56314,7 @@ export function Code({
 
 ================================================================================
 FILE: packages/ui/src/components/common/login.tsx
-SIZE: 6.17 KB | LINES: 106
+SIZE: 6.12 KB | LINES: 106
 ================================================================================
 
 // import { cn } from "@/lib/utils";
@@ -62549,8 +63349,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 393
-Total Lines: 59,791
+Files Processed: 394
+Total Lines: 60,584
 Files Skipped: 52
 Errors: 0
-Generated: 2026-03-18T04:05:30.883Z
+Generated: 2026-03-19T11:11:54.752Z
