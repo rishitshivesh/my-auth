@@ -6,6 +6,7 @@ import { StepBasedAuthFlow } from "@/components/auth/step-based-auth-flow";
 import { UniversalAuthLayout } from "@/components/layouts/universal-auth-layout";
 import { useAuth } from "@fortknox/sdk";
 import type { BrandingConfig } from "@/lib/types";
+import type { User } from "@fortknox/sdk";
 import { authClient } from "@/app/layout";
 
 const DEFAULT_BRANDING: BrandingConfig = {
@@ -14,6 +15,20 @@ const DEFAULT_BRANDING: BrandingConfig = {
   headerWeight: "bold",
   backgroundStyle: "solid",
 };
+
+function getPostLoginRoute(user: User | null): string {
+  if (!user) return '/u/login'
+  const claims = authClient.getTokenClaims()
+  const fortknoxTenantId = process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID
+  const isFortKnox = fortknoxTenantId
+    ? claims?.tenantId === fortknoxTenantId
+    : claims?.tenantSlug === 'fortknox'
+  const isInternal = Array.isArray(claims?.groups) &&
+    claims.groups.includes('fortknox-internal')
+  if (isFortKnox && isInternal) return '/dashboard'
+  const slug = claims?.tenantSlug ?? ''
+  return slug ? `/t/${slug}/dashboard` : '/u/login'
+}
 
 async function fetchPublicBranding(slug: string): Promise<BrandingConfig> {
   const url = `${authClient.getBaseURL()}/tenants/${encodeURIComponent(slug)}/branding/public`;
@@ -66,7 +81,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.replace("/dashboard");
+      router.replace(getPostLoginRoute(user));
     }
   }, [user, isLoading, router]);
 

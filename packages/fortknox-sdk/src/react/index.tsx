@@ -8,7 +8,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { FortKnoxClient } from "../core/client";
-import type { User, LoginCredentials, AuthEvent } from "../core/types";
+import type { User, LoginCredentials, LoginResponse, AuthEvent } from "../core/types";
 
 // ============================================================
 // CONTEXT
@@ -22,7 +22,7 @@ interface AuthContextValue {
   error: Error | null;
 
   // Actions
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<LoginResponse>;
   loginIntent: (params: { email: string }) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -120,23 +120,24 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
   }, [client]);
 
   // Login
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
       setError(null);
-      setIsLoading(true);
-
       const result = await client.login(credentials);
-
-      if (result.mfaRequired) {
-        throw new Error("MFA_REQUIRED");
+      if (!result.mfaRequired) {
+        setUser(result.user ?? null);
+        // Fetch fresh user data from server to ensure all fields are populated
+        try {
+          const freshUser = await client.getCurrentUser();
+          setUser(freshUser);
+        } catch {
+          // Use the user from login response as fallback
+        }
       }
-
-      setUser(result.user);
+      return result;
     } catch (err) {
       setError(err as Error);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
