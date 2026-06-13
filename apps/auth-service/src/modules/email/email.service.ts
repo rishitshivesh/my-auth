@@ -8,7 +8,7 @@
  * - Supports multi-tenant branding
  */
 
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -20,10 +20,10 @@ import * as path from "path";
 import { EmailProvider } from "./providers/email-provider.interface";
 import { NodeMailerProvider } from "./providers/nodemailer.provider";
 import { SESProvider } from "./providers/ses.provider";
+import { logger } from "@/common/logger";
 
 @Injectable()
 export class EmailService {
-  private readonly logger = new Logger(EmailService.name);
   private provider: EmailProvider | null = null;
   private templateCache: Map<string, HandlebarsTemplateDelegate> = new Map();
 
@@ -52,16 +52,16 @@ export class EmailService {
     if (awsSesAccessKey && awsSesSecretKey) {
       // Use SES
       this.provider = new SESProvider(this.configService);
-      this.logger.log("📧 Email provider: AWS SES");
+      logger.info("Email provider: AWS SES");
     } else if (smtpHost) {
       // Use SMTP (NodeMailer)
       this.provider = new NodeMailerProvider(this.configService);
-      this.logger.log("📧 Email provider: SMTP (NodeMailer)");
+      logger.info("Email provider: SMTP (NodeMailer)");
     } else {
       // Development mode - log to console
       this.provider = null;
-      this.logger.warn(
-        "📧 Email provider: CONSOLE (Development) - No email provider configured",
+      logger.warn(
+        "Email provider: CONSOLE (Development) - No email provider configured",
       );
     }
   }
@@ -81,7 +81,7 @@ export class EmailService {
     const startTime = Date.now();
     let success = false;
 
-    console.log(this.provider);
+    logger.info({ provider: this.provider?.getProviderName() || "console" }, "Email provider in use");
 
     try {
       if (this.provider) {
@@ -93,24 +93,14 @@ export class EmailService {
           text: options.text,
         });
         success = true;
-        this.logger.log(
-          `✅ Email sent to ${options.to} via ${this.provider.getProviderName()}`,
-        );
+        logger.info({ to: options.to, provider: this.provider.getProviderName() }, "Email sent");
       } else {
         // Development mode - log to console
-        console.log("\n========== EMAIL (DEVELOPMENT MODE) ==========");
-        console.log(`To: ${options.to}`);
-        console.log(`Subject: ${options.subject}`);
-        console.log(`Type: ${options.emailType}`);
-        console.log(`HTML Length: ${options.html.length} chars`);
-        console.log("==============================================\n");
+        logger.info({ to: options.to, subject: options.subject, emailType: options.emailType, htmlLength: options.html.length }, "Email (development mode)");
         success = true;
       }
     } catch (error: any) {
-      this.logger.error(
-        `❌ Failed to send email to ${options.to}: ${error.message}`,
-        error.stack,
-      );
+      logger.error({ err: error, to: options.to }, "Failed to send email");
       success = false;
     }
 
@@ -152,9 +142,7 @@ export class EmailService {
       this.templateCache.set(templateName, compiledTemplate);
       return compiledTemplate;
     } catch (error: any) {
-      this.logger.error(
-        `Failed to load template ${templateName}: ${error.message}`,
-      );
+      logger.error({ err: error, templateName }, "Failed to load template");
       throw new Error(`Template ${templateName} not found`);
     }
   }
@@ -193,9 +181,7 @@ export class EmailService {
           "https://via.placeholder.com/150x50?text=Fort+Knox",
       };
     } catch (error) {
-      this.logger.warn(
-        `Failed to load tenant branding for ${tenantId}, using defaults`,
-      );
+      logger.warn({ tenantId }, "Failed to load tenant branding, using defaults");
       return {
         tenantName: "Fort Knox",
         tenantLogo: "https://via.placeholder.com/150x50?text=Fort+Knox",

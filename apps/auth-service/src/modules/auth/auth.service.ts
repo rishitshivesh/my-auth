@@ -31,6 +31,7 @@ import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { LoginIntentResponseDto } from "./auth.dto";
+import { logger } from "@/common/logger";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -238,7 +239,7 @@ export class AuthService {
       .andWhere("user.tenantId = :tenantId", { tenantId })
       .getOne();
 
-    console.log("🔍 Login attempt:", { email, tenantId, userFound: !!user }); // ← ADD
+    logger.info({ email, tenantId, userFound: !!user }, "Login attempt");
 
     if (!user) {
       this.securityEventService.log({
@@ -254,11 +255,7 @@ export class AuthService {
 
     await this.bruteForceService.checkAccountLock(user);
 
-    console.log("🔍 User found:", {
-      userId: user.id,
-      user,
-      hasPassword: !!user.passwordHash,
-    }); // ← ADD
+    logger.info({ userId: user.id, hasPassword: !!user.passwordHash }, "User found");
 
     if (!user.passwordHash) {
       throw new BadRequestException(
@@ -269,7 +266,7 @@ export class AuthService {
     // Verify password
     const isValid = await PasswordService.verify(user.passwordHash, password);
 
-    console.log("🔍 Password check:", { isValid }); // ← ADD
+    logger.info({ isValid }, "Password check");
 
     if (!isValid) {
       await this.bruteForceService.recordFailedAttempt(user, tenantId, ip);
@@ -323,7 +320,7 @@ export class AuthService {
         },
       );
 
-      console.log(`🔐 MFA required for user ${user.email}`);
+      logger.info({ userId: user.id }, "MFA required for user");
 
       // Log MFA challenge
       this.securityEventService.log({
@@ -357,7 +354,7 @@ export class AuthService {
       deviceId: data.deviceId,
     });
 
-    console.log("✅ Session created:", session.id);
+    logger.info({ sessionId: session.id }, "Session created");
 
     // Step 2: Create refresh token using OAuthRefreshTokenService
     const { token: refreshToken } =
@@ -372,7 +369,7 @@ export class AuthService {
         expiresInDays: 30,
       });
 
-    console.log("✅ Refresh token created");
+    logger.info("Refresh token created");
 
     // Step 3: Generate access token (NOW we have sessionId!)
     const accessTokenPayloadData = await this.buildAccessTokenPayload(
@@ -390,7 +387,7 @@ export class AuthService {
       },
     );
 
-    console.log("✅ Access token generated");
+    logger.info("Access token generated");
 
     // Step 4: Log successful login
     this.securityEventService.log({
@@ -504,7 +501,7 @@ export class AuthService {
     // Send password reset OTP email
     await this.emailService.sendPasswordResetOtpEmail(user, otp);
 
-    console.log("Password reset OTP:", otp); // For development
+    // OTP intentionally not logged for security
   }
 
   /**
@@ -529,7 +526,7 @@ export class AuthService {
 
     await this.emailService.sendMagicLinkEmail(user, rawToken);
 
-    console.log("Magic link token (dev):", rawToken);
+    // Magic link token intentionally not logged for security
   }
 
   /**
@@ -758,7 +755,7 @@ export class AuthService {
     // Send verification email
     await this.emailService.sendVerificationEmail(user, emailVerificationToken);
 
-    console.log("Verification token:", emailVerificationToken); // For development
+    // Verification token intentionally not logged for security
   }
 
   /**
@@ -842,10 +839,7 @@ export class AuthService {
       },
     });
 
-    console.log("Token refresh successful", {
-      userId: accessTokenPayload.sub,
-      sessionId: accessTokenPayload.sessionId,
-    });
+    logger.info({ userId: accessTokenPayload.sub, sessionId: accessTokenPayload.sessionId }, "Token refresh successful");
 
     return {
       accessToken,
@@ -958,7 +952,7 @@ export class AuthService {
       },
     );
 
-    console.log(`🔒 Revoked all sessions in family: ${familyId}`);
+    logger.info({ familyId }, "Revoked all sessions in family");
   }
 
   /**
@@ -980,7 +974,7 @@ export class AuthService {
       throw new UnauthorizedException("Invalid token type");
     }
 
-    console.log(`🔐 Verifying MFA for user ${payload.email}`);
+    logger.info({ userId: payload.sub }, "Verifying MFA for user");
 
     // Step 2: Verify TOTP code
     const verified = await this.mfaService.verifyTotp(
@@ -1020,7 +1014,7 @@ export class AuthService {
       },
     );
 
-    console.log(`✅ MFA verified successfully for ${payload.email}`);
+    logger.info({ userId: payload.sub }, "MFA verified successfully");
 
     return {
       accessToken,
@@ -1048,7 +1042,7 @@ export class AuthService {
       throw new UnauthorizedException("Invalid token type");
     }
 
-    console.log(`🔐 Verifying backup code for user ${payload.email}`);
+    logger.info({ userId: payload.sub }, "Verifying backup code for user");
 
     // Step 2: Verify backup code
     const verified = await this.mfaService.verifyBackupCode(
@@ -1088,7 +1082,7 @@ export class AuthService {
       },
     );
 
-    console.log(`✅ Backup code verified for ${payload.email}`);
+    logger.info({ userId: payload.sub }, "Backup code verified");
 
     // Check remaining backup codes
     const mfaStatus = await this.mfaService.getMfaStatus(payload.sub, tenantId);
@@ -1135,7 +1129,7 @@ export class AuthService {
       tenantId,
     );
 
-    console.log(`🔑 WebAuthn login started for ${email}`);
+    logger.info({ email }, "WebAuthn login started");
 
     // Spread options so the response shape is flat: { sessionNonce, challenge, ... }
     return { ...options, sessionNonce };
@@ -1237,7 +1231,7 @@ export class AuthService {
       metadata: { sessionId: session.id, authMethod: "webauthn" },
     });
 
-    console.log(`✅ WebAuthn login successful for ${user.email}`);
+    logger.info({ userId: user.id }, "WebAuthn login successful");
 
     return {
       accessToken,

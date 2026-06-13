@@ -17,6 +17,7 @@ import { OAuthController } from "./oauth.controller";
 import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
+import { JwksService } from "./services/jwks.service";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 
@@ -41,9 +42,10 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
     OAuthClientService,
     OAuthTokenService,
     OAuthConsentService,
+    JwksService,
     PasswordService,
     RbacService,
   ],
-  exports: [OAuthClientService, OAuthTokenService, OAuthConsentService],
+  exports: [OAuthClientService, OAuthTokenService, OAuthConsentService, JwksService],
 })
 export class OAuthModule {}

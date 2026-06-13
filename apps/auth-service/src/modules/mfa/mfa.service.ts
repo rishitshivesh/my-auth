@@ -13,6 +13,8 @@ import { SecurityEventService } from "@/common/service/security-event.service";
 import * as speakeasy from "speakeasy";
 import * as QRCode from "qrcode";
 import * as crypto from "crypto";
+import { PasswordService } from "@repo/security";
+import { logger } from "@/common/logger";
 
 export interface SetupTotpResponse {
   secret: string;
@@ -121,7 +123,7 @@ export class MfaService {
       secret: mfaSettings.totpSecret,
       encoding: "base32",
       token,
-      window: 2, // Allow 2 time steps before/after (60s window)
+      window: 1,
     });
 
     if (!verified) {
@@ -140,7 +142,7 @@ export class MfaService {
 
     await this.mfaRepository.save(mfaSettings);
 
-    console.log(`✅ TOTP MFA enabled for user ${userId}`);
+    logger.info({ userId }, "TOTP MFA enabled for user");
 
     this.securityEventService.log({
       userId,
@@ -178,15 +180,15 @@ export class MfaService {
       secret: mfaSettings.totpSecret,
       encoding: "base32",
       token,
-      window: 2,
+      window: 1,
     });
 
     if (!verified) {
-      console.log(`❌ Invalid TOTP token for user ${userId}`);
+      logger.warn({ userId }, "Invalid TOTP token for user");
       return false;
     }
 
-    console.log(`✅ TOTP verified for user ${userId}`);
+    logger.info({ userId }, "TOTP verified for user");
     return true;
   }
 
@@ -208,7 +210,7 @@ export class MfaService {
 
     await this.mfaRepository.save(mfaSettings);
 
-    console.log(`✅ TOTP MFA disabled for user ${userId}`);
+    logger.info({ userId }, "TOTP MFA disabled for user");
 
     this.securityEventService.log({
       userId,
@@ -244,7 +246,7 @@ export class MfaService {
    * Hash backup code for storage
    */
   private async hashBackupCode(code: string): Promise<string> {
-    return crypto.createHash("sha256").update(code).digest("hex");
+    return PasswordService.hash(code);
   }
 
   /**
@@ -266,13 +268,20 @@ export class MfaService {
       throw new BadRequestException("No backup codes available");
     }
 
-    const codeHash = await this.hashBackupCode(code);
-
-    // Find and remove used code
-    const codeIndex = mfaSettings.backupCodes.indexOf(codeHash);
+    let codeIndex = -1;
+    for (let i = 0; i < mfaSettings.backupCodes.length; i++) {
+      const matches = await PasswordService.verify(
+        mfaSettings.backupCodes[i],
+        code,
+      );
+      if (matches) {
+        codeIndex = i;
+        break;
+      }
+    }
 
     if (codeIndex === -1) {
-      console.log(`❌ Invalid backup code for user ${userId}`);
+      logger.warn({ userId }, "Invalid backup code for user");
       return false;
     }
 
@@ -280,7 +289,7 @@ export class MfaService {
     mfaSettings.backupCodes.splice(codeIndex, 1);
     await this.mfaRepository.save(mfaSettings);
 
-    console.log(`✅ Backup code verified for user ${userId}`);
+    logger.info({ userId }, "Backup code verified for user");
     return true;
   }
 
@@ -313,7 +322,7 @@ export class MfaService {
 
     await this.mfaRepository.save(mfaSettings);
 
-    console.log(`✅ Backup codes regenerated for user ${userId}`);
+    logger.info({ userId }, "Backup codes regenerated for user");
 
     return backupCodes;
   }
@@ -393,7 +402,7 @@ export class MfaService {
 
     await this.mfaRepository.save(mfaSettings);
 
-    console.log(`✅ All MFA methods disabled for user ${userId}`);
+    logger.info({ userId }, "All MFA methods disabled for user");
   }
 
   // ============================================================

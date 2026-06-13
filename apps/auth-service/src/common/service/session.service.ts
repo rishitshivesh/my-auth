@@ -4,6 +4,7 @@ import { Repository, IsNull } from "typeorm";
 import { Session } from "@repo/database";
 import { RedisService } from "./redis.service";
 import { ConfigService } from "@nestjs/config";
+import { logger } from "@/common/logger";
 
 export interface SessionData {
   id: string;
@@ -79,7 +80,7 @@ export class SessionService {
       this.sessionTTL,
     );
 
-    console.log(`✅ Session created: ${session.id} (PostgreSQL + Redis)`);
+    logger.info({ sessionId: session.id }, "Session created (PostgreSQL + Redis)");
 
     return session;
   }
@@ -162,7 +163,7 @@ export class SessionService {
     // Update last activity in DB (async, don't wait)
     this.sessionRepository
       .update(sessionId, { lastActivity: new Date() })
-      .catch(console.error);
+      .catch((err) => logger.error({ err }, "Failed to update session last activity"));
 
     return sessionData;
   }
@@ -188,7 +189,7 @@ export class SessionService {
     // 2. Remove from Redis
     await this.redisService.delete(tenantId, "session", sessionId);
 
-    console.log(`🔒 Session revoked: ${sessionId} (${reason})`);
+    logger.info({ sessionId, reason }, "Session revoked");
   }
 
   /**
@@ -223,7 +224,7 @@ export class SessionService {
       await this.redisService.delete(tenantId, "session", session.id);
     }
 
-    console.log(`🔒 All sessions revoked for user: ${userId}`);
+    logger.info({ userId }, "All sessions revoked for user");
   }
 
   /**
@@ -253,7 +254,7 @@ export class SessionService {
       await this.redisService.delete(tenantId, "session", session.id);
     }
 
-    console.log(`🚨 Session family revoked: ${familyId}`);
+    logger.warn({ familyId }, "Session family revoked");
   }
 
   /**
@@ -282,7 +283,7 @@ export class SessionService {
       this.sessionTTL,
     );
 
-    console.log(`🔄 Refresh token rotated: ${sessionId}`);
+    logger.info({ sessionId }, "Refresh token rotated");
   }
 
   /**

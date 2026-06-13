@@ -9,6 +9,7 @@ import { Repository, In } from "typeorm";
 import { User, Role, Permission, UserRole } from "@repo/database";
 import { RoleService } from "./role.service";
 import { PermissionService } from "./permission.service";
+import { logger } from "@/common/logger";
 
 export interface AssignRoleDto {
   userId: string;
@@ -76,9 +77,7 @@ export class RbacService {
         existing.reason = data.reason;
         existing.metadata = data.metadata;
         await this.userRoleRepository.save(existing);
-        console.log(
-          `✅ Updated role assignment: ${role.name} for user ${user.email}`,
-        );
+        logger.info({ roleName: role.name, userEmail: user.email }, "Updated role assignment");
         return existing;
       }
 
@@ -97,7 +96,7 @@ export class RbacService {
       metadata: data.metadata,
     });
 
-    console.log(`✅ Assigned role ${role.name} to user ${user.email}`);
+    logger.info({ roleName: role.name, userEmail: user.email }, "Assigned role to user");
 
     return userRole;
   }
@@ -157,7 +156,7 @@ export class RbacService {
 
     await this.userRoleRepository.remove(userRole);
 
-    console.log(`🗑️  Removed role assignment for user ${userId}`);
+    logger.info({ userId }, "Removed role assignment for user");
   }
 
   /**
@@ -357,7 +356,7 @@ export class RbacService {
     });
 
     if (defaultRoles.length === 0) {
-      console.log("⚠️  No default roles found for tenant");
+      logger.warn("No default roles found for tenant");
       return;
     }
 
@@ -378,9 +377,7 @@ export class RbacService {
       }
     }
 
-    console.log(
-      `✅ Assigned ${defaultRoles.length} default role(s) to user ${userId}`,
-    );
+    logger.info({ userId, roleCount: defaultRoles.length }, "Assigned default roles to user");
   }
 
   /**
@@ -396,9 +393,7 @@ export class RbacService {
 
     if (expiredAssignments.length > 0) {
       await this.userRoleRepository.remove(expiredAssignments);
-      console.log(
-        `🗑️  Removed ${expiredAssignments.length} expired role assignments`,
-      );
+      logger.info({ count: expiredAssignments.length }, "Removed expired role assignments");
     }
 
     return expiredAssignments.length;
@@ -465,18 +460,18 @@ export class RbacService {
    * Initialize RBAC for tenant (create default permissions and roles)
    */
   async initializeTenant(tenantId: string, createdBy?: string): Promise<void> {
-    console.log(`🔧 Initializing RBAC for tenant ${tenantId}...`);
+    logger.info({ tenantId }, "Initializing RBAC for tenant");
 
     // 1. Create default permissions
     const permissions =
       await this.permissionService.seedDefaultPermissions(tenantId);
-    console.log(`✅ Created ${permissions.length} default permissions`);
+    logger.info({ count: permissions.length }, "Created default permissions");
 
     // 2. Create default roles
     const roles = await this.roleService.seedDefaultRoles(tenantId, createdBy);
-    console.log(`✅ Created ${roles.length} default roles`);
+    logger.info({ count: roles.length }, "Created default roles");
 
-    console.log(`🎉 RBAC initialization complete for tenant ${tenantId}`);
+    logger.info({ tenantId }, "RBAC initialization complete for tenant");
   }
 
   /**
@@ -495,7 +490,7 @@ export class RbacService {
       reason: "Admin access granted",
     });
 
-    console.log(`✅ User ${userId} is now an admin`);
+    logger.info({ userId }, "User is now an admin");
   }
 
   /**
@@ -503,6 +498,6 @@ export class RbacService {
    */
   async removeAdminAccess(userId: string, tenantId: string): Promise<void> {
     await this.removeRoleByName(userId, "admin", tenantId);
-    console.log(`🗑️  Removed admin access from user ${userId}`);
+    logger.info({ userId }, "Removed admin access from user");
   }
 }

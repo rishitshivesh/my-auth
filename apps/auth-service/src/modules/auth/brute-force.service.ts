@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
 import { User, SecurityEventType } from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
+import { logger } from "@/common/logger";
 
 @Injectable()
 export class BruteForceService {
@@ -26,9 +27,7 @@ export class BruteForceService {
         (user.lockedUntil.getTime() - Date.now()) / 60000,
       );
 
-      console.log(
-        `🔒 Account locked for user ${user.email} - ${minutesLeft} minutes remaining`,
-      );
+      logger.info({ userId: user.id, minutesLeft }, "Account locked for user");
 
       throw new UnauthorizedException({
         message: `Account temporarily locked due to too many failed login attempts`,
@@ -43,7 +42,7 @@ export class BruteForceService {
       user.lockedUntil = undefined;
       user.failedLoginAttempts = 0;
       await this.userRepository.save(user);
-      console.log(`🔓 Lock expired for user ${user.email}`);
+      logger.info({ userId: user.id }, "Account lock expired, resetting");
     }
   }
 
@@ -59,9 +58,7 @@ export class BruteForceService {
     user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
     user.lastFailedLogin = new Date();
 
-    console.log(
-      `❌ Failed login attempt ${user.failedLoginAttempts}/${this.MAX_ATTEMPTS} for ${user.email}`,
-    );
+    logger.warn({ userId: user.id, attempts: user.failedLoginAttempts, maxAttempts: this.MAX_ATTEMPTS }, "Failed login attempt");
 
     // Emit brute-force threshold event when approaching the lockout limit
     // (fires one attempt before the final lock so analysts see the build-up)
@@ -87,9 +84,7 @@ export class BruteForceService {
       user.lockedUntil = new Date(Date.now() + this.LOCKOUT_DURATION);
       await this.userRepository.save(user);
 
-      console.log(
-        `🔒 Account locked for user ${user.email} until ${user.lockedUntil}`,
-      );
+      logger.warn({ userId: user.id, lockedUntil: user.lockedUntil }, "Account locked due to too many failed attempts");
 
       this.securityEventService.log({
         userId: user.id,
@@ -126,7 +121,7 @@ export class BruteForceService {
     const delay = this.PROGRESSIVE_DELAYS[delayIndex] as number;
 
     if (delay > 0) {
-      console.log(`⏱️  Applying ${delay}ms delay for failed attempt`);
+      logger.info({ delayMs: delay }, "Applying progressive delay for failed attempt");
       await this.sleep(delay);
     }
 
@@ -143,7 +138,7 @@ export class BruteForceService {
    */
   async resetFailedAttempts(user: User): Promise<void> {
     if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      console.log(`✅ Resetting failed attempts for ${user.email}`);
+      logger.info({ userId: user.id }, "Resetting failed login attempts");
 
       user.failedLoginAttempts = 0;
       user.lockedUntil = null;
@@ -171,7 +166,7 @@ export class BruteForceService {
 
     await this.userRepository.save(user);
 
-    console.log(`🔓 Account manually unlocked for ${user.email}`);
+    logger.info({ userId: user.id }, "Account manually unlocked");
   }
 
   /**

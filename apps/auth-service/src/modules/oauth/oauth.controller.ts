@@ -49,6 +49,8 @@ import { ConfigService } from "@nestjs/config";
 import { type Request, type Response } from "express";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { RequirePermissions } from "../rbac/decorators/rbac.decorator";
+import { JwksService } from "./services/jwks.service";
+import { logger } from "@/common/logger";
 
 @ApiTags("OAuth2/OIDC")
 @Controller("oauth")
@@ -58,7 +60,23 @@ export class OAuthController {
     private tokenService: OAuthTokenService,
     private consentService: OAuthConsentService,
     private configService: ConfigService,
+    private jwksService: JwksService,
   ) {}
+
+  private parseClientCredentials(
+    authHeader?: string,
+    bodyClientId?: string,
+    bodyClientSecret?: string,
+  ): { clientId?: string; clientSecret?: string } {
+    if (authHeader && authHeader.startsWith("Basic ")) {
+      const decoded = Buffer.from(authHeader.slice(6), "base64").toString(
+        "utf-8",
+      );
+      const [id, secret] = decoded.split(":");
+      return { clientId: id, clientSecret: secret };
+    }
+    return { clientId: bodyClientId, clientSecret: bodyClientSecret };
+  }
 
   // ============================================================
   // AUTHORIZATION ENDPOINT
@@ -216,24 +234,16 @@ export class OAuthController {
   ): Promise<TokenResponseDto> {
     const tenantId = req.tenantId!;
 
-    // Extract client credentials
-    let clientId = body.client_id;
-    let clientSecret = body.client_secret;
-
-    // Check for Basic Auth
-    if (authHeader && authHeader.startsWith("Basic ")) {
-      const base64 = authHeader.slice(6);
-      const decoded = Buffer.from(base64, "base64").toString("utf-8");
-      const [id, secret] = decoded.split(":");
-      clientId = id as string;
-      clientSecret = secret;
-    }
+    const { clientId, clientSecret } = this.parseClientCredentials(
+      authHeader,
+      body.client_id,
+      body.client_secret,
+    );
 
     if (!clientId) {
       throw new BadRequestException("client_id required");
     }
 
-    // Validate client
     const client = await this.clientService.validateClient(
       clientId,
       clientSecret,
@@ -488,17 +498,24 @@ export class OAuthController {
     @Body() body: RevokeTokenRequestDto,
     @Headers("authorization") authHeader?: string,
   ): Promise<void> {
-    // TODO: Validate client credentials from Authorization header
+    const { clientId, clientSecret } = this.parseClientCredentials(authHeader);
+    if (clientId) {
+      try {
+        await this.clientService.validateClient(clientId, clientSecret);
+      } catch {
+        logger.warn({ clientId }, "Revoke attempt with invalid client credentials");
+        return;
+      }
+    }
 
-    // Always return 200 per spec (don't leak token validity)
     try {
       if (body.token_type_hint === "refresh_token") {
         await this.tokenService.revokeRefreshToken(body.token);
       } else {
         await this.tokenService.revokeAccessToken(body.token);
       }
-    } catch (error) {
-      // Silently fail per spec
+    } catch {
+      // Silently fail per RFC 7009
     }
   }
 
@@ -522,7 +539,11 @@ export class OAuthController {
     @Body() body: IntrospectTokenRequestDto,
     @Headers("authorization") authHeader?: string,
   ): Promise<IntrospectTokenResponseDto> {
-    // TODO: Validate client credentials from Authorization header
+    const { clientId, clientSecret } = this.parseClientCredentials(authHeader);
+    if (!clientId) {
+      throw new UnauthorizedException("Client authentication required");
+    }
+    await this.clientService.validateClient(clientId, clientSecret);
 
     return this.tokenService.introspectToken(body.token, body.token_type_hint);
   }
@@ -600,19 +621,7 @@ export class OAuthController {
     type: JWKSResponseDto,
   })
   getJWKS(): JWKSResponseDto {
-    // TODO: Implement actual JWKS with RSA keys
-    return {
-      keys: [
-        {
-          kty: "RSA",
-          use: "sig",
-          kid: "key_1",
-          alg: "RS256",
-          n: "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-          e: "AQAB",
-        },
-      ],
-    };
+    return this.jwksService.getJWKS() as JWKSResponseDto;
   }
 
   // ============================================================

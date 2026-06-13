@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from "@nestjs/common";
+import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, LessThan } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -115,7 +116,7 @@ export class OAuthTokenService {
       userAgent: data.userAgent,
     });
 
-    console.log(`✅ Created authorization code for user ${data.userId}`);
+    logger.info({ userId: data.userId }, "Created authorization code");
 
     return code; // Return plaintext code
   }
@@ -175,7 +176,7 @@ export class OAuthTokenService {
     authCode.usedAt = new Date();
     await this.authCodeRepository.save(authCode);
 
-    console.log(`✅ Consumed authorization code for user ${authCode.userId}`);
+    logger.info({ userId: authCode.userId }, "Consumed authorization code");
 
     return authCode;
   }
@@ -281,7 +282,7 @@ export class OAuthTokenService {
       userAgent: data.userAgent,
     });
 
-    console.log(`✅ Created access token for ${data.userId || "M2M"}`);
+    logger.info({ userId: data.userId || "M2M" }, "Created access token");
 
     return accessToken;
   }
@@ -353,7 +354,7 @@ export class OAuthTokenService {
       },
     );
 
-    console.log(`🔒 Revoked access token: ${reason}`);
+    logger.info({ reason }, "Revoked access token");
   }
 
   // ============================================================
@@ -398,7 +399,7 @@ export class OAuthTokenService {
       userAgent: data.userAgent,
     });
 
-    console.log(`✅ Created refresh token for user ${data.userId}`);
+    logger.info({ userId: data.userId }, "Created refresh token");
 
     return token; // Return plaintext token
   }
@@ -429,11 +430,7 @@ export class OAuthTokenService {
     // REUSE DETECTION
     if (refreshToken.usedAt) {
       // Token already used! Security breach!
-      console.error("🚨 REFRESH TOKEN REUSE DETECTED", {
-        tokenId: refreshToken.id,
-        familyId: refreshToken.familyId,
-        userId: refreshToken.userId,
-      });
+      logger.error({ tokenId: refreshToken.id, familyId: refreshToken.familyId, userId: refreshToken.userId }, "REFRESH TOKEN REUSE DETECTED");
 
       // Revoke entire family
       await this.revokeRefreshTokenFamily(
@@ -472,7 +469,7 @@ export class OAuthTokenService {
       userAgent: oldToken.userAgent,
     });
 
-    console.log(`🔄 Rotated refresh token for user ${oldToken.userId}`);
+    logger.info({ userId: oldToken.userId }, "Rotated refresh token");
 
     return newToken;
   }
@@ -494,7 +491,7 @@ export class OAuthTokenService {
       },
     );
 
-    console.log(`🔒 Revoked refresh token: ${reason}`);
+    logger.info({ reason }, "Revoked refresh token");
   }
 
   /**
@@ -515,7 +512,7 @@ export class OAuthTokenService {
       },
     );
 
-    console.log(`🚨 Revoked token family: ${familyId} (${reason})`);
+    logger.warn({ familyId, reason }, "Revoked token family");
   }
 
   /**
@@ -538,7 +535,7 @@ export class OAuthTokenService {
       },
     );
 
-    console.log(`🔒 Revoked all refresh tokens for user ${userId}`);
+    logger.info({ userId, reason }, "Revoked all refresh tokens for user");
   }
 
   /**
@@ -574,7 +571,7 @@ export class OAuthTokenService {
       },
     );
 
-    console.log(`🔒 Revoked all tokens for client ${clientId}`);
+    logger.info({ clientId, tenantId }, "Revoked all tokens for client");
   }
 
   // ============================================================
@@ -622,7 +619,7 @@ export class OAuthTokenService {
       expiresIn: client.idTokenTtl,
     });
 
-    console.log(`✅ Created ID token for user ${user.id}`);
+    logger.info({ userId: user.id }, "Created ID token");
 
     return idToken;
   }
@@ -654,11 +651,7 @@ export class OAuthTokenService {
       expiresAt: LessThan(oldRefreshDate),
     });
 
-    console.log(`🧹 Cleaned up expired tokens:`, {
-      codes: deletedCodes.affected || 0,
-      accessTokens: deletedAccessTokens.affected || 0,
-      refreshTokens: deletedRefreshTokens.affected || 0,
-    });
+    logger.info({ codes: deletedCodes.affected || 0, accessTokens: deletedAccessTokens.affected || 0, refreshTokens: deletedRefreshTokens.affected || 0 }, "Cleaned up expired tokens");
   }
 
   // ============================================================

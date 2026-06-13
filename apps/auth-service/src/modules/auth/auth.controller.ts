@@ -33,6 +33,7 @@ import {
   VerifyMagicLinkDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { logger } from "@/common/logger";
 import { type Request, type Response } from "express";
 import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
@@ -466,7 +467,7 @@ export class AuthController {
 
       return { status: 200, data: { accessToken: result.accessToken, message: result.message } };
     } catch (error: any) {
-      console.error("❌ MFA verification failed:", error.message);
+      logger.error({ err: error }, "MFA verification failed");
 
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -540,7 +541,7 @@ export class AuthController {
         userAgent,
       );
     } catch (error: any) {
-      console.error("❌ Backup code verification failed:", error.message);
+      logger.error({ err: error }, "Backup code verification failed");
 
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -850,16 +851,11 @@ export class AuthController {
     const { email } = body;
     const tenantId = req.tenantId!; // From TenantResolverMiddleware
 
-    console.log('🔍 Login intent check:', { email, tenantId });
+    logger.info({ email, tenantId }, "Login intent check");
 
     const result = await this.authService.getLoginIntent(email, tenantId);
 
-    console.log('✅ Login intent result:', {
-      email,
-      exists: result.exists,
-      methods: result.methods,
-      preferredMethod: result.preferredMethod,
-    });
+    logger.info({ email, exists: result.exists, methods: result.methods, preferredMethod: result.preferredMethod }, "Login intent result");
 
     return result;
   }

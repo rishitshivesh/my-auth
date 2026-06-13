@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
+import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { OAuthClient } from "@repo/database";
@@ -168,7 +169,7 @@ export class OAuthClientService {
       createdBy: data.createdBy,
     });
 
-    console.log(`✅ Created OAuth client: ${client.clientId} (${client.name})`);
+    logger.info({ clientId: client.clientId, name: client.name }, "Created OAuth client");
 
     return {
       client,
@@ -342,7 +343,7 @@ export class OAuthClientService {
 
     await this.clientRepository.save(client);
 
-    console.log(`✅ Updated OAuth client: ${client.clientId}`);
+    logger.info({ clientId: client.clientId }, "Updated OAuth client");
 
     return client;
   }
@@ -368,7 +369,7 @@ export class OAuthClientService {
     client.clientSecretHash = clientSecretHash;
     await this.clientRepository.save(client);
 
-    console.log(`🔄 Rotated client secret: ${client.clientId}`);
+    logger.info({ clientId: client.clientId }, "Rotated client secret");
 
     return {
       client,
@@ -386,7 +387,7 @@ export class OAuthClientService {
     client.isActive = false;
     await this.clientRepository.save(client);
 
-    console.log(`🗑️  Deleted OAuth client: ${client.clientId}`);
+    logger.info({ clientId: client.clientId }, "Deleted OAuth client");
   }
 
   /**
