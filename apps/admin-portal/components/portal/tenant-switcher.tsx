@@ -10,12 +10,13 @@ interface Tenant {
 }
 
 interface TenantSwitcherProps {
-  tenants: Tenant[]
+  tenants?: Tenant[]
   current?: string
   onTenantChange?: (tenantId: string) => void
 }
 
-export function TenantSwitcher({ tenants, current, onTenantChange }: TenantSwitcherProps) {
+export function TenantSwitcher({ tenants = [], current, onTenantChange }: TenantSwitcherProps) {
+
   const [open, setOpen] = useState(false)
   const currentTenant = tenants.find((t) => t.id === current) || tenants[0]
 

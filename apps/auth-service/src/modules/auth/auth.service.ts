@@ -75,10 +75,10 @@ export class AuthService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload as Record<string, unknown>, {
-      privateKey,
+      privateKey: privateKey as any,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as any,
     });
   }
 
@@ -974,8 +974,8 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey,
-      algorithms: ["RS256"],
+      publicKey: publicKey as any,
+      algorithms: ['RS256'],
     });
 
     if (payload.type !== "mfa_pending") {
@@ -1038,8 +1038,8 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey,
-      algorithms: ["RS256"],
+      publicKey: publicKey as any,
+      algorithms: ['RS256'],
     });
 
     if (payload.type !== "mfa_pending") {

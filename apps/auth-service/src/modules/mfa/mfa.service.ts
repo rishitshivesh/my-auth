@@ -272,6 +272,7 @@ export class MfaService {
     const sha256Hash = crypto.createHash("sha256").update(code).digest("hex");
     for (let i = 0; i < mfaSettings.backupCodes.length; i++) {
       const stored = mfaSettings.backupCodes[i];
+      if (!stored) continue;
       if (stored === sha256Hash) {
         codeIndex = i;
         break;

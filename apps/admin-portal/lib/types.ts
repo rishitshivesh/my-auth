@@ -18,7 +18,9 @@ export interface DashboardUser {
   createdAt: string;
   primaryAuthMethod: string;
   status: string;
+  mfaEnabled: boolean;
 }
+
 
 export interface DashboardStats {
   activeSessions: number;

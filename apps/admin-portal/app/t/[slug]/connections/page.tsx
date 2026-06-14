@@ -10,7 +10,7 @@ export default function ConnectionsPage({ params }: { params: { slug: string } }
       pageTitle="Connections"
       pageSubtitle="Manage identity providers and integrations"
       currentPath={`/t/${params.slug}/connections`}
-      primaryAction={{ label: "Add Connection", onClick: () => console.log("Add connection") }}
+      primaryAction={{ label: "Add Connection", onClick: () => {} }}
     >
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card p-6">

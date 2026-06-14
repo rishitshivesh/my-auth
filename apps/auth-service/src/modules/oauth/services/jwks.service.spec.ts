@@ -53,7 +53,7 @@ describe("JwksService", () => {
       const service = new JwksService(mockRepo, mockConfig);
       const jwk = service.toJWK(publicKeyPem, "test-kid-2");
 
-      const reconstructed = crypto.createPublicKey({ key: jwk, format: "jwk" });
+      const reconstructed = crypto.createPublicKey({ key: jwk as any, format: "jwk" });
       const reconstructedPem = reconstructed.export({
         type: "spki",
         format: "pem",
@@ -114,10 +114,10 @@ describe("JwksService", () => {
 
       const jwks = service.getJWKS();
       expect(jwks.keys).toHaveLength(1);
-      expect(jwks.keys[0].kid).toBe("platform-kid");
-      expect(jwks.keys[0].kty).toBe("RSA");
-      expect(jwks.keys[0].alg).toBe("RS256");
-      expect(jwks.keys[0].e).toBe("AQAB");
+      expect(jwks.keys[0]?.kid).toBe("platform-kid");
+      expect(jwks.keys[0]?.kty).toBe("RSA");
+      expect(jwks.keys[0]?.alg).toBe("RS256");
+      expect(jwks.keys[0]?.e).toBe("AQAB");
     });
   });
 });

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Button, Skeleton } from "@repo/ui"
+import { SentryButton, SentrySkeleton } from "@repo/ui"
+
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import {
   useTenantSettings,
@@ -64,9 +65,9 @@ export default function SettingsPage() {
       <div className="flex h-screen">
         <DashboardSidebar />
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          <Skeleton className="h-8 w-48" />
+          <SentrySkeleton className="h-8 w-48" />
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+            {[1, 2, 3].map((i) => <SentrySkeleton key={i} className="h-20 rounded-xl" />)}
           </div>
         </main>
       </div>
@@ -229,14 +230,14 @@ export default function SettingsPage() {
                               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                             />
                           </div>
-                          <Button
+                          <SentryButton
                             size="sm"
                             onClick={() => saveSocialCredentials(id)}
                             disabled={updateSocial.isPending}
                           >
                             <Save className="h-3 w-3 mr-1" />
                             Save credentials
-                          </Button>
+                          </SentryButton>
                         </div>
                       )}
                     </div>

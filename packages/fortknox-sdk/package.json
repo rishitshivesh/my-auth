@@ -8,34 +8,34 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.js"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./dist/index.js"
     },
     "./core": {
-      "import": "./dist/core/index.js",
-      "require": "./dist/core/index.js",
-      "types": "./dist/core/index.d.ts"
+      "types": "./src/core/index.ts",
+      "import": "./src/core/index.ts",
+      "default": "./dist/core/index.js"
     },
     "./web": {
-      "import": "./dist/web/index.js",
-      "require": "./dist/web/index.js",
-      "types": "./dist/web/index.d.ts"
+      "types": "./src/web/index.ts",
+      "import": "./src/web/index.ts",
+      "default": "./dist/web/index.js"
     },
     "./react": {
-      "import": "./dist/react/index.js",
-      "require": "./dist/react/index.js",
-      "types": "./dist/react/index.d.ts"
+      "types": "./src/react/index.tsx",
+      "import": "./src/react/index.tsx",
+      "default": "./dist/react/index.js"
     },
     "./next": {
-      "import": "./dist/next/index.js",
-      "require": "./dist/next/index.js",
-      "types": "./dist/next/index.d.ts"
+      "types": "./src/next/index.ts",
+      "import": "./src/next/index.ts",
+      "default": "./dist/next/index.js"
     },
     "./node": {
-      "import": "./dist/node/index.js",
-      "require": "./dist/node/index.js",
-      "types": "./dist/node/index.d.ts"
+      "types": "./src/node/index.ts",
+      "import": "./src/node/index.ts",
+      "default": "./dist/node/index.js"
     }
   },
   "files": [

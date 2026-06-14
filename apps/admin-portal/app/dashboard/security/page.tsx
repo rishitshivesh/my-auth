@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Button, Skeleton } from "@repo/ui"
+import { SentryButton, SentrySkeleton } from "@repo/ui"
+
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { useMfaStatus, useSetupTotp, useVerifyTotp, useDisableTotp } from "@/lib/queries"
 import type { TotpSetupData } from "@/lib/types"
@@ -56,7 +57,7 @@ export default function SecurityPage() {
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-2xl space-y-6">
             {isLoading ? (
-              <Skeleton className="h-48 w-full rounded-xl" />
+              <SentrySkeleton className="h-48 w-full rounded-xl" />
             ) : (
               <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                 {/* Header */}
@@ -98,14 +99,14 @@ export default function SecurityPage() {
 
                 {/* Stage: not enabled */}
                 {stage === "status" && !mfaStatus?.enabled && (
-                  <Button
+                  <SentryButton
                     onClick={handleStartSetup}
                     disabled={setupTotp.isPending}
                     className="w-full"
                   >
                     <QrCode className="h-4 w-4 mr-2" />
                     {setupTotp.isPending ? "Preparing..." : "Set up Authenticator App"}
-                  </Button>
+                  </SentryButton>
                 )}
 
                 {/* Stage: enabled */}
@@ -115,13 +116,13 @@ export default function SecurityPage() {
                       <Key className="h-4 w-4" />
                       {mfaStatus.backupCodesRemaining} backup codes remaining
                     </div>
-                    <Button
+                    <SentryButton
                       variant="destructive"
                       onClick={handleDisable}
                       disabled={disableTotp.isPending}
                     >
                       {disableTotp.isPending ? "Disabling..." : "Disable"}
-                    </Button>
+                    </SentryButton>
                   </div>
                 )}
 
@@ -145,9 +146,9 @@ export default function SecurityPage() {
                         {setupData.secret}
                       </code>
                     </p>
-                    <Button onClick={() => setStage("verify")} className="w-full">
+                    <SentryButton onClick={() => setStage("verify")} className="w-full">
                       I've scanned the code →
-                    </Button>
+                    </SentryButton>
                   </div>
                 )}
 
@@ -169,13 +170,13 @@ export default function SecurityPage() {
                       className="w-full rounded-lg border border-border bg-background px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-primary"
                       autoFocus
                     />
-                    <Button
+                    <SentryButton
                       onClick={handleVerify}
                       disabled={verifyCode.length !== 6 || verifyTotp.isPending}
                       className="w-full"
                     >
                       {verifyTotp.isPending ? "Verifying..." : "Verify & Enable MFA"}
-                    </Button>
+                    </SentryButton>
                   </div>
                 )}
 

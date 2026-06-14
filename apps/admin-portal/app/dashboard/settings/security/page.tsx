@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Key, Smartphone, Loader2, CheckCircle, XCircle, Globe, LogOut } from "lucide-react";
-import { Button } from "@repo/ui";
+import { SentryButton, SentrySkeleton } from "@repo/ui";
+
 import { useMfaStatus, useListPasskeys, useDeletePasskey, useActiveSessions, useRevokeSession, useRevokeAllOtherSessions } from "@/lib/queries";
 import type { PasskeyCredential, ActiveSessionDto } from "@/lib/types";
 import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
@@ -19,7 +20,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-function formatRelativeTime(dateStr: string): string {
+function formatRelative(dateStr: string): string {
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -154,9 +155,9 @@ export default function SecuritySettingsPage() {
               ? "Your account is protected with an authenticator app"
               : "Add extra protection to your account"}
           </p>
-          <Button variant="outline" size="sm" onClick={handleManageTotp}>
+          <SentryButton variant="outline" size="sm" onClick={handleManageTotp}>
             {totpEnabled ? "Manage" : "Enable"}
-          </Button>
+          </SentryButton>
         </div>
       </section>
 
@@ -196,11 +197,11 @@ export default function SecuritySettingsPage() {
                     <p className="text-xs text-muted-foreground">
                       Added {formatDate(pk.createdAt)}
                       {" · "}
-                      {pk.lastUsedAt ? `Last used ${formatRelativeTime(pk.lastUsedAt)}` : "Never used"}
+                      {pk.lastUsedAt ? `Last used ${formatRelative(pk.lastUsedAt)}` : "Never used"}
                     </p>
                   </div>
                 </div>
-                <Button
+                <SentryButton
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeletePasskey(pk.id)}
@@ -213,7 +214,7 @@ export default function SecuritySettingsPage() {
                   ) : (
                     "Remove"
                   )}
-                </Button>
+                </SentryButton>
               </li>
             ))}
           </ul>
@@ -223,7 +224,7 @@ export default function SecuritySettingsPage() {
           </p>
         )}
 
-        <Button
+        <SentryButton
           variant="outline"
           size="sm"
           onClick={() => setShowPasskeyModal(true)}
@@ -231,7 +232,7 @@ export default function SecuritySettingsPage() {
         >
           <Key className="h-4 w-4" />
           Add passkey
-        </Button>
+        </SentryButton>
       </section>
 
       {/* Sessions Section */}
@@ -249,7 +250,7 @@ export default function SecuritySettingsPage() {
             </div>
           </div>
           {!sessionsLoading && sessions.filter((s) => !s.isCurrent).length > 0 && (
-            <Button
+            <SentryButton
               variant="outline"
               size="sm"
               onClick={handleRevokeAllOther}
@@ -262,7 +263,7 @@ export default function SecuritySettingsPage() {
                 <LogOut className="h-3 w-3 mr-1" />
               )}
               Revoke all others
-            </Button>
+            </SentryButton>
           )}
         </div>
 
@@ -301,12 +302,12 @@ export default function SecuritySettingsPage() {
                       {session.location?.city ? ` · ${session.location.city}` : ''}
                       {session.location?.country ? `, ${session.location.country}` : ''}
                       {' · '}
-                      {formatRelativeTime(session.lastActivity)}
+                      {formatRelative(session.lastActivity)}
                     </p>
                   </div>
                 </div>
                 {!session.isCurrent && (
-                  <Button
+                  <SentryButton
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRevokeSession(session.id)}
@@ -319,7 +320,7 @@ export default function SecuritySettingsPage() {
                     ) : (
                       "Revoke"
                     )}
-                  </Button>
+                  </SentryButton>
                 )}
               </li>
             ))}

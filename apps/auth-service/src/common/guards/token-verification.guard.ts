@@ -24,7 +24,7 @@ export class TokenVerificationGuard implements CanActivate {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       const decoded = this.jwtService.verify(token, {
-        publicKey,
+        publicKey: publicKey as any,
         algorithms: ["RS256"],
       });
       if (!decoded) {
@@ -56,7 +56,7 @@ export class RequestUserGuard implements CanActivate {
       if (token) {
         const publicKey = await this.jwksService.getPublicKeyForToken(token);
         const decoded = this.jwtService.verify(token, {
-          publicKey,
+          publicKey: publicKey as any,
           algorithms: ["RS256"],
         });
         if (decoded) request.user = decoded;

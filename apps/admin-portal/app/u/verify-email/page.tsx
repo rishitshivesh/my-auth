@@ -8,10 +8,10 @@ export default function VerifyEmailPage() {
   const [showEmailChange, setShowEmailChange] = useState(false)
   const [email, setEmail] = useState("user@example.com")
 
-  const handleVerify = async (code: string) => {
-    console.log("Verifying email:", { email, code })
+  const handleVerify = async (_code: string) => {
     await new Promise((resolve) => setTimeout(resolve, 1000))
   }
+
 
   return (
     <UniversalAuthLayout

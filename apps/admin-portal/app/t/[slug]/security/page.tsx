@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { PortalLayout } from "@/components/layouts/portal-layout";
-import { Button } from "@repo/ui";
-import { Label } from "@repo/ui";
+import { SentryButton, SentrySkeleton, Label } from "@repo/ui";
 import { MFASettings } from "@/components/portal/mfa-settings";
 import {
   TrustedDeviceCard,
@@ -17,7 +16,6 @@ import {
   AuditLogList,
   type AuditEvent,
 } from "@/components/portal/audit-log-list";
-import { Skeleton } from "@repo/ui";
 import {
   useMfaStatus,
   useActiveSessions,
@@ -32,7 +30,7 @@ import { formatRelativeTime, formatEventDescription } from "@/lib/utils";
 const TRUSTED_DEVICES: TrustedDevice[] = [];
 
 export default function SecurityPage({ params }: { params: { slug: string } }) {
-  const { data: mfaData, isLoading: mfaLoading } = useMfaStatus();
+  const { data: mfaStatusData, isLoading: mfaLoading } = useMfaStatus();
   const {
     data: rawSessions = [],
     isLoading: sessionsLoading,
@@ -63,43 +61,43 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
   }));
 
   // Map MFA status to MFASettings method list
-  const mfaMethods = mfaData
+  const mfaMethods = mfaStatusData
     ? [
         {
           id: "totp",
           name: "Authenticator App",
           type: "totp" as const,
-          enabled: mfaData.methods.includes("totp"),
-          verified: mfaData.methods.includes("totp"),
+          enabled: mfaStatusData.methods.includes("totp"),
+          verified: mfaStatusData.methods.includes("totp"),
         },
         {
           id: "email-otp",
           name: "Email Code",
           type: "email-otp" as const,
           enabled:
-            mfaData.methods.includes("email_otp") ||
-            mfaData.methods.includes("email-otp"),
+            mfaStatusData.methods.includes("email_otp") ||
+            mfaStatusData.methods.includes("email-otp"),
           verified:
-            mfaData.methods.includes("email_otp") ||
-            mfaData.methods.includes("email-otp"),
+            mfaStatusData.methods.includes("email_otp") ||
+            mfaStatusData.methods.includes("email-otp"),
         },
         {
           id: "backup-codes",
           name: "Backup Codes",
           type: "backup-codes" as const,
-          enabled: (mfaData.backupCodesRemaining ?? 0) > 0,
-          verified: (mfaData.backupCodesRemaining ?? 0) > 0,
+          enabled: (mfaStatusData.backupCodesRemaining ?? 0) > 0,
+          verified: (mfaStatusData.backupCodesRemaining ?? 0) > 0,
         },
         {
           id: "passkey",
           name: "Passkey",
           type: "passkey" as const,
           enabled:
-            mfaData.methods.includes("passkey") ||
-            mfaData.methods.includes("webauthn"),
+            mfaStatusData.methods.includes("passkey") ||
+            mfaStatusData.methods.includes("webauthn"),
           verified:
-            mfaData.methods.includes("passkey") ||
-            mfaData.methods.includes("webauthn"),
+            mfaStatusData.methods.includes("passkey") ||
+            mfaStatusData.methods.includes("webauthn"),
         },
       ]
     : [];
@@ -154,7 +152,7 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
       currentPath={`/t/${params.slug}/security`}
       primaryAction={{
         label: "Save Settings",
-        onClick: () => console.log("Save security"),
+        onClick: () => {},
       }}
     >
       <div className="space-y-8">
@@ -172,14 +170,12 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
                 />
               ))}
             </div>
-          ) : mfaData ? (
+          ) : mfaStatusData ? (
             <MFASettings
               methods={mfaMethods}
               primaryColor="#6366f1"
-              onToggle={(methodId, enabled) =>
-                console.log("Toggle MFA:", { methodId, enabled })
-              }
-              onRegenerateCodes={() => console.log("Regenerate backup codes")}
+              onToggle={() => {}}
+              onRegenerateCodes={() => {}}
             />
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -320,20 +316,20 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
             Danger Zone
           </h3>
           <div className="space-y-3">
-            <Button
+            <SentryButton
               variant="outline"
               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 bg-transparent"
-              onClick={() => console.log("Reset account")}
+              onClick={() => {}}
             >
               Reset all security settings
-            </Button>
-            <Button
+            </SentryButton>
+            <SentryButton
               variant="outline"
               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 bg-transparent"
-              onClick={() => console.log("Delete account")}
+              onClick={() => {}}
             >
               Delete account
-            </Button>
+            </SentryButton>
           </div>
         </div>
       </div>

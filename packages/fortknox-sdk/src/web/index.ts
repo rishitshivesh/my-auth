@@ -80,7 +80,6 @@ export function redirectToSocialLogin(
  * Handle OAuth callback
  * Extracts tokens from URL and stores them
  */
-// @ts-expect-error
 export function handleOAuthCallback(client: FortKnoxClient): void {
   if (typeof window === 'undefined') return;
   

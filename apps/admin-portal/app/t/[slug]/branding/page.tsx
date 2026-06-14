@@ -2,9 +2,10 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { PortalLayout } from "@/components/layouts/portal-layout";
-import { Input } from "@repo/ui";
-import { Label } from "@repo/ui";
-import { Button } from "@repo/ui";
+import { SentryInput as Input, SentryButton as Button, Label, SentrySkeleton } from "@repo/ui";
+
+
+
 import { useBranding, useUpdateBranding, useUploadLogo } from "@/lib/queries";
 import { FONT_FAMILY_OPTIONS } from "@/lib/types";
 import type { BrandingConfig } from "@/lib/types";
@@ -104,11 +105,12 @@ export default function BrandingPage({
           </h3>
 
           {isLoading ? (
-            <div className="space-y-4 animate-pulse">
-              <div className="h-10 rounded bg-muted" />
-              <div className="h-10 rounded bg-muted" />
+            <div className="space-y-4">
+              <SentrySkeleton className="h-10 w-full" />
+              <SentrySkeleton className="h-10 w-full" />
             </div>
           ) : (
+
             <div className="grid gap-6 md:grid-cols-2">
               {/* Logo */}
               <div className="space-y-2">

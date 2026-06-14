@@ -119,10 +119,10 @@ export class SecurityEvent extends BaseEntity {
 
   @Column({
     type: "enum",
-    enum: ["info", "warning", "critical"],
+    enum: ["info", "medium", "warning", "high", "critical"],
     default: "info",
   })
-  severity!: "info" | "warning" | "critical";
+  severity!: "info" | "medium" | "warning" | "high" | "critical";
 
   @Column({
     type: "varchar",

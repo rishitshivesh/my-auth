@@ -4,11 +4,11 @@ import { SignupForm } from "@/components/auth/signup-form"
 import { UniversalAuthLayout } from "@/components/layouts/universal-auth-layout"
 
 export default function SignupPage() {
-  const handleSignup = async (data: any) => {
-    console.log("Signup attempt:", data)
+  const handleSignup = async (_data: any) => {
     // Mock registration
     await new Promise((resolve) => setTimeout(resolve, 1000))
   }
+
 
   return (
     <UniversalAuthLayout

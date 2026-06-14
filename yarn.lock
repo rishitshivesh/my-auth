@@ -5876,6 +5876,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/helmet@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "@types/helmet@npm:4.0.0"
+  dependencies:
+    helmet: "npm:*"
+  checksum: 10c0/19a54586ee7cae72e4f07d36526be3c99010104372501a7a48fa60f3070253b11e9df24393d9fb16123e048043f95880be79f1c1e967d5704b4b961f72898948
+  languageName: node
+  linkType: hard
+
 "@types/http-errors@npm:*":
   version: 2.0.5
   resolution: "@types/http-errors@npm:2.0.5"
@@ -7383,6 +7392,7 @@ __metadata:
     "@types/cookie-parser": "npm:^1"
     "@types/express": "npm:^5.0.0"
     "@types/express-session": "npm:^1"
+    "@types/helmet": "npm:^4.0.0"
     "@types/jest": "npm:^30.0.0"
     "@types/multer": "npm:^2.1.0"
     "@types/node": "npm:^22.10.7"
@@ -7404,6 +7414,7 @@ __metadata:
     express-session: "npm:^1.18.2"
     globals: "npm:^16.0.0"
     handlebars: "npm:^4.7.8"
+    helmet: "npm:^8.1.0"
     ioredis: "npm:^5.8.0"
     jest: "npm:^30.0.0"
     joi: "npm:^18.0.1"
@@ -10526,6 +10537,13 @@ __metadata:
   dependencies:
     function-bind: "npm:^1.1.2"
   checksum: 10c0/3769d434703b8ac66b209a4cca0737519925bbdb61dd887f93a16372b14694c63ff4e797686d87c90f08168e81082248b9b028bad60d4da9e0d1148766f56eb9
+  languageName: node
+  linkType: hard
+
+"helmet@npm:*, helmet@npm:^8.1.0":
+  version: 8.2.0
+  resolution: "helmet@npm:8.2.0"
+  checksum: 10c0/3aff1bb04123866a573eaafd7df4a5dc21b649c8fe6b39e1fb0e586f7be35709bf6003d72eed35c8deefd74573dff47d19409943cf2816125cc9597a8205a882
   languageName: node
   linkType: hard
 

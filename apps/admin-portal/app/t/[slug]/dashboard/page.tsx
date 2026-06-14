@@ -1,306 +1,280 @@
-"use client";
+'use client';
 
-import { PortalLayout } from "@/components/layouts/portal-layout";
-import { Skeleton, Button } from "@repo/ui";
+import * as React from 'react';
+import { PortalLayout } from '@/components/layouts/portal-layout';
+import { GlassCard, PageHeader, SentryButton, AuditTimeline, SentrySkeleton } from "@repo/ui";
+
 import {
   useTenantMetrics,
   useTenantActivity,
   useApiCallTrend,
-} from "@/lib/queries";
-import { formatDistanceToNow } from "date-fns";
-import type { TrendPoint } from "@/lib/types";
-import { useParams } from "next/navigation";
-
-// ── Chart helpers ──────────────────────────────────────────────
-
-const CHART_W = 700;
-const CHART_H = 200;
-const CHART_PADDING = 10;
-
-function computeChartPaths(points: TrendPoint[]): {
-  line: string;
-  area: string;
-} {
-  if (points.length === 0) {
-    return { line: "", area: "" };
-  }
-
-  const maxCount = Math.max(1, ...points.map((p) => p.count));
-  const n = points.length;
-
-  const coords = points.map((p, i) => {
-    const x = n === 1 ? CHART_W / 2 : (i / (n - 1)) * CHART_W;
-    const y =
-      CHART_PADDING + (CHART_H - CHART_PADDING * 2) * (1 - p.count / maxCount);
-    return { x, y };
-  });
-
-  const lineParts = coords.map(
-    (c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)},${c.y.toFixed(1)}`,
-  );
-  const line = lineParts.join(" ");
-  const area =
-    line +
-    ` L ${coords[coords.length - 1]!.x.toFixed(1)},${CHART_H} L ${coords[0]!.x.toFixed(1)},${CHART_H} Z`;
-
-  return { line, area };
-}
-
-// ── Severity colour ────────────────────────────────────────────
-
-function severityClass(severity: string) {
-  if (severity === "critical")
-    return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-  if (severity === "warning")
-    return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-}
-
-function eventInitial(eventType: string): string {
-  return eventType.split(".")[0]?.charAt(0).toUpperCase() ?? "E";
-}
-
-// ── Page ──────────────────────────────────────────────────────
+} from '@/lib/queries';
+import { useParams, useRouter } from 'next/navigation';
+import { 
+  Users, 
+  Activity, 
+  AppWindow, 
+  ShieldCheck,
+  Plus,
+  Settings,
+  History,
+  TrendingUp,
+  ArrowUpRight
+} from 'lucide-react';
 
 export default function DashboardPage() {
-  const {
-    data: metrics,
-    isLoading: metricsLoading,
-    isError: metricsError,
-  } = useTenantMetrics();
-
   const params = useParams();
+  const router = useRouter();
+  const slug = params.slug as string;
 
-  const {
-    data: activity,
-    isLoading: activityLoading,
-    isError: activityError,
-  } = useTenantActivity(10);
-
+  const { data: metrics, isLoading: metricsLoading } = useTenantMetrics();
+  const { data: activity, isLoading: activityLoading } = useTenantActivity(5);
   const { data: trend, isLoading: trendLoading } = useApiCallTrend(7);
-
-  const { line: trendLine, area: trendArea } = computeChartPaths(trend ?? []);
 
   const stats = [
     {
-      label: "Total Users",
-      value: metricsLoading
-        ? null
-        : (metrics?.totalUsers.toLocaleString() ?? "—"),
-      change: null,
+      label: 'Total Users',
+      value: metrics?.totalUsers.toLocaleString(),
+      icon: Users,
+      trend: '+12%',
     },
     {
-      label: "Active Sessions",
-      value: metricsLoading
-        ? null
-        : (metrics?.activeSessions.toLocaleString() ?? "—"),
-      change: null,
+      label: 'Active Sessions',
+      value: metrics?.activeSessions.toLocaleString(),
+      icon: Activity,
+      trend: '+4%',
     },
     {
-      label: "Applications",
-      value: metricsLoading
-        ? null
-        : (metrics?.totalApplications.toLocaleString() ?? "—"),
-      change: null,
+      label: 'Applications',
+      value: metrics?.totalApplications.toLocaleString(),
+      icon: AppWindow,
     },
     {
-      label: "MFA Adoption",
-      value: metricsLoading
-        ? null
-        : metrics != null
-          ? `${Math.round(metrics.mfaAdoptionRate * 100)}%`
-          : "—",
-      change: null,
+      label: 'MFA Adoption',
+      value: metrics ? `${Math.round(metrics.mfaAdoptionRate * 100)}%` : undefined,
+      icon: ShieldCheck,
+      trend: '+2.4%',
     },
   ];
 
   return (
     <PortalLayout
-      tenantSlug={params.slug as string}
-      pageTitle="Dashboard"
-      pageSubtitle="Overview of your Fort Knox tenant"
-      currentPath={`/t/${params.slug}/dashboard`}
+      pageTitle="Platform Dashboard"
+      pageSubtitle="Overview of your Sentry workspace"
     >
-      <div className="space-y-8">
-        {/* ── Stat cards ── */}
-        {metricsError ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            Failed to load metrics. Please refresh the page.
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-lg border border-border bg-card p-6"
-              >
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                {stat.value === null ? (
-                  <Skeleton className="mt-2 h-9 w-24 rounded" />
+      <div className="space-y-10">
+        {/* Stat Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, i) => (
+            <GlassCard
+              key={stat.label}
+              tier={1}
+              className="p-6 flex flex-col justify-between min-h-[140px] animate-fade-up"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="flex items-start justify-between">
+                <div className="p-2 rounded-sm bg-black/5">
+                  <stat.icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                {stat.trend && (
+                  <span className="text-[10px] font-display font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
+                    <TrendingUp className="w-2.5 h-2.5" />
+                    {stat.trend}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 space-y-1">
+                <p className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
+                  {stat.label}
+                </p>
+                {metricsLoading ? (
+                  <SentrySkeleton className="h-8 w-20" />
                 ) : (
-                  <p className="mt-2 text-3xl font-bold text-foreground">
-                    {stat.value}
+                  <p className="text-2xl font-display font-semibold text-foreground tracking-tight">
+                    {stat.value ?? '0'}
                   </p>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── API call trend chart ── */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-foreground">
-            API Call Trend (last 7 days)
-          </h3>
-          {trendLoading ? (
-            <Skeleton className="h-[200px] w-full rounded" />
-          ) : (
-            <svg
-              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-              preserveAspectRatio="none"
-              className="w-full h-[200px]"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor="rgb(99,102,241)"
-                    stopOpacity="0.3"
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor="rgb(99,102,241)"
-                    stopOpacity="0"
-                  />
-                </linearGradient>
-              </defs>
-              {trendArea && <path d={trendArea} fill="url(#trendGradient)" />}
-              {trendLine && (
-                <path
-                  d={trendLine}
-                  fill="none"
-                  stroke="rgb(99,102,241)"
-                  strokeWidth="2"
-                />
-              )}
-              {(!trend || trend.every((p) => p.count === 0)) && (
-                <text
-                  x={CHART_W / 2}
-                  y={CHART_H / 2}
-                  textAnchor="middle"
-                  fontSize="14"
-                  fill="currentColor"
-                  className="text-muted-foreground"
-                >
-                  No API calls recorded yet
-                </text>
-              )}
-            </svg>
-          )}
+            </GlassCard>
+          ))}
         </div>
 
-        {/* ── Activity feed + Quick Actions ── */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Activity */}
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-lg font-semibold text-foreground">
-              Recent Activity
-            </h3>
-
-            {activityError ? (
-              <p className="text-sm text-muted-foreground">
-                Failed to load activity.
-              </p>
-            ) : activityLoading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex gap-4">
-                    <Skeleton className="h-8 w-8 rounded-full shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4 rounded" />
-                      <Skeleton className="h-3 w-1/2 rounded" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Chart Area */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-display font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                API Traffic Trend
+              </h2>
+              <SentryButton variant="ghost" size="sm" className="h-8 text-[11px]">
+                Last 7 Days
+              </SentryButton>
+            </div>
+            
+            <GlassCard tier={1} className="p-8 h-[320px] flex flex-col">
+              {trendLoading ? (
+                <SentrySkeleton className="flex-1 w-full" />
+              ) : (
+                <div className="flex-1 relative mt-4">
+                  {/* SVG Chart Implementation */}
+                  <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+                    <defs>
+                      <linearGradient id="mintGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d={generatePath(trend ?? [], 100, 100)}
+                      fill="url(#mintGradient)"
+                      className="animate-fade-in"
+                    />
+                    <path
+                      d={generatePath(trend ?? [], 100, 100, true)}
+                      fill="none"
+                      stroke="var(--color-accent)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-fade-in"
+                    />
+                  </svg>
+                  
+                  {(!trend || trend.length === 0) && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <p className="text-xs font-body text-muted-foreground">No data available for this period</p>
                     </div>
-                  </div>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-between mt-4">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                  <span key={day} className="text-[10px] font-display font-bold text-muted-foreground/40 uppercase">
+                    {day}
+                  </span>
                 ))}
               </div>
-            ) : activity && activity.length > 0 ? (
-              <div className="space-y-4">
-                {activity.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex gap-4 border-b border-border pb-4 last:border-0 last:pb-0"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
-                      {eventInitial(event.eventType)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {event.eventType}
-                        </p>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${severityClass(event.severity)}`}
-                        >
-                          {event.severity}
-                        </span>
-                      </div>
-                      {event.actorEmail && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {event.actorEmail}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(event.createdAt), {
-                          addSuffix: true,
-                        })}
-                        {event.location ? ` · ${event.location}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No recent activity.
-              </p>
-            )}
+            </GlassCard>
           </div>
 
-          {/* Quick Actions */}
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-lg font-semibold text-foreground">
-              Quick Actions
-            </h3>
-            <div className="space-y-2">
-              <Button
-                className="w-full justify-start bg-transparent"
-                variant="outline"
+          {/* Activity Feed */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-display font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                Recent Security Events
+              </h2>
+              <SentryButton 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-[11px]"
+                onClick={() => router.push(`/t/${slug}/audit`)}
               >
-                Create new application
-              </Button>
-              <Button
-                className="w-full justify-start bg-transparent"
-                variant="outline"
-              >
-                Manage users
-              </Button>
-              <Button
-                className="w-full justify-start bg-transparent"
-                variant="outline"
-              >
-                Configure security settings
-              </Button>
-              <Button
-                className="w-full justify-start bg-transparent"
-                variant="outline"
-              >
-                View audit logs
-              </Button>
+                View Log
+              </SentryButton>
             </div>
+
+            <GlassCard tier={1} className="p-6 h-[320px] overflow-y-auto scrollbar-hide">
+              {activityLoading ? (
+                <div className="space-y-6">
+                  <SentrySkeleton className="h-12 w-full" />
+                  <SentrySkeleton className="h-12 w-full" />
+                  <SentrySkeleton className="h-12 w-full" />
+                </div>
+              ) : activity && activity.length > 0 ? (
+                <AuditTimeline 
+                  events={activity.map(a => ({
+                    id: a.id,
+                    type: a.eventType,
+                    description: `${a.actorEmail || 'System'} from ${a.ipAddress}`,
+                    timestamp: a.createdAt,
+                  }))} 
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-center p-4">
+                  <p className="text-xs font-body text-muted-foreground">
+                    No security events recorded in the last 24 hours.
+                  </p>
+                </div>
+              )}
+            </GlassCard>
+          </div>
+        </div>
+
+        {/* Quick Actions Bar */}
+        <div className="pt-4 border-t border-border/50">
+          <h2 className="text-[10px] font-display font-bold uppercase tracking-[0.15em] text-muted-foreground/40 mb-6">
+            Recommended Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <QuickActionCard 
+              icon={Plus} 
+              title="Add Application" 
+              desc="Integrate Sentry with a new service"
+              href={`/t/${slug}/applications/new`}
+            />
+            <QuickActionCard 
+              icon={Users} 
+              title="Invite Team" 
+              desc="Add administrators to this workspace"
+              href={`/t/${slug}/users`}
+            />
+            <QuickActionCard 
+              icon={Settings} 
+              title="Configure MFA" 
+              desc="Enforce multi-factor auth for users"
+              href={`/t/${slug}/security`}
+            />
           </div>
         </div>
       </div>
     </PortalLayout>
   );
+}
+
+function QuickActionCard({ icon: Icon, title, desc, href }: any) {
+  return (
+    <button className="group text-left focus:outline-none">
+      <GlassCard tier={1} className="p-5 flex items-start gap-4 group-hover:border-accent/30 group-hover:bg-accent/[0.02] transition-all">
+        <div className="p-2.5 rounded-sm bg-black/5 group-hover:bg-accent/10 transition-colors">
+          <Icon className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+        </div>
+        <div className="space-y-0.5">
+          <h4 className="text-sm font-display font-semibold group-hover:text-accent transition-colors">
+            {title}
+          </h4>
+          <p className="text-[11px] font-body text-muted-foreground leading-snug">
+            {desc}
+          </p>
+        </div>
+        <ArrowUpRight className="w-3 h-3 text-muted-foreground/20 ml-auto group-hover:text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+      </GlassCard>
+    </button>
+  );
+}
+
+function generatePath(points: any[], w: number, h: number, lineOnly = false) {
+  if (!points || points.length < 2) return '';
+  const max = Math.max(...points.map(p => p.count), 1);
+  const step = w / (points.length - 1);
+  
+  const coords = points.map((p, i) => ({
+    x: i * step,
+    y: h - (p.count / max) * h * 0.8 - (h * 0.1)
+  }));
+
+  if (coords.length === 0 || !coords[0]) return '';
+
+  let d = `M ${coords[0].x} ${coords[0].y}`;
+  for (let i = 1; i < coords.length; i++) {
+    const prev = coords[i-1];
+    const curr = coords[i];
+    if (!prev || !curr) continue;
+    const cp1x = prev.x + (curr.x - prev.x) / 2;
+    d += ` C ${cp1x} ${prev.y}, ${cp1x} ${curr.y}, ${curr.x} ${curr.y}`;
+  }
+
+
+  if (lineOnly) return d;
+  
+  return d + ` L ${w} ${h} L 0 ${h} Z`;
 }

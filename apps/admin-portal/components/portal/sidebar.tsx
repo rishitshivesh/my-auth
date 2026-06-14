@@ -1,107 +1,65 @@
-"use client";
+'use client';
 
-import type React from "react";
+import * as React from 'react';
+import { NavItem } from "@repo/ui";
+import { cn } from "@repo/ui/lib/utils";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Button, Input, Label } from "@repo/ui";
+import { LucideIcon } from 'lucide-react';
 
-interface SidebarItem {
+interface NavigationSection {
   label: string;
-  href: string;
-  icon: React.ReactNode;
-  badge?: string | number;
+  items: {
+    label: string;
+    href: string;
+    icon: LucideIcon;
+  }[];
 }
 
 interface SidebarProps {
-  items: SidebarItem[];
-  currentPath?: string;
-  collapsed?: boolean;
-  logoUrl?: string;
-  tenantName?: string;
+  navigation: NavigationSection[];
 }
 
-export function Sidebar({
-  items,
-  currentPath = "/",
-  collapsed = false,
-  logoUrl,
-  tenantName = "Fort Knox",
-}: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(collapsed);
-
+export function Sidebar({ navigation }: SidebarProps) {
   return (
-    <div
-      className={`flex flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-all duration-300 ${
-        isCollapsed ? "w-20" : "w-64"
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-sidebar-border px-6 py-4">
-        {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm">
-              FK
+    <aside className="w-[240px] flex flex-col bg-[var(--glass-3-bg)] backdrop-blur-[var(--glass-3-blur)] border-r border-border shadow-xl z-20">
+      <div className="h-16 flex items-center px-6 gap-2 border-b border-border/50">
+        <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+        <span className="text-[14px] font-display font-bold tracking-tight">
+          Scrolloop <span className="text-accent">Sentry</span>
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-8">
+        {navigation.map((section) => (
+          <div key={section.label} className="space-y-2">
+            <h3 className="px-3 text-[9px] font-display font-bold uppercase tracking-[0.12em] text-muted-foreground/60">
+              {section.label}
+            </h3>
+            <div className="space-y-0.5">
+              {section.items.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                />
+              ))}
             </div>
-            <span className="font-semibold truncate">{tenantName}</span>
           </div>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 p-0"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </Button>
-      </div>
-
-      <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-6">
-        {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${
-              currentPath === item.href
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="h-5 w-5">{item.icon}</span>
-              {!isCollapsed && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </div>
-            {!isCollapsed && item.badge && (
-              <span className="rounded-full bg-primary/20 px-2 py-1 text-xs font-medium text-primary">
-                {item.badge}
-              </span>
-            )}
-          </Link>
         ))}
-      </nav>
-
-      <div className="border-t border-sidebar-border px-3 py-6">
-        <Button
-          variant="outline"
-          className="w-full justify-start bg-transparent"
-          disabled={isCollapsed}
-        >
-          {!isCollapsed && "Sign out"}
-        </Button>
       </div>
-    </div>
+
+      <div className="p-4 border-t border-border/50">
+        <div className="bg-black/5 rounded-sm p-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+            <span className="text-[10px] font-display font-bold text-accent">SS</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-display font-semibold truncate">Enterprise Plan</p>
+            <p className="text-[10px] font-body text-muted-foreground truncate">v2.4.0-stable</p>
+          </div>
+        </div>
+      </div>
+    </aside>
   );
 }

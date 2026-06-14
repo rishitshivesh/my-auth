@@ -10,7 +10,7 @@ export default function ApplicationsPage({ params }: { params: { slug: string } 
       pageTitle="Applications"
       pageSubtitle="Manage your integrated applications"
       currentPath={`/t/${params.slug}/applications`}
-      primaryAction={{ label: "Create Application", onClick: () => console.log("Create app") }}
+      primaryAction={{ label: "Create Application", onClick: () => {} }}
     >
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card p-6">

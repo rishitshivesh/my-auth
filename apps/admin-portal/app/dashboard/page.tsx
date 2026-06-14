@@ -7,8 +7,9 @@ import { withAdmin } from '@/lib/with-admin'
 import { AdminSidebar } from '@/components/admin-sidebar'
 
 function MetricSkeleton() {
-  return <div className="h-9 w-24 rounded-md bg-muted animate-pulse" />
+  return <div className="h-9 w-24 rounded-md bg-black/5 animate-pulse" />
 }
+
 
 function SuperAdminDashboard() {
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = usePlatformMetrics()

@@ -36,10 +36,10 @@ export class SocialAuthController {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload, {
-      privateKey,
+      privateKey: privateKey as any,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as any,
     });
   }
 
@@ -290,8 +290,8 @@ export class SocialAuthController {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
-        publicKey,
-        algorithms: ["RS256"],
+        publicKey: publicKey as any,
+        algorithms: ['RS256'],
       });
 
       if (payload.type !== "social_completion") {
@@ -359,8 +359,8 @@ export class SocialAuthController {
     const state = Buffer.from(
       JSON.stringify({
         mode: "link",
-        userId: payload.userId,
-        tenantId: payload.tenantId,
+        userId: (await payload).userId,
+        tenantId: (await payload).tenantId,
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
@@ -384,8 +384,8 @@ export class SocialAuthController {
     const state = Buffer.from(
       JSON.stringify({
         mode: "link",
-        userId: payload.userId,
-        tenantId: payload.tenantId,
+        userId: (await payload).userId,
+        tenantId: (await payload).tenantId,
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
@@ -409,8 +409,8 @@ export class SocialAuthController {
     const state = Buffer.from(
       JSON.stringify({
         mode: "link",
-        userId: payload.userId,
-        tenantId: payload.tenantId,
+        userId: (await payload).userId,
+        tenantId: (await payload).tenantId,
       }),
     ).toString("base64url");
     const msTenant = this.configService.get<string>(

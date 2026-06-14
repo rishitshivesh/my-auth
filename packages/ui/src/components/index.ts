@@ -51,3 +51,20 @@ export * from "./ui/textarea";
 export * from "./ui/toggle-group";
 export * from "./ui/toggle";
 export * from "./ui/tooltip";
+
+// Sentry Components
+export * from "./sentry/GlassCard";
+export * from "./sentry/SentryButton";
+export * from "./sentry/NavItem";
+
+export * from "./sentry/SentryInput";
+export * from "./sentry/StatusBadge";
+export * from "./sentry/TokenDisplay";
+export * from "./sentry/AuditTimeline";
+export * from "./sentry/PageHeader";
+export * from "./sentry/DataTable";
+export * from "./sentry/EmptyState";
+export * from "./sentry/SentrySkeleton";
+
+export * from "./sentry/ThemeToggle";
+

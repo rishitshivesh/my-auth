@@ -6,7 +6,7 @@ import { SecurityEvent, SecurityEventType } from "@repo/database";
 export interface LogSecurityEventDto {
   tenantId: string;
   eventType: SecurityEventType;
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "medium" | "warning" | "high" | "critical";
   ipAddress: string;
   userAgent: string;
   userId?: string;

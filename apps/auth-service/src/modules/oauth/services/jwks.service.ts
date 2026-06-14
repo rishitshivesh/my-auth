@@ -213,7 +213,7 @@ export class JwksService implements OnModuleInit {
       throw new Error("Invalid token format");
     }
     const header = JSON.parse(
-      Buffer.from(parts[0], "base64url").toString(),
+      Buffer.from(parts[0]!, "base64url").toString(),
     );
     const kid = header?.kid as string | undefined;
     if (!kid) {
@@ -223,7 +223,7 @@ export class JwksService implements OnModuleInit {
     if (!jwk) {
       throw new Error("Signing key not found for kid: " + kid);
     }
-    return crypto.createPublicKey({ key: jwk as JsonWebKey, format: "jwk" });
+    return crypto.createPublicKey({ key: jwk as any, format: "jwk" });
   }
 
   getJWKS() {

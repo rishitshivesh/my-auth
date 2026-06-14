@@ -7,7 +7,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@fortknox/sdk": ["../../packages/fortknox-sdk/src/index.ts"],
+      "@fortknox/sdk/*": ["../../packages/fortknox-sdk/src/*"],
+      "@fortknox/types": ["../../packages/fortknox-types/src/index.ts"],
+      "@repo/ui": ["../../packages/ui/src/index.ts"],
+      "@repo/ui/*": ["../../packages/ui/src/*"],
+      "@repo/shared": ["../../packages/shared/src/index.ts"],
+      "@repo/database": ["../../packages/database/src/index.ts"],
+      "@repo/security": ["../../packages/security/src/index.ts"]
     }
   },
   "include": [

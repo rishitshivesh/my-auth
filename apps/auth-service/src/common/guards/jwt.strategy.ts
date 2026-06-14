@@ -1,13 +1,13 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { JwksService } from "@/modules/oauth/services/jwks.service";
+import { PassportStrategy } from "@nestjs/passport";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Request } from "express";
+import { JwksService } from "../../modules/oauth/services/jwks.service";
 import * as crypto from "crypto";
 
 const cookieExtractor = (req: Request): string | null => {
   if (req && req.cookies) {
-    return req.cookies["access_token"] || null;
+    return req.cookies["auth_token"] || null;
   }
   return null;
 };
@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             return done(new Error("Invalid token format"));
           }
           const header = JSON.parse(
-            Buffer.from(parts[0], "base64url").toString(),
+            Buffer.from(parts[0]!, "base64url").toString(),
           );
           const kid = header?.kid as string | undefined;
           if (!kid) {
@@ -46,11 +46,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           }
 
           const publicKey = crypto.createPublicKey({
-            key: jwk as JsonWebKey,
+            key: jwk as any,
             format: "jwk",
           });
-          const pem = publicKey.export({ type: "spki", format: "pem" });
-          done(null, pem as string);
+
+          const pem = publicKey.export({ format: "pem", type: "spki" });
+          done(null, pem as string | Buffer);
         } catch (err) {
           done(err as Error);
         }
@@ -58,18 +59,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: Record<string, unknown>) {
-    if (!payload.sub || !payload.tenantId) {
+  async validate(payload: any) {
+    if (!payload.sub) {
       throw new UnauthorizedException("Invalid token payload");
     }
-
     return {
-      sub: payload.sub,
-      email: payload.email,
+      userId: payload.sub,
       tenantId: payload.tenantId,
-      sessionId: payload.sessionId,
-      iat: payload.iat,
-      exp: payload.exp,
+      email: payload.email,
+      roles: payload.roles || [],
+      groups: payload.groups || [],
     };
   }
 }

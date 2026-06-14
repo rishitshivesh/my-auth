@@ -78,10 +78,10 @@ export class SocialAuthService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload, {
-      privateKey,
+      privateKey: privateKey as any,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as any,
     });
   }
 
@@ -677,7 +677,7 @@ export class SocialAuthService {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       return this.jwtService.verify(token, {
-        publicKey,
+        publicKey: publicKey as any,
         algorithms: ["RS256"],
       }) as { userId: string; tenantId: string };
     } catch {

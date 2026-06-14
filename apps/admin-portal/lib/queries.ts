@@ -1,6 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { DashboardData, MfaStatus, TotpSetupData, TenantSettings, PasskeyCredential, SocialConnection, TenantMetrics, ActivityEvent, TrendPoint, AuthBreakdown, BrandingConfig, ActiveSessionDto } from "./types";
+import type { 
+  DashboardData, 
+  MfaStatus, 
+  TotpSetupData, 
+  TenantSettings, 
+  PasskeyCredential, 
+  SocialConnection, 
+  TenantMetrics, 
+  ActivityEvent, 
+  TrendPoint, 
+  AuthBreakdown, 
+  BrandingConfig, 
+  ActiveSessionDto,
+  DashboardUser
+} from "./types";
+
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -155,9 +170,116 @@ export function useUnlinkSocialAccount() {
   });
 }
 
-// ── Tenant Admin Dashboard ──────────────────────────────────────
+// ─── Tenant Admin Dashboard ──────────────────────────────────────
+
+export function useTenantUsers(params: {
+  search?: string;
+  status?: string;
+  cursor?: string;
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.status) qs.set("status", params.status);
+  if (params.cursor) qs.set("cursor", params.cursor);
+  if (params.limit) qs.set("limit", String(params.limit));
+
+  return useQuery<{
+    users: DashboardUser[];
+    nextCursor?: string;
+    total: number;
+  }>({
+    queryKey: ["tenant", "users", params],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl(`/dashboard/tenant-users?${qs.toString()}`),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch tenant users");
+      return res.data.data;
+    },
+  });
+}
+
+export function useTenantUser(userId: string) {
+  return useQuery<DashboardUser>({
+    queryKey: ["tenant", "users", userId],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl(`/dashboard/tenant-users/${userId}`),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch user details");
+      return res.data.data;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useTenantRoles() {
+  return useQuery<any[]>({
+    queryKey: ["tenant", "roles"],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl(`/dashboard/tenant-roles`),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch roles");
+      return res.data.data;
+    },
+  });
+}
+
+export function useTenantClients() {
+  return useQuery<any[]>({
+    queryKey: ["tenant", "clients"],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl(`/dashboard/tenant-clients`),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Failed to fetch clients");
+      return res.data.data;
+    },
+  });
+}
+
+// ─── Invitations ─────────────────────────────────────────────
+
+export function useValidateInvite(token: string) {
+  return useQuery({
+    queryKey: ["invite", "validate", token],
+    queryFn: async () => {
+      const res = await authClient.request({
+        url: apiUrl(`/auth/invite/validate/${token}`),
+        method: "GET",
+      });
+      if (!res.ok) throw new Error("Invalid or expired invitation");
+      return res.data.data;
+    },
+    enabled: !!token,
+  });
+}
+
+export function useAcceptInvite() {
+  return useMutation<void, Error, { token: string; name: string; password?: string }>({
+    mutationFn: async (body) => {
+      const res = await authClient.request({
+        url: apiUrl("/auth/invite/accept"),
+        method: "POST",
+        body,
+      });
+      if (!res.ok) throw new Error(res.data?.message || "Failed to accept invitation");
+    },
+  });
+}
 
 export function useTenantMetrics() {
+
+
+
+
+
   return useQuery<TenantMetrics>({
     queryKey: ["tenant", "metrics"],
     queryFn: async () => {

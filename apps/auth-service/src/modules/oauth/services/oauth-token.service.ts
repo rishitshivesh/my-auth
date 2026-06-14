@@ -78,10 +78,10 @@ export class OAuthTokenService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string | number, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload, {
-      privateKey,
+      privateKey: privateKey as any,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as any,
     });
   }
 
@@ -305,8 +305,8 @@ export class OAuthTokenService {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
-        publicKey,
-        algorithms: ["RS256"],
+        publicKey: publicKey as any,
+        algorithms: ['RS256'],
       });
     } catch (error) {
       throw new UnauthorizedException("Invalid access token");
@@ -673,12 +673,13 @@ export class OAuthTokenService {
     token: string,
     tokenTypeHint?: "access_token" | "refresh_token",
   ): Promise<any> {
+    let payload: any;
     // Try as JWT first (access token)
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
-      const payload = this.jwtService.verify(token, {
-        publicKey,
-        algorithms: ["RS256"],
+      payload = this.jwtService.verify(token, {
+        publicKey: publicKey as any,
+        algorithms: ['RS256'],
       });
 
       const jti = payload.jti;
