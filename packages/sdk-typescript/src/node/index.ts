@@ -1,5 +1,5 @@
 /**
- * Fort Knox SDK - Node.js Module
+ * Scrolloop Sentry SDK - Node.js Module
  * 
  * For server-to-server communication:
  * - Backend services
@@ -10,10 +10,10 @@
  * Uses client credentials flow (no cookies)
  */
 
-import { FortKnoxClient } from '../core/client';
-import type { FortKnoxConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
+import { SentryClient } from '../core/client';
+import type { SentryConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
 
-interface NodeClientConfig extends Omit<FortKnoxConfig, 'transport'> {
+interface NodeClientConfig extends Omit<SentryConfig, 'transport'> {
   /**
    * Client ID for machine-to-machine auth
    */
@@ -33,7 +33,7 @@ interface NodeClientConfig extends Omit<FortKnoxConfig, 'transport'> {
 /**
  * Create a Node.js client for server-to-server communication
  */
-export function createNodeClient(config: NodeClientConfig): FortKnoxClient {
+export function createNodeClient(config: NodeClientConfig): SentryClient {
   // Create custom transport with auth credentials
   const transport: Transport = async (req: TransportRequest): Promise<TransportResponse> => {
     const headers = {
@@ -80,7 +80,7 @@ export function createNodeClient(config: NodeClientConfig): FortKnoxClient {
     };
   };
 
-  return new FortKnoxClient({
+  return new SentryClient({
     baseURL: config.baseURL,
     tenant: config.tenant,
     debug: config.debug,
@@ -89,5 +89,5 @@ export function createNodeClient(config: NodeClientConfig): FortKnoxClient {
 }
 
 // Re-export core
-export { FortKnoxClient } from '../core/client';
+export { SentryClient } from '../core/client';
 export type * from '../core/types';

@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 import { useState } from "react"
 
 export interface LoginIntentResponse {

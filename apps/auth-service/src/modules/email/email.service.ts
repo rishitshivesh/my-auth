@@ -174,17 +174,17 @@ export class EmailService {
       });
 
       return {
-        tenantName: tenant?.name || "Fort Knox",
+        tenantName: tenant?.name || "Scrolloop Sentry",
         tenantLogo:
           // TODO Tenant Logo URL
           // tenant?.metadata?.logoUrl ||
-          "https://via.placeholder.com/150x50?text=Fort+Knox",
+          "https://via.placeholder.com/150x50?text=Scrolloop+Sentry",
       };
     } catch (error) {
       logger.warn({ tenantId }, "Failed to load tenant branding, using defaults");
       return {
-        tenantName: "Fort Knox",
-        tenantLogo: "https://via.placeholder.com/150x50?text=Fort+Knox",
+        tenantName: "Scrolloop Sentry",
+        tenantLogo: "https://via.placeholder.com/150x50?text=Scrolloop+Sentry",
       };
     }
   }

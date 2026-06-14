@@ -59,7 +59,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
    * Resolve tenant from request
    * Priority:
    * 1. Custom domain (auth.acme.com)
-   * 2. Subdomain (acme.fortknox.io)
+   * 2. Subdomain (acme.sentry.scrolloop.com)
    * 3. X-Tenant-ID header (fallback)
    */
   private async resolveTenant(req: Request): Promise<Tenant | null> {
@@ -75,7 +75,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
     }
 
     // Strategy 2: Subdomain extraction
-    // acme.fortknox.io → extract "acme"
+    // acme.sentry.scrolloop.com → extract "acme"
     const subdomain = this.extractSubdomain(hostname);
 
     if (subdomain && subdomain !== "www" && subdomain !== "api") {
@@ -109,7 +109,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
   /**
    * Extract subdomain from hostname
    * Examples:
-   * - acme.fortknox.io → "acme"
+   * - acme.sentry.scrolloop.com → "acme"
    * - auth.acme.com → "auth"
    * - localhost:4000 → null
    */

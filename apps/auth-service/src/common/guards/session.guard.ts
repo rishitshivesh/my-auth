@@ -84,7 +84,7 @@ export class SessionGuard implements CanActivate {
     }
 
     // Attach session to request
-    request.fortknoxSession = session;
+    request.sentrySession = session;
 
     // Update last activity (non-blocking)
     this.updateLastActivity(sessionId).catch((err) => {

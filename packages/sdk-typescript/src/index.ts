@@ -1,22 +1,22 @@
 /**
- * Fort Knox SDK - Main Entry Point
+ * Scrolloop Sentry SDK - Main Entry Point
  *
  * Convenience exports for common use cases.
  * For specific environments, use the submodules:
- * - @fortknox/sdk/core  (pure logic)
- * - @fortknox/sdk/web   (browser)
- * - @fortknox/sdk/react (React hooks)
- * - @fortknox/sdk/next  (Next.js SSR)
- * - @fortknox/sdk/node  (server-to-server)
+ * - @scrolloop/sdk/core  (pure logic)
+ * - @scrolloop/sdk/web   (browser)
+ * - @scrolloop/sdk/react (React hooks)
+ * - @scrolloop/sdk/next  (Next.js SSR)
+ * - @scrolloop/sdk/node  (server-to-server)
  */
 
-// Shared types — re-exported so consumers only need @fortknox/sdk
-// export * from '@fortknox/types';
+// Shared types — re-exported so consumers only need @scrolloop/sdk
+// export * from '@scrolloop/types';
 
 // Core exports
-export { FortKnoxClient, AuthError } from "./core";
+export { SentryClient, AuthError } from "./core";
 export type {
-  FortKnoxConfig,
+  SentryConfig,
   LoginCredentials,
   LoginResponse,
   AuthEvent,

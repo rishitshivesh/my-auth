@@ -243,7 +243,7 @@ export class User extends BaseEntity {
     default: {},
     comment: "Additional user metadata",
   })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, string | number | boolean | null>;
 
   @Column({
     type: "varchar",

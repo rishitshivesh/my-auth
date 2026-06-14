@@ -7,16 +7,25 @@ import {
   Session,
   User,
   UserRole,
+  Policy,
+  Group,
+  UserGroup,
+  GroupPolicy,
+  UserPolicy,
+  RolePolicy,
 } from "@repo/database";
 import { JwtAuthGuard } from "./jwt-auth-guard";
 import { TenantBindingGuard } from "./tenant-binding.guard";
 import { SessionGuard } from "./session.guard";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RolesGuard } from "@/modules/rbac/guards/roles.guard";
-import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RoleService } from "@/modules/rbac/services/role.service";
 import { PermissionService } from "@/modules/rbac/services/permission.service";
+import { PolicyEvaluationService } from "@/modules/rbac/services/policy-evaluation.service";
+import { RbacCacheService } from "@/modules/rbac/services/rbac-cache.service";
+import { RedisService } from "@/common/service/redis.service";
 
 /**
  * GuardsModule
@@ -30,7 +39,7 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
  * - SessionGuard: Session validity checks
  * - PermissionsGuard: RBAC permission checks
  * - RolesGuard: RBAC role checks
- * - FortKnoxProtectedGuard: Composite guard (all of the above)
+ * - SentryProtectedGuard: Composite guard (all of the above)
  */
 @Global()
 @Module({
@@ -42,6 +51,12 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
       Role,
       RolePermission,
       Permission,
+      Policy,
+      Group,
+      UserGroup,
+      GroupPolicy,
+      UserPolicy,
+      RolePolicy,
     ]),
   ],
   providers: [
@@ -50,10 +65,13 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     SessionGuard,
     PermissionsGuard,
     RolesGuard,
-    FortKnoxProtectedGuard,
+    SentryProtectedGuard,
     RbacService,
     RoleService,
     PermissionService,
+    PolicyEvaluationService,
+    RbacCacheService,
+    RedisService,
     RolePermission,
   ],
   exports: [
@@ -62,10 +80,12 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     SessionGuard,
     PermissionsGuard,
     RolesGuard,
-    FortKnoxProtectedGuard,
+    SentryProtectedGuard,
     RbacService,
     RoleService,
     PermissionService,
+    PolicyEvaluationService,
+    RbacCacheService,
     RolePermission,
   ],
 })

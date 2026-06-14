@@ -82,7 +82,7 @@ function GeneralSettings() {
             type="email"
             value={supportEmail}
             onChange={(e) => setSupportEmail(e.target.value)}
-            placeholder="support@fortknox.com"
+            placeholder="support@scrolloop.com"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
         </div>
@@ -212,7 +212,7 @@ function TeamSettings() {
         <div>
           <h2 className="text-sm font-semibold text-foreground">Superadmin Team</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Members with the <code className="text-foreground">fortknox-internal</code> role can access this admin portal.
+            Members with the <code className="text-foreground">sentry-internal</code> role can access this admin portal.
           </p>
         </div>
 
@@ -223,7 +223,7 @@ function TeamSettings() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            placeholder="colleague@fortknox.com"
+            placeholder="colleague@scrolloop.com"
             className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           <button

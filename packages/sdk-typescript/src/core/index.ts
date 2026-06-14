@@ -1,11 +1,11 @@
 /**
- * Fort Knox SDK - Core Module
- * 
+ * Scrolloop Sentry SDK - Core Module
+ *
  * Pure auth logic - no DOM, no cookies, no framework dependencies
  * Works in any JavaScript environment
  */
 
-export { FortKnoxClient } from './client';
+export { SentryClient } from './client';
 export { createFetchTransport } from './transport';
 export {
   createAuthState,
@@ -15,7 +15,7 @@ export {
 } from './state';
 
 export type {
-  FortKnoxConfig,
+  SentryConfig,
   Transport,
   TransportRequest,
   TransportResponse,

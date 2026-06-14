@@ -9,16 +9,16 @@ import { ThemeProvider } from "@repo/ui";
 
 
 // import { defaultAuthClient } from "@repo/web-sdk";
-import { FortKnoxProvider } from "@fortknox/sdk";
+import { SentryProvider } from "@scrolloop/sdk";
 
-import { createWebClient } from "@fortknox/sdk";
+import { createWebClient } from "@scrolloop/sdk";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const authClient = createWebClient({
   baseURL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000",
   tenant:
-    process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
-    process.env.FORTKNOX_TENANT_ID ||
+    process.env.NEXT_PUBLIC_SENTRY_TENANT_ID ||
+    process.env.SENTRY_TENANT_ID ||
     "",
   debug: process.env.NODE_ENV === "development",
 });
@@ -50,9 +50,9 @@ export default function RootLayout({
 
       <body className="antialiased font-sans">
         <QueryClientProvider client={queryClient}>
-          <FortKnoxProvider client={authClient}>
+          <SentryProvider client={authClient}>
             <ThemeProvider>{children}</ThemeProvider>
-          </FortKnoxProvider>
+          </SentryProvider>
         </QueryClientProvider>
       </body>
     </html>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useParams, useRouter } from 'next/navigation'
-import { useAuth } from '@fortknox/sdk'
+import { useAuth } from '@scrolloop/sdk'
 import {
   LayoutDashboard,
   Grid3X3,

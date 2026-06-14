@@ -1,12 +1,12 @@
 /**
- * Fort Knox SDK - Core Client
+ * Scrolloop Sentry SDK - Core Client
  *
  * The session runtime - owns tokens, knows when to refresh
  * Works in any environment (browser, Node, Next.js)
  */
 
 import type {
-  FortKnoxConfig,
+  SentryConfig,
   Transport,
   TransportRequest,
   TransportResponse,
@@ -31,14 +31,14 @@ import {
   rejectPendingRequests,
 } from "./state";
 
-export class FortKnoxClient {
-  private config: Required<FortKnoxConfig>;
+export class SentryClient {
+  private config: Required<SentryConfig>;
   private state: AuthState;
   private transport: Transport;
   private listeners: AuthEventListener[] = [];
   private initPromise?: Promise<void>;
 
-  constructor(config: FortKnoxConfig) {
+  constructor(config: SentryConfig) {
     this.config = {
       debug: false,
       refreshMargin: 30,
@@ -54,7 +54,7 @@ export class FortKnoxClient {
     this.transport = this.config.transport;
     this.initPromise = this.tryRestoreSession();
 
-    this.log("FortKnox client initialized", {
+    this.log("Sentry client initialized", {
       baseURL: this.config.baseURL,
       tenant: this.config.tenant,
     });
@@ -671,18 +671,18 @@ export class FortKnoxClient {
     return Array.isArray(groups) && groups.includes(groupName);
   }
 
-  isFortKnoxInternal(): boolean {
-    const fortknoxTenantId =
+  isSentryInternal(): boolean {
+    const sentryTenantId =
       typeof process !== "undefined"
-        ? (process.env as any)?.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
-          process.env.FORTKNOX_TENANT_ID
+        ? (process.env as any)?.NEXT_PUBLIC_SENTRY_TENANT_ID ||
+          process.env.SENTRY_TENANT_ID
         : undefined;
     const claims = this.getTokenClaims();
     if (!claims) return false;
-    const tenantMatches = fortknoxTenantId
-      ? claims.tenantId === fortknoxTenantId
-      : claims.tenantSlug === "fortknox";
-    return tenantMatches && this.isInGroup("fortknox-internal");
+    const tenantMatches = sentryTenantId
+      ? claims.tenantId === sentryTenantId
+      : claims.tenantSlug === "sentry";
+    return tenantMatches && this.isInGroup("sentry-internal");
   }
 
   /**
@@ -1025,7 +1025,7 @@ export class FortKnoxClient {
    */
   private log(...args: any[]): void {
     if (this.config.debug) {
-      console.log("[FortKnox]", ...args);
+      console.log("[Sentry]", ...args);
     }
   }
 }

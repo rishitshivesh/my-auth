@@ -23,6 +23,23 @@ import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 
+interface SocialCallbackRequest {
+  tenantId?: string;
+  user: SocialProfile;
+  query: Record<string, string | undefined>;
+  ip?: string;
+  headers: Record<string, string | undefined>;
+  hostname: string;
+}
+
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; userId: string; email?: string; mfaVerified?: boolean };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+}
+
 @ApiTags("Social Authentication")
 @Controller("auth/social")
 export class SocialAuthController {
@@ -36,10 +53,10 @@ export class SocialAuthController {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload, {
-      privateKey: privateKey as any,
+      privateKey: privateKey as string,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as any,
+      expiresIn: expiresIn as string,
     });
   }
 
@@ -80,7 +97,7 @@ export class SocialAuthController {
   @Get("google/callback")
   @UseGuards(AuthGuard("google"))
   @ApiOperation({ summary: "Google OAuth callback" })
-  async googleCallback(@Req() req: any, @Res() res: Response) {
+  async googleCallback(@Req() req: SocialCallbackRequest, @Res() res: Response) {
     return this.handleSocialCallback(req, res);
   }
 
@@ -115,7 +132,7 @@ export class SocialAuthController {
   @Get("github/callback")
   @UseGuards(AuthGuard("github"))
   @ApiOperation({ summary: "GitHub OAuth callback" })
-  async githubCallback(@Req() req: any, @Res() res: Response) {
+  async githubCallback(@Req() req: SocialCallbackRequest, @Res() res: Response) {
     return this.handleSocialCallback(req, res);
   }
 
@@ -154,7 +171,7 @@ export class SocialAuthController {
   @Get("microsoft/callback")
   @UseGuards(AuthGuard("microsoft"))
   @ApiOperation({ summary: "Microsoft OAuth callback" })
-  async microsoftCallback(@Req() req: any, @Res() res: Response) {
+  async microsoftCallback(@Req() req: SocialCallbackRequest, @Res() res: Response) {
     return this.handleSocialCallback(req, res);
   }
 
@@ -165,14 +182,14 @@ export class SocialAuthController {
   /**
    * Handle OAuth callback for all providers — state-relay (Approach C)
    */
-  private async handleSocialCallback(req: any, res: Response) {
+  private async handleSocialCallback(req: SocialCallbackRequest, res: Response) {
     const profile: SocialProfile = req.user;
     const strategy = profile.provider;
 
     // Detect link mode (authenticated user linking a social account)
-    const rawState = (req.query as any).state as string | undefined;
+    const rawState = req.query.state as string | undefined;
     if (rawState) {
-      let parsedState: any = {};
+      let parsedState: Record<string, unknown> = {};
       try {
         parsedState = JSON.parse(Buffer.from(rawState, "base64url").toString());
       } catch {
@@ -180,26 +197,26 @@ export class SocialAuthController {
       }
 
       if (parsedState.mode === "link" && parsedState.userId) {
-        const rawProfile = (req as any).user;
+        const rawProfile = req.user as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
         await this.socialAuthService.handleLinkCallback({
-          userId: parsedState.userId,
-          tenantId: parsedState.tenantId,
+          userId: parsedState.userId as string,
+          tenantId: parsedState.tenantId as string,
           profile: {
             provider: strategy,
             providerId:
-              rawProfile.id || rawProfile.sub || rawProfile.providerId,
+              (rawProfile.id || rawProfile.sub || rawProfile.providerId) as string,
             email:
-              rawProfile.email || rawProfile.emails?.[0]?.value,
+              (rawProfile.email || rawProfile.emails?.[0]?.value) as string,
             displayName:
-              rawProfile.displayName ||
+              (rawProfile.displayName ||
               rawProfile.name ||
               rawProfile.login ||
-              rawProfile.username,
+              rawProfile.username) as string,
             avatarUrl:
-              rawProfile.photos?.[0]?.value ||
+              (rawProfile.photos?.[0]?.value ||
               rawProfile.avatar_url ||
-              rawProfile.picture,
-            accessToken: rawProfile.accessToken || "",
+              rawProfile.picture) as string | undefined,
+            accessToken: (rawProfile.accessToken as string) || "",
           },
         });
         const adminPortalUrl = this.configService.get<string>(
@@ -266,8 +283,8 @@ export class SocialAuthController {
       );
 
       return res.redirect(`${safeReturnUrl}/u/auth/callback?ct=${completionToken}`);
-    } catch (error: any) {
-      return res.redirect(`${safeReturnUrl}/u/login?error=${encodeURIComponent(error.message)}`);
+    } catch (error: unknown) {
+      return res.redirect(`${safeReturnUrl}/u/login?error=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
     }
   }
 
@@ -290,7 +307,7 @@ export class SocialAuthController {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
-        publicKey: publicKey as any,
+        publicKey: publicKey as string,
         algorithms: ['RS256'],
       });
 
@@ -327,9 +344,9 @@ export class SocialAuthController {
       successUrl.searchParams.set("message", result.message);
 
       return res.redirect(successUrl.toString());
-    } catch (error: any) {
+    } catch (error: unknown) {
       return res.redirect(
-        `/error?message=${encodeURIComponent(error.message)}`,
+        `/error?message=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`,
       );
     }
   }
@@ -341,7 +358,7 @@ export class SocialAuthController {
   @Post("link/token")
   @Protected()
   @HttpCode(HttpStatus.OK)
-  async getLinkToken(@Req() req: any) {
+  async getLinkToken(@Req() req: AuthenticatedRequest) {
     const { userId, tenantId } = req.user;
     const result = await this.socialAuthService.createLinkToken(
       userId,
@@ -445,7 +462,7 @@ export class SocialAuthController {
     status: 200,
     description: "List of connected social accounts",
   })
-  async getConnections(@Req() req: any) {
+  async getConnections(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
 
@@ -465,7 +482,7 @@ export class SocialAuthController {
     status: 200,
     description: "Social account unlinked",
   })
-  async unlinkAccount(@Req() req: any, @Param("provider") provider: string) {
+  async unlinkAccount(@Req() req: AuthenticatedRequest, @Param("provider") provider: string) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
 

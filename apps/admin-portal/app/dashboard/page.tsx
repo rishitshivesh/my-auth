@@ -55,7 +55,7 @@ function SuperAdminDashboard() {
         <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Platform Overview</h1>
-            <p className="text-xs text-muted-foreground">Fort Knox operator dashboard</p>
+            <p className="text-xs text-muted-foreground">Scrolloop Sentry operator dashboard</p>
           </div>
         </header>
 

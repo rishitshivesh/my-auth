@@ -8,6 +8,7 @@
 import { Controller, Get, Query, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
+import { User } from "@repo/database";
 import { EmailService } from "./email.service";
 
 @ApiTags("Email (Development)")
@@ -28,7 +29,7 @@ export class EmailController {
   async testEmail(
     @Query("type") type: string,
     @Query("to") to: string,
-  ): Promise<any> {
+  ): Promise<{ success: boolean; type: string; recipient: string; message: string }> {
     // Only allow in development
     const nodeEnv = this.configService.get<string>("NODE_ENV");
     if (nodeEnv === "production") {
@@ -48,7 +49,7 @@ export class EmailController {
       passwordHash: "",
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as any;
+    } as User;
 
     let result: boolean;
 

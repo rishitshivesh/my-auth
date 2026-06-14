@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { Badge } from "@repo/ui"
 

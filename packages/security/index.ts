@@ -1,7 +1,7 @@
 /**
  * @repo/security
  *
- * Fort Knox Security Package
+ * Scrolloop Sentry Security Package
  * Provides encryption, hashing, and rate limiting utilities
  */
 

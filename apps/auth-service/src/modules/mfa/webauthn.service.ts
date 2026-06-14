@@ -32,7 +32,7 @@ const AUTH_CHALLENGE_RESOURCE = "passkey:challenge:auth";
 
 @Injectable()
 export class WebAuthnService {
-  private readonly rpName = "Fort Knox";
+  private readonly rpName = "Scrolloop Sentry";
   private readonly rpID: string;
   private readonly origin: string;
 

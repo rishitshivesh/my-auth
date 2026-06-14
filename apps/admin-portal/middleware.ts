@@ -32,7 +32,7 @@ export function middleware(request: NextRequest) {
   const hostname = host.split(':')[0]!
 
   // ── Phase 4: Subdomain routing ──────────────────────────────
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'auth.fortknox.com'
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'sentry.scrolloop.com'
 
   if (hostname !== rootDomain && hostname.endsWith(`.${rootDomain}`)) {
     const slug = hostname.replace(`.${rootDomain}`, '')
@@ -72,11 +72,11 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/u/login', request.url))
     }
 
-    const fortknoxTenantId = process.env.FORTKNOX_TENANT_ID
-    const tenantOk = fortknoxTenantId
-      ? claims.tenantId === fortknoxTenantId
-      : claims.tenantSlug === 'fortknox'
-    const groupOk = Array.isArray(claims.groups) && claims.groups.includes('fortknox-internal')
+    const sentryTenantId = process.env.SENTRY_TENANT_ID
+    const tenantOk = sentryTenantId
+      ? claims.tenantId === sentryTenantId
+      : claims.tenantSlug === 'sentry'
+    const groupOk = Array.isArray(claims.groups) && claims.groups.includes('sentry-internal')
 
     if (!tenantOk || !groupOk) {
       const slug = claims.tenantSlug ?? ''

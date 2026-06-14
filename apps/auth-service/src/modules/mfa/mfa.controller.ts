@@ -31,6 +31,24 @@ import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+}
+
+interface WebAuthnRegistrationResponse {
+  id: string;
+  rawId: string;
+  response: {
+    attestationObject: string;
+    clientDataJSON: string;
+  };
+  type: string;
+}
+
 @ApiTags("MFA")
 @Controller("mfa")
 @UseGuards(JwtAuthGuard)
@@ -59,7 +77,7 @@ export class MfaController {
     description: "TOTP setup data",
     type: SetupTotpResponseDto,
   })
-  async setupTotp(@Request() req: any): Promise<SetupTotpResponseDto> {
+  async setupTotp(@Request() req: AuthenticatedRequest): Promise<SetupTotpResponseDto> {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -87,7 +105,7 @@ export class MfaController {
   })
   @ApiResponse({ status: 401, description: "Invalid TOTP code" })
   async verifyAndEnableTotp(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: VerifyTotpDto,
   ): Promise<MfaEnabledResponseDto> {
     const userId = req.user.sub;
@@ -115,7 +133,7 @@ export class MfaController {
     description: "Turn off TOTP-based MFA",
   })
   @ApiResponse({ status: 200, description: "TOTP disabled" })
-  async disableTotp(@Request() req: any) {
+  async disableTotp(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -144,7 +162,7 @@ export class MfaController {
   })
   @ApiResponse({ status: 400, description: "MFA must be enabled first" })
   async regenerateBackupCodes(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<BackupCodesResponseDto> {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
@@ -172,7 +190,7 @@ export class MfaController {
   @ApiResponse({ status: 200, description: "Backup code verified" })
   @ApiResponse({ status: 401, description: "Invalid backup code" })
   async verifyBackupCode(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: VerifyBackupCodeDto,
   ) {
     const userId = req.user.sub;
@@ -208,7 +226,7 @@ export class MfaController {
     description: "MFA status",
     type: MfaStatusDto,
   })
-  async getMfaStatus(@Request() req: any): Promise<MfaStatusDto> {
+  async getMfaStatus(@Request() req: AuthenticatedRequest): Promise<MfaStatusDto> {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -228,7 +246,7 @@ export class MfaController {
     description: "Turn off all MFA methods",
   })
   @ApiResponse({ status: 200, description: "All MFA disabled" })
-  async disableAllMfa(@Request() req: any) {
+  async disableAllMfa(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -247,7 +265,7 @@ export class MfaController {
     summary: "Request OTP code via email",
     description: "Send a 6-digit code to user email for MFA",
   })
-  async requestEmailOtp(@Request() req: any) {
+  async requestEmailOtp(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -270,7 +288,7 @@ export class MfaController {
     summary: "Verify email OTP code",
     description: "Verify the 6-digit code received via email",
   })
-  async verifyEmailOtp(@Request() req: any, @Body() dto: { code: string }) {
+  async verifyEmailOtp(@Request() req: AuthenticatedRequest, @Body() dto: { code: string }) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -294,7 +312,7 @@ export class MfaController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Start WebAuthn credential registration" })
-  async startWebAuthnRegistration(@Request() req: any) {
+  async startWebAuthnRegistration(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -313,8 +331,8 @@ export class MfaController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Finish WebAuthn credential registration" })
   async finishWebAuthnRegistration(
-    @Request() req: any,
-    @Body() body: { response: any; deviceName?: string },
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { response: WebAuthnRegistrationResponse; deviceName?: string },
   ) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
@@ -340,7 +358,7 @@ export class MfaController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "List user WebAuthn credentials" })
-  async listWebAuthnCredentials(@Request() req: any) {
+  async listWebAuthnCredentials(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -359,7 +377,7 @@ export class MfaController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Delete WebAuthn credential" })
   async deleteWebAuthnCredential(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("credentialId") credentialId: string,
   ) {
     const userId = req.user.sub;

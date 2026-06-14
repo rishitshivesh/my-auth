@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEmailAuthFlow } from '@/hooks/use-email-auth-flow';
-import { useAuth } from '@fortknox/sdk';
+import { useAuth } from '@scrolloop/sdk';
 import { SentryButton, SentryInput } from "@repo/ui";
 import { cn } from "@repo/ui/lib/utils";
 import { ShieldCheck, AlertCircle, Loader2, Github, Mail } from 'lucide-react';

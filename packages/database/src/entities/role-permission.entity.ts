@@ -73,7 +73,7 @@ export class RolePermission extends BaseEntity {
   })
   constraints?: {
     conditions?: string[];
-    resourceFilters?: Record<string, any>;
+    resourceFilters?: Record<string, string | number | boolean>;
     fieldRestrictions?: string[];
   };
 }

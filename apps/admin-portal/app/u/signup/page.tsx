@@ -13,13 +13,13 @@ export default function SignupPage() {
   return (
     <UniversalAuthLayout
       heroTitle="Create your account"
-      heroSubtitle="Join Fort Knox to manage your applications"
+      heroSubtitle="Join Scrolloop Sentry to manage your applications"
       primaryColor="#6366f1"
     >
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Get started</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Create a new Fort Knox account in seconds</p>
+          <p className="mt-2 text-sm text-muted-foreground">Create a new Scrolloop Sentry account in seconds</p>
         </div>
         <SignupForm onSubmit={handleSignup} />
       </div>

@@ -199,7 +199,7 @@ export default function SettingsPage() {
                       {isExpanded && (
                         <div className="border-t border-border p-4 bg-muted/30 space-y-3">
                           <p className="text-xs text-muted-foreground">
-                            Optional: override with your own OAuth app credentials. Leave blank to use the shared Fort Knox app.
+                            Optional: override with your own OAuth app credentials. Leave blank to use the shared Scrolloop Sentry app.
                           </p>
                           <div className="space-y-2">
                             <label className="text-xs font-medium">Client ID</label>

@@ -35,10 +35,21 @@ import {
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
 import { type Request, type Response } from "express";
-import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { access } from "fs";
+
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string; tenantId?: string };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+  hostname?: string;
+  sentrySession?: { id: string; createdAt: string; lastActivity: string; expiresAt: string; ipAddress: string; userAgent: string; deviceId: string };
+  tenant?: { id: string; name: string; slug: string; customDomain?: string };
+}
 
 /**
  * Authentication Controller
@@ -137,7 +148,7 @@ export class AuthController {
   @ApiOperation({ summary: "Logout and revoke session" })
   @ApiResponse({ status: 200, description: "Logout successful" })
   async logout(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Res({passthrough: true}) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -339,9 +350,9 @@ export class AuthController {
     status: 403,
     description: "Forbidden - Tenant mismatch",
   })
-  async getCurrentUser(@Req() req: any) {
+  async getCurrentUser(@Req() req: AuthenticatedRequest) {
     const user = req.user; // From JWT payload
-    const session = req.fortknoxSession;
+    const session = req.sentrySession;
     const tenant = req.tenant; // From TenantResolverMiddleware
 
     // Fetch full user details
@@ -471,7 +482,7 @@ export class AuthController {
       });
 
       return { status: 200, data: { accessToken: result.accessToken, message: result.message } };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
       if (error instanceof UnauthorizedException) {
@@ -545,7 +556,7 @@ export class AuthController {
         ip,
         userAgent,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
       if (error instanceof UnauthorizedException) {
@@ -643,7 +654,7 @@ export class AuthController {
   async finishWebAuthnLogin(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() dto: { email: string; response: any; sessionNonce: string },
+    @Body() dto: { email: string; response: Record<string, unknown>; sessionNonce: string },
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -852,7 +863,7 @@ export class AuthController {
   })
   async loginIntent(
     @Body() body: LoginIntentRequestDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ): Promise<LoginIntentResponseDto> {
     const { email } = body;
     const tenantId = req.tenantId!; // From TenantResolverMiddleware

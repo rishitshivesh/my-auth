@@ -23,7 +23,7 @@ export class AdminController {
   // ─── Platform Metrics ─────────────────────────────────────────
 
   @Get("dashboard")
-  @ApiOperation({ summary: "Get platform-wide metrics for Fort Knox operators" })
+  @ApiOperation({ summary: "Get platform-wide metrics for Scrolloop Sentry operators" })
   async getPlatformMetrics() {
     return this.adminService.getPlatformMetrics();
   }
@@ -103,20 +103,20 @@ export class AdminController {
   // ─── Team Management ────────────────────────────────────────────
 
   @Get("team")
-  @ApiOperation({ summary: "List fortknox-internal team members" })
+  @ApiOperation({ summary: "List sentry-internal team members" })
   async getTeam() {
     return this.adminService.getTeamMembers();
   }
 
   @Post("team")
-  @ApiOperation({ summary: "Add a user to the fortknox-internal team" })
+  @ApiOperation({ summary: "Add a user to the sentry-internal team" })
   async addTeamMember(@Body() body: { email: string }) {
     return this.adminService.addTeamMember(body.email);
   }
 
   @Delete("team/:userId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: "Remove a user from the fortknox-internal team" })
+  @ApiOperation({ summary: "Remove a user from the sentry-internal team" })
   async removeTeamMember(@Param("userId") userId: string) {
     await this.adminService.removeTeamMember(userId);
   }

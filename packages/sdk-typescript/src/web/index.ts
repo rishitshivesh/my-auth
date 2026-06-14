@@ -1,18 +1,18 @@
 /**
- * Fort Knox SDK - Web Module
+ * Scrolloop Sentry SDK - Web Module
  * 
  * Browser-specific helpers
  * Adds OAuth redirects, social login, etc.
  */
 
-import { FortKnoxClient } from '../core/client';
-import type { FortKnoxConfig } from '../core/types';
+import { SentryClient } from '../core/client';
+import type { SentryConfig } from '../core/types';
 
 /**
- * Create a browser-optimized Fort Knox client
+ * Create a browser-optimized Sentry client
  */
-export function createWebClient(config: Omit<FortKnoxConfig, 'transport'>): FortKnoxClient {
-  return new FortKnoxClient({
+export function createWebClient(config: Omit<SentryConfig, 'transport'>): SentryClient {
+  return new SentryClient({
     ...config,
     // Browser always uses fetch with credentials
     transport: undefined, // Uses default fetch transport
@@ -80,7 +80,7 @@ export function redirectToSocialLogin(
  * Handle OAuth callback
  * Extracts tokens from URL and stores them
  */
-export function handleOAuthCallback(client: FortKnoxClient): void {
+export function handleOAuthCallback(client: SentryClient): void {
   if (typeof window === 'undefined') return;
   
   const params = new URLSearchParams(window.location.search);
@@ -94,5 +94,5 @@ export function handleOAuthCallback(client: FortKnoxClient): void {
 }
 
 // Re-export core types and client
-export { FortKnoxClient } from '../core/client';
+export { SentryClient } from '../core/client';
 export type * from '../core/types';

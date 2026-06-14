@@ -125,7 +125,7 @@ function NewTenantPage() {
                         onAvailabilityChange={setSlugAvailable}
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Used in URLs: <code className="text-foreground">{slug || 'your-slug'}.auth.fortknox.com</code>
+                        Used in URLs: <code className="text-foreground">{slug || 'your-slug'}.sentry.scrolloop.com</code>
                       </p>
                     </div>
 

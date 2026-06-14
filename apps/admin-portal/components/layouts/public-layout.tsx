@@ -9,7 +9,7 @@ interface PublicLayoutProps {
   showNav?: boolean
 }
 
-export function PublicLayout({ children, logoUrl, tenantName = "Fort Knox", showNav = true }: PublicLayoutProps) {
+export function PublicLayout({ children, logoUrl, tenantName = "Scrolloop Sentry", showNav = true }: PublicLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {showNav && (
@@ -17,7 +17,7 @@ export function PublicLayout({ children, logoUrl, tenantName = "Fort Knox", show
           <div className="mx-auto flex max-w-7xl items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-                FK
+                SS
               </div>
               <span className="font-semibold text-foreground">{tenantName}</span>
             </div>
@@ -123,7 +123,7 @@ export function PublicLayout({ children, logoUrl, tenantName = "Fort Knox", show
             </div>
           </div>
           <div className="border-t border-border mt-8 pt-8">
-            <p className="text-sm text-muted-foreground text-center">© 2025 Fort Knox. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground text-center">© 2025 Scrolloop Sentry. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -5,7 +5,7 @@ import { AppModule } from "@/core/app.module";
 import { OAuthClientService } from "@/modules/oauth/services/oauth-client.service";
 
 /**
- * Seed first-party OAuth client for Fort Knox Admin Portal
+ * Seed first-party OAuth client for Scrolloop Sentry Admin Portal
  */
 async function seedOAuthClient() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -16,23 +16,23 @@ async function seedOAuthClient() {
   const tenantId = "your-tenant-id-here"; // TODO: Get from database
 
   try {
-    // Create Fort Knox Admin Portal client
+    // Create Scrolloop Sentry Admin Portal client
     const { client, clientSecret } = await clientService.createClient({
       tenantId,
-      name: "Fort Knox Admin Portal",
-      description: "First-party admin portal for Fort Knox",
+      name: "Scrolloop Sentry Admin Portal",
+      description: "First-party admin portal for Scrolloop Sentry",
       clientType: "public", // SPA doesn't have server
       grantTypes: ["authorization_code", "refresh_token"],
       redirectUris: [
         "http://localhost:3000/callback",
         "http://localhost:3000/auth/callback",
-        "https://admin.fortknox.io/callback",
+        "https://admin.sentry.scrolloop.com/callback",
       ],
       postLogoutRedirectUris: [
         "http://localhost:3000",
-        "https://admin.fortknox.io",
+        "https://admin.sentry.scrolloop.com",
       ],
-      allowedOrigins: ["http://localhost:3000", "https://admin.fortknox.io"],
+      allowedOrigins: ["http://localhost:3000", "https://admin.sentry.scrolloop.com"],
       allowedScopes: ["openid", "profile", "email", "offline_access"],
       defaultScopes: ["openid", "profile", "email"],
       requirePkce: true, // MUST for public clients
@@ -43,7 +43,7 @@ async function seedOAuthClient() {
       idTokenTtl: 3600, // 1 hour
     });
 
-    console.log("✅ Created Fort Knox Admin Portal client:");
+    console.log("✅ Created Scrolloop Sentry Admin Portal client:");
     console.log("   Client ID:", client.clientId);
     console.log("   Client Type:", client.clientType);
     console.log("   Grant Types:", client.grantTypes);
@@ -54,7 +54,7 @@ async function seedOAuthClient() {
     const { client: backendClient, clientSecret: backendSecret } =
       await clientService.createClient({
         tenantId,
-        name: "Fort Knox Backend Service",
+        name: "Scrolloop Sentry Backend Service",
         description: "Backend service for machine-to-machine auth",
         clientType: "confidential",
         grantTypes: ["client_credentials"],
@@ -67,7 +67,7 @@ async function seedOAuthClient() {
         accessTokenTtl: 3600, // 1 hour for M2M
       });
 
-    console.log("\n✅ Created Fort Knox Backend Service client:");
+    console.log("\n✅ Created Scrolloop Sentry Backend Service client:");
     console.log("   Client ID:", backendClient.clientId);
     console.log("   Client Secret:", backendSecret);
     console.log("   ⚠️  SAVE THIS SECRET - IT WILL NOT BE SHOWN AGAIN!");

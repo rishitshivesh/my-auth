@@ -13,7 +13,7 @@ interface LoginFormProps {
   tenantName?: string
 }
 
-export function LoginForm({ onSubmit, primaryColor, logoUrl, tenantName = "Fort Knox" }: LoginFormProps) {
+export function LoginForm({ onSubmit, primaryColor, logoUrl, tenantName = "Scrolloop Sentry" }: LoginFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)

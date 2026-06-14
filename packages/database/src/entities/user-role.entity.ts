@@ -91,7 +91,7 @@ export class UserRole extends BaseEntity {
   })
   metadata?: {
     conditions?: string[];
-    restrictions?: Record<string, any>;
+    restrictions?: Record<string, string | number | boolean>;
     source?: string; // 'manual', 'auto', 'sso', etc.
   };
 

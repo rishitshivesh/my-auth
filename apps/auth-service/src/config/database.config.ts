@@ -12,5 +12,5 @@ export const databaseConfig: SequelizeModuleOptions = {
   database: process.env.DATABASE_NAME,
   autoLoadModels: true,
   synchronize: process.env.NODE_ENV === 'development',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  logging: false,
 };

@@ -64,7 +64,7 @@ export class TenantSocialProvider extends BaseEntity {
     type: "boolean",
     default: false,
     name: "use_shared_app",
-    comment: "Use Fort Knox shared OAuth app?",
+    comment: "Use Scrolloop Sentry shared OAuth app?",
   })
   useSharedApp!: boolean;
 
