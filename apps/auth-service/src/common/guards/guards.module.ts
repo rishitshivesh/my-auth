@@ -13,7 +13,7 @@ import { TenantBindingGuard } from "./tenant-binding.guard";
 import { SessionGuard } from "./session.guard";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RolesGuard } from "@/modules/rbac/guards/roles.guard";
-import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
+import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RoleService } from "@/modules/rbac/services/role.service";
 import { PermissionService } from "@/modules/rbac/services/permission.service";
@@ -30,7 +30,7 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
  * - SessionGuard: Session validity checks
  * - PermissionsGuard: RBAC permission checks
  * - RolesGuard: RBAC role checks
- * - FortKnoxProtectedGuard: Composite guard (all of the above)
+ * - SentryProtectedGuard: Composite guard (all of the above)
  */
 @Global()
 @Module({
@@ -50,7 +50,7 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     SessionGuard,
     PermissionsGuard,
     RolesGuard,
-    FortKnoxProtectedGuard,
+    SentryProtectedGuard,
     RbacService,
     RoleService,
     PermissionService,
@@ -62,7 +62,7 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     SessionGuard,
     PermissionsGuard,
     RolesGuard,
-    FortKnoxProtectedGuard,
+    SentryProtectedGuard,
     RbacService,
     RoleService,
     PermissionService,

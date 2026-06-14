@@ -1,6 +1,6 @@
 /**
- * Fort Knox SDK - Next.js Module
- * 
+ * Scrolloop Sentry SDK - Next.js Module
+ *
  * SSR-safe client that works in:
  * - Server Components
  * - API Routes
@@ -8,17 +8,17 @@
  * - Client Components (use /react instead)
  */
 
-import { FortKnoxClient } from '../core/client';
-import type { FortKnoxConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
+import { SentryClient } from '../core/client';
+import type { SentryConfig, Transport, TransportRequest, TransportResponse } from '../core/types';
 
 /**
  * Create a Next.js server-side client
  * Injects cookies from request into fetch calls
  */
 export function createServerClient(
-  config: Omit<FortKnoxConfig, 'transport'>,
+  config: Omit<SentryConfig, 'transport'>,
   cookies?: Record<string, string>,
-): FortKnoxClient {
+): SentryClient {
   // Create custom transport that includes cookies
   const transport: Transport = async (req: TransportRequest): Promise<TransportResponse> => {
     const headers = {
@@ -30,7 +30,7 @@ export function createServerClient(
       const cookieHeader = Object.entries(cookies)
         .map(([key, value]) => `${key}=${value}`)
         .join('; ');
-      
+
       if (cookieHeader) {
         headers['Cookie'] = cookieHeader;
       }
@@ -45,7 +45,7 @@ export function createServerClient(
 
     let data: any;
     const contentType = response.headers.get('content-type');
-    
+
     if (contentType?.includes('application/json')) {
       data = await response.json();
     } else {
@@ -66,7 +66,7 @@ export function createServerClient(
     };
   };
 
-  return new FortKnoxClient({
+  return new SentryClient({
     ...config,
     transport,
   });
@@ -80,7 +80,7 @@ export function getCookiesFromRequest(req: Request): Record<string, string> {
   if (!cookieHeader) return {};
 
   const cookies: Record<string, string> = {};
-  
+
   cookieHeader.split(';').forEach((cookie) => {
     const [key, value] = cookie.trim().split('=');
     if (key && value) {
@@ -95,13 +95,13 @@ export function getCookiesFromRequest(req: Request): Record<string, string> {
  * Create client from Next.js request
  * Usage in API routes or Server Components
  */
-export function getFortKnoxClient(
+export function getSentryClient(
   baseURL: string,
   tenant: string,
   req: Request,
-): FortKnoxClient {
+): SentryClient {
   const cookies = getCookiesFromRequest(req);
-  
+
   return createServerClient(
     {
       baseURL,
@@ -112,5 +112,5 @@ export function getFortKnoxClient(
 }
 
 // Re-export core
-export { FortKnoxClient } from '../core/client';
+export { SentryClient } from '../core/client';
 export type * from '../core/types';

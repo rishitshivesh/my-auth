@@ -4,20 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SentryAuthFlow } from "@/components/auth/SentryAuthFlow";
 import { AuthLayout } from "@/components/layouts/AuthLayout";
-import { useAuth } from "@fortknox/sdk";
-import type { User } from "@fortknox/sdk";
+import { useAuth } from "@scrolloop/sdk";
+import type { User } from "@scrolloop/sdk";
 import { authClient } from "@/app/layout";
 
 function getPostLoginRoute(user: User | null): string {
   if (!user) return '/u/login'
   const claims = authClient.getTokenClaims()
-  const fortknoxTenantId = process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID
-  const isFortKnox = fortknoxTenantId
-    ? claims?.tenantId === fortknoxTenantId
-    : claims?.tenantSlug === 'fortknox'
+  const sentryTenantId = process.env.NEXT_PUBLIC_SENTRY_TENANT_ID
+  const isSentry = sentryTenantId
+    ? claims?.tenantId === sentryTenantId
+    : claims?.tenantSlug === 'sentry'
   const isInternal = Array.isArray(claims?.groups) &&
-    claims.groups.includes('fortknox-internal')
-  if (isFortKnox && isInternal) return '/dashboard'
+    claims.groups.includes('sentry-internal')
+  if (isSentry && isInternal) return '/dashboard'
   const slug = claims?.tenantSlug ?? ''
   return slug ? `/t/${slug}/dashboard` : '/u/login'
 }

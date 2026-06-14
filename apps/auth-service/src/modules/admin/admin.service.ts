@@ -59,8 +59,8 @@ export interface PlatformSettingsDto {
   maintenanceMode: boolean;
 }
 
-const FORTKNOX_TENANT_SLUG = "fortknox";
-const FORTKNOX_INTERNAL_ROLE = "fortknox-internal";
+const SENTRY_TENANT_SLUG = "sentry";
+const SENTRY_INTERNAL_ROLE = "sentry-internal";
 
 @Injectable()
 export class AdminService {
@@ -80,17 +80,17 @@ export class AdminService {
     private readonly redisService: RedisService,
   ) {}
 
-  private async getFortKnoxTenant(): Promise<Tenant | null> {
+  private async getSentryTenant(): Promise<Tenant | null> {
     return this.tenantRepository.findOne({
-      where: { slug: FORTKNOX_TENANT_SLUG },
+      where: { slug: SENTRY_TENANT_SLUG },
     });
   }
 
-  private async getFortKnoxInternalRole(
+  private async getSentryInternalRole(
     tenantId: string,
   ): Promise<Role | null> {
     return this.roleRepository.findOne({
-      where: { name: FORTKNOX_INTERNAL_ROLE, tenantId },
+      where: { name: SENTRY_INTERNAL_ROLE, tenantId },
     });
   }
 
@@ -289,7 +289,7 @@ export class AdminService {
       "www",
       "mail",
       "smtp",
-      "fortknox",
+      "sentry",
       "support",
       "help",
       "status",
@@ -361,14 +361,14 @@ export class AdminService {
   // ─── Team Management ────────────────────────────────────────────
 
   async getTeamMembers(): Promise<TeamMemberDto[]> {
-    const fkTenant = await this.getFortKnoxTenant();
-    if (!fkTenant) return [];
+    const sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) return [];
 
-    const role = await this.getFortKnoxInternalRole(fkTenant.id);
+    const role = await this.getSentryInternalRole(sentryTenant.id);
     if (!role) return [];
 
     const userRoles = await this.userRoleRepository.find({
-      where: { roleId: role.id, tenantId: fkTenant.id },
+      where: { roleId: role.id, tenantId: sentryTenant.id },
       relations: ["user"],
     });
 
@@ -382,31 +382,31 @@ export class AdminService {
   }
 
   async addTeamMember(email: string): Promise<TeamMemberDto> {
-    const fkTenant = await this.getFortKnoxTenant();
-    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+    const sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
 
     const user = await this.userRepository.findOne({
-      where: { email, tenantId: fkTenant.id },
+      where: { email, tenantId: sentryTenant.id },
     });
     if (!user) {
       throw new NotFoundException(
-        `No user with email "${email}" found in the fortknox tenant`,
+        `No user with email "${email}" found in the sentry tenant`,
       );
     }
 
-    let role = await this.getFortKnoxInternalRole(fkTenant.id);
+    let role = await this.getSentryInternalRole(sentryTenant.id);
     if (!role) {
       role = this.roleRepository.create({
-        name: FORTKNOX_INTERNAL_ROLE,
-        description: "Fort Knox platform superadmin",
-        tenantId: fkTenant.id,
+        name: SENTRY_INTERNAL_ROLE,
+        description: "Scrolloop Sentry platform superadmin",
+        tenantId: sentryTenant.id,
         isSystem: true,
       } as any) as any;
       role = await this.roleRepository.save(role as any);
     }
 
     const existing = await this.userRoleRepository.findOne({
-      where: { userId: user.id, roleId: role?.id, tenantId: fkTenant.id },
+      where: { userId: user.id, roleId: role?.id, tenantId: sentryTenant.id },
     });
     if (existing) {
       throw new ConflictException(`${email} is already a team member`);
@@ -415,7 +415,7 @@ export class AdminService {
     const userRole = this.userRoleRepository.create({
       userId: user.id,
       roleId: role?.id,
-      tenantId: fkTenant.id,
+      tenantId: sentryTenant.id,
     });
     await this.userRoleRepository.save(userRole);
 
@@ -429,14 +429,14 @@ export class AdminService {
   }
 
   async removeTeamMember(userId: string): Promise<void> {
-    const fkTenant = await this.getFortKnoxTenant();
-    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+    const sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
 
-    const role = await this.getFortKnoxInternalRole(fkTenant.id);
+    const role = await this.getSentryInternalRole(sentryTenant.id);
     if (!role) throw new NotFoundException("Role not found");
 
     const userRole = await this.userRoleRepository.findOne({
-      where: { userId, roleId: role.id, tenantId: fkTenant.id },
+      where: { userId, roleId: role.id, tenantId: sentryTenant.id },
     });
     if (!userRole) throw new NotFoundException("Team member not found");
 
@@ -446,11 +446,11 @@ export class AdminService {
   // ─── Platform Settings ───────────────────────────────────────────
 
   async getPlatformSettings(): Promise<PlatformSettingsDto> {
-    const fkTenant = await this.getFortKnoxTenant();
-    const stored = (fkTenant as any)?.settings ?? {};
+    const sentryTenant = await this.getSentryTenant();
+    const stored = (sentryTenant as any)?.settings ?? {};
 
     return {
-      platformName: stored.platformName ?? "Fort Knox",
+      platformName: stored.platformName ?? "Scrolloop Sentry",
       smtpConfigured: !!(process.env.SMTP_HOST || stored.smtpHost),
       smtpHost: stored.smtpHost ?? process.env.SMTP_HOST ?? undefined,
       supportEmail:
@@ -463,10 +463,10 @@ export class AdminService {
   async updatePlatformSettings(
     dto: Partial<PlatformSettingsDto>,
   ): Promise<PlatformSettingsDto> {
-    const fkTenant = await this.getFortKnoxTenant();
-    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+    const sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
 
-    const current = (fkTenant as any).settings ?? {};
+    const current = (sentryTenant as any).settings ?? {};
     const updated = { ...current };
 
     if (dto.platformName !== undefined) updated.platformName = dto.platformName;
@@ -477,7 +477,7 @@ export class AdminService {
     if (dto.maintenanceMode !== undefined)
       updated.maintenanceMode = dto.maintenanceMode;
 
-    await this.tenantRepository.update({ id: fkTenant.id }, {
+    await this.tenantRepository.update({ id: sentryTenant.id }, {
       settings: updated,
     } as any);
     return this.getPlatformSettings();

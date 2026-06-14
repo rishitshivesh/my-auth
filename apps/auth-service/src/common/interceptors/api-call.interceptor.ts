@@ -13,7 +13,7 @@ const THIRTY_FIVE_DAYS_SECONDS = 35 * 24 * 60 * 60;
 /**
  * Increments a per-tenant, per-day API call counter in Redis on every
  * successful request.  Key format (via RedisService.buildKey):
- *   fortknox:t:{tenantId}:api_calls:{YYYY-MM-DD}
+ *   sentry:t:{tenantId}:api_calls:{YYYY-MM-DD}
  * TTL is set to 35 days from the current date so old keys self-expire.
  */
 @Injectable()

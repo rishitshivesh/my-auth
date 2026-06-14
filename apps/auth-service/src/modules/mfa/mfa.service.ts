@@ -58,8 +58,8 @@ export class MfaService {
 
     // Generate secret
     const secret = speakeasy.generateSecret({
-      name: `FortKnox (${user.email})`,
-      issuer: "Fort Knox Auth",
+      name: `Scrolloop Sentry (${user.email})`,
+      issuer: "Scrolloop Sentry",
       length: 32,
     });
 

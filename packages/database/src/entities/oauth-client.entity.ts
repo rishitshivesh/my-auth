@@ -299,7 +299,7 @@ export class OAuthClient extends BaseEntity {
     type: "boolean",
     default: false,
     name: "is_first_party",
-    comment: "Whether this is a first-party client (Fort Knox owned)",
+    comment: "Whether this is a first-party client (Scrolloop Sentry owned)",
   })
   isFirstParty!: boolean;
 

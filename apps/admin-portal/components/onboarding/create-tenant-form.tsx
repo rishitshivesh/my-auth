@@ -70,7 +70,7 @@ export function CreateTenantForm({ onSubmit }: CreateTenantFormProps) {
       <div className="space-y-2">
         <Label htmlFor="slug">Tenant slug</Label>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">https://app.fortknox.io/</span>
+          <span className="text-sm text-muted-foreground">https://sentry.scrolloop.com/</span>
           <Input
             id="slug"
             type="text"

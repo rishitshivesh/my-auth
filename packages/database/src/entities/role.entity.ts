@@ -127,6 +127,14 @@ export class Role extends BaseEntity {
   })
   createdBy?: string;
 
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "permission_boundary_policy_id",
+    comment: "Policy that caps maximum permissions for this role",
+  })
+  permissionBoundaryPolicyId?: string;
+
   // ============================================================
   // RELATIONSHIPS
   // ============================================================
@@ -216,8 +224,7 @@ export class Role extends BaseEntity {
       if (!grouped[permission.resource]) {
         grouped[permission.resource] = [];
       }
-      // @ts-ignore
-      grouped[permission.resource].push(permission.action);
+      grouped[permission.resource]!.push(permission.action);
     }
 
     return grouped;

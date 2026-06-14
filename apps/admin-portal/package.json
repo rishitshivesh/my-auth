@@ -11,7 +11,7 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@fortknox/sdk": "workspace:*",
+    "@scrolloop/sdk": "workspace:*",
     "@repo/ui": "workspace:*",
     "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "^5.90.21",

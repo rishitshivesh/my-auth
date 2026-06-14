@@ -7,7 +7,7 @@ import { EmailStep } from "./email-step";
 import { MethodSelectionStep } from "./method-selection-step";
 import { CredentialsStep } from "./credentials-step";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAuth } from "@fortknox/sdk";
+import { useAuth } from "@scrolloop/sdk";
 import { Button } from "@repo/ui";
 import { ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 

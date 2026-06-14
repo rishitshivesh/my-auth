@@ -247,7 +247,7 @@ export class OAuthTokenService {
 
     // Build JWT payload
     const payload: any = {
-      iss: this.configService.get("JWT_ISSUER", "https://auth.fortknox.io"),
+      iss: this.configService.get("JWT_ISSUER", "https://sentry.scrolloop.com"),
       sub: data.userId || data.clientId, // User ID or client ID for M2M
       aud: data.audience || data.clientId,
       exp,
@@ -602,7 +602,7 @@ export class OAuthTokenService {
 
     // Build ID token payload (OIDC standard claims)
     const payload: any = {
-      iss: this.configService.get("JWT_ISSUER", "https://auth.fortknox.io"),
+      iss: this.configService.get("JWT_ISSUER", "https://sentry.scrolloop.com"),
       sub: user.id,
       aud: client.clientId,
       exp,

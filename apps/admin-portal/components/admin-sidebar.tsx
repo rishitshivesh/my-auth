@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useAuth } from '@fortknox/sdk'
+import { useAuth } from '@scrolloop/sdk'
 import {
   LayoutDashboard,
   Building2,
@@ -42,7 +42,7 @@ export function AdminSidebar() {
           <Shield className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+          <p className="text-sm font-semibold text-foreground">Scrolloop Sentry</p>
           <p className="text-xs text-muted-foreground">Superadmin</p>
         </div>
       </div>

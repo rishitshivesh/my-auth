@@ -1,4 +1,4 @@
-// apps/auth-service/src/common/guards/fortknox-protected.guard.ts
+// apps/auth-service/src/common/guards/sentry-protected-route.guard.ts
 
 import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
@@ -8,7 +8,7 @@ import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { SessionGuard } from "@/common/guards/session.guard";
 
 /**
- * FortKnoxProtectedGuard
+ * SentryProtectedGuard
  *
  * Composite guard that enforces complete auth boundary:
  * 1. JWT validation (token is valid)
@@ -19,7 +19,7 @@ import { SessionGuard } from "@/common/guards/session.guard";
  * This is the "one guard to rule them all" approach.
  *
  * Usage:
- * @UseGuards(FortKnoxProtectedGuard)
+ * @UseGuards(SentryProtectedGuard)
  * @RequirePermissions('users:read') // Optional
  * async myProtectedRoute() { ... }
  *
@@ -30,7 +30,7 @@ import { SessionGuard } from "@/common/guards/session.guard";
  * - Less error-prone
  */
 @Injectable()
-export class FortKnoxProtectedGuard implements CanActivate {
+export class SentryProtectedGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtAuthGuard: JwtAuthGuard,

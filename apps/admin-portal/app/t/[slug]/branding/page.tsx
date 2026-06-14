@@ -269,7 +269,7 @@ export default function BrandingPage({
                   className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg font-bold text-white text-lg"
                   style={{ backgroundColor: primaryColor }}
                 >
-                  FK
+                  SS
                 </div>
               )}
               <p
@@ -284,7 +284,7 @@ export default function BrandingPage({
                 Welcome back
               </p>
               <p className="text-xs text-muted-foreground">
-                Secured by Fort Knox
+                Secured by Scrolloop Sentry
               </p>
             </div>
           </div>

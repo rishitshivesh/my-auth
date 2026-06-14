@@ -6,7 +6,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Input, Label, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@repo/ui"
 import { Key, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 
 type RegistrationStatus =
   | 'idle'

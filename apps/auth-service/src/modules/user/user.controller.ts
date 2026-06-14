@@ -36,6 +36,14 @@ import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Protected } from "@/common/decorators/protected.decorator";
 
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+}
+
 @ApiTags("Users")
 @Controller("users")
 @Protected()
@@ -53,7 +61,7 @@ export class UserController {
   @Get("me")
   @ApiOperation({ summary: "Get current user profile" })
   @ApiResponse({ status: 200, description: "User profile retrieved" })
-  async getProfile(@Request() req: any) {
+  async getProfile(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
     return this.userService.findById(tenantId, req.user.sub);
   }
@@ -67,7 +75,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Profile updated successfully" })
   @ApiResponse({ status: 400, description: "Bad request - validation failed" })
   async updateProfile(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() updateUserDto: UpdateUserDto,
   ) {
     const tenantId = req.tenantId!;
@@ -88,7 +96,7 @@ export class UserController {
     description: "Invalid current password or weak new password",
   })
   async changePassword(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     const tenantId = req.tenantId!;
@@ -108,7 +116,7 @@ export class UserController {
   @Get("me/sessions")
   @ApiOperation({ summary: "Get all active sessions" })
   @ApiResponse({ status: 200, description: "Sessions retrieved" })
-  async getSessions(@Request() req: any) {
+  async getSessions(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
     return this.userService.getActiveSessions(tenantId, req.user.sub);
   }
@@ -123,7 +131,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Session revoked" })
   @ApiResponse({ status: 404, description: "Session not found" })
   async revokeSession(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("sessionId") sessionId: string,
   ) {
     const tenantId = req.tenantId!;
@@ -139,7 +147,7 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Revoke all sessions except current" })
   @ApiResponse({ status: 200, description: "Sessions revoked" })
-  async revokeAllSessions(@Request() req: any) {
+  async revokeAllSessions(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
     await this.userService.revokeAllSessions(tenantId, req.user.sub);
     return { message: "All other sessions revoked successfully" };
@@ -153,7 +161,7 @@ export class UserController {
   @ApiOperation({ summary: "Get security event history" })
   @ApiResponse({ status: 200, description: "Security events retrieved" })
   async getSecurityEvents(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query("limit") limit: string = "50",
   ) {
     const tenantId = req.tenantId!;
@@ -172,7 +180,7 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Delete user account" })
   @ApiResponse({ status: 200, description: "Account deleted successfully" })
-  async deleteAccount(@Request() req: any, @Body("password") password: string) {
+  async deleteAccount(@Request() req: AuthenticatedRequest, @Body("password") password: string) {
     const tenantId = req.tenantId!;
     await this.userService.deleteAccount(tenantId, req.user.sub, password);
     return { message: "Account deleted successfully" };
@@ -193,13 +201,13 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Users retrieved" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async listUsers(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query() query: ListUsersQueryDto,
   ): Promise<ListUsersResponseDto> {
     const tenantId = req.tenantId!;
 
     // Convert date strings to Date objects
-    const options: any = { ...query };
+    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
     if (query.createdAfter) {
       options.createdAfter = new Date(query.createdAfter);
     }
@@ -226,7 +234,7 @@ export class UserController {
     type: UserStatsDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async getUserStats(@Request() req: any): Promise<UserStatsDto> {
+  async getUserStats(@Request() req: AuthenticatedRequest): Promise<UserStatsDto> {
     const tenantId = req.tenantId!;
     return this.userService.getUserStats(tenantId);
   }
@@ -246,12 +254,12 @@ export class UserController {
   @ApiResponse({ status: 200, description: "CSV file" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async exportUsers(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query() query: ListUsersQueryDto,
   ): Promise<string> {
     const tenantId = req.tenantId!;
 
-    const options: any = { ...query };
+    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
     if (query.createdAfter) {
       options.createdAfter = new Date(query.createdAfter);
     }
@@ -275,7 +283,7 @@ export class UserController {
   })
   @ApiResponse({ status: 200, description: "Users updated" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async bulkUpdateStatus(@Request() req: any, @Body() dto: BulkUpdateUsersDto) {
+  async bulkUpdateStatus(@Request() req: AuthenticatedRequest, @Body() dto: BulkUpdateUsersDto) {
     const tenantId = req.tenantId!;
     const adminUserId = req.user.sub;
 
@@ -302,7 +310,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "User retrieved" })
   @ApiResponse({ status: 404, description: "User not found" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async getUserById(@Request() req: any, @Param("id") id: string) {
+  async getUserById(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     return this.userService.findById(tenantId, id);
   }
@@ -319,7 +327,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: "User not found" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async updateUser(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() updateUserDto: UpdateUserDto,
   ) {
@@ -340,7 +348,7 @@ export class UserController {
   @ApiResponse({ status: 204, description: "User deleted successfully" })
   @ApiResponse({ status: 404, description: "User not found" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async deleteUser(@Request() req: any, @Param("id") id: string) {
+  async deleteUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     await this.userService.adminDeleteUser(tenantId, id);
   }
@@ -356,7 +364,7 @@ export class UserController {
   @ApiOperation({ summary: "Force user to reset password (Admin)" })
   @ApiResponse({ status: 200, description: "Password reset forced" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async forcePasswordReset(@Request() req: any, @Param("id") id: string) {
+  async forcePasswordReset(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     await this.userService.adminForcePasswordReset(tenantId, id);
     return { message: "User will be required to reset password on next login" };
@@ -373,7 +381,7 @@ export class UserController {
   @ApiOperation({ summary: "Lock user account (Admin)" })
   @ApiResponse({ status: 200, description: "User account locked" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async lockUser(@Request() req: any, @Param("id") id: string) {
+  async lockUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     await this.userService.adminLockUser(tenantId, id);
     return { message: "User account locked" };
@@ -386,7 +394,7 @@ export class UserController {
   @ApiOperation({ summary: "Unlock user account (Admin)" })
   @ApiResponse({ status: 200, description: "User account unlocked" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async unlockUser(@Request() req: any, @Param("id") id: string) {
+  async unlockUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
     await this.userService.adminUnlockUser(tenantId, id);
     return { message: "User account unlocked" };

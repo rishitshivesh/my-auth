@@ -11,12 +11,12 @@ export default function CreateTenantPage() {
   }
 
   return (
-    <OnboardingLayout step={2} totalSteps={2} tenantName="Fort Knox">
+    <OnboardingLayout step={2} totalSteps={2} tenantName="Scrolloop Sentry">
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Create your tenant</h1>
           <p className="text-base text-muted-foreground">
-            Set up your organization in Fort Knox. You can always change these details later.
+            Set up your organization in Scrolloop Sentry. You can always change these details later.
           </p>
         </div>
 

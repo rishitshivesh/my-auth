@@ -1,8 +1,8 @@
 /**
- * Fort Knox Types
+ * Scrolloop Sentry Types
  *
- * Shared types consumed by both the Fort Knox SDK and backend services.
- * SDK-specific types (AuthState, FortKnoxConfig, AuthError, etc.) live in @fortknox/sdk.
+ * Shared types consumed by both the Scrolloop Sentry SDK and backend services.
+ * SDK-specific types (AuthState, SentryConfig, AuthError, etc.) live in @scrolloop/sdk.
  */
 
 // ============================================================

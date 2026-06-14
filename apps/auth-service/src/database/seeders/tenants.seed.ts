@@ -25,13 +25,13 @@ export async function seed() {
 
     const tenants = [
       {
-        name: "Fort Knox",
-        slug: "fortknox",
-        subdomain: "fortknox",
+        name: "Scrolloop Sentry",
+        slug: "sentry",
+        subdomain: "sentry",
         status: "active",
         plan: "enterprise",
         settings: {
-          platformName: "Fort Knox",
+          platformName: "Scrolloop Sentry",
         },
         featureFlags: {
           mfaRequired: true,
@@ -152,21 +152,21 @@ export async function seed() {
       },
     ];
 
-    // Seed fortknox-internal role for the fortknox tenant only
-    const fortknoxTenant = allTenants.find((t) => t.slug === "fortknox");
-    if (fortknoxTenant) {
+    // Seed sentry-internal role for the sentry tenant only
+    const sentryTenant = allTenants.find((t) => t.slug === "sentry");
+    if (sentryTenant) {
       const existing = await roleRepo.findOne({
-        where: { name: "fortknox-internal", tenantId: fortknoxTenant.id },
+        where: { name: "sentry-internal", tenantId: sentryTenant.id },
       });
       if (!existing) {
         const role = roleRepo.create({
-          name: "fortknox-internal",
-          description: "Fort Knox platform superadmin — grants access to the admin portal",
-          tenantId: fortknoxTenant.id,
+          name: "sentry-internal",
+          description: "Scrolloop Sentry platform superadmin — grants access to the admin portal",
+          tenantId: sentryTenant.id,
           isSystem: true,
         });
         await roleRepo.save(role);
-        console.log(`  ✅ Created role: fortknox/fortknox-internal`);
+        console.log(`  ✅ Created role: sentry/sentry-internal`);
       }
     }
 

@@ -28,6 +28,9 @@ import {
 import { RbacService } from "./services/rbac.service";
 import { RoleService } from "./services/role.service";
 import { PermissionService } from "./services/permission.service";
+import { PolicyService } from "./services/policy.service";
+import { GroupService } from "./services/group.service";
+import { PolicyEvaluationService } from "./services/policy-evaluation.service";
 import {
   CreatePermissionDto,
   UpdatePermissionDto,
@@ -41,7 +44,15 @@ import {
   CheckPermissionDto,
   CheckRoleDto,
 } from "./dto/rbac.dto";
+import { CreatePolicyDto, UpdatePolicyDto, SimulatePolicyDto } from "./dto/policy.dto";
+import { CreateGroupDto, UpdateGroupDto } from "./dto/group.dto";
 import { JwtAuthGuard } from "@/common/guards";
+
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; mfaVerified?: boolean };
+  ip?: string;
+}
 
 @ApiTags("RBAC")
 @Controller("rbac")
@@ -52,6 +63,9 @@ export class RbacController {
     private rbacService: RbacService,
     private roleService: RoleService,
     private permissionService: PermissionService,
+    private policyService: PolicyService,
+    private groupService: GroupService,
+    private policyEvaluationService: PolicyEvaluationService,
   ) {}
 
   // ============================================================
@@ -63,8 +77,8 @@ export class RbacController {
   @RequirePermissions("permissions:read")
   @ApiOperation({ summary: "List all permissions" })
   @ApiResponse({ status: 200, description: "Permissions retrieved" })
-  async listPermissions(@Request() req: any) {
-    const tenantId = req.tenantId!;
+  async listPermissions(@Request() req: AuthenticatedRequest) {
+    const tenantId = req.tenantId;
     return this.permissionService.listPermissions(tenantId);
   }
 
@@ -74,10 +88,10 @@ export class RbacController {
   @ApiOperation({ summary: "Create permission" })
   @ApiResponse({ status: 201, description: "Permission created" })
   async createPermission(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: CreatePermissionDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.permissionService.createPermission({
       tenantId,
       ...dto,
@@ -88,8 +102,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("permissions:read")
   @ApiOperation({ summary: "Get permission by ID" })
-  async getPermission(@Request() req: any, @Param("id") id: string) {
-    const tenantId = req.tenantId!;
+  async getPermission(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    const tenantId = req.tenantId;
     return this.permissionService.getPermission(id, tenantId);
   }
 
@@ -98,11 +112,11 @@ export class RbacController {
   @RequirePermissions("permissions:write")
   @ApiOperation({ summary: "Update permission" })
   async updatePermission(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdatePermissionDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.permissionService.updatePermission(id, tenantId, dto);
   }
 
@@ -111,8 +125,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("permissions:write")
   @ApiOperation({ summary: "Delete permission" })
-  async deletePermission(@Request() req: any, @Param("id") id: string) {
-    const tenantId = req.tenantId!;
+  async deletePermission(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    const tenantId = req.tenantId;
     await this.permissionService.deletePermission(id, tenantId);
   }
 
@@ -125,10 +139,10 @@ export class RbacController {
   @RequirePermissions("roles:read")
   @ApiOperation({ summary: "List all roles" })
   async listRoles(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query("loadPermissions") loadPermissions?: string,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.roleService.listRoles(tenantId, {
       loadPermissions: loadPermissions === "true",
     });
@@ -138,8 +152,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("roles:write")
   @ApiOperation({ summary: "Create role" })
-  async createRole(@Request() req: any, @Body() dto: CreateRoleDto) {
-    const tenantId = req.tenantId!;
+  async createRole(@Request() req: AuthenticatedRequest, @Body() dto: CreateRoleDto) {
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     return this.roleService.createRole({
       tenantId,
@@ -153,11 +167,11 @@ export class RbacController {
   @RequirePermissions("roles:read")
   @ApiOperation({ summary: "Get role by ID" })
   async getRole(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Query("loadPermissions") loadPermissions?: string,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.roleService.getRole(id, tenantId, loadPermissions === "true");
   }
 
@@ -166,11 +180,11 @@ export class RbacController {
   @RequirePermissions("roles:write")
   @ApiOperation({ summary: "Update role" })
   async updateRole(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.roleService.updateRole(id, tenantId, dto);
   }
 
@@ -179,8 +193,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("roles:write")
   @ApiOperation({ summary: "Delete role" })
-  async deleteRole(@Request() req: any, @Param("id") id: string) {
-    const tenantId = req.tenantId!;
+  async deleteRole(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    const tenantId = req.tenantId;
     await this.roleService.deleteRole(id, tenantId);
   }
 
@@ -193,11 +207,11 @@ export class RbacController {
   @RequirePermissions("roles:write")
   @ApiOperation({ summary: "Assign permissions to role" })
   async assignPermissionsToRole(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: AssignPermissionsDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     await this.roleService.assignPermissionsToRole(
       id,
@@ -214,11 +228,11 @@ export class RbacController {
   @RequirePermissions("roles:write")
   @ApiOperation({ summary: "Remove permissions from role" })
   async removePermissionsFromRole(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: RemovePermissionsDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     await this.roleService.removePermissionsFromRole(
       id,
       tenantId,
@@ -231,8 +245,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("roles:read")
   @ApiOperation({ summary: "Get role permissions" })
-  async getRolePermissions(@Request() req: any, @Param("id") id: string) {
-    const tenantId = req.tenantId!;
+  async getRolePermissions(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    const tenantId = req.tenantId;
     return this.roleService.getRolePermissions(id, tenantId);
   }
 
@@ -244,8 +258,8 @@ export class RbacController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions("users:read")
   @ApiOperation({ summary: "Get user roles" })
-  async getUserRoles(@Request() req: any, @Param("userId") userId: string) {
-    const tenantId = req.tenantId!;
+  async getUserRoles(@Request() req: AuthenticatedRequest, @Param("userId") userId: string) {
+    const tenantId = req.tenantId;
     return this.rbacService.getUserRoles(userId, tenantId);
   }
 
@@ -254,11 +268,11 @@ export class RbacController {
   @RequirePermissions("users:write")
   @ApiOperation({ summary: "Assign roles to user" })
   async assignRolesToUser(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
     @Body() dto: AssignRolesByNameDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const assignedBy = req.user.sub;
 
     await this.rbacService.assignRolesByNames({
@@ -278,11 +292,11 @@ export class RbacController {
   @RequirePermissions("users:write")
   @ApiOperation({ summary: "Set user roles (replace all)" })
   async setUserRoles(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
     @Body() dto: SetUserRolesDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const assignedBy = req.user.sub;
 
     await this.rbacService.setUserRoles(
@@ -300,11 +314,11 @@ export class RbacController {
   @RequirePermissions("users:write")
   @ApiOperation({ summary: "Remove role from user" })
   async removeRoleFromUser(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
     @Param("roleName") roleName: string,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     await this.rbacService.removeRoleByName(userId, roleName, tenantId);
     return { message: "Role removed successfully" };
   }
@@ -314,10 +328,10 @@ export class RbacController {
   @RequirePermissions("users:read")
   @ApiOperation({ summary: "Get user permissions (aggregated from all roles)" })
   async getUserPermissions(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     return this.rbacService.getUserPermissions(userId, tenantId);
   }
 
@@ -329,11 +343,11 @@ export class RbacController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Check if user has permission" })
   async checkPermission(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
     @Body() dto: CheckPermissionDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const hasPermission = await this.rbacService.userHasPermission(
       userId,
       tenantId,
@@ -346,11 +360,11 @@ export class RbacController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Check if user has role" })
   async checkRole(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("userId") userId: string,
     @Body() dto: CheckRoleDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const hasRole = await this.rbacService.userHasRole(
       userId,
       tenantId,
@@ -365,16 +379,16 @@ export class RbacController {
 
   @Get("me/roles")
   @ApiOperation({ summary: "Get my roles" })
-  async getMyRoles(@Request() req: any) {
-    const tenantId = req.tenantId!;
+  async getMyRoles(@Request() req: AuthenticatedRequest) {
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     return this.rbacService.getUserRoles(userId, tenantId);
   }
 
   @Get("me/permissions")
   @ApiOperation({ summary: "Get my permissions" })
-  async getMyPermissions(@Request() req: any) {
-    const tenantId = req.tenantId!;
+  async getMyPermissions(@Request() req: AuthenticatedRequest) {
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     return this.rbacService.getUserPermissions(userId, tenantId);
   }
@@ -383,10 +397,10 @@ export class RbacController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Check if I have permission" })
   async checkMyPermission(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: CheckPermissionDto,
   ) {
-    const tenantId = req.tenantId!;
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     const hasPermission = await this.rbacService.userHasPermission(
       userId,
@@ -406,8 +420,8 @@ export class RbacController {
   @ApiOperation({
     summary: "Initialize RBAC for tenant (create default permissions & roles)",
   })
-  async initializeTenant(@Request() req: any) {
-    const tenantId = req.tenantId!;
+  async initializeTenant(@Request() req: AuthenticatedRequest) {
+    const tenantId = req.tenantId;
     const userId = req.user.sub;
     await this.rbacService.initializeTenant(tenantId, userId);
     return { message: "RBAC initialized successfully" };
@@ -417,9 +431,216 @@ export class RbacController {
   @UseGuards(RolesGuard)
   @RequireAdmin()
   @ApiOperation({ summary: "Remove expired role assignments" })
-  async cleanupExpiredRoles(@Request() req: any) {
-    const tenantId = req.tenantId!;
+  async cleanupExpiredRoles(@Request() req: AuthenticatedRequest) {
+    const tenantId = req.tenantId;
     const count = await this.rbacService.cleanupExpiredRoles(tenantId);
     return { message: `Removed ${count} expired role assignments` };
+  }
+
+  // ============================================================
+  // POLICY ENDPOINTS
+  // ============================================================
+
+  @Post("policies")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:write")
+  @ApiOperation({ summary: "Create policy" })
+  @ApiResponse({ status: 201, description: "Policy created" })
+  async createPolicy(@Request() req: AuthenticatedRequest, @Body() dto: CreatePolicyDto) {
+    return this.policyService.createPolicy(req.tenantId, dto);
+  }
+
+  @Get("policies")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:read")
+  @ApiOperation({ summary: "List policies" })
+  async listPolicies(
+    @Request() req: AuthenticatedRequest,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.policyService.listPolicies(
+      req.tenantId,
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+    );
+  }
+
+  @Get("policies/:id")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:read")
+  @ApiOperation({ summary: "Get policy detail" })
+  async getPolicy(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    return this.policyService.getPolicy(id, req.tenantId);
+  }
+
+  @Put("policies/:id")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:write")
+  @ApiOperation({ summary: "Update policy" })
+  async updatePolicy(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() dto: UpdatePolicyDto,
+  ) {
+    return this.policyService.updatePolicy(id, req.tenantId, dto);
+  }
+
+  @Delete("policies/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:write")
+  @ApiOperation({ summary: "Delete policy" })
+  async deletePolicy(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    await this.policyService.deletePolicy(id, req.tenantId);
+  }
+
+  @Post("policies/simulate")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("policies:read")
+  @ApiOperation({ summary: "Simulate policy evaluation" })
+  async simulatePolicy(@Request() req: AuthenticatedRequest, @Body() dto: SimulatePolicyDto) {
+    return this.policyEvaluationService.simulate({
+      userId: dto.userId,
+      tenantId: req.tenantId,
+      action: dto.action,
+      resource: dto.resource,
+      context: {
+        ipAddress: dto.ipAddress ?? req.ip ?? '0.0.0.0',
+        mfaVerified: dto.mfaVerified ?? false,
+      },
+    });
+  }
+
+  @Post("roles/:roleId/policies/:policyId")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("roles:write")
+  @ApiOperation({ summary: "Attach policy to role" })
+  async attachPolicyToRole(
+    @Request() req: AuthenticatedRequest,
+    @Param("roleId") roleId: string,
+    @Param("policyId") policyId: string,
+  ) {
+    await this.policyService.attachPolicyToRole(roleId, policyId, req.tenantId);
+    return { message: "Policy attached to role" };
+  }
+
+  @Delete("roles/:roleId/policies/:policyId")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("roles:write")
+  @ApiOperation({ summary: "Detach policy from role" })
+  async detachPolicyFromRole(
+    @Request() req: AuthenticatedRequest,
+    @Param("roleId") roleId: string,
+    @Param("policyId") policyId: string,
+  ) {
+    await this.policyService.detachPolicyFromRole(roleId, policyId, req.tenantId);
+    return { message: "Policy detached from role" };
+  }
+
+  // ============================================================
+  // GROUP ENDPOINTS
+  // ============================================================
+
+  @Post("groups")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Create group" })
+  @ApiResponse({ status: 201, description: "Group created" })
+  async createGroup(@Request() req: AuthenticatedRequest, @Body() dto: CreateGroupDto) {
+    return this.groupService.createGroup(req.tenantId, dto);
+  }
+
+  @Get("groups")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:read")
+  @ApiOperation({ summary: "List groups (tree)" })
+  async listGroups(@Request() req: AuthenticatedRequest) {
+    return this.groupService.listGroups(req.tenantId);
+  }
+
+  @Get("groups/:id")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:read")
+  @ApiOperation({ summary: "Get group detail with members and policies" })
+  async getGroupDetail(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    return this.groupService.getGroupDetail(id, req.tenantId);
+  }
+
+  @Put("groups/:id")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Update group" })
+  async updateGroup(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() dto: UpdateGroupDto,
+  ) {
+    return this.groupService.updateGroup(id, req.tenantId, dto);
+  }
+
+  @Delete("groups/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Delete group" })
+  async deleteGroup(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    await this.groupService.deleteGroup(id, req.tenantId);
+  }
+
+  @Post("groups/:id/members/:userId")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Add user to group" })
+  async addGroupMember(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Param("userId") userId: string,
+  ) {
+    await this.groupService.addMember(id, userId, req.tenantId, req.user.sub);
+    return { message: "User added to group" };
+  }
+
+  @Delete("groups/:id/members/:userId")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Remove user from group" })
+  async removeGroupMember(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Param("userId") userId: string,
+  ) {
+    await this.groupService.removeMember(id, userId, req.tenantId);
+    return { message: "User removed from group" };
+  }
+
+  @Post("groups/:id/policies/:policyId")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Attach policy to group" })
+  async attachPolicyToGroup(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Param("policyId") policyId: string,
+  ) {
+    await this.groupService.attachPolicy(id, policyId, req.tenantId);
+    return { message: "Policy attached to group" };
+  }
+
+  @Delete("groups/:id/policies/:policyId")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("groups:write")
+  @ApiOperation({ summary: "Detach policy from group" })
+  async detachPolicyFromGroup(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Param("policyId") policyId: string,
+  ) {
+    await this.groupService.detachPolicy(id, policyId, req.tenantId);
+    return { message: "Policy detached from group" };
   }
 }

@@ -19,7 +19,7 @@ export function UniversalAuthLayout({
   children,
   logoUrl,
   primaryColor = "#6366f1",
-  tenantName = "Fort Knox",
+  tenantName = "Scrolloop Sentry",
   backgroundImage,
   heroTitle = "Secure Authentication for Everyone",
   heroSubtitle = "Build trust with enterprise-grade identity platform",
@@ -59,14 +59,14 @@ export function UniversalAuthLayout({
                 className="flex h-10 w-10 items-center justify-center rounded-lg font-bold text-white"
                 style={{ backgroundColor: primaryColor }}
               >
-                FK
+                SS
               </div>
             )}
           </div>
 
           {children}
 
-          {/* "Secured by Fort Knox" badge — always present (contractual) */}
+          {/* "Secured by Scrolloop Sentry" badge — always present (contractual) */}
           <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -81,7 +81,7 @@ export function UniversalAuthLayout({
                 clipRule="evenodd"
               />
             </svg>
-            Secured by Fort Knox
+            Secured by Scrolloop Sentry
           </div>
         </div>
       </div>

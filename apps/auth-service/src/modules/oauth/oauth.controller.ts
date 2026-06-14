@@ -53,6 +53,25 @@ import { JwksService } from "./services/jwks.service";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { logger } from "@/common/logger";
 
+interface OAuthClient {
+  id: string;
+  clientType: string;
+  requirePkce: boolean;
+  accessTokenTtl: number;
+  [key: string]: unknown;
+}
+
+interface JwtUser {
+  sub: string;
+  userId: string;
+  email?: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  tenantId?: string;
+}
+
 @ApiTags("OAuth2/OIDC")
 @Controller("oauth")
 export class OAuthController {
@@ -118,7 +137,7 @@ export class OAuthController {
 
     // TODO: Check if user is logged in
     // For now, assume user is authenticated and we have userId
-    const userId = (req.user as any)?.userId;
+    const userId = (req.user as JwtUser)?.userId;
 
     if (!userId) {
       // Redirect to login with return URL
@@ -290,7 +309,7 @@ export class OAuthController {
    */
   private async handleAuthorizationCodeGrant(
     tenantId: string,
-    client: any,
+    client: OAuthClient,
     body: TokenRequestDto,
     ipAddress?: string,
     userAgent?: string,
@@ -359,7 +378,7 @@ export class OAuthController {
    */
   private async handleRefreshTokenGrant(
     tenantId: string,
-    client: any,
+    client: OAuthClient,
     body: TokenRequestDto,
     ipAddress?: string,
     userAgent?: string,
@@ -409,7 +428,7 @@ export class OAuthController {
    */
   private async handleClientCredentialsGrant(
     tenantId: string,
-    client: any,
+    client: OAuthClient,
     body: TokenRequestDto,
     ipAddress?: string,
     userAgent?: string,
@@ -467,7 +486,7 @@ export class OAuthController {
     description: "Unauthorized",
   })
   async userInfo(@Req() req: Request): Promise<UserInfoResponseDto> {
-    const user = req.user as any;
+    const user = req.user as JwtUser;
 
     return {
       sub: user.userId,
@@ -567,7 +586,7 @@ export class OAuthController {
   getOpenIDConfiguration(): OpenIDConfigurationDto {
     const baseUrl = this.configService.get(
       "BASE_URL",
-      "https://auth.fortknox.io",
+      "https://sentry.scrolloop.com",
     );
 
     return {
@@ -731,7 +750,7 @@ export class OAuthController {
     @Req() req: Request,
   ): Promise<CreateClientResponseDto> {
     const tenantId = req.tenantId!;
-    const userId = (req.user as any).sub;
+    const userId = (req.user as JwtUser).sub;
 
     const { client, clientSecret } = await this.clientService.createClient({
       tenantId,
@@ -742,7 +761,7 @@ export class OAuthController {
     return {
       ...client,
       clientSecret, // Only shown once!
-    } as any;
+    } as CreateClientResponseDto;
   }
 
   /**

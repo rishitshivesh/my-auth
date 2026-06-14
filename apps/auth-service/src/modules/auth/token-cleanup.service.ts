@@ -65,11 +65,11 @@ export class TokenCleanupService {
             );
             totalDeleted += deleted;
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger.error(
             `Failed to cleanup tokens for tenant ${tenant.name}`,
             {
-              error: error.message,
+              error: error instanceof Error ? error.message : String(error),
               tenantId: tenant.id,
             },
           );
@@ -91,10 +91,10 @@ export class TokenCleanupService {
         durationMs: duration,
         timestamp: new Date(),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("❌ Daily token cleanup failed", {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
     }
   }
@@ -120,9 +120,9 @@ export class TokenCleanupService {
       if (deleted > 0) {
         this.logger.log(`Hourly cleanup: deleted ${deleted} expired tokens`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("❌ Hourly token cleanup failed", {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -148,9 +148,9 @@ export class TokenCleanupService {
           `15m session cleanup: removed ${sessionsCleanedUp} sessions, revoked ${tokensRevoked} tokens`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("❌ 15-minute session cleanup failed", {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

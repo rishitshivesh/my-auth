@@ -9,7 +9,7 @@ import { EnhancedPasswordInput } from "./enhanced-password-input"
 import { MagicLinkForm } from "./magic-link-form"
 import { PasskeyLoginButton } from "./passkey-login-button"
 import type { PasswordPolicy } from "@/lib/auth-config"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 
 interface CredentialsStepProps {
   email: string
