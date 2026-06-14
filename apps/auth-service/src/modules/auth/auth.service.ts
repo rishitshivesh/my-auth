@@ -974,9 +974,9 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as any,
+      publicKey: publicKey as crypto.KeyObject,
       algorithms: ['RS256'],
-    });
+    }) as Record<string, unknown>;
 
     if (payload.type !== "mfa_pending") {
       throw new UnauthorizedException("Invalid token type");
@@ -986,7 +986,7 @@ export class AuthService {
 
     // Step 2: Verify TOTP code
     const verified = await this.mfaService.verifyTotp(
-      payload.sub,
+      payload.sub as string,
       tenantId,
       code,
     );
@@ -1004,16 +1004,16 @@ export class AuthService {
       .digest("hex");
 
     const session = await this.sessionService.createSession({
-      userId: payload.sub,
+      userId: payload.sub as string,
       tenantId,
-      email: payload.email,
+      email: payload.email as string,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
     });
 
-    const mfaPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
+    const mfaPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
     const accessToken = await this.signToken(mfaPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "MFA verified successfully");
@@ -1038,9 +1038,9 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as any,
+      publicKey: publicKey as crypto.KeyObject,
       algorithms: ['RS256'],
-    });
+    }) as Record<string, unknown>;
 
     if (payload.type !== "mfa_pending") {
       throw new UnauthorizedException("Invalid token type");
@@ -1050,7 +1050,7 @@ export class AuthService {
 
     // Step 2: Verify backup code
     const verified = await this.mfaService.verifyBackupCode(
-      payload.sub,
+      payload.sub as string,
       tenantId,
       code,
     );
@@ -1068,22 +1068,22 @@ export class AuthService {
       .digest("hex");
 
     const session = await this.sessionService.createSession({
-      userId: payload.sub,
+      userId: payload.sub as string,
       tenantId,
-      email: payload.email,
+      email: payload.email as string,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
     });
 
-    const backupPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
+    const backupPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
     const accessToken = await this.signToken(backupPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "Backup code verified");
 
     // Check remaining backup codes
-    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub, tenantId);
+    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub as string, tenantId);
     const remaining = mfaStatus.backupCodesRemaining as number;
 
     return {
