@@ -303,8 +303,7 @@ export class OAuthTokenService {
     // Verify JWT signature (RS256)
     let payload: any;
     try {
-      const { privateKey } = await this.jwksService.getCurrentSigningKey();
-      const publicKey = crypto.createPublicKey(privateKey);
+      const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
         publicKey,
         algorithms: ["RS256"],
@@ -676,8 +675,7 @@ export class OAuthTokenService {
   ): Promise<any> {
     // Try as JWT first (access token)
     try {
-      const { privateKey } = await this.jwksService.getCurrentSigningKey();
-      const publicKey = crypto.createPublicKey(privateKey);
+      const publicKey = await this.jwksService.getPublicKeyForToken(token);
       const payload = this.jwtService.verify(token, {
         publicKey,
         algorithms: ["RS256"],

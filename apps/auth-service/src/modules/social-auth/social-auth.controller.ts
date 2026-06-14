@@ -288,8 +288,7 @@ export class SocialAuthController {
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
   async claimSession(@Body() body: { ct: string }) {
     try {
-      const { privateKey } = await this.jwksService.getCurrentSigningKey();
-      const publicKey = crypto.createPublicKey(privateKey);
+      const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
         publicKey,
         algorithms: ["RS256"],

@@ -85,6 +85,7 @@ export class JwksService implements OnModuleInit {
       use: "sig",
       publicKeyPem: publicKey as string,
       encryptedPrivateKey: encrypted.encrypted,
+      iv: encrypted.iv,
       authTag: encrypted.authTag,
       status: "active",
       expiresAt,
@@ -98,7 +99,7 @@ export class JwksService implements OnModuleInit {
     const pem = await EncryptionService.decrypt(
       {
         encrypted: keyPair.encryptedPrivateKey,
-        iv: "",
+        iv: keyPair.iv,
         authTag: keyPair.authTag,
       },
       masterKey,
@@ -146,6 +147,14 @@ export class JwksService implements OnModuleInit {
     const keyPairs = await this.keyPairRepository.find({ where });
 
     return keyPairs.map((kp) => this.toJWK(kp.publicKeyPem, kp.kid));
+  }
+
+  async getVerificationKeyByKid(kid: string): Promise<JsonWebKeyWithKid | null> {
+    const keyPair = await this.keyPairRepository.findOne({
+      where: { kid, status: In(["active", "retired"]) },
+    });
+    if (!keyPair) return null;
+    return this.toJWK(keyPair.publicKeyPem, keyPair.kid);
   }
 
   async rotateKey(tenantId?: string): Promise<void> {
@@ -196,6 +205,25 @@ export class JwksService implements OnModuleInit {
       n: jwk.n as string,
       e: jwk.e as string,
     };
+  }
+
+  async getPublicKeyForToken(token: string): Promise<crypto.KeyObject> {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      throw new Error("Invalid token format");
+    }
+    const header = JSON.parse(
+      Buffer.from(parts[0], "base64url").toString(),
+    );
+    const kid = header?.kid as string | undefined;
+    if (!kid) {
+      throw new Error("Token missing kid header");
+    }
+    const jwk = await this.getVerificationKeyByKid(kid);
+    if (!jwk) {
+      throw new Error("Signing key not found for kid: " + kid);
+    }
+    return crypto.createPublicKey({ key: jwk as JsonWebKey, format: "jwk" });
   }
 
   getJWKS() {

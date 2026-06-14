@@ -972,8 +972,7 @@ export class AuthService {
     userAgent: string,
   ) {
     // Step 1: Verify temporary token
-    const { privateKey } = await this.jwksService.getCurrentSigningKey();
-    const publicKey = crypto.createPublicKey(privateKey);
+    const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
       publicKey,
       algorithms: ["RS256"],
@@ -1037,8 +1036,7 @@ export class AuthService {
     userAgent: string,
   ) {
     // Step 1: Verify temporary token
-    const { privateKey } = await this.jwksService.getCurrentSigningKey();
-    const publicKey = crypto.createPublicKey(privateKey);
+    const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
       publicKey,
       algorithms: ["RS256"],

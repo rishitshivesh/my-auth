@@ -675,8 +675,7 @@ export class SocialAuthService {
    */
   async verifyLinkToken(token: string): Promise<{ userId: string; tenantId: string }> {
     try {
-      const { privateKey } = await this.jwksService.getCurrentSigningKey();
-      const publicKey = crypto.createPublicKey(privateKey);
+      const publicKey = await this.jwksService.getPublicKeyForToken(token);
       return this.jwtService.verify(token, {
         publicKey,
         algorithms: ["RS256"],

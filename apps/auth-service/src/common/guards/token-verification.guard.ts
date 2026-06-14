@@ -2,7 +2,6 @@ import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { logger } from "../logger";
-import * as crypto from "crypto";
 
 @Injectable()
 export class TokenVerificationGuard implements CanActivate {
@@ -23,8 +22,7 @@ export class TokenVerificationGuard implements CanActivate {
     }
 
     try {
-      const { privateKey } = await this.jwksService.getCurrentSigningKey();
-      const publicKey = crypto.createPublicKey(privateKey);
+      const publicKey = await this.jwksService.getPublicKeyForToken(token);
       const decoded = this.jwtService.verify(token, {
         publicKey,
         algorithms: ["RS256"],
@@ -56,8 +54,7 @@ export class RequestUserGuard implements CanActivate {
 
     try {
       if (token) {
-        const { privateKey } = await this.jwksService.getCurrentSigningKey();
-        const publicKey = crypto.createPublicKey(privateKey);
+        const publicKey = await this.jwksService.getPublicKeyForToken(token);
         const decoded = this.jwtService.verify(token, {
           publicKey,
           algorithms: ["RS256"],

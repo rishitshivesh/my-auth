@@ -73,6 +73,7 @@ describe("JwksService", () => {
         use: "sig",
         publicKeyPem,
         encryptedPrivateKey: privateKeyPem,
+        iv: "test-iv",
         authTag: "",
         status: "active",
         createdAt: new Date(),

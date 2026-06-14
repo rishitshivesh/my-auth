@@ -30,6 +30,9 @@ export class KeyPair {
   @Column({ name: "encrypted_private_key", type: "text" })
   encryptedPrivateKey!: string;
 
+  @Column({ name: "iv", type: "text" })
+  iv!: string;
+
   @Column({ name: "auth_tag", type: "text" })
   authTag!: string;
 

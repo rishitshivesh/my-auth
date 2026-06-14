@@ -10,6 +10,7 @@ describe("KeyPair entity", () => {
     kp.use = "sig";
     kp.publicKeyPem = "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----";
     kp.encryptedPrivateKey = "encrypted-data";
+    kp.iv = "random-iv";
     kp.authTag = "auth-tag";
     kp.status = "active";
     kp.createdAt = new Date();

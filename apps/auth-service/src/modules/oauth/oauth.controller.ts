@@ -506,7 +506,7 @@ export class OAuthController {
         await this.clientService.validateClient(clientId, clientSecret);
       } catch {
         logger.warn({ clientId }, "Revoke attempt with invalid client credentials");
-        return;
+        throw new UnauthorizedException("Invalid client credentials");
       }
     }
 
