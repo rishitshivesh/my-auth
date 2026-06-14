@@ -119,9 +119,9 @@ export class TokenEncryptionService {
       this.logger.debug("Token decrypted successfully");
 
       return decrypted;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("Failed to decrypt token", {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw new Error("Token decryption failed");
     }

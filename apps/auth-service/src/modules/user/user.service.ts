@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull, In } from "typeorm";
+import { Repository, MoreThan, IsNull, In, FindOptionsWhere } from "typeorm";
 import {
   User,
   Session,
@@ -57,7 +57,7 @@ export class UserService {
    * Find user by email
    */
   async findByEmail(tenantId: string, email: string): Promise<User | null> {
-    const where: any = { email };
+    const where: FindOptionsWhere<User> = { email };
     if (tenantId) {
       where.tenantId = tenantId;
     }
@@ -392,7 +392,7 @@ export class UserService {
 
     const newAttempts = user.failedLoginAttempts + 1;
 
-    const update: any = {
+    const update: Partial<Pick<User, 'failedLoginAttempts' | 'lockedUntil'>> = {
       failedLoginAttempts: newAttempts,
     };
 

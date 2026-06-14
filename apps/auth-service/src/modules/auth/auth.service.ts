@@ -75,10 +75,10 @@ export class AuthService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload as Record<string, unknown>, {
-      privateKey: privateKey as any,
+      privateKey: privateKey as crypto.KeyObject,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as any,
+      expiresIn,
     });
   }
 
@@ -102,7 +102,7 @@ export class AuthService {
     tenantId: string,
     sessionId: string,
     tenant?: Tenant,
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     const [groups, resolvedTenant] = await Promise.all([
       this.getUserGroups(userId, tenantId),
       tenant
@@ -230,7 +230,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; user: any }
+    | { accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | {
         mfaRequired: boolean;
         tempToken: string;
@@ -777,7 +777,7 @@ export class AuthService {
     userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     // Use OAuthRefreshTokenService for rotation
-    let accessTokenPayload: any;
+    let accessTokenPayload: Record<string, unknown>;
     let newToken: string;
 
     try {
@@ -804,23 +804,23 @@ export class AuthService {
 
     // Enrich payload with groups and tenantSlug
     const enrichedPayload = await this.buildAccessTokenPayload(
-      accessTokenPayload.sub,
-      accessTokenPayload.email,
-      accessTokenPayload.tenantId,
-      accessTokenPayload.sessionId,
+      accessTokenPayload.sub as string,
+      accessTokenPayload.email as string,
+      accessTokenPayload.tenantId as string,
+      accessTokenPayload.sessionId as string,
     );
     // Generate new access token
     const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
 
     // Update session: new refresh token hash + expiry + lastUsedAt
-    if (accessTokenPayload.sessionId) {
+    if (accessTokenPayload.sessionId as string) {
       const newRefreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       const newRefreshTokenHash = crypto
         .createHash("sha256")
         .update(newToken)
         .digest("hex");
       await this.sessionRepository.update(
-        { id: accessTokenPayload.sessionId, tenantId },
+        { id: accessTokenPayload.sessionId as string, tenantId },
         {
           refreshTokenHash: newRefreshTokenHash,
           refreshExpiresAt: newRefreshExpiresAt,
@@ -833,15 +833,15 @@ export class AuthService {
     // Log token refresh
     this.securityEventService.log({
       tenantId,
-      userId: accessTokenPayload.sub,
+      userId: accessTokenPayload.sub as string,
       eventType: SecurityEventType.TOKEN_REFRESHED,
       severity: "info",
       ipAddress: ip,
       userAgent,
-      resourceId: accessTokenPayload.sessionId,
+      resourceId: accessTokenPayload.sessionId as string,
       resourceType: "session",
       metadata: {
-        sessionId: accessTokenPayload.sessionId,
+        sessionId: accessTokenPayload.sessionId as string,
       },
     });
 
