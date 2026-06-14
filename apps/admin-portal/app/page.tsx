@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/layouts/public-layout"
 
 export default function HomePage() {
   return (
-    <PublicLayout tenantName="Fort Knox" showNav={true}>
+    <PublicLayout tenantName="Scrolloop Sentry" showNav={true}>
       <div className="flex-1">
         <div className="px-6 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl">
@@ -14,7 +14,7 @@ export default function HomePage() {
                 Enterprise-Grade Identity for Everyone
               </h1>
               <p className="mt-6 text-lg text-muted-foreground sm:text-xl text-balance max-w-2xl mx-auto">
-                Fort Knox is a modern, secure, and compliant identity platform designed to help you manage users,
+                Scrolloop Sentry is a modern, secure, and compliant identity platform designed to help you manage users,
                 applications, and access control with ease.
               </p>
 

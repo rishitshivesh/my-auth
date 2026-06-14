@@ -1,7 +1,7 @@
 {
-  "name": "@fortknox/sdk",
+  "name": "@scrolloop/sdk",
   "version": "1.0.1",
-  "description": "Fort Knox Authentication SDK - Session runtime for multi-tenant auth",
+  "description": "Scrolloop Sentry Authentication SDK - Session runtime for multi-tenant auth",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -57,9 +57,9 @@
     "jwt",
     "multi-tenant",
     "session",
-    "fortknox"
+    "sentry"
   ],
-  "author": "Fort Knox Security",
+  "author": "Scrolloop Sentry",
   "license": "MIT",
   "peerDependencies": {
     "next": "^14.0.0 || ^15.0.0",
@@ -78,7 +78,7 @@
     }
   },
   "dependencies": {
-    "@fortknox/types": "*"
+    "@scrolloop/types": "*"
   },
   "devDependencies": {
     "@types/node": "^20.11.5",

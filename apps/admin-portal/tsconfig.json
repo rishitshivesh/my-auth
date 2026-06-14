@@ -8,9 +8,9 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@fortknox/sdk": ["../../packages/fortknox-sdk/src/index.ts"],
-      "@fortknox/sdk/*": ["../../packages/fortknox-sdk/src/*"],
-      "@fortknox/types": ["../../packages/fortknox-types/src/index.ts"],
+      "@scrolloop/sdk": ["../../packages/scrolloop-sdk/src/index.ts"],
+      "@scrolloop/sdk/*": ["../../packages/scrolloop-sdk/src/*"],
+      "@scrolloop/types": ["../../packages/scrolloop-types/src/index.ts"],
       "@repo/ui": ["../../packages/ui/src/index.ts"],
       "@repo/ui/*": ["../../packages/ui/src/*"],
       "@repo/shared": ["../../packages/shared/src/index.ts"],

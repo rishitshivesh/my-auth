@@ -17,7 +17,7 @@ export function OnboardingLayout({
   totalSteps,
   logoUrl,
   primaryColor = "#6366f1",
-  tenantName = "Fort Knox",
+  tenantName = "Scrolloop Sentry",
 }: OnboardingLayoutProps) {
   const progress = (step / totalSteps) * 100
 
@@ -27,7 +27,7 @@ export function OnboardingLayout({
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-              FK
+              SS
             </div>
             <span className="font-semibold text-foreground">{tenantName}</span>
           </div>

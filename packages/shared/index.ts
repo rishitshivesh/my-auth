@@ -1,7 +1,7 @@
 /**
  * @repo/shared
  *
- * Fort Knox Shared Package
+ * Scrolloop Sentry Shared Package
  * Provides common types, constants, and DTOs
  */
 

@@ -5,7 +5,7 @@ interface BrandLogoProps {
   href?: string
 }
 
-export function BrandLogo({ logoUrl, tenantName = "Fort Knox", className = "", href = "/" }: BrandLogoProps) {
+export function BrandLogo({ logoUrl, tenantName = "Scrolloop Sentry", className = "", href = "/" }: BrandLogoProps) {
   const content = (
     <div className={`flex items-center gap-3 ${className}`}>
       {logoUrl ? (

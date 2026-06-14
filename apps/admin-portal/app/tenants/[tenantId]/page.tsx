@@ -91,8 +91,8 @@ export default function TenantDetailPage() {
       {/* Sidebar */}
       <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
         <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
-          <div><p className="text-sm font-semibold text-foreground">Fort Knox</p><p className="text-xs text-muted-foreground">Superadmin</p></div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">SS</div>
+          <div><p className="text-sm font-semibold text-foreground">Scrolloop Sentry</p><p className="text-xs text-muted-foreground">Superadmin</p></div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {[

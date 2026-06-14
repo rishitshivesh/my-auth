@@ -1,14 +1,14 @@
 /**
- * Fort Knox SDK - Core Types
+ * Scrolloop Sentry SDK - Core Types
  *
  * These types are used across all adapters (web, node, next, react).
  * Shared base types (User, Session, SecurityEventType, and UI types) live in
- * @fortknox/types and are re-exported here so SDK consumers need only one import.
+ * @scrolloop/types and are re-exported here so SDK consumers need only one import.
  */
 
 // Re-export shared types so internal SDK modules can import from './types'
-// and external consumers can import from '@fortknox/sdk' without knowing about @fortknox/types.
-// export type { User, Session, SecurityEventType } from '@fortknox/types';
+// and external consumers can import from '@scrolloop/sdk' without knowing about @scrolloop/types.
+// export type { User, Session, SecurityEventType } from '@scrolloop/types';
 
 // ============================================================
 // TRANSPORT ABSTRACTION
@@ -73,7 +73,7 @@ export interface PendingRequest {
 // CLIENT CONFIGURATION
 // ============================================================
 
-export interface FortKnoxConfig {
+export interface SentryConfig {
   /** Base URL of the auth service */
   baseURL: string;
 
@@ -199,10 +199,10 @@ export type AuthEvent =
 export type AuthEventListener = (event: AuthEvent) => void;
 
 /**
- * Fort Knox Types
+ * Scrolloop Sentry Types
  *
- * Shared types consumed by both the Fort Knox SDK and backend services.
- * SDK-specific types (AuthState, FortKnoxConfig, AuthError, etc.) live in @fortknox/sdk.
+ * Shared types consumed by both the Scrolloop Sentry SDK and backend services.
+ * SDK-specific types (AuthState, SentryConfig, AuthError, etc.) live in @scrolloop/sdk.
  */
 
 // ============================================================

@@ -120,7 +120,7 @@ export class OAuthClientService {
     }
 
     // Generate client ID
-    const clientId = `${data.isFirstParty ? "fortknox" : "client"}_${crypto.randomBytes(16).toString("hex")}`;
+    const clientId = `${data.isFirstParty ? "sentry" : "client"}_${crypto.randomBytes(16).toString("hex")}`;
 
     // Generate client secret (for confidential clients)
     let clientSecret: string | undefined;

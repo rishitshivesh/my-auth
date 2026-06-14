@@ -74,10 +74,10 @@ export class TokenEncryptionService {
       this.logger.debug("Token encrypted successfully");
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("Failed to encrypt token", {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       throw new Error("Token encryption failed");
     }
@@ -119,9 +119,9 @@ export class TokenEncryptionService {
       this.logger.debug("Token decrypted successfully");
 
       return decrypted;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error("Failed to decrypt token", {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw new Error("Token decryption failed");
     }

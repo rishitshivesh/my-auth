@@ -6,13 +6,24 @@ import {
   RolePermission,
   UserRole,
   User,
+  Policy,
+  Group,
+  UserGroup,
+  GroupPolicy,
+  UserPolicy,
+  RolePolicy,
 } from "@repo/database";
 import { RbacController } from "./rbac.controller";
 import { RbacService } from "./services/rbac.service";
 import { RoleService } from "./services/role.service";
 import { PermissionService } from "./services/permission.service";
+import { PolicyService } from "./services/policy.service";
+import { GroupService } from "./services/group.service";
+import { PolicyEvaluationService } from "./services/policy-evaluation.service";
+import { RbacCacheService } from "./services/rbac-cache.service";
 import { PermissionsGuard } from "./guards/permissions.guard";
 import { RolesGuard } from "./guards/roles.guard";
+import { RedisService } from "@/common/service/redis.service";
 
 @Module({
   imports: [
@@ -22,6 +33,12 @@ import { RolesGuard } from "./guards/roles.guard";
       RolePermission,
       UserRole,
       User,
+      Policy,
+      Group,
+      UserGroup,
+      GroupPolicy,
+      UserPolicy,
+      RolePolicy,
     ]),
   ],
   controllers: [RbacController],
@@ -29,6 +46,11 @@ import { RolesGuard } from "./guards/roles.guard";
     RbacService,
     RoleService,
     PermissionService,
+    PolicyService,
+    GroupService,
+    PolicyEvaluationService,
+    RbacCacheService,
+    RedisService,
     PermissionsGuard,
     RolesGuard,
   ],
@@ -36,6 +58,10 @@ import { RolesGuard } from "./guards/roles.guard";
     RbacService,
     RoleService,
     PermissionService,
+    PolicyService,
+    GroupService,
+    PolicyEvaluationService,
+    RbacCacheService,
     PermissionsGuard,
     RolesGuard,
   ],

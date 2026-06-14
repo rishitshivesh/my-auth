@@ -2,7 +2,7 @@
   "name": "@repo/database",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeORM entities and migrations for Fort Knox authentication system",
+  "description": "TypeORM entities and migrations for Scrolloop Sentry authentication system",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

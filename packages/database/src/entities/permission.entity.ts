@@ -86,7 +86,7 @@ export class Permission extends BaseEntity {
   })
   metadata?: {
     conditions?: string[]; // e.g., ["own_resource_only"]
-    constraints?: Record<string, any>;
+    constraints?: Record<string, string | number | boolean>;
   };
 
   // ============================================================

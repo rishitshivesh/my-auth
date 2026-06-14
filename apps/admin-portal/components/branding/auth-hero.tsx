@@ -21,9 +21,9 @@ export function AuthHero({ title, subtitle, backgroundImage, primaryColor = "#63
           className="flex h-10 w-10 items-center justify-center rounded-lg text-white font-bold"
           style={{ backgroundColor: primaryColor }}
         >
-          FK
+          SS
         </div>
-        <span className="text-lg font-semibold text-white">Fort Knox</span>
+        <span className="text-lg font-semibold text-white">Scrolloop Sentry</span>
       </div>
       <div>
         <h1 className="mb-4 text-4xl font-bold text-white">{title}</h1>

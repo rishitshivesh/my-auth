@@ -25,7 +25,7 @@ export const validationSchema = Joi.object({
   // ── JWT & KEY MANAGEMENT ──────────────────────────────────────
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_ALG: Joi.string().valid("RS256", "EdDSA").default("RS256"),
-  JWT_ISSUER: Joi.string().default("https://auth.fortknox.io"),
+  JWT_ISSUER: Joi.string().default("https://sentry.scrolloop.com"),
   JWKS_CACHE_SECONDS: Joi.number().integer().min(0).default(300),
   KEYRING_MASTER_KEY: Joi.string().base64().length(44).required(),
   KEY_ACTIVE_TTL_DAYS: Joi.number().integer().min(1).default(90),
@@ -50,7 +50,7 @@ export const validationSchema = Joi.object({
   REDIS_USERNAME: Joi.string().allow("").default(""),
   REDIS_PASSWORD: Joi.string().allow("").default(""),
   REDIS_DB: Joi.number().integer().min(0).default(0),
-  REDIS_KEY_PREFIX: Joi.string().default("fortknox"),
+  REDIS_KEY_PREFIX: Joi.string().default("sentry"),
 
   // ── WEBAUTHN ──────────────────────────────────────────────────
   WEBAUTHN_RP_ID: Joi.string().default("localhost"),
@@ -59,9 +59,9 @@ export const validationSchema = Joi.object({
     .default("http://localhost:3000"),
 
   // ── EMAIL ─────────────────────────────────────────────────────
-  EMAIL_FROM: Joi.string().email().default("noreply@fortknox.io"),
-  EMAIL_FROM_NAME: Joi.string().default("Fort Knox"),
-  EMAIL_REPLY_TO: Joi.string().email().default("support@fortknox.io"),
+  EMAIL_FROM: Joi.string().email().default("noreply@sentry.scrolloop.com"),
+  EMAIL_FROM_NAME: Joi.string().default("Scrolloop Sentry"),
+  EMAIL_REPLY_TO: Joi.string().email().default("support@sentry.scrolloop.com"),
 
   SMTP_HOST: Joi.string().allow("").optional(),
   SMTP_PORT: Joi.number().port().default(587),

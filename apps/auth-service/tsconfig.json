@@ -22,8 +22,8 @@
 
     "paths": {
       "@/*": ["./src/*"],
-      "@fortknox/sdk": ["../../packages/fortknox-sdk/src/index.ts"],
-      "@fortknox/types": ["../../packages/fortknox-types/src/index.ts"],
+      "@scrolloop/sdk": ["../../packages/sdk-typescript/src/index.ts"],
+      "@scrolloop/types": ["../../packages/sentry-types/src/index.ts"],
       "@repo/database": ["../../packages/database/index.ts"],
       "@repo/shared": ["../../packages/shared/src/index.ts"],
       "@repo/security": ["../../packages/security/src/index.ts"]

@@ -1,5 +1,5 @@
 /**
- * Fort Knox SDK - React Provider
+ * Scrolloop Sentry SDK - React Provider
  *
  * React Context for auth state management
  */
@@ -7,7 +7,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { FortKnoxClient } from "../core/client";
+import { SentryClient } from "../core/client";
 import type { User, LoginCredentials, LoginResponse, AuthEvent } from "../core/types";
 
 // ============================================================
@@ -53,7 +53,7 @@ interface AuthContextValue {
   initiateSocialLinking: (provider: string) => Promise<void>;
 
   // Client
-  client: FortKnoxClient;
+  client: SentryClient;
 }
 
 const AuthContext = createContext<AuthContextValue>(undefined as any);
@@ -64,10 +64,10 @@ const AuthContext = createContext<AuthContextValue>(undefined as any);
 
 interface AuthProviderProps {
   children: React.ReactNode;
-  client: FortKnoxClient;
+  client: SentryClient;
 }
 
-export function FortKnoxProvider({ children, client }: AuthProviderProps) {
+export function SentryProvider({ children, client }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -407,7 +407,7 @@ export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 
   if (context === undefined) {
-    throw new Error("useAuth must be used within FortKnoxProvider");
+    throw new Error("useAuth must be used within SentryProvider");
   }
 
   return context as AuthContextValue;

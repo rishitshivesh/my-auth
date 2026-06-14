@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button, Input, Label, InputOTP, InputOTPGroup, InputOTPSlot } from "@repo/ui"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 
 interface ResetPasswordFormProps {
   primaryColor?: string

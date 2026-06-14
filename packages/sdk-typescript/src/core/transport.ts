@@ -1,6 +1,6 @@
 /**
- * Fort Knox SDK - Default Transport
- * 
+ * Scrolloop Sentry SDK - Default Transport
+ *
  * Uses the Fetch API (works in browsers and Node 18+)
  */
 
@@ -23,7 +23,7 @@ export function createFetchTransport(): Transport {
       // Parse response body
       let data: any;
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType?.includes('application/json')) {
         data = await response.json();
       } else {

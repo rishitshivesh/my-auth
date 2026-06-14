@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 import {
   LayoutDashboard,
   AppWindow,
@@ -38,7 +38,7 @@ export function DashboardSidebar() {
           <Lock className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+          <p className="text-sm font-semibold text-foreground">Scrolloop Sentry</p>
           <p className="text-xs text-muted-foreground">Admin Portal</p>
         </div>
       </div>

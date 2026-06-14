@@ -15,7 +15,7 @@ export default function CountryPage() {
   }
 
   return (
-    <OnboardingLayout step={1} totalSteps={2} tenantName="Fort Knox">
+    <OnboardingLayout step={1} totalSteps={2} tenantName="Scrolloop Sentry">
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Where are you located?</h1>

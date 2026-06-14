@@ -1,5 +1,5 @@
 /**
- * Fort Knox Database Entities
+ * Scrolloop Sentry Database Entities
  *
  * All TypeORM entities for the authentication system
  */
@@ -36,6 +36,14 @@ export * from "./src/entities/tenant-social-providers.entity";
 export * from "./src/entities/social-link-request.entity";
 export * from "./src/entities/tenant-branding.entity";
 export * from "./src/entities/key-pair.entity";
+
+// IAM Policy Engine
+export * from "./src/entities/policy.entity";
+export * from "./src/entities/group.entity";
+export * from "./src/entities/user-group.entity";
+export * from "./src/entities/group-policy.entity";
+export * from "./src/entities/user-policy.entity";
+export * from "./src/entities/role-policy.entity";
 
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";

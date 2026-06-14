@@ -1,6 +1,6 @@
 /**
- * Fort Knox SDK - State Manager
- * 
+ * Scrolloop Sentry SDK - State Manager
+ *
  * Manages the in-memory auth state
  * Never persisted, never exposed
  */
@@ -54,7 +54,7 @@ export function isTokenExpired(state: AuthState, margin: number = 30): boolean {
 
   const now = Date.now();
   const expiryWithMargin = state.accessTokenExp - (margin * 1000);
-  
+
   return now >= expiryWithMargin;
 }
 
@@ -77,7 +77,7 @@ export function flushPendingRequests(
 ): void {
   const requests = [...state.pendingRequests];
   state.pendingRequests = [];
-  
+
   requests.forEach(handler);
 }
 
@@ -90,7 +90,7 @@ export function rejectPendingRequests(
 ): void {
   const requests = [...state.pendingRequests];
   state.pendingRequests = [];
-  
+
   requests.forEach((req) => req.reject(error));
 }
 
@@ -105,7 +105,7 @@ function parseTokenExpiry(token: string): number | undefined {
 
     // Decode payload (base64url)
     const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')));
-    
+
     // exp is in seconds, convert to milliseconds
     return payload.exp ? payload.exp * 1000 : undefined;
   } catch (error) {

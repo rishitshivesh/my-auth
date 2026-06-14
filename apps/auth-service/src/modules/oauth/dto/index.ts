@@ -500,43 +500,43 @@ export class CreateClientResponseDto extends OAuthClientResponseDto {
 export class OpenIDConfigurationDto {
   @ApiProperty({
     description: "Issuer URL",
-    example: "https://auth.fortknox.io",
+    example: "https://sentry.scrolloop.com",
   })
   issuer!: string;
 
   @ApiProperty({
     description: "Authorization endpoint",
-    example: "https://auth.fortknox.io/oauth/authorize",
+    example: "https://sentry.scrolloop.com/oauth/authorize",
   })
   authorization_endpoint!: string;
 
   @ApiProperty({
     description: "Token endpoint",
-    example: "https://auth.fortknox.io/oauth/token",
+    example: "https://sentry.scrolloop.com/oauth/token",
   })
   token_endpoint!: string;
 
   @ApiProperty({
     description: "UserInfo endpoint",
-    example: "https://auth.fortknox.io/oauth/userinfo",
+    example: "https://sentry.scrolloop.com/oauth/userinfo",
   })
   userinfo_endpoint!: string;
 
   @ApiProperty({
     description: "JWKS URI",
-    example: "https://auth.fortknox.io/oauth/jwks",
+    example: "https://sentry.scrolloop.com/oauth/jwks",
   })
   jwks_uri!: string;
 
   @ApiPropertyOptional({
     description: "Revocation endpoint",
-    example: "https://auth.fortknox.io/oauth/revoke",
+    example: "https://sentry.scrolloop.com/oauth/revoke",
   })
   revocation_endpoint?: string;
 
   @ApiPropertyOptional({
     description: "Introspection endpoint",
-    example: "https://auth.fortknox.io/oauth/introspect",
+    example: "https://sentry.scrolloop.com/oauth/introspect",
   })
   introspection_endpoint?: string;
 

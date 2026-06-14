@@ -4,7 +4,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button, Alert, AlertDescription } from "@repo/ui"
 import { Key, Loader2 } from "lucide-react"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 
 type LoginStatus =
   | 'idle'

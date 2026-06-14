@@ -27,7 +27,7 @@ export default function ApplicationsPage() {
             </div>
             <h2 className="text-lg font-semibold text-foreground">No applications yet</h2>
             <p className="text-sm text-muted-foreground">
-              Create your first application to integrate Fort Knox authentication into your product.
+              Create your first application to integrate Scrolloop Sentry authentication into your product.
             </p>
             <Button>
               <Plus className="h-4 w-4 mr-1" />

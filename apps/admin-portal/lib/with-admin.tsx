@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@fortknox/sdk'
+import { useAuth } from '@scrolloop/sdk'
 import { authClient } from '@/app/layout'
 
 interface AdminUser {
@@ -15,12 +15,12 @@ function isSuperAdmin(user: AdminUser | null): boolean {
   if (!user) return false
   const claims = authClient.getTokenClaims()
   if (!claims) return false
-  const fortknoxTenantId = process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID
-  const tenantOk = fortknoxTenantId
-    ? claims.tenantId === fortknoxTenantId
-    : claims.tenantSlug === 'fortknox'
+  const sentryTenantId = process.env.NEXT_PUBLIC_SENTRY_TENANT_ID
+  const tenantOk = sentryTenantId
+    ? claims.tenantId === sentryTenantId
+    : claims.tenantSlug === 'sentry'
   const groupOk = Array.isArray(claims.groups) &&
-    claims.groups.includes('fortknox-internal')
+    claims.groups.includes('sentry-internal')
   return tenantOk && groupOk
 }
 

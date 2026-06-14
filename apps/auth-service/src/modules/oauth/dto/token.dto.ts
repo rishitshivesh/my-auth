@@ -139,7 +139,7 @@ export class TokenErrorResponseDto {
 
   @ApiPropertyOptional({
     description: "URI with error information",
-    example: "https://docs.fortknox.io/errors/invalid_grant",
+    example: "https://docs.scrolloop.com/errors/invalid_grant",
   })
   error_uri?: string;
 }

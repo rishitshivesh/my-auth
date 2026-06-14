@@ -10,7 +10,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     this.keyPrefix =
-      this.configService.get("REDIS_KEY_PREFIX", "fortknox") + ":";
+      this.configService.get("REDIS_KEY_PREFIX", "sentry") + ":";
   }
 
   async onModuleInit() {
@@ -45,7 +45,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Build tenant-scoped key
-   * Format: fortknox:t:{tenantId}:{resource}:{identifier}
+   * Format: sentry:t:{tenantId}:{resource}:{identifier}
    */
   private buildKey(
     tenantId: string,
@@ -62,7 +62,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     tenantId: string,
     resource: string,
     identifier: string,
-    value: any,
+    value: unknown,
     ttl?: number,
   ): Promise<void> {
     const key = this.buildKey(tenantId, resource, identifier);
@@ -91,7 +91,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       return JSON.parse(value) as T;
     } catch {
-      return value as any;
+      return value as unknown as T;
     }
   }
 

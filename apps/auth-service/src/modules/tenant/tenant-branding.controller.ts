@@ -31,6 +31,15 @@ import {
 import { SecurityEventService } from '@/common/service/security-event.service';
 import { SecurityEventType } from '@repo/database';
 
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+  headers?: Record<string, string>;
+}
+
 const LOGO_MAX_BYTES = 500 * 1024; // 500 KB
 const ALLOWED_MIME = new Set(['image/png', 'image/svg+xml', 'image/jpeg']);
 
@@ -44,7 +53,7 @@ export class TenantBrandingController {
 
   /** GET /tenants/current/branding */
   @Get()
-  async getBranding(@Req() req: any): Promise<BrandingResponse> {
+  async getBranding(@Req() req: AuthenticatedRequest): Promise<BrandingResponse> {
     const tenantId: string = req.tenantId!;
     return this.brandingService.getBranding(tenantId);
   }
@@ -52,7 +61,7 @@ export class TenantBrandingController {
   /** PUT /tenants/current/branding */
   @Put()
   async updateBranding(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() dto: TenantBrandingDto,
   ): Promise<BrandingResponse> {
     const tenantId: string = req.tenantId!;
@@ -101,7 +110,7 @@ export class TenantBrandingController {
     }),
   )
   async uploadLogo(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<LogoUploadResponse> {
     if (!file) {

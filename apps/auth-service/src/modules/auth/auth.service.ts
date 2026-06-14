@@ -75,10 +75,10 @@ export class AuthService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload as Record<string, unknown>, {
-      privateKey: privateKey as any,
+      privateKey: privateKey as crypto.KeyObject,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as any,
+      expiresIn,
     });
   }
 
@@ -102,7 +102,7 @@ export class AuthService {
     tenantId: string,
     sessionId: string,
     tenant?: Tenant,
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     const [groups, resolvedTenant] = await Promise.all([
       this.getUserGroups(userId, tenantId),
       tenant
@@ -230,7 +230,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; user: any }
+    | { accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | {
         mfaRequired: boolean;
         tempToken: string;
@@ -777,7 +777,7 @@ export class AuthService {
     userAgent: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     // Use OAuthRefreshTokenService for rotation
-    let accessTokenPayload: any;
+    let accessTokenPayload: Record<string, unknown>;
     let newToken: string;
 
     try {
@@ -804,23 +804,23 @@ export class AuthService {
 
     // Enrich payload with groups and tenantSlug
     const enrichedPayload = await this.buildAccessTokenPayload(
-      accessTokenPayload.sub,
-      accessTokenPayload.email,
-      accessTokenPayload.tenantId,
-      accessTokenPayload.sessionId,
+      accessTokenPayload.sub as string,
+      accessTokenPayload.email as string,
+      accessTokenPayload.tenantId as string,
+      accessTokenPayload.sessionId as string,
     );
     // Generate new access token
     const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
 
     // Update session: new refresh token hash + expiry + lastUsedAt
-    if (accessTokenPayload.sessionId) {
+    if (accessTokenPayload.sessionId as string) {
       const newRefreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       const newRefreshTokenHash = crypto
         .createHash("sha256")
         .update(newToken)
         .digest("hex");
       await this.sessionRepository.update(
-        { id: accessTokenPayload.sessionId, tenantId },
+        { id: accessTokenPayload.sessionId as string, tenantId },
         {
           refreshTokenHash: newRefreshTokenHash,
           refreshExpiresAt: newRefreshExpiresAt,
@@ -833,15 +833,15 @@ export class AuthService {
     // Log token refresh
     this.securityEventService.log({
       tenantId,
-      userId: accessTokenPayload.sub,
+      userId: accessTokenPayload.sub as string,
       eventType: SecurityEventType.TOKEN_REFRESHED,
       severity: "info",
       ipAddress: ip,
       userAgent,
-      resourceId: accessTokenPayload.sessionId,
+      resourceId: accessTokenPayload.sessionId as string,
       resourceType: "session",
       metadata: {
-        sessionId: accessTokenPayload.sessionId,
+        sessionId: accessTokenPayload.sessionId as string,
       },
     });
 
@@ -928,7 +928,7 @@ export class AuthService {
     const newAttempts = user.failedLoginAttempts + 1;
 
     // Lock account after 5 failed attempts
-    const update: any = {
+    const update: Partial<Pick<User, 'failedLoginAttempts' | 'lockedUntil'>> = {
       failedLoginAttempts: newAttempts,
     };
 
@@ -974,9 +974,9 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as any,
+      publicKey: publicKey as crypto.KeyObject,
       algorithms: ['RS256'],
-    });
+    }) as Record<string, unknown>;
 
     if (payload.type !== "mfa_pending") {
       throw new UnauthorizedException("Invalid token type");
@@ -986,7 +986,7 @@ export class AuthService {
 
     // Step 2: Verify TOTP code
     const verified = await this.mfaService.verifyTotp(
-      payload.sub,
+      payload.sub as string,
       tenantId,
       code,
     );
@@ -1004,16 +1004,16 @@ export class AuthService {
       .digest("hex");
 
     const session = await this.sessionService.createSession({
-      userId: payload.sub,
+      userId: payload.sub as string,
       tenantId,
-      email: payload.email,
+      email: payload.email as string,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
     });
 
-    const mfaPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
+    const mfaPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
     const accessToken = await this.signToken(mfaPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "MFA verified successfully");
@@ -1038,9 +1038,9 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as any,
+      publicKey: publicKey as crypto.KeyObject,
       algorithms: ['RS256'],
-    });
+    }) as Record<string, unknown>;
 
     if (payload.type !== "mfa_pending") {
       throw new UnauthorizedException("Invalid token type");
@@ -1050,7 +1050,7 @@ export class AuthService {
 
     // Step 2: Verify backup code
     const verified = await this.mfaService.verifyBackupCode(
-      payload.sub,
+      payload.sub as string,
       tenantId,
       code,
     );
@@ -1068,22 +1068,22 @@ export class AuthService {
       .digest("hex");
 
     const session = await this.sessionService.createSession({
-      userId: payload.sub,
+      userId: payload.sub as string,
       tenantId,
-      email: payload.email,
+      email: payload.email as string,
       refreshTokenFamilyId: familyId,
       refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
     });
 
-    const backupPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
+    const backupPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
     const accessToken = await this.signToken(backupPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "Backup code verified");
 
     // Check remaining backup codes
-    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub, tenantId);
+    const mfaStatus = await this.mfaService.getMfaStatus(payload.sub as string, tenantId);
     const remaining = mfaStatus.backupCodesRemaining as number;
 
     return {
@@ -1110,7 +1110,7 @@ export class AuthService {
   async startWebAuthnLogin(
     tenantId: string,
     email: string,
-  ): Promise<{ sessionNonce: string; [key: string]: any }> {
+  ): Promise<{ sessionNonce: string; [key: string]: unknown }> {
     // Find user
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
@@ -1142,12 +1142,12 @@ export class AuthService {
   async finishWebAuthnLogin(data: {
     tenantId: string;
     email: string;
-    webauthnResponse: any;
+    webauthnResponse: unknown;
     sessionNonce: string;
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+  }): Promise<{ accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
@@ -1358,7 +1358,7 @@ export class AuthService {
     };
 
     const preferredMethod =
-      (user.preferredAuthMethod as any) ||
+      (user.preferredAuthMethod as string) ||
       this.determineDefaultMethod(methods);
 
     return {

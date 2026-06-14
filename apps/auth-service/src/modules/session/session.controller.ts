@@ -12,6 +12,14 @@ import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { SessionManagementService } from "./session-management.service";
 
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+}
+
 @ApiTags("Sessions")
 @Controller("sessions")
 export class SessionController {
@@ -32,7 +40,7 @@ export class SessionController {
     status: 200,
     description: "List of active sessions",
   })
-  async getActiveSessions(@Req() req: any) {
+  async getActiveSessions(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
     const currentSessionId = req.user.sessionId;
@@ -50,7 +58,7 @@ export class SessionController {
   @Get("analytics")
   @Protected()
   @ApiOperation({ summary: "Get session analytics" })
-  async getSessionAnalytics(@Req() req: any) {
+  async getSessionAnalytics(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
 
@@ -67,7 +75,7 @@ export class SessionController {
     summary: "Revoke a session",
     description: "Logout from a specific device/session",
   })
-  async revokeSession(@Param("sessionId") sessionId: string, @Req() req: any) {
+  async revokeSession(@Param("sessionId") sessionId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
 
@@ -91,7 +99,7 @@ export class SessionController {
     summary: "Logout all other devices",
     description: "Revoke all sessions except the current one",
   })
-  async revokeAllOtherSessions(@Req() req: any) {
+  async revokeAllOtherSessions(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
     const currentSessionId = req.user.sessionId;
@@ -119,7 +127,7 @@ export class SessionController {
     summary: "Logout all devices",
     description: "Revoke all sessions including the current one",
   })
-  async revokeAllSessions(@Req() req: any) {
+  async revokeAllSessions(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
 

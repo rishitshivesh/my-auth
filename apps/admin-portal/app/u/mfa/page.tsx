@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@repo/ui"
 import { UniversalAuthLayout } from "@/components/layouts/universal-auth-layout"
-import { useAuth } from "@fortknox/sdk"
+import { useAuth } from "@scrolloop/sdk"
 import { ShieldCheck, AlertCircle } from "lucide-react"
 
 export default function MFAPage() {
@@ -43,7 +43,7 @@ export default function MFAPage() {
 
   const handleSubmit = useCallback(async () => {
     if (code.length !== 6 || loading) return
-    const tempToken = sessionStorage.getItem("_fk_mfa_temp_token")
+    const tempToken = sessionStorage.getItem("_sentry_mfa_temp_token")
     if (!tempToken) {
       setError("Session expired. Please sign in again.")
       return
@@ -52,7 +52,7 @@ export default function MFAPage() {
     setError(null)
     try {
       await verifyMfaLogin(tempToken, code)
-      sessionStorage.removeItem("_fk_mfa_temp_token")
+      sessionStorage.removeItem("_sentry_mfa_temp_token")
       router.push("/dashboard")
     } catch (err: any) {
       setError(err?.message || "Invalid code. Please try again.")
