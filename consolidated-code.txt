@@ -1,5 +1,5 @@
 CODE CONSOLIDATION REPORT
-Generated: 2026-03-19T11:11:54.752Z
+Generated: 2026-03-21T22:17:40.755Z
 Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth
 ================================================================================
 
@@ -503,6 +503,169 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 
 ================================================================================
+FILE: apps/admin-portal/app/audit-logs/layout.tsx
+SIZE: 439 B | LINES: 17
+================================================================================
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifyAdminSession, isSuperAdmin } from "@/lib/auth-guard";
+
+export default async function AuditLogsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await verifyAdminSession();
+
+  if (!user) redirect("/u/login");
+  if (!isSuperAdmin(user)) redirect(`/t/${user.tenantSlug ?? ""}/dashboard`);
+
+  return <>{children}</>;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/audit-logs/page.tsx
+SIZE: 6.17 KB | LINES: 132
+================================================================================
+
+'use client'
+
+import Link from 'next/link'
+import { usePlatformActivity } from '@/lib/admin-queries'
+import { formatRelativeTime, formatEventDescription, getEventColor } from '@/lib/utils'
+
+export default function AuditLogsPage() {
+  const { data: events, isLoading } = usePlatformActivity(100)
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+            <p className="text-xs text-muted-foreground">Superadmin</p>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {[
+            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+            { label: 'Tenants', href: '/tenants', icon: '🏢' },
+            { label: 'Users', href: '/users', icon: '👥' },
+            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+            { label: 'Settings', href: '/settings', icon: '⚙' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                item.href === '/audit-logs'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Audit Logs</h1>
+            <p className="text-xs text-muted-foreground">Security events across all tenants</p>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-muted/30">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Event</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actor</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">IP</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Severity</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading
+                  ? Array.from({ length: 8 }).map((_, i) => (
+                      <tr key={i} className="border-b border-border">
+                        {Array.from({ length: 5 }).map((_, j) => (
+                          <td key={j} className="px-4 py-3">
+                            <div className="h-4 rounded bg-muted animate-pulse" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : events?.map((event) => (
+                      <tr key={event.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`h-2 w-2 shrink-0 rounded-full ${
+                                getEventColor(event.eventType).includes('destructive')
+                                  ? 'bg-destructive'
+                                  : getEventColor(event.eventType).includes('amber')
+                                  ? 'bg-amber-500'
+                                  : 'bg-primary'
+                              }`}
+                            />
+                            <span className="font-medium text-foreground">
+                              {formatEventDescription(event.eventType)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {event.actorEmail ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
+                          {event.ipAddress ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              event.severity === 'critical'
+                                ? 'bg-destructive/10 text-destructive'
+                                : event.severity === 'high'
+                                ? 'bg-amber-500/10 text-amber-700'
+                                : event.severity === 'medium'
+                                ? 'bg-blue-500/10 text-blue-700'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            {event.severity}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">
+                          {formatRelativeTime(event.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+            {!isLoading && (!events || events.length === 0) && (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No audit events recorded yet.
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+
+
+================================================================================
 FILE: apps/admin-portal/app/auth/callback/page.tsx
 SIZE: 4.15 KB | LINES: 124
 ================================================================================
@@ -684,62 +847,37 @@ export default function ApplicationsPage() {
 
 ================================================================================
 FILE: apps/admin-portal/app/dashboard/layout.tsx
-SIZE: 1.66 KB | LINES: 55
+SIZE: 731 B | LINES: 30
 ================================================================================
 
-"use client"
+/**
+ * Superadmin Dashboard Layout — Server Component
+ *
+ * Enforces that only Fort Knox internal (fortknox-internal group) users
+ * can access /dashboard and its sub-routes.
+ */
+import cookies from "js-cookie";
+import { redirect } from "next/navigation";
+import { verifyAdminSession, isSuperAdmin } from "@/lib/auth-guard";
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@fortknox/sdk"
-import { Skeleton } from "@repo/ui"
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await verifyAdminSession();
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { user, isLoading } = useAuth()
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/u/login")
-    }
-  }, [user, isLoading, router])
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen bg-background">
-        <div className="w-64 border-r border-border bg-card p-4 space-y-4">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-5 w-40" />
-          <div className="space-y-1 pt-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col">
-          <div className="border-b border-border px-8 py-4 bg-card">
-            <Skeleton className="h-6 w-40" />
-          </div>
-          <div className="p-8 space-y-6">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <div className="grid grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-xl" />
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <Skeleton className="h-72 rounded-xl" />
-              <Skeleton className="h-72 rounded-xl" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  if (!user) {
+    redirect("/u/login");
   }
 
-  if (!user) return null
+  if (!isSuperAdmin(user)) {
+    // Authenticated but not a superadmin — send to their tenant portal
+    const slug = user.tenantSlug ?? "";
+    redirect(`/t/${slug}/dashboard`);
+  }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 
@@ -788,182 +926,219 @@ export default function DashboardLoading() {
 
 ================================================================================
 FILE: apps/admin-portal/app/dashboard/page.tsx
-SIZE: 8.11 KB | LINES: 179
+SIZE: 8.73 KB | LINES: 216
 ================================================================================
 
-"use client"
+'use client'
 
-import { useAuth } from "@fortknox/sdk"
-import { Skeleton } from "@repo/ui"
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
-import { useDashboard } from "@/lib/queries"
-import { ShieldAlert, ShieldCheck } from "lucide-react"
-import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
+import { usePlatformMetrics, usePlatformActivity } from '@/lib/admin-queries'
+import { formatRelativeTime, formatEventDescription, getEventColor } from '@/lib/utils'
+import Link from 'next/link'
+import { useAuth } from '@fortknox/sdk'
 
-export default function DashboardPage() {
+function MetricSkeleton() {
+  return <div className="h-9 w-24 rounded-md bg-muted animate-pulse" />
+}
+
+export default function SuperAdminDashboard() {
   const { user } = useAuth()
-  const { data, isLoading, isError } = useDashboard()
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = usePlatformMetrics()
+  const { data: activity, isLoading: activityLoading } = usePlatformActivity(20)
+
+  const statCards = [
+    {
+      label: 'Total Tenants',
+      value: metrics?.totalTenants,
+      sub: 'organisations on the platform',
+      color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      href: '/tenants',
+    },
+    {
+      label: 'Total Users',
+      value: metrics?.totalUsers,
+      sub: 'across all tenants',
+      color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      href: '/users',
+    },
+    {
+      label: 'Active Sessions',
+      value: metrics?.activeSessions,
+      sub: 'live right now',
+      color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+      href: null,
+    },
+    {
+      label: 'API Calls Today',
+      value: metrics?.apiCallsToday,
+      sub: 'requests processed today',
+      color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      href: null,
+    },
+  ]
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <DashboardSidebar />
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center border-b border-border bg-card px-8 py-4">
+      {/* Sidebar */}
+      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
+            FK
+          </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">
-              {user?.firstName ? `Welcome back, ${user.firstName}` : "Dashboard"}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              {data?.stats?.lastLoginAt
-                ? `Last login ${formatDistanceToNow(new Date(data.stats.lastLoginAt), { addSuffix: true })}`
-                : "Fort Knox Admin Portal"}
-            </p>
+            <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+            <p className="text-xs text-muted-foreground">Superadmin</p>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {[
+            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+            { label: 'Tenants', href: '/tenants', icon: '🏢' },
+            { label: 'Users', href: '/users', icon: '👥' },
+            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+            { label: 'Settings', href: '/settings', icon: '⚙' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                item.href === '/dashboard'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="border-t border-border px-3 py-3">
+          <p className="truncate text-xs text-muted-foreground px-3">{user?.email}</p>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Platform Overview</h1>
+            <p className="text-xs text-muted-foreground">Fort Knox operator dashboard</p>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 space-y-6">
-          {isError ? (
+          {metricsError ? (
             <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
-              Failed to load dashboard data. Please refresh the page.
+              Failed to load platform metrics. Please refresh.
             </div>
-          ) : isLoading ? (
-            <div className="space-y-6">
-              <Skeleton className="h-16 w-full rounded-xl" />
-              <div className="grid grid-cols-3 gap-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-28 rounded-xl" />
-                ))}
+          ) : null}
+
+          {/* Stat cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {statCards.map((card) => (
+              <div key={card.label} className="rounded-xl border border-border bg-card p-5">
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+                <div className="mt-2">
+                  {metricsLoading ? (
+                    <MetricSkeleton />
+                  ) : (
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-2xl font-bold ${card.color}`}
+                    >
+                      {card.value?.toLocaleString() ?? '—'}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p>
+                {card.href && (
+                  <Link
+                    href={card.href}
+                    className="mt-2 inline-block text-xs text-primary hover:underline"
+                  >
+                    View all →
+                  </Link>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-6">
-                <Skeleton className="h-64 rounded-xl" />
-                <Skeleton className="h-64 rounded-xl" />
+            ))}
+          </div>
+
+          {/* Activity feed + quick actions */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Recent activity */}
+            <div className="rounded-xl border border-border bg-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground">Recent Platform Activity</h2>
+                <Link href="/audit-logs" className="text-xs text-primary hover:underline">
+                  View all
+                </Link>
               </div>
-            </div>
-          ) : (
-            <>
-              {/* MFA Banner */}
-              {data?.mfa?.enabled ? (
-                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-5 py-4">
-                  <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
-                    Your account is protected with multi-factor authentication.
-                  </p>
+
+              {activityLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="h-6 w-6 rounded-full bg-muted animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <div className="h-3 w-3/4 rounded bg-muted animate-pulse" />
+                        <div className="h-2.5 w-1/2 rounded bg-muted animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : activity && activity.length > 0 ? (
+                <div className="space-y-3">
+                  {activity.slice(0, 10).map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+                    >
+                      <span
+                        className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                          getEventColor(event.eventType).includes('destructive')
+                            ? 'bg-destructive'
+                            : getEventColor(event.eventType).includes('amber')
+                            ? 'bg-amber-500'
+                            : 'bg-primary'
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">
+                          {formatEventDescription(event.eventType)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {event.actorEmail && `${event.actorEmail} · `}
+                          {formatRelativeTime(event.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-5 py-4">
-                  <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                      Multi-factor authentication is not enabled
-                    </p>
-                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                      MFA is required to secure your account.
-                    </p>
-                  </div>
-                  <Link
-                    href="/dashboard/security"
-                    className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
-                  >
-                    Enable MFA
-                  </Link>
-                </div>
+                <p className="text-sm text-muted-foreground">No recent activity.</p>
               )}
+            </div>
 
-              {/* Stats cards */}
-              <div className="grid gap-4 sm:grid-cols-3">
+            {/* Quick actions */}
+            <div className="rounded-xl border border-border bg-card p-6">
+              <h2 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h2>
+              <div className="space-y-2">
                 {[
-                  {
-                    label: "Active Sessions",
-                    value: String(data?.stats?.activeSessions ?? 0),
-                    sub: "across all devices",
-                    color: "bg-blue-500/10 text-blue-600",
-                  },
-                  {
-                    label: "MFA Status",
-                    value: data?.mfa?.enabled ? "Enabled" : "Disabled",
-                    sub: data?.mfa?.enabled ? "Account is secured" : "Action required",
-                    color: data?.mfa?.enabled
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-red-500/10 text-red-600",
-                  },
-                  {
-                    label: "Auth Method",
-                    value: data?.user?.primaryAuthMethod ?? "password",
-                    sub: "Primary sign-in method",
-                    color: "bg-purple-500/10 text-purple-600",
-                  },
-                ].map((card) => (
-                  <div key={card.label} className="rounded-xl border border-border bg-card p-5">
-                    <p className="text-sm text-muted-foreground">{card.label}</p>
-                    <p className={`mt-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-semibold ${card.color}`}>
-                      {card.value}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{card.sub}</p>
-                  </div>
+                  { label: 'Create New Tenant', href: '/tenants/new' },
+                  { label: 'View All Tenants', href: '/tenants' },
+                  { label: 'View Audit Logs', href: '/audit-logs' },
+                  { label: 'Platform Settings', href: '/settings' },
+                ].map((action) => (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                  >
+                    {action.label}
+                    <span className="text-muted-foreground text-xs">→</span>
+                  </Link>
                 ))}
               </div>
-
-              {/* Details + Quick Actions */}
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="text-sm font-semibold text-foreground mb-4">Account Details</h2>
-                  <div className="space-y-3">
-                    {[
-                      { label: "Email", value: data?.user?.email },
-                      {
-                        label: "Name",
-                        value:
-                          [data?.user?.firstName, data?.user?.lastName].filter(Boolean).join(" ") ||
-                          "—",
-                      },
-                      { label: "Email Verified", value: data?.user?.emailVerified ? "Yes" : "No" },
-                      {
-                        label: "Member Since",
-                        value: data?.user?.createdAt
-                          ? new Date(data.user.createdAt).toLocaleDateString()
-                          : "—",
-                      },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{row.label}</span>
-                        <span className="font-medium text-foreground">{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h2>
-                  <div className="space-y-2">
-                    {[
-                      {
-                        label: "Set up MFA",
-                        href: "/dashboard/security",
-                        highlight: !data?.mfa?.enabled,
-                      },
-                      { label: "Create an Application", href: "/dashboard/applications" },
-                      { label: "Edit Profile", href: "/dashboard/profile" },
-                    ].map((action) => (
-                      <Link
-                        key={action.label}
-                        href={action.href}
-                        className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-colors ${
-                          action.highlight
-                            ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            : "border-border text-foreground hover:bg-accent"
-                        }`}
-                      >
-                        {action.label}
-                        <span className="text-muted-foreground text-xs">→</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </main>
       </div>
     </div>
@@ -1905,7 +2080,7 @@ SIZE: 32 B | LINES: 2
 
 ================================================================================
 FILE: apps/admin-portal/app/layout.tsx
-SIZE: 1.9 KB | LINES: 67
+SIZE: 1.92 KB | LINES: 70
 ================================================================================
 
 // @ts-ignore
@@ -1923,9 +2098,12 @@ import { createWebClient } from "@fortknox/sdk";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const authClient = createWebClient({
-  baseURL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000", // Your auth service
-  tenant: "220bea14-69ca-420f-a8a2-d017e600ea4b", // Your tenant ID
-  debug: true, // Enable logging (dev only)
+  baseURL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000",
+  tenant:
+    process.env.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
+    process.env.FORTKNOX_TENANT_ID ||
+    "",
+  debug: process.env.NODE_ENV === "development",
 });
 
 const queryClient = new QueryClient({
@@ -2323,6 +2501,395 @@ export default function HomePage() {
         </div>
       </div>
     </PublicLayout>
+  )
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/settings/layout.tsx
+SIZE: 438 B | LINES: 17
+================================================================================
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifyAdminSession, isSuperAdmin } from "@/lib/auth-guard";
+
+export default async function SettingsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await verifyAdminSession();
+
+  if (!user) redirect("/u/login");
+  if (!isSuperAdmin(user)) redirect(`/t/${user.tenantSlug ?? ""}/dashboard`);
+
+  return <>{children}</>;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/settings/page.tsx
+SIZE: 13.34 KB | LINES: 358
+================================================================================
+
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import {
+  usePlatformSettings,
+  useUpdatePlatformSettings,
+  useAdminTeam,
+  useAddTeamMember,
+  useRemoveTeamMember,
+  type TeamMember,
+} from '@/lib/admin-queries'
+import { formatRelativeTime } from '@/lib/utils'
+
+const TABS = ['general', 'team'] as const
+type Tab = (typeof TABS)[number]
+
+function AdminSidebar() {
+  return (
+    <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+          <p className="text-xs text-muted-foreground">Superadmin</p>
+        </div>
+      </div>
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {[
+          { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+          { label: 'Tenants', href: '/tenants', icon: '🏢' },
+          { label: 'Users', href: '/users', icon: '👥' },
+          { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+          { label: 'Settings', href: '/settings', icon: '⚙' },
+        ].map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              item.href === '/settings'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            <span className="text-base">{item.icon}</span>
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  )
+}
+
+function GeneralSettings() {
+  const { data: settings, isLoading } = usePlatformSettings()
+  const { mutate: updateSettings, isPending } = useUpdatePlatformSettings()
+
+  const [platformName, setPlatformName] = useState('')
+  const [supportEmail, setSupportEmail] = useState('')
+  const [allowPublicSignup, setAllowPublicSignup] = useState(false)
+  const [maintenanceMode, setMaintenanceMode] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [initialized, setInitialized] = useState(false)
+
+  // Initialize form from fetched data once
+  if (settings && !initialized) {
+    setPlatformName(settings.platformName)
+    setSupportEmail(settings.supportEmail ?? '')
+    setAllowPublicSignup(settings.allowPublicSignup)
+    setMaintenanceMode(settings.maintenanceMode)
+    setInitialized(true)
+  }
+
+  function handleSave() {
+    updateSettings(
+      { platformName, supportEmail: supportEmail || undefined, allowPublicSignup, maintenanceMode },
+      {
+        onSuccess: () => {
+          setSaved(true)
+          setTimeout(() => setSaved(false), 2500)
+        },
+      }
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <h2 className="text-sm font-semibold text-foreground">Platform</h2>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Platform Name</label>
+          <input
+            type="text"
+            value={platformName}
+            onChange={(e) => setPlatformName(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1.5">Support Email</label>
+          <input
+            type="email"
+            value={supportEmail}
+            onChange={(e) => setSupportEmail(e.target.value)}
+            placeholder="support@fortknox.com"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Allow Public Signup</p>
+            <p className="text-xs text-muted-foreground">New tenants can self-register on the platform</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={allowPublicSignup}
+            onClick={() => setAllowPublicSignup((v) => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+              allowPublicSignup ? 'bg-primary' : 'bg-muted-foreground/30'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                allowPublicSignup ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Maintenance Mode</p>
+            <p className="text-xs text-muted-foreground">Block all auth requests across all tenants</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={maintenanceMode}
+            onClick={() => setMaintenanceMode((v) => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+              maintenanceMode ? 'bg-destructive' : 'bg-muted-foreground/30'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                maintenanceMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          {saved && (
+            <span className="text-xs text-emerald-600 font-medium">Settings saved</span>
+          )}
+          <div className="ml-auto">
+            <button
+              onClick={handleSave}
+              disabled={isPending}
+              className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+            >
+              {isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SMTP Status */}
+      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">SMTP Configuration</h2>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+              settings?.smtpConfigured
+                ? 'bg-emerald-500/10 text-emerald-700'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                settings?.smtpConfigured ? 'bg-emerald-500' : 'bg-muted-foreground'
+              }`}
+            />
+            {settings?.smtpConfigured ? 'Configured' : 'Not configured'}
+          </span>
+          {settings?.smtpHost && (
+            <span className="text-xs text-muted-foreground">{settings.smtpHost}</span>
+          )}
+        </div>
+        {!settings?.smtpConfigured && (
+          <p className="text-xs text-muted-foreground">
+            Set <code className="text-foreground">SMTP_HOST</code> in your environment to enable transactional email.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TeamSettings() {
+  const { data: members, isLoading } = useAdminTeam()
+  const { mutate: addMember, isPending: isAdding } = useAddTeamMember()
+  const { mutate: removeMember } = useRemoveTeamMember()
+
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  function handleAdd() {
+    if (!email.trim()) return
+    setError(null)
+    addMember(
+      { email: email.trim() },
+      {
+        onSuccess: () => setEmail(''),
+        onError: (e) => setError(e.message),
+      }
+    )
+  }
+
+  function handleRemove(member: TeamMember) {
+    setRemovingId(member.id)
+    removeMember(member.id, {
+      onSettled: () => setRemovingId(null),
+      onError: (e) => alert(e.message),
+    })
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Superadmin Team</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Members with the <code className="text-foreground">fortknox-internal</code> role can access this admin portal.
+          </p>
+        </div>
+
+        {/* Add member */}
+        <div className="flex gap-2">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder="colleague@fortknox.com"
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!email.trim() || isAdding}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {isAdding ? 'Adding…' : 'Add Member'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {/* Member list */}
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : members && members.length > 0 ? (
+          <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+            {members.map((member) => (
+              <div key={member.id} className="flex items-center justify-between px-4 py-3 bg-card">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+                    {member.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {[member.firstName, member.lastName].filter(Boolean).join(' ') || member.email}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {member.email}
+                      {member.addedAt && ` · Added ${formatRelativeTime(member.addedAt)}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRemove(member)}
+                  disabled={removingId === member.id}
+                  className="text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                >
+                  {removingId === member.id ? 'Removing…' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No team members yet. Add your first superadmin above.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function SettingsPage() {
+  const [tab, setTab] = useState<Tab>('general')
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      <AdminSidebar />
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="border-b border-border bg-card px-8 py-4">
+          <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+          <p className="text-xs text-muted-foreground">Platform configuration and team management</p>
+
+          <div className="flex gap-0.5 mt-4 -mb-4">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                  tab === t
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t === 'general' ? 'General' : 'Team'}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          {tab === 'general' && <GeneralSettings />}
+          {tab === 'team' && <TeamSettings />}
+        </main>
+      </div>
+    </div>
   )
 }
 
@@ -3441,6 +4008,820 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
 
 
 ================================================================================
+FILE: apps/admin-portal/app/tenants/[tenantId]/page.tsx
+SIZE: 13.17 KB | LINES: 295
+================================================================================
+
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useAdminTenant, useUpdateTenant, useDeleteTenant } from '@/lib/admin-queries'
+import { formatRelativeTime, formatEventDescription } from '@/lib/utils'
+
+function tenantColor(slug: string): string {
+  const colors = [
+    'bg-blue-500/10 text-blue-600',
+    'bg-amber-500/10 text-amber-600',
+    'bg-emerald-500/10 text-emerald-600',
+    'bg-purple-500/10 text-purple-600',
+    'bg-rose-500/10 text-rose-600',
+  ]
+  return colors[(slug.charCodeAt(0) ?? 0) % colors.length] ?? colors[0]!
+}
+
+const TABS = ['overview', 'users', 'api-keys', 'audit-logs', 'danger-zone'] as const
+type Tab = (typeof TABS)[number]
+
+export default function TenantDetailPage() {
+  const { tenantId } = useParams<{ tenantId: string }>()
+  const router = useRouter()
+
+  const { data: tenant, isLoading, isError } = useAdminTenant(tenantId)
+  const { mutate: updateTenant, isPending: isUpdating } = useUpdateTenant(tenantId)
+  const { mutate: deleteTenant, isPending: isDeleting } = useDeleteTenant()
+
+  const [tab, setTab] = useState<Tab>('overview')
+  const [confirmText, setConfirmText] = useState('')
+  const [suspendPhase, setSuspendPhase] = useState<'idle' | 'confirm'>('idle')
+  const [suspendTimer, setSuspendTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync tab with URL hash
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '') as Tab
+    if (TABS.includes(hash)) setTab(hash)
+  }, [])
+
+  function selectTab(t: Tab) {
+    setTab(t)
+    window.history.replaceState(null, '', `#${t}`)
+  }
+
+  function handleSuspendClick() {
+    if (suspendPhase === 'idle') {
+      setSuspendPhase('confirm')
+      const t = setTimeout(() => setSuspendPhase('idle'), 3000)
+      setSuspendTimer(t)
+    } else {
+      if (suspendTimer) clearTimeout(suspendTimer)
+      setSuspendPhase('idle')
+      updateTenant(
+        { status: tenant?.status === 'active' ? 'suspended' : 'active' },
+        { onError: (e) => alert(e.message) }
+      )
+    }
+  }
+
+  function handleDelete() {
+    if (confirmText !== tenant?.slug) return
+    deleteTenant(tenantId, {
+      onSuccess: () => router.push('/tenants'),
+      onError: (e) => alert(e.message),
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (isError || !tenant) {
+    return (
+      <div className="flex h-screen bg-background items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Failed to load tenant</p>
+          <Link href="/tenants" className="text-sm text-primary hover:underline">← Back to tenants</Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+          <div><p className="text-sm font-semibold text-foreground">Fort Knox</p><p className="text-xs text-muted-foreground">Superadmin</p></div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {[
+            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+            { label: 'Tenants', href: '/tenants', icon: '🏢' },
+            { label: 'Users', href: '/users', icon: '👥' },
+            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+            { label: 'Settings', href: '/settings', icon: '⚙' },
+          ].map((item) => (
+            <Link key={item.href} href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${item.href === '/tenants' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+              <span className="text-base">{item.icon}</span>{item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <header className="border-b border-border bg-card px-8 py-4">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
+            <Link href="/tenants" className="hover:text-foreground">Tenants</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">{tenant.name}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold ${tenantColor(tenant.slug)}`}>
+              {tenant.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">{tenant.name}</h1>
+              <p className="text-sm text-muted-foreground">{tenant.slug} · {tenant.plan} · {tenant.environment}</p>
+            </div>
+            <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tenant.status === 'active' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
+              {tenant.status}
+            </span>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-0.5 mt-4 -mb-4 overflow-x-auto">
+            {TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => selectTab(t)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap ${
+                  tab === t
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t.replace(/-/g, ' ')}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          {/* OVERVIEW */}
+          {tab === 'overview' && (
+            <div className="space-y-6 max-w-4xl">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  { label: 'Total Users', value: tenant.userCount.toLocaleString() },
+                  { label: 'Active Sessions', value: tenant.activeSessions.toLocaleString() },
+                ].map((card) => (
+                  <div key={card.label} className="rounded-xl border border-border bg-card p-5">
+                    <p className="text-sm text-muted-foreground">{card.label}</p>
+                    <p className="mt-2 text-2xl font-bold text-foreground">{card.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Recent sign-ins */}
+                <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
+                  <h2 className="text-sm font-semibold text-foreground mb-4">Recent Activity</h2>
+                  {tenant.recentActivity.length > 0 ? (
+                    <div className="space-y-3">
+                      {tenant.recentActivity.map((event: any) => (
+                        <div key={event.id} className="flex gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
+                          <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                          <div>
+                            <p className="text-xs font-medium text-foreground">{formatEventDescription(event.eventType)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {event.actorEmail && `${event.actorEmail} · `}
+                              {formatRelativeTime(event.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent activity.</p>
+                  )}
+                </div>
+
+                {/* Sidebar info */}
+                <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+                  <h2 className="text-sm font-semibold text-foreground">Info</h2>
+                  {[
+                    { label: 'Created', value: new Date(tenant.createdAt).toLocaleDateString() },
+                    { label: 'Plan', value: tenant.plan },
+                    { label: 'Environment', value: tenant.environment },
+                    { label: 'Custom Domain', value: tenant.customDomain ?? 'Not configured' },
+                  ].map((row) => (
+                    <div key={row.label} className="flex flex-col gap-0.5">
+                      <p className="text-xs text-muted-foreground">{row.label}</p>
+                      <p className="text-sm text-foreground font-medium">{row.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DANGER ZONE */}
+          {tab === 'danger-zone' && (
+            <div className="max-w-2xl space-y-6">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold text-destructive">Danger Zone</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">These actions are irreversible.</p>
+                </div>
+
+                {/* Suspend */}
+                <div className="flex items-start justify-between gap-6 rounded-lg border border-border bg-card p-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {tenant.status === 'active' ? 'Suspend Tenant' : 'Reactivate Tenant'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {tenant.status === 'active'
+                        ? 'Prevent all users from signing in.'
+                        : 'Allow users to sign in again.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSuspendClick}
+                    disabled={isUpdating}
+                    className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      suspendPhase === 'confirm'
+                        ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                        : 'border border-border text-foreground hover:bg-accent'
+                    } disabled:opacity-50`}
+                  >
+                    {isUpdating
+                      ? 'Updating…'
+                      : suspendPhase === 'confirm'
+                      ? 'Click again to confirm'
+                      : tenant.status === 'active'
+                      ? 'Suspend'
+                      : 'Reactivate'}
+                  </button>
+                </div>
+
+                {/* Delete */}
+                <div className="rounded-lg border border-destructive/30 bg-card p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Delete Tenant</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Permanently delete <strong>{tenant.name}</strong> and all associated data. This cannot be undone.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">
+                      Type <strong className="text-foreground">{tenant.slug}</strong> to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
+                      placeholder={tenant.slug}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/40"
+                    />
+                  </div>
+                  <button
+                    onClick={handleDelete}
+                    disabled={confirmText !== tenant.slug || isDeleting}
+                    className="w-full rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-40"
+                  >
+                    {isDeleting ? 'Deleting…' : 'Delete Tenant'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PLACEHOLDER TABS */}
+          {(tab === 'users' || tab === 'api-keys' || tab === 'audit-logs') && (
+            <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+              {tab.replace(/-/g, ' ')} — coming soon
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/tenants/layout.tsx
+SIZE: 437 B | LINES: 17
+================================================================================
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifyAdminSession, isSuperAdmin } from "@/lib/auth-guard";
+
+export default async function TenantsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await verifyAdminSession();
+
+  if (!user) redirect("/u/login");
+  if (!isSuperAdmin(user)) redirect(`/t/${user.tenantSlug ?? ""}/dashboard`);
+
+  return <>{children}</>;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/tenants/new/page.tsx
+SIZE: 10.98 KB | LINES: 252
+================================================================================
+
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { SlugInput } from '@/components/slug-input'
+import { useCreateTenant } from '@/lib/admin-queries'
+
+type Plan = 'free' | 'pro' | 'enterprise'
+
+const PLANS: { id: Plan; name: string; price: string; limits: string[] }[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: '$0/mo',
+    limits: ['1,000 MAU', '2 social providers', 'Community support'],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '$29/mo',
+    limits: ['10,000 MAU', 'All social providers', 'Priority support'],
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom',
+    limits: ['Unlimited MAU', 'SAML/SCIM', 'Dedicated support'],
+  },
+]
+
+export default function NewTenantPage() {
+  const router = useRouter()
+  const [step, setStep] = useState<1 | 2>(1)
+
+  // Step 1 fields
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [slugAvailable, setSlugAvailable] = useState(false)
+  const [plan, setPlan] = useState<Plan>('free')
+
+  // Step 2 fields
+  const [ownerEmail, setOwnerEmail] = useState('')
+
+  const [error, setError] = useState<string | null>(null)
+
+  const { mutate: createTenant, isPending } = useCreateTenant()
+
+  const step1Valid = name.trim().length > 0 && slug.length >= 4 && slugAvailable && plan
+
+  function handleCreate() {
+    setError(null)
+    createTenant(
+      { name: name.trim(), slug, plan, ownerEmail: ownerEmail || undefined },
+      {
+        onSuccess: (tenant) => {
+          router.push(`/tenants/${tenant.id}?created=1`)
+        },
+        onError: (err) => {
+          setError(err.message)
+        },
+      }
+    )
+  }
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+          <div><p className="text-sm font-semibold text-foreground">Fort Knox</p><p className="text-xs text-muted-foreground">Superadmin</p></div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {[
+            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+            { label: 'Tenants', href: '/tenants', icon: '🏢' },
+            { label: 'Users', href: '/users', icon: '👥' },
+            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+            { label: 'Settings', href: '/settings', icon: '⚙' },
+          ].map((item) => (
+            <Link key={item.href} href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${item.href === '/tenants' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+              <span className="text-base">{item.icon}</span>{item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center gap-3 border-b border-border bg-card px-8 py-4">
+          <Link href="/tenants" className="text-muted-foreground hover:text-foreground text-sm">← Tenants</Link>
+          <span className="text-muted-foreground">/</span>
+          <h1 className="text-sm font-semibold text-foreground">New Tenant</h1>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8">
+          <div className="mx-auto max-w-2xl">
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 mb-8">
+              {[1, 2].map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${s === step ? 'bg-primary text-primary-foreground' : s < step ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                    {s < step ? '✓' : s}
+                  </div>
+                  <span className={`text-sm ${s === step ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                    {s === 1 ? 'Basic Info' : 'Owner Account'}
+                  </span>
+                  {s < 2 && <span className="text-muted-foreground mx-1">→</span>}
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-8">
+              {step === 1 ? (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Basic Information</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Configure the new tenant's core details.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Tenant Name <span className="text-destructive">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Acme Corporation"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Slug <span className="text-destructive">*</span>
+                      </label>
+                      <SlugInput
+                        value={slug}
+                        onChange={setSlug}
+                        onAvailabilityChange={setSlugAvailable}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Used in URLs: <code className="text-foreground">{slug || 'your-slug'}.auth.fortknox.com</code>
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Plan <span className="text-destructive">*</span>
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {PLANS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setPlan(p.id)}
+                            className={`rounded-xl border p-4 text-left transition-all ${plan === p.id ? 'border-primary ring-2 ring-primary/30 bg-primary/5' : 'border-border hover:border-muted-foreground/40'}`}
+                          >
+                            <p className="font-semibold text-foreground text-sm">{p.name}</p>
+                            <p className="text-xs font-medium text-primary mt-0.5">{p.price}</p>
+                            <ul className="mt-2 space-y-0.5">
+                              {p.limits.map((l) => (
+                                <li key={l} className="text-xs text-muted-foreground">• {l}</li>
+                              ))}
+                            </ul>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      disabled={!step1Valid}
+                      onClick={() => setStep(2)}
+                      className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                    >
+                      Continue →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Owner Account</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">The first admin user for this tenant.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Owner Email</label>
+                    <input
+                      type="email"
+                      value={ownerEmail}
+                      onChange={(e) => setOwnerEmail(e.target.value)}
+                      placeholder="admin@company.com"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      An invitation will be sent to this email address.
+                    </p>
+                  </div>
+
+                  {error && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm space-y-2">
+                    <p className="font-medium text-foreground">Summary</p>
+                    <div className="text-muted-foreground space-y-1">
+                      <p>Name: <span className="text-foreground">{name}</span></p>
+                      <p>Slug: <span className="text-foreground">{slug}</span></p>
+                      <p>Plan: <span className="text-foreground capitalize">{plan}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handleCreate}
+                      className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60 hover:bg-primary/90 transition-colors"
+                    >
+                      {isPending && (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                      )}
+                      Create Tenant
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/tenants/page.tsx
+SIZE: 10.07 KB | LINES: 222
+================================================================================
+
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAdminTenants } from '@/lib/admin-queries'
+import type { TenantListItem } from '@/lib/admin-queries'
+
+function tenantColor(slug: string): string {
+  const colors = [
+    'bg-blue-500/10 text-blue-600',
+    'bg-amber-500/10 text-amber-600',
+    'bg-emerald-500/10 text-emerald-600',
+    'bg-purple-500/10 text-purple-600',
+    'bg-rose-500/10 text-rose-600',
+  ]
+  const index = (slug.charCodeAt(0) ?? 0) % colors.length
+  return colors[index] ?? colors[0]!
+}
+
+function planBadgeColor(plan: string): string {
+  switch (plan?.toLowerCase()) {
+    case 'enterprise': return 'bg-purple-500/10 text-purple-700 dark:text-purple-300'
+    case 'pro':
+    case 'professional': return 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+    default: return 'bg-muted text-muted-foreground'
+  }
+}
+
+function AdminSidebar({ current }: { current: string }) {
+  return (
+    <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+        <div><p className="text-sm font-semibold text-foreground">Fort Knox</p><p className="text-xs text-muted-foreground">Superadmin</p></div>
+      </div>
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {[
+          { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+          { label: 'Tenants', href: '/tenants', icon: '🏢' },
+          { label: 'Users', href: '/users', icon: '👥' },
+          { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+          { label: 'Settings', href: '/settings', icon: '⚙' },
+        ].map((item) => (
+          <Link key={item.href} href={item.href}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${item.href === current ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}>
+            <span className="text-base">{item.icon}</span>{item.label}
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  )
+}
+
+export default function TenantsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [search, setSearch] = useState(searchParams.get('search') ?? '')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') ?? '')
+  const [planFilter, setPlanFilter] = useState(searchParams.get('plan') ?? '')
+  const [page, setPage] = useState(1)
+
+  const { data, isLoading, isError } = useAdminTenants({
+    search: search || undefined,
+    status: statusFilter || undefined,
+    plan: planFilter || undefined,
+    page,
+    limit: 20,
+  })
+
+  const totalPages = data ? Math.ceil(data.total / 20) : 1
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      <AdminSidebar current="/tenants" />
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Tenants</h1>
+            {data && (
+              <p className="text-xs text-muted-foreground">{data.total} tenant{data.total !== 1 ? 's' : ''} total</p>
+            )}
+          </div>
+          <Link
+            href="/tenants/new"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            New Tenant
+          </Link>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-8 space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search by name or slug…"
+              className="flex-1 min-w-48 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+            <select
+              value={planFilter}
+              onChange={(e) => { setPlanFilter(e.target.value); setPage(1) }}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All plans</option>
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+
+          {/* Table */}
+          {isError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Failed to load tenants. Please refresh.
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/30">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tenant</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Plan</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Users</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading
+                    ? Array.from({ length: 6 }).map((_, i) => (
+                        <tr key={i} className="border-b border-border">
+                          {Array.from({ length: 5 }).map((_, j) => (
+                            <td key={j} className="px-4 py-3">
+                              <div className="h-4 rounded bg-muted animate-pulse" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    : data?.tenants.map((tenant: TenantListItem) => (
+                        <tr
+                          key={tenant.id}
+                          onClick={() => router.push(`/tenants/${tenant.id}`)}
+                          className="border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tenantColor(tenant.slug)}`}>
+                                {tenant.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">{tenant.name}</p>
+                                <p className="text-xs text-muted-foreground">{tenant.slug}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${planBadgeColor(tenant.plan)}`}>
+                              {tenant.plan}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{tenant.userCount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {new Date(tenant.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${tenant.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
+                              {tenant.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+
+
+================================================================================
 FILE: apps/admin-portal/app/u/auth/callback/page.tsx
 SIZE: 1.63 KB | LINES: 55
 ================================================================================
@@ -3973,6 +5354,91 @@ export default function VerifyEmailPage() {
         )}
       </div>
     </UniversalAuthLayout>
+  )
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/users/layout.tsx
+SIZE: 435 B | LINES: 17
+================================================================================
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifyAdminSession, isSuperAdmin } from "@/lib/auth-guard";
+
+export default async function UsersLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await verifyAdminSession();
+
+  if (!user) redirect("/u/login");
+  if (!isSuperAdmin(user)) redirect(`/t/${user.tenantSlug ?? ""}/dashboard`);
+
+  return <>{children}</>;
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/app/users/page.tsx
+SIZE: 2.21 KB | LINES: 54
+================================================================================
+
+'use client'
+
+import Link from 'next/link'
+
+export default function UsersPage() {
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      <aside className="w-64 shrink-0 border-r border-border bg-card flex flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">FK</div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Fort Knox</p>
+            <p className="text-xs text-muted-foreground">Superadmin</p>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {[
+            { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
+            { label: 'Tenants', href: '/tenants', icon: '🏢' },
+            { label: 'Users', href: '/users', icon: '👥' },
+            { label: 'Audit Logs', href: '/audit-logs', icon: '📋' },
+            { label: 'Settings', href: '/settings', icon: '⚙' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                item.href === '/users'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Users</h1>
+            <p className="text-xs text-muted-foreground">All users across all tenants</p>
+          </div>
+        </header>
+        <main className="flex-1 overflow-y-auto flex items-center justify-center">
+          <p className="text-muted-foreground text-sm">Cross-tenant user management — coming soon</p>
+        </main>
+      </div>
+    </div>
   )
 }
 
@@ -9321,6 +10787,120 @@ export function UserMenu({
 
 
 ================================================================================
+FILE: apps/admin-portal/components/slug-input.tsx
+SIZE: 3.23 KB | LINES: 107
+================================================================================
+
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { apiUrl, authFetcher } from '@/lib/fetcher'
+
+interface SlugInputProps {
+  value: string
+  onChange: (value: string) => void
+  onAvailabilityChange?: (available: boolean) => void
+  className?: string
+}
+
+type SlugState = 'idle' | 'checking' | 'available' | 'unavailable'
+
+export function SlugInput({
+  value,
+  onChange,
+  onAvailabilityChange,
+  className = '',
+}: SlugInputProps) {
+  const [slugState, setSlugState] = useState<SlugState>('idle')
+  const [reason, setReason] = useState<string>('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    if (!value || value.length < 4) {
+      setSlugState('idle')
+      onAvailabilityChange?.(false)
+      return
+    }
+
+    setSlugState('checking')
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const result = await authFetcher<{ available: boolean; reason?: string }>(
+          apiUrl(`/admin/tenants/check-slug?slug=${encodeURIComponent(value)}`)
+        )
+        if (result.available) {
+          setSlugState('available')
+          setReason('')
+          onAvailabilityChange?.(true)
+        } else {
+          setSlugState('unavailable')
+          setReason(result.reason ?? 'This slug is not available')
+          onAvailabilityChange?.(false)
+        }
+      } catch {
+        setSlugState('unavailable')
+        setReason('Could not check availability')
+        onAvailabilityChange?.(false)
+      }
+    }, 400)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    onChange(cleaned)
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={handleChange}
+          placeholder="my-company"
+          maxLength={63}
+          className={`w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 pr-8 ${className}`}
+        />
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+          {slugState === 'checking' && (
+            <span className="block h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+          )}
+          {slugState === 'available' && (
+            <span className="text-emerald-500 text-sm font-bold">✓</span>
+          )}
+          {slugState === 'unavailable' && (
+            <span className="text-destructive text-sm font-bold">✗</span>
+          )}
+        </div>
+      </div>
+
+      {slugState === 'available' && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+          Available
+        </p>
+      )}
+      {slugState === 'unavailable' && reason && (
+        <p className="text-xs text-destructive">{reason}</p>
+      )}
+      {value.length > 0 && value.length < 4 && (
+        <p className="text-xs text-muted-foreground">
+          Minimum 4 characters
+        </p>
+      )}
+    </div>
+  )
+}
+
+
+
+================================================================================
 FILE: apps/admin-portal/eslint.config.js
 SIZE: 138 B | LINES: 5
 ================================================================================
@@ -9466,6 +11046,234 @@ export function useIsMobile() {
   }, [])
 
   return !!isMobile
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/lib/admin-queries.ts
+SIZE: 6.12 KB | LINES: 221
+================================================================================
+
+'use client'
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { authFetcher, authMutate, apiUrl } from './fetcher'
+
+// ─── Types ─────────────────────────────────────────────────────
+
+export interface PlatformMetrics {
+  totalTenants: number
+  totalUsers: number
+  activeSessions: number
+  apiCallsToday: number
+}
+
+export interface TenantListItem {
+  id: string
+  slug: string
+  name: string
+  plan: string
+  status: string
+  userCount: number
+  createdAt: string
+  environment: string
+  customDomain?: string
+}
+
+export interface TenantDetail extends TenantListItem {
+  featureFlags: Record<string, boolean>
+  settings: Record<string, any>
+  activeSessions: number
+  recentActivity: ActivityEvent[]
+}
+
+export interface ActivityEvent {
+  id: string
+  eventType: string
+  actorEmail?: string
+  severity: string
+  createdAt: string
+  ipAddress?: string
+  tenantId?: string
+}
+
+export interface TenantsListResponse {
+  tenants: TenantListItem[]
+  total: number
+}
+
+export interface SlugCheckResult {
+  available: boolean
+  reason?: string
+}
+
+// ─── Platform Dashboard ─────────────────────────────────────────
+
+export function usePlatformMetrics() {
+  return useQuery<PlatformMetrics>({
+    queryKey: ['admin', 'metrics'],
+    queryFn: () => authFetcher<PlatformMetrics>(apiUrl('/admin/dashboard')),
+    refetchInterval: 30_000,
+  })
+}
+
+export function usePlatformActivity(limit = 20) {
+  return useQuery<ActivityEvent[]>({
+    queryKey: ['admin', 'activity', limit],
+    queryFn: () =>
+      authFetcher<ActivityEvent[]>(apiUrl(`/admin/activity?limit=${limit}`)),
+    refetchInterval: 60_000,
+  })
+}
+
+// ─── Tenants ────────────────────────────────────────────────────
+
+export function useAdminTenants(params: {
+  search?: string
+  status?: string
+  plan?: string
+  page?: number
+  limit?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params.search) qs.set('search', params.search)
+  if (params.status) qs.set('status', params.status)
+  if (params.plan) qs.set('plan', params.plan)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.limit) qs.set('limit', String(params.limit))
+
+  return useQuery<TenantsListResponse>({
+    queryKey: ['admin', 'tenants', params],
+    queryFn: () =>
+      authFetcher<TenantsListResponse>(
+        apiUrl(`/admin/tenants?${qs.toString()}`)
+      ),
+  })
+}
+
+export function useAdminTenant(id: string) {
+  return useQuery<TenantDetail>({
+    queryKey: ['admin', 'tenants', id],
+    queryFn: () => authFetcher<TenantDetail>(apiUrl(`/admin/tenants/${id}`)),
+    enabled: !!id,
+  })
+}
+
+export function useCreateTenant() {
+  const qc = useQueryClient()
+  return useMutation<
+    TenantDetail,
+    Error,
+    { name: string; slug: string; plan: string; ownerEmail?: string }
+  >({
+    mutationFn: (body) => authMutate(apiUrl('/admin/tenants'), 'POST', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+    },
+  })
+}
+
+export function useUpdateTenant(id: string) {
+  const qc = useQueryClient()
+  return useMutation<
+    TenantDetail,
+    Error,
+    { status?: string; name?: string; plan?: string }
+  >({
+    mutationFn: (body) =>
+      authMutate(apiUrl(`/admin/tenants/${id}`), 'PATCH', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+    },
+  })
+}
+
+export function useDeleteTenant() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => authMutate(apiUrl(`/admin/tenants/${id}`), 'DELETE'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+    },
+  })
+}
+
+export function useCheckSlug(slug: string, enabled: boolean) {
+  return useQuery<SlugCheckResult>({
+    queryKey: ['admin', 'check-slug', slug],
+    queryFn: () =>
+      authFetcher<SlugCheckResult>(
+        apiUrl(`/admin/tenants/check-slug?slug=${encodeURIComponent(slug)}`)
+      ),
+    enabled: enabled && slug.length >= 4,
+    staleTime: 5_000,
+  })
+}
+
+// ─── Settings ────────────────────────────────────────────────────
+
+export interface PlatformSettings {
+  platformName: string
+  smtpConfigured: boolean
+  smtpHost?: string
+  supportEmail?: string
+  allowPublicSignup: boolean
+  maintenanceMode: boolean
+}
+
+export function usePlatformSettings() {
+  return useQuery<PlatformSettings>({
+    queryKey: ['admin', 'settings'],
+    queryFn: () => authFetcher<PlatformSettings>(apiUrl('/admin/settings')),
+  })
+}
+
+export function useUpdatePlatformSettings() {
+  const qc = useQueryClient()
+  return useMutation<PlatformSettings, Error, Partial<PlatformSettings>>({
+    mutationFn: (body) => authMutate(apiUrl('/admin/settings'), 'PATCH', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'settings'] })
+    },
+  })
+}
+
+// ─── Team ────────────────────────────────────────────────────────
+
+export interface TeamMember {
+  id: string
+  email: string
+  firstName?: string
+  lastName?: string
+  addedAt?: string
+}
+
+export function useAdminTeam() {
+  return useQuery<TeamMember[]>({
+    queryKey: ['admin', 'team'],
+    queryFn: () => authFetcher<TeamMember[]>(apiUrl('/admin/team')),
+  })
+}
+
+export function useAddTeamMember() {
+  const qc = useQueryClient()
+  return useMutation<TeamMember, Error, { email: string }>({
+    mutationFn: (body) => authMutate(apiUrl('/admin/team'), 'POST', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'team'] })
+    },
+  })
+}
+
+export function useRemoveTeamMember() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, string>({
+    mutationFn: (userId) => authMutate(apiUrl(`/admin/team/${userId}`), 'DELETE'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'team'] })
+    },
+  })
 }
 
 
@@ -9654,6 +11462,210 @@ const cachedConfig: AuthConfig = {
 
 export async function getAuthConfig(): Promise<AuthConfig> {
   return cachedConfig
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/lib/auth-guard.ts
+SIZE: 2.92 KB | LINES: 110
+================================================================================
+
+/**
+ * Server-side admin guard utilities
+ * Used in Server Component layouts to protect superadmin routes
+ */
+
+const AUTH_SERVICE_URL =
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000";
+const FORTKNOX_TENANT_ID = process.env.FORTKNOX_TENANT_ID || "";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  tenantId: string;
+  tenantSlug?: string;
+  groups?: string[];
+}
+
+/**
+ * Verify superadmin session server-side.
+ * Reads httpOnly refresh cookie, exchanges it for an access token,
+ * fetches /users/me, and checks fortknox-internal membership.
+ *
+ * Returns the user if the session is valid and the user is a superadmin.
+ * Returns null if the session is invalid or the user lacks superadmin access.
+ */
+export async function verifyAdminSession(
+  todoRemoveThis?: string,
+): Promise<AdminUser | null> {
+  if (!FORTKNOX_TENANT_ID) {
+    console.warn("[AdminGuard] FORTKNOX_TENANT_ID is not set");
+    return null;
+  }
+
+  try {
+    // Step 1: Refresh the access token using the httpOnly refresh cookie
+    const refreshRes = await fetch(`${AUTH_SERVICE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-ID": FORTKNOX_TENANT_ID,
+      },
+      cache: "no-store",
+    });
+
+    if (!refreshRes.ok) return null;
+
+    const refreshData = await refreshRes.json().catch(() => null);
+    const accessToken =
+      refreshData?.data?.accessToken ?? refreshData?.accessToken;
+    if (!accessToken) return null;
+
+    // Step 2: Fetch the current user
+    const userRes = await fetch(`${AUTH_SERVICE_URL}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-Tenant-ID": FORTKNOX_TENANT_ID,
+      },
+      cache: "no-store",
+    });
+
+    if (!userRes.ok) return null;
+
+    const userData = await userRes.json().catch(() => null);
+    const user = userData?.data ?? userData;
+
+    if (!user?.id) return null;
+
+    // Parse groups from the access token JWT payload
+    let groups: string[] = [];
+    let tenantSlug: string | undefined;
+    try {
+      const parts = accessToken.split(".");
+      if (parts[1]) {
+        const payload = JSON.parse(
+          atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+        );
+        groups = Array.isArray(payload.groups) ? payload.groups : [];
+        tenantSlug = payload.tenantSlug;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      tenantId: user.tenantId,
+      tenantSlug: tenantSlug ?? user.tenantSlug,
+      groups,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a user has Fort Knox internal superadmin access.
+ */
+export function isSuperAdmin(user: AdminUser): boolean {
+  return (
+    user.tenantId === FORTKNOX_TENANT_ID &&
+    Array.isArray(user.groups) &&
+    user.groups.includes("fortknox-internal")
+  );
+}
+
+
+
+================================================================================
+FILE: apps/admin-portal/lib/fetcher.ts
+SIZE: 2.01 KB | LINES: 80
+================================================================================
+
+/**
+ * Authenticated fetcher for admin API calls.
+ * Attaches the current access token via the SDK and handles 401s.
+ */
+import { authClient } from '@/app/layout'
+
+const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:4000'
+
+export function apiUrl(path: string): string {
+  return `${AUTH_URL}${path}`
+}
+
+export async function authFetcher<T = any>(url: string): Promise<T> {
+  const token = await authClient.getAccessToken()
+  if (!token) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/u/login'
+    }
+    throw new Error('Not authenticated')
+  }
+
+  const res = await fetch(url.startsWith('http') ? url : apiUrl(url), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  })
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/u/login'
+    }
+    throw new Error('Session expired')
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data?.message ?? `API error ${res.status}`)
+  }
+
+  const data = await res.json()
+  return (data?.data ?? data) as T
+}
+
+export async function authMutate(
+  url: string,
+  method: 'POST' | 'PATCH' | 'DELETE' | 'PUT',
+  body?: unknown,
+): Promise<any> {
+  const token = await authClient.getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(url.startsWith('http') ? url : apiUrl(url), {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+
+  if (res.status === 204) return null
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/u/login'
+    }
+    throw new Error('Session expired')
+  }
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data?.message ?? `API error ${res.status}`)
+  }
+
+  return data?.data ?? data
 }
 
 
@@ -10223,6 +12235,135 @@ export function getEventColor(eventType: string): string {
 
 
 ================================================================================
+FILE: apps/admin-portal/middleware.ts
+SIZE: 4.11 KB | LINES: 122
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server'
+
+// Pure helpers — no SDK imports (middleware runs on Edge runtime)
+
+function parseJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    return JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+  } catch {
+    return null
+  }
+}
+
+function getAccessTokenFromRequest(request: NextRequest): string | null {
+  // Check Authorization header first
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7)
+  }
+  // TODO: The access token is stored in module memory (not in any readable cookie).
+  // Middleware cannot read it from the httpOnly refresh cookie.
+  // Primary auth guard is the (admin)/layout.tsx server component which reads the
+  // httpOnly cookie server-side and calls the auth service to verify the session.
+  // This middleware provides a best-effort first-pass guard when a Bearer token
+  // is present in the request headers.
+  return null
+}
+
+export function middleware(request: NextRequest) {
+  const host = request.headers.get('host') ?? ''
+  const hostname = host.split(':')[0]!
+
+  // ── Phase 4: Subdomain routing ──────────────────────────────
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'auth.fortknox.com'
+
+  if (hostname !== rootDomain && hostname.endsWith(`.${rootDomain}`)) {
+    const slug = hostname.replace(`.${rootDomain}`, '')
+
+    // Reserved subdomains for the superadmin portal
+    if (slug === 'app' || slug === 'admin') {
+      return NextResponse.next()
+    }
+
+    // Rewrite to /t/[slug]/... path internally
+    const url = request.nextUrl.clone()
+    url.pathname = `/t/${slug}${request.nextUrl.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
+  const { pathname } = request.nextUrl
+  const accessToken = getAccessTokenFromRequest(request)
+
+  // ── Superadmin routes ──────────────────────────────────────
+  const isSuperAdminRoute =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/tenants') ||
+    pathname.startsWith('/users') ||
+    pathname.startsWith('/audit-logs') ||
+    (pathname.startsWith('/settings') && !pathname.startsWith('/t/'))
+
+  if (isSuperAdminRoute) {
+    if (!accessToken) {
+      // No token in header — let the server layout component do the full check.
+      // We cannot read the httpOnly cookie here, so we pass through and rely on
+      // the (admin)/layout.tsx server component guard for enforcement.
+      return NextResponse.next()
+    }
+
+    const claims = parseJwtPayload(accessToken)
+    if (!claims) {
+      return NextResponse.redirect(new URL('/u/login', request.url))
+    }
+
+    const fortknoxTenantId = process.env.FORTKNOX_TENANT_ID
+    const tenantOk = fortknoxTenantId
+      ? claims.tenantId === fortknoxTenantId
+      : claims.tenantSlug === 'fortknox'
+    const groupOk = Array.isArray(claims.groups) && claims.groups.includes('fortknox-internal')
+
+    if (!tenantOk || !groupOk) {
+      const slug = claims.tenantSlug ?? ''
+      return NextResponse.redirect(new URL(`/t/${slug}/dashboard`, request.url))
+    }
+  }
+
+  // ── Tenant routes (/t/[slug]/...) ─────────────────────────
+  const tenantMatch = pathname.match(/^\/t\/([^/]+)/)
+  if (tenantMatch) {
+    const slugFromUrl = tenantMatch[1]!
+
+    if (!accessToken) {
+      // Let the tenant layout handle the full server-side check
+      return NextResponse.next()
+    }
+
+    const claims = parseJwtPayload(accessToken)
+    if (!claims) {
+      return NextResponse.redirect(new URL('/u/login', request.url))
+    }
+
+    if (claims.tenantSlug && claims.tenantSlug !== slugFromUrl) {
+      return NextResponse.redirect(
+        new URL(`/t/${claims.tenantSlug}/dashboard`, request.url)
+      )
+    }
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/tenants/:path*',
+    '/users/:path*',
+    '/audit-logs/:path*',
+    '/settings/:path*',
+    '/t/:path*',
+  ],
+}
+
+
+
+================================================================================
 FILE: apps/admin-portal/next-env.d.ts
 SIZE: 251 B | LINES: 7
 ================================================================================
@@ -10238,12 +12379,15 @@ import "./.next/dev/types/routes.d.ts";
 
 ================================================================================
 FILE: apps/admin-portal/next.config.js
-SIZE: 129 B | LINES: 7
+SIZE: 198 B | LINES: 10
 ================================================================================
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    transpilePackages: ["@repo/ui"]
+  transpilePackages: ["@repo/ui"],
+  env: {
+    FORTKNOX_TENANT_ID: process.env.FORTKNOX_TENANT_ID,
+  },
 };
 
 export default nextConfig;
@@ -10252,7 +12396,7 @@ export default nextConfig;
 
 ================================================================================
 FILE: apps/admin-portal/package.json
-SIZE: 870 B | LINES: 35
+SIZE: 927 B | LINES: 37
 ================================================================================
 
 {
@@ -10274,6 +12418,7 @@ SIZE: 870 B | LINES: 35
     "@tanstack/react-query": "^5.90.21",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.36.0",
+    "js-cookie": "^3.0.5",
     "lucide-react": "^0.577.0",
     "next": "^16.0.1",
     "react": "^19.2.0",
@@ -10282,6 +12427,7 @@ SIZE: 870 B | LINES: 35
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
+    "@types/js-cookie": "^3",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
@@ -10447,7 +12593,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ================================================================================
 FILE: apps/auth-service/api-management/nest-be/api-docs.yaml
-SIZE: 134.57 KB | LINES: 5501
+SIZE: 142.45 KB | LINES: 5885
 ================================================================================
 
 {
@@ -14361,6 +16507,390 @@ SIZE: 134.57 KB | LINES: 5501
         "summary": "Enable/disable and configure a social provider for this tenant",
         "tags": [
           "Dashboard"
+        ]
+      }
+    },
+    "/admin/dashboard": {
+      "get": {
+        "operationId": "AdminController_getPlatformMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get platform-wide metrics for Fort Knox operators",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/tenants": {
+      "get": {
+        "operationId": "AdminController_listTenants",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plan",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List all tenants on the platform",
+        "tags": [
+          "Admin - Platform"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_createTenant",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Create a new tenant",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/tenants/check-slug": {
+      "get": {
+        "operationId": "AdminController_checkSlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Check tenant slug availability",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/tenants/{id}": {
+      "get": {
+        "operationId": "AdminController_getTenant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get tenant detail by ID",
+        "tags": [
+          "Admin - Platform"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminController_updateTenant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Update tenant (status, name, plan)",
+        "tags": [
+          "Admin - Platform"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminController_deleteTenant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Delete tenant permanently",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/activity": {
+      "get": {
+        "operationId": "AdminController_getActivity",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Recent security events across all tenants",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/team": {
+      "get": {
+        "operationId": "AdminController_getTeam",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List fortknox-internal team members",
+        "tags": [
+          "Admin - Platform"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_addTeamMember",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Add a user to the fortknox-internal team",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/team/{userId}": {
+      "delete": {
+        "operationId": "AdminController_removeTeamMember",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Remove a user from the fortknox-internal team",
+        "tags": [
+          "Admin - Platform"
+        ]
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "AdminController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get platform settings",
+        "tags": [
+          "Admin - Platform"
+        ]
+      },
+      "patch": {
+        "operationId": "AdminController_updateSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Update platform settings",
+        "tags": [
+          "Admin - Platform"
         ]
       }
     }
@@ -21976,7 +24506,7 @@ ORDER BY created_at;
 
 ================================================================================
 FILE: apps/auth-service/src/database/seeders/tenants.seed.ts
-SIZE: 8.53 KB | LINES: 316
+SIZE: 9.62 KB | LINES: 351
 ================================================================================
 
 import { DataSource } from "typeorm";
@@ -22005,6 +24535,23 @@ export async function seed() {
     console.log("🏢 Seeding tenants...");
 
     const tenants = [
+      {
+        name: "Fort Knox",
+        slug: "fortknox",
+        subdomain: "fortknox",
+        status: "active",
+        plan: "enterprise",
+        settings: {
+          platformName: "Fort Knox",
+        },
+        featureFlags: {
+          mfaRequired: true,
+          passwordlessEnabled: true,
+          socialProvidersEnabled: false,
+        },
+        isActive: true,
+        environment: "production",
+      },
       {
         name: "Default Organization",
         slug: "default",
@@ -22115,6 +24662,24 @@ export async function seed() {
         isSystem: false,
       },
     ];
+
+    // Seed fortknox-internal role for the fortknox tenant only
+    const fortknoxTenant = allTenants.find((t) => t.slug === "fortknox");
+    if (fortknoxTenant) {
+      const existing = await roleRepo.findOne({
+        where: { name: "fortknox-internal", tenantId: fortknoxTenant.id },
+      });
+      if (!existing) {
+        const role = roleRepo.create({
+          name: "fortknox-internal",
+          description: "Fort Knox platform superadmin — grants access to the admin portal",
+          tenantId: fortknoxTenant.id,
+          isSystem: true,
+        });
+        await roleRepo.save(role);
+        console.log(`  ✅ Created role: fortknox/fortknox-internal`);
+      }
+    }
 
     for (const tenant of allTenants) {
       for (const roleData of systemRoles) {
@@ -22380,6 +24945,678 @@ export class AdminCleanupController {
   })
   async getCleanupStats(@Query("tenantId") tenantId?: string) {
     return this.tokenCleanupService.getCleanupStats(tenantId);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/admin/admin.controller.ts
+SIZE: 4.43 KB | LINES: 147
+================================================================================
+
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { Protected } from "@/common/decorators/protected.decorator";
+import { AdminService } from "./admin.service";
+
+@ApiTags("Admin - Platform")
+@Controller("admin")
+@Protected()
+export class AdminController {
+  constructor(private readonly adminService: AdminService) {}
+
+  // ─── Platform Metrics ─────────────────────────────────────────
+
+  @Get("dashboard")
+  @ApiOperation({ summary: "Get platform-wide metrics for Fort Knox operators" })
+  async getPlatformMetrics() {
+    return this.adminService.getPlatformMetrics();
+  }
+
+  // ─── Tenant Management ─────────────────────────────────────────
+
+  @Get("tenants")
+  @ApiOperation({ summary: "List all tenants on the platform" })
+  async listTenants(
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("plan") plan?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminService.listTenants({
+      search,
+      status,
+      plan,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 20,
+    });
+  }
+
+  @Get("tenants/check-slug")
+  @ApiOperation({ summary: "Check tenant slug availability" })
+  async checkSlug(@Query("slug") slug: string) {
+    return this.adminService.checkSlugAvailability(slug ?? "");
+  }
+
+  @Get("tenants/:id")
+  @ApiOperation({ summary: "Get tenant detail by ID" })
+  async getTenant(@Param("id") id: string) {
+    return this.adminService.getTenantById(id);
+  }
+
+  @Post("tenants")
+  @ApiOperation({ summary: "Create a new tenant" })
+  async createTenant(
+    @Body()
+    body: {
+      name: string;
+      slug: string;
+      plan?: string;
+      ownerEmail?: string;
+      environment?: string;
+    },
+  ) {
+    return this.adminService.createTenant(body);
+  }
+
+  @Patch("tenants/:id")
+  @ApiOperation({ summary: "Update tenant (status, name, plan)" })
+  async updateTenant(
+    @Param("id") id: string,
+    @Body() body: { status?: string; name?: string; plan?: string },
+  ) {
+    return this.adminService.updateTenant(id, body);
+  }
+
+  @Delete("tenants/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Delete tenant permanently" })
+  async deleteTenant(@Param("id") id: string) {
+    await this.adminService.deleteTenant(id);
+  }
+
+  // ─── Platform Activity ─────────────────────────────────────────
+
+  @Get("activity")
+  @ApiOperation({ summary: "Recent security events across all tenants" })
+  async getActivity(@Query("limit") limitStr?: string) {
+    const limit = limitStr ? Math.min(parseInt(limitStr, 10), 100) : 20;
+    return this.adminService.getRecentActivity(limit);
+  }
+
+  // ─── Team Management ────────────────────────────────────────────
+
+  @Get("team")
+  @ApiOperation({ summary: "List fortknox-internal team members" })
+  async getTeam() {
+    return this.adminService.getTeamMembers();
+  }
+
+  @Post("team")
+  @ApiOperation({ summary: "Add a user to the fortknox-internal team" })
+  async addTeamMember(@Body() body: { email: string }) {
+    return this.adminService.addTeamMember(body.email);
+  }
+
+  @Delete("team/:userId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Remove a user from the fortknox-internal team" })
+  async removeTeamMember(@Param("userId") userId: string) {
+    await this.adminService.removeTeamMember(userId);
+  }
+
+  // ─── Platform Settings ───────────────────────────────────────────
+
+  @Get("settings")
+  @ApiOperation({ summary: "Get platform settings" })
+  async getSettings() {
+    return this.adminService.getPlatformSettings();
+  }
+
+  @Patch("settings")
+  @ApiOperation({ summary: "Update platform settings" })
+  async updateSettings(
+    @Body()
+    body: {
+      platformName?: string;
+      smtpHost?: string;
+      supportEmail?: string;
+      allowPublicSignup?: boolean;
+      maintenanceMode?: boolean;
+    },
+  ) {
+    return this.adminService.updatePlatformSettings(body);
+  }
+}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/admin/admin.module.ts
+SIZE: 645 B | LINES: 18
+================================================================================
+
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { User, Session, Tenant, SecurityEvent, Role, UserRole } from "@repo/database";
+import { AdminController } from "./admin.controller";
+import { AdminService } from "./admin.service";
+import { RedisService } from "@/common/service/redis.service";
+import { GuardsModule } from "@/common/guards/guards.module";
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([User, Session, Tenant, SecurityEvent, Role, UserRole]),
+    GuardsModule,
+  ],
+  controllers: [AdminController],
+  providers: [AdminService, RedisService],
+})
+export class AdminModule {}
+
+
+
+================================================================================
+FILE: apps/auth-service/src/modules/admin/admin.service.ts
+SIZE: 14.26 KB | LINES: 486
+================================================================================
+
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull, MoreThan } from "typeorm";
+import {
+  User,
+  Session,
+  Tenant,
+  SecurityEvent,
+  Role,
+  UserRole,
+} from "@repo/database";
+import { RedisService } from "@/common/service/redis.service";
+
+export interface PlatformMetricsDto {
+  totalTenants: number;
+  totalUsers: number;
+  activeSessions: number;
+  apiCallsToday: number;
+}
+
+export interface TenantListItemDto {
+  id: string;
+  slug: string;
+  name: string;
+  plan: string;
+  status: string;
+  userCount: number;
+  createdAt: Date;
+  environment: string;
+  customDomain?: string;
+}
+
+export interface TenantDetailDto extends TenantListItemDto {
+  featureFlags: Record<string, boolean>;
+  settings: Record<string, any>;
+  activeSessions: number;
+  recentActivity: any[];
+}
+
+export interface TeamMemberDto {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  addedAt?: Date;
+}
+
+export interface PlatformSettingsDto {
+  platformName: string;
+  smtpConfigured: boolean;
+  smtpHost?: string;
+  supportEmail?: string;
+  allowPublicSignup: boolean;
+  maintenanceMode: boolean;
+}
+
+const FORTKNOX_TENANT_SLUG = "fortknox";
+const FORTKNOX_INTERNAL_ROLE = "fortknox-internal";
+
+@Injectable()
+export class AdminService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(SecurityEvent)
+    private readonly securityEventRepository: Repository<SecurityEvent>,
+    @InjectRepository(Role)
+    private readonly roleRepository: Repository<Role>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepository: Repository<UserRole>,
+    private readonly redisService: RedisService,
+  ) {}
+
+  private async getFortKnoxTenant(): Promise<Tenant | null> {
+    return this.tenantRepository.findOne({
+      where: { slug: FORTKNOX_TENANT_SLUG },
+    });
+  }
+
+  private async getFortKnoxInternalRole(
+    tenantId: string,
+  ): Promise<Role | null> {
+    return this.roleRepository.findOne({
+      where: { name: FORTKNOX_INTERNAL_ROLE, tenantId },
+    });
+  }
+
+  async getPlatformMetrics(): Promise<PlatformMetricsDto> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [totalTenants, totalUsers, activeSessions] = await Promise.all([
+      this.tenantRepository.count(),
+      this.userRepository.count(),
+      this.sessionRepository.count({
+        where: {
+          revokedAt: IsNull(),
+          expiresAt: MoreThan(new Date()),
+        },
+      }),
+    ]);
+
+    // Sum API calls across all tenants from Redis
+    const allTenants = await this.tenantRepository.find({ select: ["id"] });
+    const todayStr = new Date().toISOString().split("T")[0] as string;
+    let apiCallsToday = 0;
+    for (const t of allTenants) {
+      const counts = await this.redisService
+        .getDailyApiCallCounts(t.id, [todayStr])
+        .catch(() => [0]);
+      apiCallsToday += counts[0] ?? 0;
+    }
+
+    return { totalTenants, totalUsers, activeSessions, apiCallsToday };
+  }
+
+  async listTenants(params: {
+    search?: string;
+    status?: string;
+    plan?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ tenants: TenantListItemDto[]; total: number }> {
+    const { search, status, plan, page = 1, limit = 20 } = params;
+
+    const qb = this.tenantRepository.createQueryBuilder("t");
+
+    if (search) {
+      qb.andWhere("(t.name ILIKE :search OR t.slug ILIKE :search)", {
+        search: `%${search}%`,
+      });
+    }
+    if (status) {
+      qb.andWhere("t.active = :active", { active: status === "active" });
+    }
+    if (plan) {
+      qb.andWhere("t.plan = :plan", { plan });
+    }
+
+    qb.orderBy("t.createdAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [tenants, total] = await qb.getManyAndCount();
+
+    // Get user counts per tenant
+    const tenantIds = tenants.map((t) => t.id);
+    const userCounts: Record<string, number> = {};
+    if (tenantIds.length > 0) {
+      const rows = await this.userRepository
+        .createQueryBuilder("u")
+        .select("u.tenantId", "tenantId")
+        .addSelect("COUNT(u.id)", "count")
+        .where("u.tenantId IN (:...ids)", { ids: tenantIds })
+        .groupBy("u.tenantId")
+        .getRawMany<{ tenantId: string; count: string }>();
+      for (const r of rows) {
+        userCounts[r.tenantId] = parseInt(r.count, 10);
+      }
+    }
+
+    return {
+      total,
+      tenants: tenants.map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        plan: (t as any).plan ?? "free",
+        status: t.active ? "active" : "suspended",
+        userCount: userCounts[t.id] ?? 0,
+        createdAt: t.createdAt,
+        environment: t.environment,
+        customDomain: t.customDomain,
+      })),
+    };
+  }
+
+  async getTenantById(id: string): Promise<TenantDetailDto> {
+    const tenant = await this.tenantRepository.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException("Tenant not found");
+
+    const [userCount, activeSessions, recentActivity] = await Promise.all([
+      this.userRepository.count({ where: { tenantId: id } }),
+      this.sessionRepository.count({
+        where: {
+          tenantId: id,
+          revokedAt: IsNull(),
+          expiresAt: MoreThan(new Date()),
+        },
+      }),
+      this.securityEventRepository.find({
+        where: { tenantId: id },
+        order: { createdAt: "DESC" },
+        take: 5,
+      }),
+    ]);
+
+    return {
+      id: tenant.id,
+      slug: tenant.slug,
+      name: tenant.name,
+      plan: (tenant as any).plan ?? "free",
+      status: tenant.active ? "active" : "suspended",
+      userCount,
+      createdAt: tenant.createdAt,
+      environment: tenant.environment,
+      customDomain: tenant.customDomain,
+      featureFlags: tenant.featureFlags ?? {},
+      settings: (tenant as any).settings ?? {},
+      activeSessions,
+      recentActivity: recentActivity.map((e) => ({
+        id: e.id,
+        eventType: e.eventType,
+        actorEmail: e.actorEmail,
+        severity: e.severity,
+        createdAt: e.createdAt,
+        ipAddress: e.ipAddress,
+      })),
+    };
+  }
+
+  async createTenant(dto: {
+    name: string;
+    slug: string;
+    plan?: string;
+    ownerEmail?: string;
+    environment?: string;
+  }): Promise<TenantDetailDto> {
+    const existing = await this.tenantRepository.findOne({
+      where: { slug: dto.slug },
+    });
+    if (existing) throw new ConflictException("Slug is already taken");
+
+    const tenant = this.tenantRepository.create({
+      name: dto.name,
+      slug: dto.slug,
+      environment: dto.environment ?? "production",
+      active: true,
+      featureFlags: {
+        mfaRequired: false,
+        passwordlessEnabled: true,
+        socialProvidersEnabled: true,
+      },
+    } as any);
+    if (dto.plan) (tenant as any).plan = dto.plan;
+
+    const saved: any = await this.tenantRepository.save(tenant);
+    return this.getTenantById(saved.id);
+  }
+
+  async updateTenant(
+    id: string,
+    dto: { status?: string; name?: string; plan?: string },
+  ): Promise<TenantDetailDto> {
+    const tenant = await this.tenantRepository.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException("Tenant not found");
+
+    const updates: Partial<Tenant> = {};
+    if (dto.name) updates.name = dto.name;
+    if (dto.status) updates.active = dto.status === "active";
+    if (dto.plan) (updates as any).plan = dto.plan;
+
+    await this.tenantRepository.update({ id }, updates);
+    return this.getTenantById(id);
+  }
+
+  async deleteTenant(id: string): Promise<void> {
+    const tenant = await this.tenantRepository.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException("Tenant not found");
+    await this.tenantRepository.delete({ id });
+  }
+
+  async checkSlugAvailability(
+    slug: string,
+  ): Promise<{ available: boolean; reason?: string }> {
+    const RESERVED = [
+      "admin",
+      "api",
+      "auth",
+      "www",
+      "mail",
+      "smtp",
+      "fortknox",
+      "support",
+      "help",
+      "status",
+      "billing",
+      "dashboard",
+      "login",
+      "logout",
+      "signup",
+      "register",
+    ];
+
+    if (slug.length < 4)
+      return { available: false, reason: "Slug must be at least 4 characters" };
+    if (slug.length > 63)
+      return { available: false, reason: "Slug must be 63 characters or less" };
+    if (!/^[a-z0-9-]+$/.test(slug))
+      return {
+        available: false,
+        reason: "Only lowercase letters, numbers, and hyphens allowed",
+      };
+    if (slug.startsWith("-") || slug.endsWith("-"))
+      return {
+        available: false,
+        reason: "Slug cannot start or end with a hyphen",
+      };
+    if (RESERVED.includes(slug))
+      return { available: false, reason: "This slug is reserved" };
+
+    // Check Redis reservation
+    const reservationKey = `common:slug:reservation:${slug}`;
+    const reserved = await this.redisService
+      .get("", "", reservationKey)
+      .catch(() => null);
+    if (reserved)
+      return {
+        available: false,
+        reason: "This slug is being claimed by another user",
+      };
+
+    // Check database
+    const existing = await this.tenantRepository.findOne({ where: { slug } });
+    if (existing)
+      return { available: false, reason: "This slug is already taken" };
+
+    // Reserve for 5 minutes
+    await this.redisService
+      .set("", "", reservationKey, "pending", 300)
+      .catch(() => {});
+
+    return { available: true };
+  }
+
+  async getRecentActivity(limit = 20): Promise<any[]> {
+    const events = await this.securityEventRepository.find({
+      order: { createdAt: "DESC" },
+      take: limit,
+    });
+    return events.map((e) => ({
+      id: e.id,
+      eventType: e.eventType,
+      actorEmail: e.actorEmail,
+      severity: e.severity,
+      createdAt: e.createdAt,
+      ipAddress: e.ipAddress,
+      tenantId: e.tenantId,
+    }));
+  }
+
+  // ─── Team Management ────────────────────────────────────────────
+
+  async getTeamMembers(): Promise<TeamMemberDto[]> {
+    const fkTenant = await this.getFortKnoxTenant();
+    if (!fkTenant) return [];
+
+    const role = await this.getFortKnoxInternalRole(fkTenant.id);
+    if (!role) return [];
+
+    const userRoles = await this.userRoleRepository.find({
+      where: { roleId: role.id, tenantId: fkTenant.id },
+      relations: ["user"],
+    });
+
+    return userRoles.map((ur) => ({
+      id: ur.user.id,
+      email: ur.user.email,
+      firstName: (ur.user as any).firstName,
+      lastName: (ur.user as any).lastName,
+      addedAt: ur.assignedAt,
+    }));
+  }
+
+  async addTeamMember(email: string): Promise<TeamMemberDto> {
+    const fkTenant = await this.getFortKnoxTenant();
+    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+
+    const user = await this.userRepository.findOne({
+      where: { email, tenantId: fkTenant.id },
+    });
+    if (!user) {
+      throw new NotFoundException(
+        `No user with email "${email}" found in the fortknox tenant`,
+      );
+    }
+
+    let role = await this.getFortKnoxInternalRole(fkTenant.id);
+    if (!role) {
+      role = this.roleRepository.create({
+        name: FORTKNOX_INTERNAL_ROLE,
+        description: "Fort Knox platform superadmin",
+        tenantId: fkTenant.id,
+        isSystem: true,
+      } as any) as any;
+      role = await this.roleRepository.save(role as any);
+    }
+
+    const existing = await this.userRoleRepository.findOne({
+      where: { userId: user.id, roleId: role?.id, tenantId: fkTenant.id },
+    });
+    if (existing) {
+      throw new ConflictException(`${email} is already a team member`);
+    }
+
+    const userRole = this.userRoleRepository.create({
+      userId: user.id,
+      roleId: role?.id,
+      tenantId: fkTenant.id,
+    });
+    await this.userRoleRepository.save(userRole);
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: (user as any).firstName,
+      lastName: (user as any).lastName,
+      addedAt: userRole.assignedAt,
+    };
+  }
+
+  async removeTeamMember(userId: string): Promise<void> {
+    const fkTenant = await this.getFortKnoxTenant();
+    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+
+    const role = await this.getFortKnoxInternalRole(fkTenant.id);
+    if (!role) throw new NotFoundException("Role not found");
+
+    const userRole = await this.userRoleRepository.findOne({
+      where: { userId, roleId: role.id, tenantId: fkTenant.id },
+    });
+    if (!userRole) throw new NotFoundException("Team member not found");
+
+    await this.userRoleRepository.delete({ id: userRole.id });
+  }
+
+  // ─── Platform Settings ───────────────────────────────────────────
+
+  async getPlatformSettings(): Promise<PlatformSettingsDto> {
+    const fkTenant = await this.getFortKnoxTenant();
+    const stored = (fkTenant as any)?.settings ?? {};
+
+    return {
+      platformName: stored.platformName ?? "Fort Knox",
+      smtpConfigured: !!(process.env.SMTP_HOST || stored.smtpHost),
+      smtpHost: stored.smtpHost ?? process.env.SMTP_HOST ?? undefined,
+      supportEmail:
+        stored.supportEmail ?? process.env.SUPPORT_EMAIL ?? undefined,
+      allowPublicSignup: stored.allowPublicSignup ?? false,
+      maintenanceMode: stored.maintenanceMode ?? false,
+    };
+  }
+
+  async updatePlatformSettings(
+    dto: Partial<PlatformSettingsDto>,
+  ): Promise<PlatformSettingsDto> {
+    const fkTenant = await this.getFortKnoxTenant();
+    if (!fkTenant) throw new NotFoundException("Fort Knox tenant not found");
+
+    const current = (fkTenant as any).settings ?? {};
+    const updated = { ...current };
+
+    if (dto.platformName !== undefined) updated.platformName = dto.platformName;
+    if (dto.smtpHost !== undefined) updated.smtpHost = dto.smtpHost;
+    if (dto.supportEmail !== undefined) updated.supportEmail = dto.supportEmail;
+    if (dto.allowPublicSignup !== undefined)
+      updated.allowPublicSignup = dto.allowPublicSignup;
+    if (dto.maintenanceMode !== undefined)
+      updated.maintenanceMode = dto.maintenanceMode;
+
+    await this.tenantRepository.update({ id: fkTenant.id }, {
+      settings: updated,
+    } as any);
+    return this.getPlatformSettings();
   }
 }
 
@@ -23653,7 +26890,7 @@ export class AuthModule {}
 
 ================================================================================
 FILE: apps/auth-service/src/modules/auth/auth.service.ts
-SIZE: 39.11 KB | LINES: 1414
+SIZE: 40.63 KB | LINES: 1457
 ================================================================================
 
 import {
@@ -23664,7 +26901,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull } from "typeorm";
+import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -23673,6 +26910,7 @@ import {
   Tenant,
   OAuthRefreshToken,
   UserSocialConnection,
+  UserRole,
   SecurityEventType,
 } from "@repo/database";
 import {
@@ -23712,6 +26950,8 @@ export class AuthService {
     private readonly oauthRefreshTokenRepository: Repository<OAuthRefreshToken>,
     @InjectRepository(UserSocialConnection)
     private readonly socialConnectionRepository: Repository<UserSocialConnection>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepository: Repository<UserRole>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -23723,6 +26963,43 @@ export class AuthService {
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly securityEventService: SecurityEventService,
   ) {}
+
+  /**
+   * Get role names (groups) for a user within a tenant
+   */
+  private async getUserGroups(userId: string, tenantId: string): Promise<string[]> {
+    const userRoles = await this.userRoleRepository.find({
+      where: { userId, tenantId },
+      relations: ['role'],
+    });
+    return userRoles.map((ur) => ur.role.name).filter(Boolean);
+  }
+
+  /**
+   * Build a complete JWT access token payload including groups and tenantSlug
+   */
+  private async buildAccessTokenPayload(
+    userId: string,
+    email: string,
+    tenantId: string,
+    sessionId: string,
+    tenant?: Tenant,
+  ): Promise<Record<string, any>> {
+    const [groups, resolvedTenant] = await Promise.all([
+      this.getUserGroups(userId, tenantId),
+      tenant
+        ? Promise.resolve(tenant)
+        : this.tenantRepository.findOne({ where: { id: tenantId } }),
+    ]);
+    return {
+      sub: userId,
+      email,
+      tenantId,
+      tenantSlug: resolvedTenant?.slug ?? '',
+      groups,
+      sessionId,
+    };
+  }
 
   /**
    * Register a new user (TENANT REQUIRED)
@@ -23993,13 +27270,15 @@ export class AuthService {
     console.log("✅ Refresh token created");
 
     // Step 3: Generate access token (NOW we have sessionId!)
+    const accessTokenPayloadData = await this.buildAccessTokenPayload(
+      user.id,
+      user.email,
+      data.tenantId,
+      session.id,
+      user.tenant,
+    );
     const accessToken = this.jwtService.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: data.tenantId,
-        sessionId: session.id,
-      },
+      accessTokenPayloadData,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -24195,8 +27474,9 @@ export class AuthService {
       expiresInDays: 30,
     });
 
+    const magicLinkPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      magicLinkPayload,
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
@@ -24411,8 +27691,15 @@ export class AuthService {
       throw err;
     }
 
+    // Enrich payload with groups and tenantSlug
+    const enrichedPayload = await this.buildAccessTokenPayload(
+      accessTokenPayload.sub,
+      accessTokenPayload.email,
+      accessTokenPayload.tenantId,
+      accessTokenPayload.sessionId,
+    );
     // Generate new access token
-    const accessToken = this.jwtService.sign(accessTokenPayload, {
+    const accessToken = this.jwtService.sign(enrichedPayload, {
       secret: this.configService.get("JWT_SECRET"),
       expiresIn: "15m",
     });
@@ -24619,13 +27906,9 @@ export class AuthService {
       userAgent: userAgent || "unknown",
     });
 
+    const mfaPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      {
-        sub: payload.sub,
-        email: payload.email,
-        tenantId,
-        sessionId: session.id,
-      },
+      mfaPayload,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -24691,13 +27974,9 @@ export class AuthService {
       userAgent: userAgent || "unknown",
     });
 
+    const backupPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      {
-        sub: payload.sub,
-        email: payload.email,
-        tenantId,
-        sessionId: session.id,
-      },
+      backupPayload,
       {
         secret: this.configService.get("JWT_SECRET"),
         expiresIn: "15m",
@@ -24833,8 +28112,9 @@ export class AuthService {
       expiresInDays: 30,
     });
 
+    const passkeyPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
     const accessToken = this.jwtService.sign(
-      { sub: user.id, email: user.email, tenantId, sessionId: session.id },
+      passkeyPayload,
       { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
     );
 
@@ -27048,7 +30328,7 @@ export class SESProvider implements EmailProvider {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/index.ts
-SIZE: 810 B | LINES: 26
+SIZE: 887 B | LINES: 28
 ================================================================================
 
 import { Module } from "@nestjs/common";
@@ -27060,6 +30340,7 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 import { SessionModule } from "@/modules/session/session.module";
 import { DashboardModule } from "@/modules/dashboard/dashboard.module";
+import { AdminModule } from "@/modules/admin/admin.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -27072,6 +30353,7 @@ import { ScheduleModule } from "@nestjs/schedule";
     MfaModule,
     SessionModule,
     DashboardModule,
+    AdminModule,
     ScheduleModule.forRoot(),
   ],
 })
@@ -31843,7 +35125,7 @@ export class OAuthConsentService {
 
 ================================================================================
 FILE: apps/auth-service/src/modules/oauth/services/oauth-refresh-token.service.ts
-SIZE: 8.73 KB | LINES: 334
+SIZE: 8.82 KB | LINES: 335
 ================================================================================
 
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
@@ -32033,6 +35315,7 @@ export class OAuthRefreshTokenService {
     });
 
     // Return payload for new access token
+    // groups and tenantSlug are resolved by AuthService.refreshToken using this payload
     const accessTokenPayload = {
       sub: storedToken.userId,
       email: storedToken.user.email,
@@ -51838,7 +55121,7 @@ SIZE: 2.06 KB | LINES: 93
 
 ================================================================================
 FILE: packages/fortknox-sdk/src/core/client.ts
-SIZE: 27.03 KB | LINES: 984
+SIZE: 28.35 KB | LINES: 1032
 ================================================================================
 
 /**
@@ -52478,6 +55761,54 @@ export class FortKnoxClient {
       !!this.state.accessToken &&
       !isTokenExpired(this.state, this.config.refreshMargin)
     );
+  }
+
+  /**
+   * Parse the JWT payload from the current access token.
+   * Returns null if no token is present.
+   */
+  getTokenClaims(): Record<string, any> | null {
+    if (!this.state.accessToken) return null;
+    try {
+      const payload = JSON.parse(
+        atob(
+          this.state.accessToken
+            .split(".")[1]!
+            .replace(/-/g, "+")
+            .replace(/_/g, "/"),
+        ),
+      );
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  getUserTenantId(): string | null {
+    return this.getTokenClaims()?.tenantId ?? null;
+  }
+
+  getUserTenantSlug(): string | null {
+    return this.getTokenClaims()?.tenantSlug ?? null;
+  }
+
+  isInGroup(groupName: string): boolean {
+    const groups: string[] | undefined = this.getTokenClaims()?.groups;
+    return Array.isArray(groups) && groups.includes(groupName);
+  }
+
+  isFortKnoxInternal(): boolean {
+    const fortknoxTenantId =
+      typeof process !== "undefined"
+        ? (process.env as any)?.NEXT_PUBLIC_FORTKNOX_TENANT_ID ||
+          process.env.FORTKNOX_TENANT_ID
+        : undefined;
+    const claims = this.getTokenClaims();
+    if (!claims) return false;
+    const tenantMatches = fortknoxTenantId
+      ? claims.tenantId === fortknoxTenantId
+      : claims.tenantSlug === "fortknox";
+    return tenantMatches && this.isInGroup("fortknox-internal");
   }
 
   /**
@@ -63349,8 +66680,8 @@ SIZE: 414 B | LINES: 22
 ================================================================================
 CONSOLIDATION SUMMARY
 ================================================================================
-Files Processed: 394
-Total Lines: 60,584
+Files Processed: 412
+Total Lines: 63,789
 Files Skipped: 52
 Errors: 0
-Generated: 2026-03-19T11:11:54.752Z
+Generated: 2026-03-21T22:17:40.755Z
