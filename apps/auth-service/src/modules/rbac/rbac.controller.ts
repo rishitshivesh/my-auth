@@ -459,11 +459,9 @@ export class RbacController {
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
-    return this.policyService.listPolicies(
-      req.tenantId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
-    );
+    const parsedPage = Math.max(1, page ? parseInt(page, 10) || 1 : 1);
+    const parsedLimit = Math.min(100, Math.max(1, limit ? parseInt(limit, 10) || 50 : 50));
+    return this.policyService.listPolicies(req.tenantId, parsedPage, parsedLimit);
   }
 
   @Get("policies/:id")

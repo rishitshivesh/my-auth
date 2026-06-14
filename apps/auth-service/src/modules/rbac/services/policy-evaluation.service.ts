@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import {
   Policy,
   UserRole,
@@ -144,12 +144,14 @@ export class PolicyEvaluationService {
 
     if (condition.DateGreaterThan) {
       const threshold = new Date(condition.DateGreaterThan['sentry:CurrentTime']);
-      if (new Date() <= threshold) return false;
+      const now = context.timestamp ? new Date(context.timestamp) : new Date();
+      if (now <= threshold) return false;
     }
 
     if (condition.DateLessThan) {
       const threshold = new Date(condition.DateLessThan['sentry:CurrentTime']);
-      if (new Date() >= threshold) return false;
+      const now = context.timestamp ? new Date(context.timestamp) : new Date();
+      if (now >= threshold) return false;
     }
 
     if (condition.StringEquals) {
@@ -170,10 +172,11 @@ export class PolicyEvaluationService {
     try {
       const [rangeStr, bitsStr] = cidr.split('/');
       const bits = parseInt(bitsStr, 10);
+      if (isNaN(bits) || bits < 0 || bits > 32) return false;
       const ipNum = this.ipToNumber(ip);
       const rangeNum = this.ipToNumber(rangeStr);
       if (ipNum === null || rangeNum === null) return false;
-      const mask = ~((1 << (32 - bits)) - 1) >>> 0;
+      const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
       return (ipNum & mask) === (rangeNum & mask);
     } catch {
       return false;
@@ -216,14 +219,16 @@ export class PolicyEvaluationService {
       if (up.policy) addPolicy(up.policy);
     }
 
-    // 2. Role policies (via user's roles)
+    // 2. Role policies (via user's roles) — batched to avoid N+1
     const userRoles = await this.userRoleRepo.find({
       where: { userId, tenantId },
     });
-    for (const ur of userRoles) {
-      if (ur.expiresAt && ur.expiresAt < new Date()) continue;
+    const activeRoleIds = userRoles
+      .filter(ur => !ur.expiresAt || ur.expiresAt >= new Date())
+      .map(ur => ur.roleId);
+    if (activeRoleIds.length > 0) {
       const rolePolicies = await this.rolePolicyRepo.find({
-        where: { roleId: ur.roleId, tenantId },
+        where: { roleId: In(activeRoleIds), tenantId },
         relations: ['policy'],
       });
       for (const rp of rolePolicies) {
@@ -236,10 +241,12 @@ export class PolicyEvaluationService {
       where: { userId, tenantId },
       relations: ['group'],
     });
+    const visitedGroups = new Set<string>();
     for (const ug of userGroups) {
       await this.collectGroupPolicies(ug.groupId, tenantId, addPolicy);
+      visitedGroups.add(ug.groupId);
       if (ug.group?.parentGroupId) {
-        await this.walkParentGroups(ug.group.parentGroupId, tenantId, addPolicy);
+        await this.walkParentGroups(ug.group.parentGroupId, tenantId, addPolicy, visitedGroups);
       }
     }
 
@@ -265,14 +272,18 @@ export class PolicyEvaluationService {
     groupId: string,
     tenantId: string,
     addPolicy: (p: Policy) => void,
+    visited: Set<string>,
   ): Promise<void> {
+    if (visited.has(groupId)) return;
+    visited.add(groupId);
+
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
     if (!group) return;
 
     await this.collectGroupPolicies(groupId, tenantId, addPolicy);
 
     if (group.parentGroupId) {
-      await this.walkParentGroups(group.parentGroupId, tenantId, addPolicy);
+      await this.walkParentGroups(group.parentGroupId, tenantId, addPolicy, visited);
     }
   }
 
@@ -285,12 +296,13 @@ export class PolicyEvaluationService {
   ): Promise<EvaluationResult | null> {
     const userRoles = await this.userRoleRepo.find({
       where: { userId, tenantId },
+      relations: ['role'],
     });
 
     for (const ur of userRoles) {
       if (ur.expiresAt && ur.expiresAt < new Date()) continue;
 
-      const role = await this.roleRepo.findOne({ where: { id: ur.roleId } });
+      const role = ur.role;
       if (!role?.permissionBoundaryPolicyId) continue;
 
       const boundaryPolicy = await this.policyRepo.findOne({

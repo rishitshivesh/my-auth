@@ -232,8 +232,11 @@ async function migrateTenant(
           );
         }
 
-        // Verify
-        const verifyCount = await getRowCount(ds, schemaName, table);
+        // Verify using queryRunner to see uncommitted writes within the transaction
+        const verifyResult = await queryRunner.query(
+          `SELECT count(*)::int as count FROM "${schemaName}"."${table}"`,
+        );
+        const verifyCount: number = verifyResult[0]?.count ?? 0;
         if (verifyCount !== sourceCount) {
           throw new Error(
             `Verification failed for "${table}": expected ${sourceCount}, got ${verifyCount}`,

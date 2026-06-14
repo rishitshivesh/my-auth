@@ -7,6 +7,12 @@ import {
   Session,
   User,
   UserRole,
+  Policy,
+  Group,
+  UserGroup,
+  GroupPolicy,
+  UserPolicy,
+  RolePolicy,
 } from "@repo/database";
 import { JwtAuthGuard } from "./jwt-auth-guard";
 import { TenantBindingGuard } from "./tenant-binding.guard";
@@ -17,6 +23,9 @@ import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.gua
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RoleService } from "@/modules/rbac/services/role.service";
 import { PermissionService } from "@/modules/rbac/services/permission.service";
+import { PolicyEvaluationService } from "@/modules/rbac/services/policy-evaluation.service";
+import { RbacCacheService } from "@/modules/rbac/services/rbac-cache.service";
+import { RedisService } from "@/common/service/redis.service";
 
 /**
  * GuardsModule
@@ -42,6 +51,12 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
       Role,
       RolePermission,
       Permission,
+      Policy,
+      Group,
+      UserGroup,
+      GroupPolicy,
+      UserPolicy,
+      RolePolicy,
     ]),
   ],
   providers: [
@@ -54,6 +69,9 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     RbacService,
     RoleService,
     PermissionService,
+    PolicyEvaluationService,
+    RbacCacheService,
+    RedisService,
     RolePermission,
   ],
   exports: [
@@ -66,6 +84,8 @@ import { PermissionService } from "@/modules/rbac/services/permission.service";
     RbacService,
     RoleService,
     PermissionService,
+    PolicyEvaluationService,
+    RbacCacheService,
     RolePermission,
   ],
 })

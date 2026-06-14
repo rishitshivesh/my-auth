@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PolicyEvaluationService } from '../services/policy-evaluation.service';
+import { RbacService } from '../services/rbac.service';
 import { EvaluationContext } from '../types/policy.types';
 
 export const PERMISSIONS_KEY = 'permissions';
@@ -15,6 +16,7 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private policyEvaluationService: PolicyEvaluationService,
+    private rbacService: RbacService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -35,28 +37,50 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
-    const evaluationContext: EvaluationContext = {
-      ipAddress: request.ip ?? '0.0.0.0',
-      mfaVerified: !!user.mfaVerified,
-    };
+    // Try IAM policy evaluation first
+    const policies = await this.policyEvaluationService.collectPolicies(user.sub, tenantId);
 
-    const controllerPath = request.route?.path ?? request.path;
-    const resourceId = request.params?.id;
+    if (policies.length > 0) {
+      // IAM policies exist — use policy-based evaluation
+      const evaluationContext: EvaluationContext = {
+        ipAddress: request.ip ?? '0.0.0.0',
+        mfaVerified: !!user.mfaVerified,
+      };
 
+      const rawPath: string = request.route?.path ?? request.path;
+      const controllerPath = rawPath.replace(/^\/+/, '');
+      const resourceId = request.params?.id;
+
+      for (const permission of requiredPermissions) {
+        const resource = `sentry:tenant:${tenantId}/${controllerPath}${resourceId ? `/${resourceId}` : ''}`;
+
+        const result = await this.policyEvaluationService.evaluate({
+          userId: user.sub,
+          tenantId,
+          action: permission,
+          resource,
+          context: evaluationContext,
+        });
+
+        if (!result.allowed) {
+          throw new ForbiddenException(
+            `Access denied: ${result.reason}${result.deniedBy?.length ? ` (${result.deniedBy.join(', ')})` : ''}`,
+          );
+        }
+      }
+      return true;
+    }
+
+    // Fallback to legacy role-based permission check when no IAM policies are configured
     for (const permission of requiredPermissions) {
-      const resource = `sentry:tenant:${tenantId}/${controllerPath}${resourceId ? `/${resourceId}` : ''}`;
-
-      const result = await this.policyEvaluationService.evaluate({
-        userId: user.sub,
+      const hasPermission = await this.rbacService.userHasPermission(
+        user.sub,
         tenantId,
-        action: permission,
-        resource,
-        context: evaluationContext,
-      });
-
-      if (!result.allowed) {
+        permission,
+      );
+      if (!hasPermission) {
         throw new ForbiddenException(
-          `Access denied: ${result.reason}${result.deniedBy?.length ? ` (${result.deniedBy.join(', ')})` : ''}`,
+          `Access denied: missing permission "${permission}"`,
         );
       }
     }

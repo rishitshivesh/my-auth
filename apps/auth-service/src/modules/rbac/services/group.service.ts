@@ -96,8 +96,33 @@ export class GroupService {
       throw new BadRequestException('Cannot modify system group');
     }
 
-    if (dto.name !== undefined) group.name = dto.name;
     if (dto.description !== undefined) group.description = dto.description ?? null;
+
+    if (dto.name !== undefined && dto.name !== group.name) {
+      const oldPath = group.path;
+      const parentPath = oldPath.substring(0, oldPath.lastIndexOf(group.name + '/'));
+      const newPath = `${parentPath}${dto.name}/`;
+      group.name = dto.name;
+      group.path = newPath;
+
+      const saved = await this.groupRepo.save(group);
+
+      // Cascade path change to all descendants
+      const descendants = await this.groupRepo
+        .createQueryBuilder('g')
+        .where('g.tenantId = :tenantId', { tenantId })
+        .andWhere('g.path LIKE :prefix', { prefix: `${oldPath}%` })
+        .andWhere('g.id != :id', { id })
+        .getMany();
+
+      for (const desc of descendants) {
+        desc.path = newPath + desc.path.substring(oldPath.length);
+        await this.groupRepo.save(desc);
+      }
+
+      logger.info({ groupId: id, oldPath, newPath }, 'Group renamed with path cascade');
+      return saved;
+    }
 
     const saved = await this.groupRepo.save(group);
     logger.info({ groupId: id }, 'Group updated');
