@@ -37,6 +37,7 @@ import { logger } from "@/common/logger";
 import { type Request, type Response } from "express";
 import { FortKnoxProtectedGuard } from "@/common/guards/fortknox-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
+import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { access } from "fs";
 
 /**
@@ -58,6 +59,7 @@ export class AuthController {
    * Register a new user
    */
   @Post("register")
+  @RateLimit({ max: 3, windowMs: 3600000, keyBy: "ip" })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Register a new user" })
   @ApiResponse({ status: 201, description: "User successfully registered" })
@@ -82,6 +84,7 @@ export class AuthController {
    * Login with email and password
    */
   @Post("login")
+  @RateLimit({ max: 5, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Login with email and password" })
   @ApiResponse({ status: 200, description: "Login successful" })
@@ -159,6 +162,7 @@ export class AuthController {
    * Request password reset
    */
   @Post("forgot-password")
+  @RateLimit({ max: 3, windowMs: 3600000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Request password reset email" })
   @ApiResponse({ status: 200, description: "Password reset email sent" })
@@ -398,6 +402,7 @@ export class AuthController {
    * Verify MFA code and complete login
    */
   @Post("mfa/verify")
+  @RateLimit({ max: 5, windowMs: 300000, keyBy: "user" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Verify MFA code and complete login",
@@ -669,6 +674,7 @@ export class AuthController {
    * Send magic link sign-in email
    */
   @Post("magic-link/send")
+  @RateLimit({ max: 3, windowMs: 3600000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Send magic link sign-in email" })
   @ApiResponse({ status: 200, description: "Magic link sent (or silently ignored if user not found)" })

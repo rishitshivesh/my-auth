@@ -50,6 +50,7 @@ import { type Request, type Response } from "express";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { RequirePermissions } from "../rbac/decorators/rbac.decorator";
 import { JwksService } from "./services/jwks.service";
+import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { logger } from "@/common/logger";
 
 @ApiTags("OAuth2/OIDC")
@@ -205,6 +206,7 @@ export class OAuthController {
   // ============================================================
 
   @Post("token")
+  @RateLimit({ max: 10, windowMs: 60000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "OAuth2 Token Endpoint",
@@ -620,8 +622,10 @@ export class OAuthController {
     description: "JWKS",
     type: JWKSResponseDto,
   })
-  getJWKS(): JWKSResponseDto {
-    return this.jwksService.getJWKS() as JWKSResponseDto;
+  async getJWKS(@Req() req: Request): Promise<JWKSResponseDto> {
+    const tenantId = req.tenantId;
+    const keys = await this.jwksService.getVerificationKeys(tenantId);
+    return { keys } as JWKSResponseDto;
   }
 
   // ============================================================

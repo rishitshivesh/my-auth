@@ -17,6 +17,7 @@ import {
 } from "@repo/database";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import { JwksService } from "./jwks.service";
 
 export interface CreateAuthorizationCodeDto {
   tenantId: string;
@@ -71,7 +72,18 @@ export class OAuthTokenService {
     private userRepository: Repository<User>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private readonly jwksService: JwksService,
   ) {}
+
+  private async signToken(payload: Record<string, unknown>, expiresIn: string | number, tenantId?: string): Promise<string> {
+    const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    return this.jwtService.sign(payload, {
+      privateKey,
+      algorithm: 'RS256',
+      header: { alg: 'RS256', kid },
+      expiresIn,
+    });
+  }
 
   // ============================================================
   // AUTHORIZATION CODES
@@ -263,10 +275,7 @@ export class OAuthTokenService {
     }
 
     // Sign JWT
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get("JWT_SECRET"),
-      expiresIn: client.accessTokenTtl,
-    });
+    const accessToken = await this.signToken(payload, client.accessTokenTtl, data.tenantId);
 
     // Store token record (for revocation tracking)
     await this.accessTokenRepository.save({
@@ -291,11 +300,14 @@ export class OAuthTokenService {
    * Validate access token
    */
   async validateAccessToken(token: string): Promise<OAuthAccessToken> {
-    // Verify JWT signature
+    // Verify JWT signature (RS256)
     let payload: any;
     try {
+      const { privateKey } = await this.jwksService.getCurrentSigningKey();
+      const publicKey = crypto.createPublicKey(privateKey);
       payload = this.jwtService.verify(token, {
-        secret: this.configService.get("JWT_SECRET"),
+        publicKey,
+        algorithms: ["RS256"],
       });
     } catch (error) {
       throw new UnauthorizedException("Invalid access token");
@@ -614,10 +626,7 @@ export class OAuthTokenService {
     }
 
     // Sign ID token
-    const idToken = this.jwtService.sign(payload, {
-      secret: this.configService.get("JWT_SECRET"),
-      expiresIn: client.idTokenTtl,
-    });
+    const idToken = await this.signToken(payload, client.idTokenTtl, client.tenantId);
 
     logger.info({ userId: user.id }, "Created ID token");
 
@@ -667,8 +676,11 @@ export class OAuthTokenService {
   ): Promise<any> {
     // Try as JWT first (access token)
     try {
+      const { privateKey } = await this.jwksService.getCurrentSigningKey();
+      const publicKey = crypto.createPublicKey(privateKey);
       const payload = this.jwtService.verify(token, {
-        secret: this.configService.get("JWT_SECRET"),
+        publicKey,
+        algorithms: ["RS256"],
       });
 
       const jti = payload.jti;

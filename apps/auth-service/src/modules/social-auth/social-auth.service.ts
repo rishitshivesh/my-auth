@@ -23,6 +23,7 @@ import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { JwksService } from "@/modules/oauth/services/jwks.service";
 
 export interface SocialProfile {
   provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
@@ -71,7 +72,18 @@ export class SocialAuthService {
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly jwksService: JwksService,
   ) {}
+
+  private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
+    const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    return this.jwtService.sign(payload, {
+      privateKey,
+      algorithm: 'RS256',
+      header: { alg: 'RS256', kid },
+      expiresIn,
+    });
+  }
 
   /**
    * Handle social login callback
@@ -224,17 +236,15 @@ export class SocialAuthService {
       });
 
     // Generate access token
-    const accessToken = this.jwtService.sign(
+    const accessToken = await this.signToken(
       {
         sub: user.id,
         email: user.email,
         tenantId: connection.tenantId,
         sessionId: session.id,
       },
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
+      "15m",
+      connection.tenantId,
     );
 
     // Update user last login
@@ -362,17 +372,15 @@ export class SocialAuthService {
       });
 
     // Generate access token
-    const accessToken = this.jwtService.sign(
+    const accessToken = await this.signToken(
       {
         sub: user.id,
         email: user.email,
         tenantId,
         sessionId: session.id,
       },
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
+      "15m",
+      tenantId,
     );
 
     // Log security event
@@ -654,9 +662,10 @@ export class SocialAuthService {
     userId: string,
     tenantId: string,
   ): Promise<{ linkToken: string }> {
-    const linkToken = this.jwtService.sign(
+    const linkToken = await this.signToken(
       { userId, tenantId, mode: "link" },
-      { expiresIn: "60s" },
+      "60s",
+      tenantId,
     );
     return { linkToken };
   }
@@ -664,12 +673,14 @@ export class SocialAuthService {
   /**
    * Verify and decode a link token. Throws UnauthorizedException if invalid/expired.
    */
-  verifyLinkToken(token: string): { userId: string; tenantId: string } {
+  async verifyLinkToken(token: string): Promise<{ userId: string; tenantId: string }> {
     try {
-      return this.jwtService.verify(token) as {
-        userId: string;
-        tenantId: string;
-      };
+      const { privateKey } = await this.jwksService.getCurrentSigningKey();
+      const publicKey = crypto.createPublicKey(privateKey);
+      return this.jwtService.verify(token, {
+        publicKey,
+        algorithms: ["RS256"],
+      }) as { userId: string; tenantId: string };
     } catch {
       throw new UnauthorizedException("Invalid or expired link token");
     }

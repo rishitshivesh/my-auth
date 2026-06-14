@@ -21,6 +21,7 @@ import {
 import {
   SecurityEventService,
 } from "@/common/service/security-event.service";
+import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
@@ -68,7 +69,18 @@ export class AuthService {
     private readonly webauthnService: WebAuthnService,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly securityEventService: SecurityEventService,
+    private readonly jwksService: JwksService,
   ) {}
+
+  private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
+    const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    return this.jwtService.sign(payload as Record<string, unknown>, {
+      privateKey,
+      algorithm: 'RS256',
+      header: { alg: 'RS256', kid },
+      expiresIn,
+    });
+  }
 
   /**
    * Get role names (groups) for a user within a tenant
@@ -307,17 +319,15 @@ export class AuthService {
 
     if (mfaStatus.enabled) {
       // Generate temporary token for MFA verification
-      const tempToken = this.jwtService.sign(
+      const tempToken = await this.signToken(
         {
           sub: user.id,
           email: user.email,
           tenantId,
           type: "mfa_pending",
         },
-        {
-          secret: this.configService.get("JWT_SECRET"),
-          expiresIn: "5m", // Short-lived
-        },
+        "5m",
+        tenantId,
       );
 
       logger.info({ userId: user.id }, "MFA required for user");
@@ -379,12 +389,10 @@ export class AuthService {
       session.id,
       user.tenant,
     );
-    const accessToken = this.jwtService.sign(
+    const accessToken = await this.signToken(
       accessTokenPayloadData,
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
+      "15m",
+      data.tenantId,
     );
 
     logger.info("Access token generated");
@@ -577,9 +585,10 @@ export class AuthService {
     });
 
     const magicLinkPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
-    const accessToken = this.jwtService.sign(
+    const accessToken = await this.signToken(
       magicLinkPayload,
-      { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
+      "15m",
+      tenantId,
     );
 
     this.securityEventService.log({
@@ -801,10 +810,7 @@ export class AuthService {
       accessTokenPayload.sessionId,
     );
     // Generate new access token
-    const accessToken = this.jwtService.sign(enrichedPayload, {
-      secret: this.configService.get("JWT_SECRET"),
-      expiresIn: "15m",
-    });
+    const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
 
     // Update session: new refresh token hash + expiry + lastUsedAt
     if (accessTokenPayload.sessionId) {
@@ -966,8 +972,11 @@ export class AuthService {
     userAgent: string,
   ) {
     // Step 1: Verify temporary token
+    const { privateKey } = await this.jwksService.getCurrentSigningKey();
+    const publicKey = crypto.createPublicKey(privateKey);
     const payload = this.jwtService.verify(tempToken, {
-      secret: this.configService.get("JWT_SECRET"),
+      publicKey,
+      algorithms: ["RS256"],
     });
 
     if (payload.type !== "mfa_pending") {
@@ -1006,13 +1015,7 @@ export class AuthService {
     });
 
     const mfaPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
-    const accessToken = this.jwtService.sign(
-      mfaPayload,
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
-    );
+    const accessToken = await this.signToken(mfaPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "MFA verified successfully");
 
@@ -1034,8 +1037,11 @@ export class AuthService {
     userAgent: string,
   ) {
     // Step 1: Verify temporary token
+    const { privateKey } = await this.jwksService.getCurrentSigningKey();
+    const publicKey = crypto.createPublicKey(privateKey);
     const payload = this.jwtService.verify(tempToken, {
-      secret: this.configService.get("JWT_SECRET"),
+      publicKey,
+      algorithms: ["RS256"],
     });
 
     if (payload.type !== "mfa_pending") {
@@ -1074,13 +1080,7 @@ export class AuthService {
     });
 
     const backupPayload = await this.buildAccessTokenPayload(payload.sub, payload.email, tenantId, session.id);
-    const accessToken = this.jwtService.sign(
-      backupPayload,
-      {
-        secret: this.configService.get("JWT_SECRET"),
-        expiresIn: "15m",
-      },
-    );
+    const accessToken = await this.signToken(backupPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "Backup code verified");
 
@@ -1212,10 +1212,7 @@ export class AuthService {
     });
 
     const passkeyPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
-    const accessToken = this.jwtService.sign(
-      passkeyPayload,
-      { secret: this.configService.get("JWT_SECRET"), expiresIn: "15m" },
-    );
+    const accessToken = await this.signToken(passkeyPayload, "15m", tenantId);
 
     // Log successful passkey login
     this.securityEventService.log({

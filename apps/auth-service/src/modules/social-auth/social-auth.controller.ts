@@ -18,8 +18,10 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
+import * as crypto from "crypto";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
+import { JwksService } from "@/modules/oauth/services/jwks.service";
 
 @ApiTags("Social Authentication")
 @Controller("auth/social")
@@ -28,7 +30,18 @@ export class SocialAuthController {
     private readonly socialAuthService: SocialAuthService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly jwksService: JwksService,
   ) {}
+
+  private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
+    const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    return this.jwtService.sign(payload, {
+      privateKey,
+      algorithm: 'RS256',
+      header: { alg: 'RS256', kid },
+      expiresIn,
+    });
+  }
 
   // ============================================================
   // GOOGLE OAUTH
@@ -246,9 +259,10 @@ export class SocialAuthController {
       });
 
       // Create short-lived completion token (60s, one-time use by the portal)
-      const completionToken = this.jwtService.sign(
+      const completionToken = await this.signToken(
         { accessToken: result.accessToken, type: "social_completion" },
-        { secret: this.configService.get("JWT_SECRET"), expiresIn: "60s" },
+        "60s",
+        tenantId,
       );
 
       return res.redirect(`${safeReturnUrl}/u/auth/callback?ct=${completionToken}`);
@@ -274,8 +288,11 @@ export class SocialAuthController {
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
   async claimSession(@Body() body: { ct: string }) {
     try {
+      const { privateKey } = await this.jwksService.getCurrentSigningKey();
+      const publicKey = crypto.createPublicKey(privateKey);
       const payload = this.jwtService.verify(body.ct, {
-        secret: this.configService.get("JWT_SECRET"),
+        publicKey,
+        algorithms: ["RS256"],
       });
 
       if (payload.type !== "social_completion") {

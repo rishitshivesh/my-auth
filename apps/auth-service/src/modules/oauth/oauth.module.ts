@@ -11,6 +11,7 @@ import {
   Role,
   Permission,
   UserRole,
+  KeyPair,
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { OAuthController } from "./oauth.controller";
@@ -33,6 +34,7 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
       Role,
       Permission,
       UserRole,
+      KeyPair,
     ]),
     JwtModule.register({}), // Config provided in service
     RbacModule,
