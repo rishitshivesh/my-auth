@@ -8,6 +8,7 @@
 import { Controller, Get, Query, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
+import { User } from "@repo/database";
 import { EmailService } from "./email.service";
 
 @ApiTags("Email (Development)")
