@@ -5,9 +5,17 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { logger } from "src/common/logger";
 import { ResponseInterceptor } from "src/common/interceptors/response.interceptors";
 import { saveApiDoc } from "./services/utility/utility.service";
-import { ALLOWED_URLS } from "../common/constants";
 import cookieParser from "cookie-parser";
 import session from "express-session";
+import helmet from "helmet";
+
+function parseCorsOrigins(): string[] {
+  const raw = process.env.CORS_ORIGINS || "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 @Module({
   imports: [],
@@ -15,13 +23,24 @@ import session from "express-session";
 export class AppModule {
   static async startApp(): Promise<void> {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
+
+    const isProduction = process.env.NODE_ENV === "production";
+    const allowedOrigins = parseCorsOrigins();
+
+    // Security headers
+    app.use(
+      helmet({
+        contentSecurityPolicy: isProduction ? undefined : false,
+      }),
+    );
+
+    // Cookie parser must be registered before interceptors
+    app.use(cookieParser());
+
     app.enableCors({
       origin: (origin: any, cb: any) => {
-        // allow non-browser calls (curl/postman/server-to-server)
         if (!origin) return cb(null, true);
-
-        const allowed = ALLOWED_URLS.includes(origin);
-        return allowed
+        return allowedOrigins.includes(origin)
           ? cb(null, true)
           : cb(new Error(`CORS blocked for origin: ${origin}`), false);
       },
@@ -39,18 +58,6 @@ export class AppModule {
       optionsSuccessStatus: 204,
     });
 
-    app.use((req: any, _res: any, next: any) => {
-      if (req.method === "OPTIONS") {
-        console.log("Preflight:", {
-          origin: req.headers.origin,
-          acrm: req.headers["access-control-request-method"],
-          acrh: req.headers["access-control-request-headers"],
-          path: req.path,
-        });
-      }
-      next();
-    });
-    
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -58,33 +65,33 @@ export class AppModule {
       }),
     );
 
-    const config = new DocumentBuilder()
-      .setTitle("identity-server")
-      .setDescription("API for Identity Server")
-      .setVersion("1.0")
-      .setExternalDoc("Sample", "https://id.sample.com")
-      .addBearerAuth()
-      .build();
+    // Swagger — disabled in production
+    if (!isProduction) {
+      const config = new DocumentBuilder()
+        .setTitle("identity-server")
+        .setDescription("API for Identity Server")
+        .setVersion("1.0")
+        .setExternalDoc("Sample", "https://id.sample.com")
+        .addBearerAuth()
+        .build();
 
-    const documentForGeneralApis = SwaggerModule.createDocument(app, config);
-
-    SwaggerModule.setup("api-docs", app, documentForGeneralApis);
-    saveApiDoc("api-docs", documentForGeneralApis, "nest-be");
-
-    if (app) {
-      logger.info("Application started successfully");
-      logger.info(`Application is running on: ${process.env.PORT}`);
-      app.useGlobalInterceptors(new ResponseInterceptor());
-      app.use(cookieParser());
-      // app.setGlobalPrefix('api');
-      app.use(
-        session({
-          secret: "nest-session-secret",
-          resave: false,
-          saveUninitialized: false,
-        }),
-      );
-      await app.listen(process.env.PORT || 4000);
+      const documentForGeneralApis = SwaggerModule.createDocument(app, config);
+      SwaggerModule.setup("api-docs", app, documentForGeneralApis);
+      saveApiDoc("api-docs", documentForGeneralApis, "nest-be");
     }
+
+    app.useGlobalInterceptors(new ResponseInterceptor());
+
+    app.use(
+      session({
+        secret: process.env.SESSION_SECRET!,
+        resave: false,
+        saveUninitialized: false,
+      }),
+    );
+
+    const port = process.env.PORT || 4000;
+    await app.listen(port);
+    logger.info(`Application is running on port ${port}`);
   }
 }

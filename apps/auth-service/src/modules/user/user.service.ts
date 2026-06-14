@@ -14,6 +14,7 @@ import {
 } from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
+import { logger } from "@/common/logger";
 
 /**
  * User Service
@@ -689,11 +690,118 @@ export class UserService {
       });
     }
 
-    console.log(
-      `✅ Bulk ${isActive ? "activated" : "deactivated"} ${users.length} users`,
+    logger.info(
+      { count: users.length, isActive },
+      `Bulk ${isActive ? "activated" : "deactivated"} users`,
     );
 
     return { updated: result.affected || 0 };
+  }
+
+  async adminForcePasswordReset(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    user.forcePasswordChange = true;
+    await this.userRepository.save(user);
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      actorEmail: "admin",
+      eventType: SecurityEventType.PASSWORD_RESET_REQUESTED,
+      severity: "medium",
+      ipAddress: "0.0.0.0",
+      userAgent: "admin",
+      metadata: { action: "force_password_reset" },
+    });
+
+    logger.info({ userId, tenantId }, "Admin forced password reset for user");
+  }
+
+  async adminLockUser(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    user.status = "suspended";
+    user.lockedUntil = new Date("2099-12-31T23:59:59Z");
+    await this.userRepository.save(user);
+
+    await this.sessionRepository.update(
+      { userId, revokedAt: IsNull() },
+      { revokedAt: new Date(), revokedReason: "admin_lock" },
+    );
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      actorEmail: "admin",
+      eventType: SecurityEventType.USER_LOCKED,
+      severity: "high",
+      ipAddress: "0.0.0.0",
+      userAgent: "admin",
+      metadata: { action: "admin_lock" },
+    });
+
+    logger.info({ userId, tenantId }, "Admin locked user account");
+  }
+
+  async adminUnlockUser(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    user.status = "active";
+    user.lockedUntil = null;
+    user.failedLoginAttempts = 0;
+    await this.userRepository.save(user);
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      actorEmail: "admin",
+      eventType: SecurityEventType.USER_ACTIVATED,
+      severity: "medium",
+      ipAddress: "0.0.0.0",
+      userAgent: "admin",
+      metadata: { action: "admin_unlock" },
+    });
+
+    logger.info({ userId, tenantId }, "Admin unlocked user account");
+  }
+
+  async adminDeleteUser(tenantId: string, userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId, tenantId },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    user.status = "deleted";
+    user.isActive = false;
+    await this.userRepository.save(user);
+
+    await this.sessionRepository.update(
+      { userId, revokedAt: IsNull() },
+      { revokedAt: new Date(), revokedReason: "admin_delete" },
+    );
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      actorEmail: "admin",
+      eventType: SecurityEventType.USER_DELETED,
+      severity: "high",
+      ipAddress: "0.0.0.0",
+      userAgent: "admin",
+      metadata: { action: "admin_soft_delete" },
+    });
+
+    logger.info({ userId, tenantId }, "Admin soft-deleted user account");
   }
 
   /**

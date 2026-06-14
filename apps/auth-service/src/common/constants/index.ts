@@ -1,6 +1,5 @@
 export const AUTHORIZATION_KEY = 'x-authorization';
 
-export const ALLOWED_URLS = ['*', 'http://localhost:3000'];
 
 export const EXPIRES_IN = {
   ONE_MINUTE: 60,

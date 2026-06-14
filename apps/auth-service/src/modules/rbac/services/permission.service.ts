@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Permission } from "@repo/database";
+import { logger } from "@/common/logger";
 
 export interface CreatePermissionDto {
   tenantId: string;
@@ -62,7 +63,7 @@ export class PermissionService {
       metadata: data.metadata,
     });
 
-    console.log(`✅ Created permission: ${permission.name}`);
+    logger.info({ permissionName: permission.name }, "Created permission");
 
     return permission;
   }
@@ -93,9 +94,7 @@ export class PermissionService {
       } catch (error) {
         // Skip if already exists
         if (error instanceof ConflictException) {
-          console.log(
-            `⏭️  Skipping existing permission: ${perm.resource}:${perm.action}`,
-          );
+          logger.info({ permission: `${perm.resource}:${perm.action}` }, "Skipping existing permission");
         } else {
           throw error;
         }
@@ -213,7 +212,7 @@ export class PermissionService {
 
     await this.permissionRepository.save(permission);
 
-    console.log(`✅ Updated permission: ${permission.name}`);
+    logger.info({ permissionName: permission.name }, "Updated permission");
 
     return permission;
   }
@@ -230,7 +229,7 @@ export class PermissionService {
 
     await this.permissionRepository.remove(permission);
 
-    console.log(`🗑️  Deleted permission: ${permission.name}`);
+    logger.info({ permissionName: permission.name }, "Deleted permission");
   }
 
   /**

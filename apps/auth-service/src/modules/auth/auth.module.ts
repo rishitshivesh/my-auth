@@ -35,6 +35,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
 import { ScheduleModule } from "@nestjs/schedule";
 import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 import { SessionModule } from "@/modules/session/session.module";
+import { OAuthModule } from "@/modules/oauth/oauth.module";
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { SessionModule } from "@/modules/session/session.module";
     EmailModule,
     GuardsModule,
     SessionModule,
+    OAuthModule,
     ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
     JwtModule.registerAsync({
