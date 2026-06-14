@@ -928,7 +928,7 @@ export class AuthService {
     const newAttempts = user.failedLoginAttempts + 1;
 
     // Lock account after 5 failed attempts
-    const update: any = {
+    const update: Partial<Pick<User, 'failedLoginAttempts' | 'lockedUntil'>> = {
       failedLoginAttempts: newAttempts,
     };
 
@@ -1110,7 +1110,7 @@ export class AuthService {
   async startWebAuthnLogin(
     tenantId: string,
     email: string,
-  ): Promise<{ sessionNonce: string; [key: string]: any }> {
+  ): Promise<{ sessionNonce: string; [key: string]: unknown }> {
     // Find user
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
@@ -1142,12 +1142,12 @@ export class AuthService {
   async finishWebAuthnLogin(data: {
     tenantId: string;
     email: string;
-    webauthnResponse: any;
+    webauthnResponse: unknown;
     sessionNonce: string;
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+  }): Promise<{ accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
@@ -1358,7 +1358,7 @@ export class AuthService {
     };
 
     const preferredMethod =
-      (user.preferredAuthMethod as any) ||
+      (user.preferredAuthMethod as string) ||
       this.determineDefaultMethod(methods);
 
     return {

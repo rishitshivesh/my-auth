@@ -3,9 +3,18 @@ import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { User, Session, Tenant, TenantSocialProvider } from "@repo/database";
+import { type SocialProvider } from "@repo/database/src/entities/user-social-connections.entity";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { DashboardService } from "./dashboard.service";
+
+interface AuthenticatedRequest {
+  tenantId: string;
+  user: { sub: string; email?: string; mfaVerified?: boolean };
+  ip?: string;
+  route?: { path: string };
+  params?: Record<string, string>;
+}
 
 @ApiTags("Dashboard")
 @Controller("dashboard")
@@ -26,7 +35,7 @@ export class DashboardController {
 
   @Get()
   @ApiOperation({ summary: "Get dashboard overview for current user" })
-  async getOverview(@Request() req: any) {
+  async getOverview(@Request() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -62,7 +71,7 @@ export class DashboardController {
 
   @Get("tenant-settings")
   @ApiOperation({ summary: "Get tenant login method settings" })
-  async getTenantSettings(@Request() req: any) {
+  async getTenantSettings(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
 
     const [tenant, socialProviders] = await Promise.all([
@@ -84,7 +93,7 @@ export class DashboardController {
   @Patch("tenant-settings")
   @ApiOperation({ summary: "Update tenant feature flags for login methods" })
   async updateTenantSettings(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() body: { featureFlags: Record<string, boolean> },
   ) {
     const tenantId = req.tenantId!;
@@ -101,14 +110,14 @@ export class DashboardController {
 
   @Get("tenant-metrics")
   @ApiOperation({ summary: "Get aggregate metrics for this tenant" })
-  async getTenantMetrics(@Request() req: any) {
+  async getTenantMetrics(@Request() req: AuthenticatedRequest) {
     return this.dashboardService.getTenantMetrics(req.tenantId!);
   }
 
   @Get("tenant-activity")
   @ApiOperation({ summary: "Get recent security events for this tenant" })
   async getTenantActivity(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query("limit") limitStr?: string,
   ) {
     const limit = limitStr ? Math.min(parseInt(limitStr, 10) || 20, 100) : 20;
@@ -118,7 +127,7 @@ export class DashboardController {
   @Get("api-call-trend")
   @ApiOperation({ summary: "Get daily API call counts for this tenant" })
   async getApiCallTrend(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query("days") daysStr?: string,
   ) {
     const raw = parseInt(daysStr ?? "7", 10);
@@ -128,21 +137,21 @@ export class DashboardController {
 
   @Get("auth-breakdown")
   @ApiOperation({ summary: "Get authentication method breakdown for this tenant" })
-  async getAuthBreakdown(@Request() req: any) {
+  async getAuthBreakdown(@Request() req: AuthenticatedRequest) {
     return this.dashboardService.getAuthMethodBreakdown(req.tenantId!);
   }
 
   @Patch("tenant-settings/social/:provider")
   @ApiOperation({ summary: "Enable/disable and configure a social provider for this tenant" })
   async updateSocialProvider(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param("provider") provider: string,
     @Body() body: { enabled: boolean; clientId?: string; clientSecret?: string },
   ) {
     const tenantId = req.tenantId!;
 
     const existing = await this.tenantSocialProviderRepository.findOne({
-      where: { tenantId, provider: provider as any },
+      where: { tenantId, provider: provider as SocialProvider },
     });
 
     if (existing) {
@@ -154,7 +163,7 @@ export class DashboardController {
     } else {
       await this.tenantSocialProviderRepository.save({
         tenantId,
-        provider: provider as any,
+        provider: provider as SocialProvider,
         enabled: body.enabled,
         clientId: body.clientId,
         clientSecret: body.clientSecret,

@@ -79,7 +79,7 @@ export class OAuthRefreshTokenService {
     token: string;
     ipAddress?: string;
     userAgent?: string;
-  }): Promise<{ accessTokenPayload: any; newToken: string }> {
+  }): Promise<{ accessTokenPayload: Record<string, unknown>; newToken: string }> {
     const { tenantId, token, ipAddress, userAgent } = params;
 
     // Hash incoming token

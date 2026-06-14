@@ -78,10 +78,10 @@ export class OAuthTokenService {
   private async signToken(payload: Record<string, unknown>, expiresIn: string | number, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     return this.jwtService.sign(payload, {
-      privateKey: privateKey as any,
+      privateKey: privateKey as crypto.KeyObject,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as any,
+      expiresIn: expiresIn as string | number,
     });
   }
 
@@ -246,7 +246,7 @@ export class OAuthTokenService {
     const iat = Math.floor(Date.now() / 1000);
 
     // Build JWT payload
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       iss: this.configService.get("JWT_ISSUER", "https://sentry.scrolloop.com"),
       sub: data.userId || data.clientId, // User ID or client ID for M2M
       aud: data.audience || data.clientId,
@@ -301,19 +301,19 @@ export class OAuthTokenService {
    */
   async validateAccessToken(token: string): Promise<OAuthAccessToken> {
     // Verify JWT signature (RS256)
-    let payload: any;
+    let payload: Record<string, unknown>;
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
-        publicKey: publicKey as any,
+        publicKey: publicKey as crypto.KeyObject,
         algorithms: ['RS256'],
-      });
-    } catch (error) {
+      }) as Record<string, unknown>;
+    } catch (error: unknown) {
       throw new UnauthorizedException("Invalid access token");
     }
 
     // Look up token in database (for revocation check)
-    const jti = payload.jti;
+    const jti = payload.jti as string;
     const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
 
     const accessToken = await this.accessTokenRepository.findOne({
@@ -348,13 +348,13 @@ export class OAuthTokenService {
     reason: string = "user_revoked",
   ): Promise<void> {
     // Decode without verifying (to get JTI)
-    const payload = this.jwtService.decode(token) as any;
+    const payload = this.jwtService.decode(token) as Record<string, unknown> | null;
 
     if (!payload || !payload.jti) {
       return; // Invalid token, nothing to revoke
     }
 
-    const jti = payload.jti;
+    const jti = payload.jti as string;
     const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
 
     await this.accessTokenRepository.update(
@@ -601,7 +601,7 @@ export class OAuthTokenService {
     const iat = Math.floor(Date.now() / 1000);
 
     // Build ID token payload (OIDC standard claims)
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       iss: this.configService.get("JWT_ISSUER", "https://sentry.scrolloop.com"),
       sub: user.id,
       aud: client.clientId,
@@ -672,15 +672,15 @@ export class OAuthTokenService {
   async introspectToken(
     token: string,
     tokenTypeHint?: "access_token" | "refresh_token",
-  ): Promise<any> {
-    let payload: any;
+  ): Promise<Record<string, unknown>> {
+    let payload: Record<string, unknown>;
     // Try as JWT first (access token)
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
-        publicKey: publicKey as any,
+        publicKey: publicKey as crypto.KeyObject,
         algorithms: ['RS256'],
-      });
+      }) as Record<string, unknown>;
 
       const jti = payload.jti;
       const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
