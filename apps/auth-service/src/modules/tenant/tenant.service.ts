@@ -11,6 +11,8 @@ import { Tenant } from "@repo/database";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { type Cache } from "cache-manager";
 import { TenantBrandingDto } from "./dto/tenant-branding.dto";
+import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
+import { logger } from "@/common/logger";
 
 @Injectable()
 export class TenantService {
@@ -20,6 +22,7 @@ export class TenantService {
 
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+    private tenantSchemaService: TenantSchemaService,
   ) {}
 
   /**
@@ -137,7 +140,16 @@ export class TenantService {
       active: true,
     });
 
-    return this.tenantRepository.save(tenant);
+    const saved = await this.tenantRepository.save(tenant);
+
+    try {
+      await this.tenantSchemaService.createSchema(saved.slug);
+      logger.info({ tenantId: saved.id, slug: saved.slug }, "tenant_schema_created");
+    } catch (err) {
+      logger.error({ err, tenantId: saved.id }, "Failed to create tenant schema");
+    }
+
+    return saved;
   }
 
   /**

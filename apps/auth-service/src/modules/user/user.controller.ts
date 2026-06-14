@@ -342,8 +342,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async deleteUser(@Request() req: any, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    // TODO: Implement admin delete in UserService (different from self-delete)
-    await this.userService.deleteAccount(tenantId, id, ""); // Requires service update
+    await this.userService.adminDeleteUser(tenantId, id);
   }
 
   /**
@@ -359,7 +358,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async forcePasswordReset(@Request() req: any, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    // TODO: Implement in UserService
+    await this.userService.adminForcePasswordReset(tenantId, id);
     return { message: "User will be required to reset password on next login" };
   }
 
@@ -376,7 +375,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async lockUser(@Request() req: any, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    // TODO: Implement in UserService
+    await this.userService.adminLockUser(tenantId, id);
     return { message: "User account locked" };
   }
 
@@ -389,7 +388,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async unlockUser(@Request() req: any, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    // TODO: Implement in UserService
+    await this.userService.adminUnlockUser(tenantId, id);
     return { message: "User account unlocked" };
   }
 }

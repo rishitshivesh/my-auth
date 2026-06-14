@@ -9,6 +9,7 @@ import { TenantBrandingController, PublicBrandingController } from "./tenant-bra
 import { TenantBrandingService } from "./tenant-branding.service";
 import { FileStorageService } from "./file-storage.service";
 import { SecurityEventModule } from "@/common/service/security-event.module";
+import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
 
 @Module({
   imports: [
@@ -19,8 +20,8 @@ import { SecurityEventModule } from "@/common/service/security-event.module";
     }),
     SecurityEventModule,
   ],
-  providers: [TenantService, TenantBrandingService, FileStorageService],
+  providers: [TenantService, TenantBrandingService, FileStorageService, TenantSchemaService],
   controllers: [TenantController, TenantBrandingController, PublicBrandingController],
-  exports: [TenantService, TenantBrandingService],
+  exports: [TenantService, TenantBrandingService, TenantSchemaService],
 })
 export class TenantModule {}

@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 import * as crypto from "crypto";
 import { EmailService } from "@/modules/email/email.service";
 import { UserService } from "@/modules/user/user.service";
+import { logger } from "@/common/logger";
 
 interface OtpEntry {
   code: string;
@@ -46,7 +47,7 @@ export class EmailOtpService {
 
     await this.emailService.sendOTPEmail(user, code);
 
-    console.log(`📧 OTP sent to ${user.email} (expires in 10 minutes)`);
+    logger.info({ email: user.email }, "OTP sent (expires in 10 minutes)");
   }
 
   /**
@@ -61,20 +62,20 @@ export class EmailOtpService {
     const entry = this.otpStore.get(key);
 
     if (!entry) {
-      console.log("❌ No OTP found for user");
+      logger.warn("No OTP found for user");
       return false;
     }
 
     // Check expiration
     if (entry.expiresAt < new Date()) {
-      console.log("❌ OTP expired");
+      logger.warn("OTP expired");
       this.otpStore.delete(key);
       return false;
     }
 
     // Check attempts (max 5)
     if (entry.attempts >= 5) {
-      console.log("❌ Too many attempts");
+      logger.warn("Too many OTP attempts");
       this.otpStore.delete(key);
       return false;
     }
@@ -85,13 +86,13 @@ export class EmailOtpService {
     // Verify code
     const hashedCode = await this.hashCode(code);
     if (hashedCode !== entry.code) {
-      console.log("❌ Invalid OTP code");
+      logger.warn("Invalid OTP code");
       return false;
     }
 
     // Valid! Delete OTP (one-time use)
     this.otpStore.delete(key);
-    console.log("✅ OTP verified");
+    logger.info("OTP verified");
     return true;
   }
 
@@ -124,7 +125,7 @@ export class EmailOtpService {
     }
 
     if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} expired OTPs`);
+      logger.info({ count: cleaned }, "Cleaned up expired OTPs");
     }
   }
 }

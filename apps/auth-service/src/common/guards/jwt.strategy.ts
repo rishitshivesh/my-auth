@@ -1,12 +1,10 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import { ConfigService } from "@nestjs/config";
+import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { Request } from "express";
+import * as crypto from "crypto";
 
-/**
- * Cookie extractor for browser clients
- */
 const cookieExtractor = (req: Request): string | null => {
   if (req && req.cookies) {
     return req.cookies["access_token"] || null;
@@ -14,45 +12,57 @@ const cookieExtractor = (req: Request): string | null => {
   return null;
 };
 
-/**
- * JWT Strategy - ONLY validates token signature and expiry
- *
- * Does NOT validate:
- * - Session (SessionGuard does this)
- * - Tenant (TenantBindingGuard does this)
- * - Permissions (PermissionsGuard does this)
- *
- * Supports:
- * - Bearer token (Authorization: Bearer <token>)
- * - HttpOnly cookie (access_token)
- */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private configService: ConfigService) {
+  constructor(private readonly jwksService: JwksService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderAsBearerToken(), // Bearer token first
-        cookieExtractor, // Cookie fallback
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        cookieExtractor,
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.getOrThrow("JWT_SECRET"),
+      algorithms: ["RS256"],
+      secretOrKeyProvider: async (
+        _request: Request,
+        rawJwtToken: string,
+        done: (err: Error | null, key?: string | Buffer) => void,
+      ) => {
+        try {
+          const parts = rawJwtToken.split(".");
+          if (parts.length !== 3) {
+            return done(new Error("Invalid token format"));
+          }
+          const header = JSON.parse(
+            Buffer.from(parts[0], "base64url").toString(),
+          );
+          const kid = header?.kid as string | undefined;
+          if (!kid) {
+            return done(new Error("Token missing kid header"));
+          }
+
+          const jwk = await jwksService.getVerificationKeyByKid(kid);
+          if (!jwk) {
+            return done(new Error("Signing key not found in JWKS"));
+          }
+
+          const publicKey = crypto.createPublicKey({
+            key: jwk as JsonWebKey,
+            format: "jwk",
+          });
+          const pem = publicKey.export({ type: "spki", format: "pem" });
+          done(null, pem as string);
+        } catch (err) {
+          done(err as Error);
+        }
+      },
     });
   }
 
-  /**
-   * Validate JWT payload
-   *
-   * This runs AFTER signature verification
-   * ONLY checks payload structure, NOT business logic
-   */
-  async validate(payload: any) {
-    // Basic payload validation
+  async validate(payload: Record<string, unknown>) {
     if (!payload.sub || !payload.tenantId) {
       throw new UnauthorizedException("Invalid token payload");
     }
 
-    // Return payload to be attached to request.user
-    // Other guards will do additional validation
     return {
       sub: payload.sub,
       email: payload.email,

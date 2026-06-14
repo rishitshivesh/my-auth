@@ -81,8 +81,6 @@ export function FortKnoxProvider({ children, client }: AuthProviderProps) {
         // Wait for SDK to restore session from cookie
         await client.waitForInit();
 
-        console.log({ client });
-
         // If we have a token now, get the user
         if (client.isAuthenticated()) {
           const currentUser = await client.getCurrentUser();

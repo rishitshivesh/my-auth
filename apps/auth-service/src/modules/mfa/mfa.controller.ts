@@ -27,6 +27,7 @@ import {
   BackupCodesResponseDto,
 } from "./dto/mfa.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 
@@ -69,6 +70,7 @@ export class MfaController {
    * Verify and enable TOTP (Step 2: Verify code from authenticator app)
    */
   @Post("verify/totp")
+  @RateLimit({ max: 5, windowMs: 300000, keyBy: "user" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Verify and enable TOTP MFA",

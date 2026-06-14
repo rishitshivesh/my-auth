@@ -1,6 +1,7 @@
 // apps/auth-service/src/modules/oauth/services/oauth-consent.service.ts
 
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { OAuthConsent, OAuthClient, User } from "@repo/database";
@@ -128,9 +129,7 @@ export class OAuthConsentService {
 
       await this.consentRepository.save(existingConsent);
 
-      console.log(
-        `✅ Updated consent: user ${data.userId} → client ${client.clientId}`,
-      );
+      logger.info({ userId: data.userId, clientId: client.clientId }, "Updated consent");
 
       return existingConsent;
     }
@@ -147,9 +146,7 @@ export class OAuthConsentService {
       userAgent: data.userAgent,
     });
 
-    console.log(
-      `✅ Granted consent: user ${data.userId} → client ${client.clientId}`,
-    );
+    logger.info({ userId: data.userId, clientId: client.clientId }, "Granted consent");
 
     return consent;
   }
@@ -180,7 +177,7 @@ export class OAuthConsentService {
 
     await this.consentRepository.save(consent);
 
-    console.log(`🔒 Revoked consent: user ${userId} → client ${clientId}`);
+    logger.info({ userId, clientId }, "Revoked consent");
   }
 
   /**
@@ -203,7 +200,7 @@ export class OAuthConsentService {
       },
     );
 
-    console.log(`🔒 Revoked all consents for user ${userId}`);
+    logger.info({ userId, reason }, "Revoked all consents for user");
   }
 
   /**
@@ -226,7 +223,7 @@ export class OAuthConsentService {
       },
     );
 
-    console.log(`🔒 Revoked all consents for client ${clientId}`);
+    logger.info({ clientId, reason }, "Revoked all consents for client");
   }
 
   /**
@@ -336,7 +333,7 @@ export class OAuthConsentService {
     const count = result.affected || 0;
 
     if (count > 0) {
-      console.log(`🧹 Cleaned up ${count} expired consents`);
+      logger.info({ count }, "Cleaned up expired consents");
     }
 
     return count;

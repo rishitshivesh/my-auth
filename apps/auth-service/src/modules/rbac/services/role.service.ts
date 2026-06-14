@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import { Role, RolePermission, Permission } from "@repo/database";
+import { logger } from "@/common/logger";
 
 export interface CreateRoleDto {
   tenantId: string;
@@ -84,7 +85,7 @@ export class RoleService {
       );
     }
 
-    console.log(`✅ Created role: ${role.name}`);
+    logger.info({ roleName: role.name }, "Created role");
 
     return role;
   }
@@ -202,7 +203,7 @@ export class RoleService {
 
     await this.roleRepository.save(role);
 
-    console.log(`✅ Updated role: ${role.name}`);
+    logger.info({ roleName: role.name }, "Updated role");
 
     return role;
   }
@@ -223,7 +224,7 @@ export class RoleService {
 
     await this.roleRepository.remove(role);
 
-    console.log(`🗑️  Deleted role: ${role.name}`);
+    logger.info({ roleName: role.name }, "Deleted role");
   }
 
   /**
@@ -282,9 +283,7 @@ export class RoleService {
 
       await this.rolePermissionRepository.save(rolePermissions);
 
-      console.log(
-        `✅ Assigned ${toAdd.length} permissions to role ${role.name}`,
-      );
+      logger.info({ count: toAdd.length, roleName: role.name }, "Assigned permissions to role");
     }
   }
 
@@ -319,9 +318,7 @@ export class RoleService {
       permissionId: In(permissionIds),
     });
 
-    console.log(
-      `🗑️  Removed ${permissions.length} permissions from role ${role.name}`,
-    );
+    logger.info({ count: permissions.length, roleName: role.name }, "Removed permissions from role");
   }
 
   /**
@@ -355,9 +352,7 @@ export class RoleService {
       );
     }
 
-    console.log(
-      `✅ Set ${permissionNames.length} permissions for role ${role.name}`,
-    );
+    logger.info({ count: permissionNames.length, roleName: role.name }, "Set permissions for role");
   }
 
   /**
@@ -442,7 +437,7 @@ export class RoleService {
         created.push(role);
       } catch (error) {
         if (error instanceof ConflictException) {
-          console.log(`⏭️  Skipping existing role: ${roleData.name}`);
+          logger.info({ roleName: roleData.name }, "Skipping existing role");
         } else {
           throw error;
         }

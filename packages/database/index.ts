@@ -35,6 +35,7 @@ export * from "./src/entities/user-social-connections.entity";
 export * from "./src/entities/tenant-social-providers.entity";
 export * from "./src/entities/social-link-request.entity";
 export * from "./src/entities/tenant-branding.entity";
+export * from "./src/entities/key-pair.entity";
 
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";

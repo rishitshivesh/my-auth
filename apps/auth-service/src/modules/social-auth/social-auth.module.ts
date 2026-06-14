@@ -20,6 +20,7 @@ import { SessionService } from "@/common/service/session.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
+import { OAuthModule } from "@/modules/oauth/oauth.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SecurityEventService } from "@/common/service/security-event.service";
       OAuthRefreshToken,
     ]),
     SecurityEventModule,
+    OAuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

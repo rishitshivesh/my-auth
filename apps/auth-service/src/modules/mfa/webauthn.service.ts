@@ -23,6 +23,7 @@ import { ConfigService } from "@nestjs/config";
 import { type AuthenticatorTransportFuture } from "@simplewebauthn/server";
 import { RedisService } from "@/common/service/redis.service";
 import * as crypto from "crypto";
+import { logger } from "@/common/logger";
 
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 // Redis resource namespaces
@@ -176,7 +177,7 @@ export class WebAuthnService {
 
     await this.storeRegistrationChallenge(tenantId, userId, options.challenge);
 
-    console.log("🔐 WebAuthn registration started for", user.email);
+    logger.info({ email: user.email }, "WebAuthn registration started");
 
     return options;
   }
@@ -209,7 +210,7 @@ export class WebAuthnService {
         expectedRPID: this.rpID,
       });
     } catch (error) {
-      console.error("❌ WebAuthn registration verification failed:", error);
+      logger.error({ err: error }, "WebAuthn registration verification failed");
       throw new BadRequestException("Registration verification failed");
     }
 
@@ -236,7 +237,7 @@ export class WebAuthnService {
     // Mark webauthn as enabled on mfa_settings
     await this.mfaRepository.update({ userId, tenantId }, { webauthnEnabled: true });
 
-    console.log("✅ WebAuthn credential registered:", credentialID);
+    logger.info({ credentialId: credentialID }, "WebAuthn credential registered");
 
     this.securityEventService.log({
       userId,
@@ -294,7 +295,7 @@ export class WebAuthnService {
 
     await this.storeAuthChallenge(tenantId, sessionNonce, options.challenge);
 
-    console.log("🔐 WebAuthn authentication started for user:", userId);
+    logger.info({ userId }, "WebAuthn authentication started");
 
     return { options, sessionNonce };
   }
@@ -346,7 +347,7 @@ export class WebAuthnService {
         },
       });
     } catch (error) {
-      console.error("❌ WebAuthn authentication verification failed:", error);
+      logger.error({ err: error }, "WebAuthn authentication verification failed");
       throw new BadRequestException("Authentication verification failed");
     }
 
@@ -369,17 +370,14 @@ export class WebAuthnService {
       .execute();
 
     if (!result.affected || result.affected === 0) {
-      console.error(
-        "❌ WebAuthn counter rollback detected for credential:",
-        credential.credentialId,
-      );
+      logger.error({ credentialId: credential.credentialId }, "WebAuthn counter rollback detected for credential");
       throw new BadRequestException({
         message: "Counter rollback detected — possible replay attack",
         error: "WEBAUTHN_REPLAY_DETECTED",
       });
     }
 
-    console.log("✅ WebAuthn authentication verified:", credential.credentialId);
+    logger.info({ credentialId: credential.credentialId }, "WebAuthn authentication verified");
 
     return true;
   }
@@ -445,7 +443,7 @@ export class WebAuthnService {
       );
     }
 
-    console.log("🗑️ WebAuthn credential deleted:", credentialId);
+    logger.info({ credentialId }, "WebAuthn credential deleted");
 
     this.securityEventService.log({
       userId,
