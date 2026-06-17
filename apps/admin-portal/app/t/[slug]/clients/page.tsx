@@ -37,19 +37,19 @@ export default function ClientsPage() {
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-sm bg-black/5 flex items-center justify-center">
-                      {client.type === 'spa' ? <Monitor className="w-6 h-6 text-muted-foreground" /> : <Globe className="w-6 h-6 text-muted-foreground" />}
+                      {client.clientType === 'public' ? <Monitor className="w-6 h-6 text-muted-foreground" /> : <Globe className="w-6 h-6 text-muted-foreground" />}
                     </div>
                     <div>
                       <h3 className="text-base font-display font-semibold group-hover:text-accent transition-colors">
                         {client.name}
                       </h3>
                       <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mt-0.5">
-                        {client.type || 'Standard Web App'}
+                        {client.clientType === 'public' ? 'Public Client' : 'Confidential Client'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={client.status || 'active'} />
+                    <StatusBadge status={client.isActive ? 'active' : 'suspended'} />
                     <SentryButton variant="icon" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
                       <MoreHorizontal className="h-4 w-4" />
                     </SentryButton>
@@ -61,30 +61,34 @@ export default function ClientsPage() {
                     <label className="text-[9px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
                       Client ID
                     </label>
-                    <TokenDisplay value={client.clientId || 'sentry_client_829374'} />
+                    <TokenDisplay value={client.clientId} />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[9px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
-                        Auth Strategy
+                        Grant Types
                       </label>
-                      <p className="text-xs font-body text-foreground">Authorization Code</p>
+                      <p className="text-xs font-body text-foreground">{client.grantTypes.join(', ') || '—'}</p>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[9px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
-                        Last Used
+                        Created
                       </label>
-                      <p className="text-xs font-body text-muted-foreground">2 hours ago</p>
+                      <p className="text-xs font-body text-muted-foreground">
+                        {new Date(client.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-border/50 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-accent">
-                    <Key className="w-3 h-3" />
-                    <span className="text-[10px] font-display font-bold uppercase tracking-wider">OIDC Enabled</span>
-                  </div>
+                  {client.grantTypes.includes('authorization_code') && (
+                    <div className="flex items-center gap-1.5 text-accent">
+                      <Key className="w-3 h-3" />
+                      <span className="text-[10px] font-display font-bold uppercase tracking-wider">OIDC Enabled</span>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <SentryButton variant="ghost" size="sm" className="h-8 px-3 text-[11px] gap-2">
                        <Settings className="w-3.5 h-3.5" />

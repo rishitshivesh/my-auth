@@ -1,19 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
-import type { 
-  DashboardData, 
-  MfaStatus, 
-  TotpSetupData, 
-  TenantSettings, 
-  PasskeyCredential, 
-  SocialConnection, 
-  TenantMetrics, 
-  ActivityEvent, 
-  TrendPoint, 
-  AuthBreakdown, 
-  BrandingConfig, 
+import type {
+  DashboardData,
+  DashboardUser,
+  MfaStatus,
+  TotpSetupData,
+  TenantSettings,
+  PasskeyCredential,
+  SocialConnection,
+  TenantMetrics,
+  ActivityEvent,
+  TrendPoint,
+  AuthBreakdown,
+  BrandingConfig,
   ActiveSessionDto,
-  DashboardUser
+  UserListItem,
+  UserListResponse,
+  Role,
+  Client
 } from "./types";
 
 
@@ -174,25 +178,22 @@ export function useUnlinkSocialAccount() {
 
 export function useTenantUsers(params: {
   search?: string;
-  status?: string;
-  cursor?: string;
+  status?: "active" | "suspended" | "all";
+  page?: number;
   limit?: number;
 }) {
   const qs = new URLSearchParams();
   if (params.search) qs.set("search", params.search);
-  if (params.status) qs.set("status", params.status);
-  if (params.cursor) qs.set("cursor", params.cursor);
-  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.status === "active") qs.set("isActive", "true");
+  if (params.status === "suspended") qs.set("isActive", "false");
+  qs.set("page", String(params.page ?? 1));
+  qs.set("limit", String(params.limit ?? 20));
 
-  return useQuery<{
-    users: DashboardUser[];
-    nextCursor?: string;
-    total: number;
-  }>({
+  return useQuery<UserListResponse>({
     queryKey: ["tenant", "users", params],
     queryFn: async () => {
       const res = await authClient.request({
-        url: apiUrl(`/dashboard/tenant-users?${qs.toString()}`),
+        url: apiUrl(`/users?${qs.toString()}`),
         method: "GET",
       });
       if (!res.ok) throw new Error("Failed to fetch tenant users");
@@ -206,7 +207,7 @@ export function useTenantUser(userId: string) {
     queryKey: ["tenant", "users", userId],
     queryFn: async () => {
       const res = await authClient.request({
-        url: apiUrl(`/dashboard/tenant-users/${userId}`),
+        url: apiUrl(`/users/${userId}`),
         method: "GET",
       });
       if (!res.ok) throw new Error("Failed to fetch user details");
@@ -217,11 +218,11 @@ export function useTenantUser(userId: string) {
 }
 
 export function useTenantRoles() {
-  return useQuery<any[]>({
+  return useQuery<Role[]>({
     queryKey: ["tenant", "roles"],
     queryFn: async () => {
       const res = await authClient.request({
-        url: apiUrl(`/dashboard/tenant-roles`),
+        url: apiUrl(`/rbac/roles?loadPermissions=true`),
         method: "GET",
       });
       if (!res.ok) throw new Error("Failed to fetch roles");
@@ -231,11 +232,11 @@ export function useTenantRoles() {
 }
 
 export function useTenantClients() {
-  return useQuery<any[]>({
+  return useQuery<Client[]>({
     queryKey: ["tenant", "clients"],
     queryFn: async () => {
       const res = await authClient.request({
-        url: apiUrl(`/dashboard/tenant-clients`),
+        url: apiUrl(`/oauth/clients`),
         method: "GET",
       });
       if (!res.ok) throw new Error("Failed to fetch clients");

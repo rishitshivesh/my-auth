@@ -193,6 +193,55 @@ the correct schema. The `TenantSchemaMiddleware` sets `search_path` per request.
 
 ---
 
+## Tenant Isolation Architecture
+
+TWO layers of isolation are now active simultaneously (defense-in-depth):
+
+### Layer 1: Schema-level (search_path)
+`TenantSchemaMiddleware` runs on every tenant request after `TenantResolverMiddleware`.
+It acquires a connection from the TypeORM pool and executes:
+```sql
+SET search_path TO "fk_{slug}", public
+```
+This routes ALL TypeORM queries for this request to the correct tenant schema.
+The connection is returned to the pool after the response completes,
+with `search_path` reset to `public`.
+
+The `QueryRunner` is stored in `AsyncLocalStorage` via `TenantContextService`.
+Services use `TenantAwareRepository` which reads from `TenantContextService`
+instead of the default DataSource pool.
+
+### Layer 2: Row-level (tenant_id column)
+All entities retain their `tenant_id` columns.
+All services retain their `WHERE tenant_id = ?` clauses, marked:
+```typescript
+// Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+// Both layers must match for a query to succeed
+```
+This is defense-in-depth — a bug in Layer 1 does not expose Layer 2.
+
+### Request lifecycle:
+1. `TenantResolverMiddleware` → resolves slug from hostname/header → `req.tenant`
+2. `TenantSchemaMiddleware`  → sets `search_path` → stores in `AsyncLocalStorage`
+3. Guards run              → `TenantBindingGuard` validates JWT vs `req.tenant`
+4. Controller/Service      → `TenantAwareRepository` uses scoped `EntityManager`
+5. Response sent           → `search_path` reset, `QueryRunner` released
+
+### Platform routes (excluded from TenantSchemaMiddleware):
+- `GET /health`
+- `GET /.well-known/*`
+- `ALL /superadmin/*`
+
+These routes operate on the public schema (platform-level data).
+
+### Key files:
+- `apps/auth-service/src/core/database/tenant-context.service.ts` — AsyncLocalStorage
+- `apps/auth-service/src/core/database/tenant-aware.repository.ts` — base repository
+- `apps/auth-service/src/common/midllewares/tenant-schema.middleware.ts` — sets search_path
+- `apps/auth-service/src/modules/user/user.repository.ts` — proof of concept (Sprint 3a)
+
+---
+
 ## AUTHENTICATION FLOWS
 
 ### Login (password):

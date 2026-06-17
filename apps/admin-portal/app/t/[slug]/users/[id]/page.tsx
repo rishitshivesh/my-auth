@@ -5,13 +5,10 @@ import { PortalLayout } from '@/components/layouts/portal-layout';
 import { GlassCard, PageHeader, SentryButton, StatusBadge, SentrySkeleton, AuditTimeline } from "@repo/ui";
 import { useTenantUser, useTenantActivity } from '@/lib/queries';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  ChevronLeft, 
-  Mail, 
-  Shield, 
-  Clock, 
-  MapPin, 
-  Monitor,
+import {
+  ChevronLeft,
+  Mail,
+  Clock,
   Ban,
   Trash2,
   KeyRound,
@@ -19,6 +16,12 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from "@repo/ui/lib/utils";
+
+function userStatusBadge(status: string): 'active' | 'pending' | 'suspended' | 'admin' | 'mfa' | 'system' {
+  if (status === 'active') return 'active';
+  if (status === 'suspended' || status === 'deleted') return 'suspended';
+  return 'system';
+}
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -29,7 +32,8 @@ export default function UserDetailPage() {
   const { data: user, isLoading } = useTenantUser(userId);
   const { data: activity, isLoading: activityLoading } = useTenantActivity(10);
 
-  const [activeTab, setActiveTab] = React.useState<'overview' | 'sessions' | 'audit'>('overview');
+  type Tab = 'overview' | 'sessions' | 'audit';
+  const [activeTab, setActiveTab] = React.useState<Tab>('overview');
 
   if (isLoading) {
     return (
@@ -83,7 +87,9 @@ export default function UserDetailPage() {
               </div>
               <h2 className="text-xl font-display font-semibold mb-1">{user.displayName || 'Unnamed User'}</h2>
               <p className="text-sm font-body text-muted-foreground mb-4">{user.email}</p>
-              <StatusBadge status={user.status as any} className="mb-8" />
+              <StatusBadge status={userStatusBadge(user.status)} className="mb-8">
+                {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+              </StatusBadge>
               
               <div className="w-full space-y-4 pt-6 border-t border-border/50 text-left">
                 <div className="flex items-center justify-between">
@@ -133,7 +139,7 @@ export default function UserDetailPage() {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as Tab)}
                   className={cn(
                     'pb-4 text-xs font-display font-bold uppercase tracking-[0.12em] transition-all relative',
                     activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -153,29 +159,25 @@ export default function UserDetailPage() {
                   <GlassCard tier={1} className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-sm bg-black/5">
-                        <Monitor className="w-4 h-4 text-muted-foreground" />
+                        <Mail className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <h4 className="text-sm font-display font-semibold">Primary Device</h4>
+                      <h4 className="text-sm font-display font-semibold">Email Verification</h4>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-body text-foreground">MacBook Pro &middot; Chrome</p>
-                      <p className="text-xs font-body text-muted-foreground">Last used from San Francisco, US</p>
-                    </div>
+                    <StatusBadge status={user.emailVerified ? 'active' : 'pending'}>
+                      {user.emailVerified ? 'Verified' : 'Unverified'}
+                    </StatusBadge>
                   </GlassCard>
 
                   <GlassCard tier={1} className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-sm bg-black/5">
-                        <Shield className="w-4 h-4 text-muted-foreground" />
+                        <Clock className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <h4 className="text-sm font-display font-semibold">Trust Score</h4>
+                      <h4 className="text-sm font-display font-semibold">Last Login</h4>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 bg-black/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-accent w-[92%]" />
-                      </div>
-                      <span className="text-[11px] font-mono font-bold text-accent">92%</span>
-                    </div>
+                    <p className="text-sm font-body text-foreground">
+                      {user.lastLoginAt ? format(new Date(user.lastLoginAt), 'MMM dd, yyyy · h:mm a') : 'Never logged in'}
+                    </p>
                   </GlassCard>
                 </div>
               )}

@@ -23,7 +23,7 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
-import { UserService } from "./user.service";
+import { UserService, ListUsersOptions } from "./user.service";
 import {
   UpdateUserDto,
   ChangePasswordDto,
@@ -206,15 +206,11 @@ export class UserController {
   ): Promise<ListUsersResponseDto> {
     const tenantId = req.tenantId!;
 
-    // Convert date strings to Date objects
-    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
-    if (query.createdAfter) {
-      options.createdAfter = new Date(query.createdAfter);
-    }
-    if (query.createdBefore) {
-      options.createdBefore = new Date(query.createdBefore);
-    }
-
+    const options: ListUsersOptions = {
+      ...query,
+      createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
+      createdBefore: query.createdBefore ? new Date(query.createdBefore) : undefined,
+    };
     return this.userService.listUsers(tenantId, options);
   }
 
@@ -259,14 +255,11 @@ export class UserController {
   ): Promise<string> {
     const tenantId = req.tenantId!;
 
-    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
-    if (query.createdAfter) {
-      options.createdAfter = new Date(query.createdAfter);
-    }
-    if (query.createdBefore) {
-      options.createdBefore = new Date(query.createdBefore);
-    }
-
+    const options: ListUsersOptions = {
+      ...query,
+      createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
+      createdBefore: query.createdBefore ? new Date(query.createdBefore) : undefined,
+    };
     return this.userService.exportUsers(tenantId, options);
   }
 

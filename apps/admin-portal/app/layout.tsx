@@ -1,14 +1,9 @@
-// @ts-ignore
-
 "use client";
+// @ts-ignore
 import "@repo/ui/globals.css";
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import Script from "next/script";
+
 import { ThemeProvider } from "@repo/ui";
 
-
-// import { defaultAuthClient } from "@repo/web-sdk";
 import { SentryProvider } from "@scrolloop/sdk";
 
 import { createWebClient } from "@scrolloop/sdk";
@@ -19,7 +14,7 @@ export const authClient = createWebClient({
   tenant:
     process.env.NEXT_PUBLIC_SENTRY_TENANT_ID ||
     process.env.SENTRY_TENANT_ID ||
-    "",
+    "220bea14-69ca-420f-a8a2-d017e600ea4b",
   debug: process.env.NODE_ENV === "development",
 });
 
@@ -39,15 +34,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          async={true}
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8195619606985915"
-          crossOrigin="anonymous"
-        ></Script>
-        <meta name="google-adsense-account" content="ca-pub-8195619606985915" />
-      </head>
-
       <body className="antialiased font-sans">
         <QueryClientProvider client={queryClient}>
           <SentryProvider client={authClient}>

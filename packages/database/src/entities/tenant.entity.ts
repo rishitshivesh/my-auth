@@ -76,6 +76,14 @@ export class Tenant extends BaseEntity {
   branding?: TenantBrandingConfig;
 
   @Column({
+    type: 'simple-array',
+    nullable: true,
+    name: 'allowed_origins',
+    comment: 'Per-tenant allowed CORS origins',
+  })
+  allowedOrigins?: string[];
+
+  @Column({
     type: "boolean",
     default: true,
   })

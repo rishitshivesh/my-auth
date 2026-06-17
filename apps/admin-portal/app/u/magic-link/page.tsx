@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+export const dynamic = 'force-dynamic'
+
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@scrolloop/sdk"
 
-export default function MagicLinkPage() {
+function MagicLinkInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { verifyMagicLink } = useAuth()
@@ -25,9 +27,9 @@ export default function MagicLinkPage() {
         setStatus("success")
         setTimeout(() => router.replace("/dashboard"), 1500)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         setStatus("error")
-        setErrorMsg(err?.message || "This magic link has expired or already been used.")
+        setErrorMsg(err instanceof Error ? err.message : "This magic link has expired or already been used.")
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -66,5 +68,17 @@ export default function MagicLinkPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function MagicLinkPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <MagicLinkInner />
+    </Suspense>
   )
 }

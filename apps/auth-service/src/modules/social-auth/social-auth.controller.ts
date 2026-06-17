@@ -19,6 +19,7 @@ import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
 import * as crypto from "crypto";
+import type { StringValue } from "ms";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
@@ -52,11 +53,12 @@ export class SocialAuthController {
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
     return this.jwtService.sign(payload, {
-      privateKey: privateKey as string,
+      privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as string,
+      expiresIn: expiresIn as StringValue,
     });
   }
 
@@ -197,7 +199,7 @@ export class SocialAuthController {
       }
 
       if (parsedState.mode === "link" && parsedState.userId) {
-        const rawProfile = req.user as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
+        const rawProfile = req.user as unknown as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
         await this.socialAuthService.handleLinkCallback({
           userId: parsedState.userId as string,
           tenantId: parsedState.tenantId as string,
@@ -255,7 +257,7 @@ export class SocialAuthController {
       const result = await this.socialAuthService.handleCallback({
         tenantId,
         profile,
-        ipAddress: req.ip,
+        ipAddress: req.ip ?? '0.0.0.0',
         userAgent: req.headers["user-agent"] || "unknown",
       });
 
@@ -307,7 +309,7 @@ export class SocialAuthController {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
-        publicKey: publicKey as string,
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         algorithms: ['RS256'],
       });
 
@@ -359,7 +361,8 @@ export class SocialAuthController {
   @Protected()
   @HttpCode(HttpStatus.OK)
   async getLinkToken(@Req() req: AuthenticatedRequest) {
-    const { userId, tenantId } = req.user;
+    const userId = req.user.userId;
+    const tenantId = req.tenantId;
     const result = await this.socialAuthService.createLinkToken(
       userId,
       tenantId,

@@ -1,21 +1,34 @@
 import { DataSource } from "typeorm";
-import { Tenant, Role, Permission } from "@repo/database";
-import * as crypto from "crypto";
+import { Tenant, Role, Permission, User, UserRole } from "@repo/database";
+import { PasswordService } from "@repo/security";
 
-export async function seed() {
-  // Connect to database
-  const dataSource = new DataSource({
-    type: "postgres",
-    url: process.env.DATABASE_URL,
-    entities: [Tenant, Role, Permission],
-    ssl:
-      process.env.DATABASE_SSL === "true"
-        ? { rejectUnauthorized: false }
-        : false,
-  });
+/**
+ * Seed tenants, roles, permissions, and (optionally) a superadmin user.
+ *
+ * If called without an existing DataSource the function creates its own
+ * connection, runs the seed, and destroys it when done.  When called from
+ * run-seeds.ts an already-initialised DataSource is passed so we reuse it.
+ */
+export async function seed(existingDataSource?: DataSource): Promise<void> {
+  let dataSource: DataSource;
+  let ownsConnection = false;
 
-  await dataSource.initialize();
-  console.log("🔌 Connected to database");
+  if (existingDataSource) {
+    dataSource = existingDataSource;
+  } else {
+    dataSource = new DataSource({
+      type: "postgres",
+      url: process.env.DATABASE_URL,
+      entities: [Tenant, Role, Permission, User, UserRole],
+      ssl:
+        process.env.DATABASE_SSL === "true"
+          ? { rejectUnauthorized: false }
+          : false,
+    });
+    await dataSource.initialize();
+    ownsConnection = true;
+    console.log("🔌 Connected to database");
+  }
 
   try {
     // ==================================================
@@ -38,6 +51,7 @@ export async function seed() {
           passwordlessEnabled: true,
           socialProvidersEnabled: false,
         },
+        allowedOrigins: ['http://localhost:3000', 'https://admin.sentry.scrolloop.com'],
         isActive: true,
         environment: "production",
       },
@@ -161,7 +175,8 @@ export async function seed() {
       if (!existing) {
         const role = roleRepo.create({
           name: "sentry-internal",
-          description: "Scrolloop Sentry platform superadmin — grants access to the admin portal",
+          description:
+            "Scrolloop Sentry platform superadmin — grants access to the admin portal",
           tenantId: sentryTenant.id,
           isSystem: true,
         });
@@ -322,6 +337,11 @@ export async function seed() {
       }
     }
 
+    // ==================================================
+    // 4. Seed Superadmin User (optional — env-gated)
+    // ==================================================
+    await seedSuperadmin(dataSource, sentryTenant ?? null, roleRepo);
+
     console.log("");
     console.log("✅ Seeding complete!");
     console.log("");
@@ -334,17 +354,117 @@ export async function seed() {
     console.error("❌ Seeding failed:", error);
     throw error;
   } finally {
-    await dataSource.destroy();
+    if (ownsConnection) {
+      await dataSource.destroy();
+    }
   }
 }
 
-// Run seed
-seed()
-  .then(() => {
-    console.log("✅ Done");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("❌ Error:", error);
-    process.exit(1);
+// ---------------------------------------------------------------------------
+// Superadmin creation helper
+// ---------------------------------------------------------------------------
+
+async function seedSuperadmin(
+  dataSource: DataSource,
+  sentryTenant: Tenant | null,
+  roleRepo: ReturnType<DataSource["getRepository"]>,
+): Promise<void> {
+  const email = process.env.SEED_SUPERADMIN_EMAIL;
+  const password = process.env.SEED_SUPERADMIN_PASSWORD;
+
+  if (!email || !password) {
+    const missing = !email ? "SEED_SUPERADMIN_EMAIL" : "SEED_SUPERADMIN_PASSWORD";
+    console.warn(`⚠️  ${missing} not set — no superadmin created`);
+    return;
+  }
+
+  if (!sentryTenant) {
+    console.warn(
+      "⚠️  Sentry tenant not found — cannot create superadmin",
+    );
+    return;
+  }
+
+  console.log("👤 Seeding superadmin user...");
+
+  // Switch to fk_sentry schema so the user lands in the correct tenant schema
+  await dataSource.query(`SET search_path TO "fk_sentry", public`);
+
+  const userRepo = dataSource.getRepository(User);
+  const userRoleRepo = dataSource.getRepository(UserRole);
+
+  // Idempotent: skip if user already exists
+  const existing = await userRepo.findOne({
+    where: { tenantId: sentryTenant.id, email },
   });
+
+  if (existing) {
+    console.log(`  ⏭️  Superadmin already exists: ${email}`);
+    await dataSource.query(`SET search_path TO public`);
+    return;
+  }
+
+  const passwordHash = await PasswordService.hash(password);
+
+  const user = userRepo.create({
+    tenantId: sentryTenant.id,
+    email,
+    emailVerified: true,
+    firstName: "Super",
+    lastName: "Admin",
+    displayName: "Super Admin",
+    primaryAuthMethod: "password",
+    passwordHash,
+    status: "active",
+    isActive: true,
+    mfaEnabled: false,
+    failedLoginAttempts: 0,
+    forcePasswordChange: false,
+    passwordHistory: [],
+    metadata: { seeded: true },
+  });
+
+  await userRepo.save(user);
+  console.log(`  ✅ Created superadmin: ${email}`);
+
+  // Assign all roles in the sentry tenant
+  const allSentryRoles = await roleRepo.find({
+    where: { tenantId: sentryTenant.id },
+  });
+
+  for (const role of allSentryRoles) {
+    const existingAssignment = await userRoleRepo.findOne({
+      where: { userId: user.id, roleId: role.id },
+    });
+
+    if (!existingAssignment) {
+      const userRole = userRoleRepo.create({
+        tenantId: sentryTenant.id,
+        userId: user.id,
+        roleId: role.id,
+        reason: "Seeded superadmin",
+        metadata: { source: "seed" },
+      });
+      await userRoleRepo.save(userRole);
+      console.log(`  ✅ Assigned role: ${role.name}`);
+    }
+  }
+
+  // Reset search_path back to public
+  await dataSource.query(`SET search_path TO public`);
+}
+
+// ============================================================
+// Standalone entry point (for running this file directly)
+// ============================================================
+if (require.main === module) {
+  seed()
+    .then(() => {
+      console.log("✅ Done");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("❌ Error:", error);
+      process.exit(1);
+    });
+}

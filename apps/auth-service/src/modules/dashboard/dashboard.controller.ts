@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { User, Session, Tenant, TenantSocialProvider } from "@repo/database";
-import { type SocialProvider } from "@repo/database/src/entities/user-social-connections.entity";
+import { type SocialProvider } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { DashboardService } from "./dashboard.service";

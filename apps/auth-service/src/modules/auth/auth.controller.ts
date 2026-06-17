@@ -7,9 +7,11 @@ import {
   Ip,
   Headers,
   Get,
+  Query,
   UseGuards,
   Req,
   UnauthorizedException,
+  BadRequestException,
   Res,
 } from "@nestjs/common";
 import {
@@ -31,6 +33,8 @@ import {
   LoginIntentResponseDto,
   SendMagicLinkDto,
   VerifyMagicLinkDto,
+  GetProvidersQueryDto,
+  GetProvidersResponseDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
@@ -38,8 +42,6 @@ import { type Request, type Response } from "express";
 import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
-import { access } from "fs";
-
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string; tenantId?: string };
@@ -155,7 +157,7 @@ export class AuthController {
   ) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
-    const sessionId = req.user.sessionId;
+    const sessionId = req.user.sessionId ?? '';
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
 
     res.clearCookie("refreshToken", {
@@ -381,7 +383,7 @@ export class AuthController {
         slug: tenant?.slug,
         customDomain: tenant?.customDomain,
       },
-      session: {
+      session: session ? {
         id: session.id,
         createdAt: session.createdAt,
         lastActivity: session.lastActivity,
@@ -389,7 +391,7 @@ export class AuthController {
         ipAddress: session.ipAddress,
         userAgent: session.userAgent,
         deviceId: session.deviceId,
-      },
+      } : null,
       auth: {
         method: "jwt",
         // issuedAt: new Date(user.iat * 1000).toISOString(),
@@ -663,7 +665,7 @@ export class AuthController {
     const result = await this.authService.finishWebAuthnLogin({
       tenantId,
       email: dto.email,
-      webauthnResponse: dto.response,
+      webauthnResponse: dto.response as unknown as import("@simplewebauthn/server").AuthenticationResponseJSON,
       sessionNonce: dto.sessionNonce,
       ip,
       userAgent,
@@ -730,6 +732,42 @@ export class AuthController {
     });
 
     return { status: 200, data: { accessToken } };
+  }
+
+  /**
+   * Get enabled authentication providers for a tenant.
+   *
+   * Public endpoint — no authentication required.
+   * The tenant is resolved from request context (hostname / X-Tenant-ID header).
+   * Optional query params tenant_id / tenant_slug allow cross-tenant lookup for
+   * superadmin tooling (middleware must still resolve the request tenant first).
+   */
+  @Get('providers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List enabled authentication providers',
+    description: 'Returns which login methods (password, magic link, passkey, social) are enabled for the resolved tenant. Call this before showing the login screen to decide which options to render.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider list returned successfully',
+    type: GetProvidersResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Tenant could not be resolved from request' })
+  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  async getProviders(
+    @Query() query: GetProvidersQueryDto,
+    @Req() req: Request,
+  ): Promise<GetProvidersResponseDto> {
+    const tenantId = query.tenant_id ?? (req as unknown as { tenantId?: string }).tenantId;
+
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Tenant could not be resolved. Pass an X-Tenant-ID header or use a tenant subdomain.',
+      );
+    }
+
+    return this.authService.getProviders(tenantId);
   }
 
   /**

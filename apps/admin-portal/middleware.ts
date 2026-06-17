@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const AUTH_SERVICE_URL =
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? 'http://localhost:3001'
+
+const INITIALIZED_COOKIE = 'sentry-initialized'
+const INITIALIZED_TTL_SECONDS = 300 // 5 minutes
+const UNINITIALIZED_TTL_SECONDS = 30 // 30 seconds — re-check quickly
+
 // Pure helpers — no SDK imports (middleware runs on Edge runtime)
 
-function parseJwtPayload(token: string): Record<string, any> | null {
+function parseJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const part = token.split('.')[1]
     if (!part) return null
-    return JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+    return JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>
   } catch {
     return null
   }
@@ -27,7 +34,27 @@ function getAccessTokenFromRequest(request: NextRequest): string | null {
   return null
 }
 
-export function middleware(request: NextRequest) {
+/**
+ * Fetch initialization status from the auth service.
+ * Returns null on network error (fail open — let through, don't break the app).
+ */
+async function fetchIsInitialized(): Promise<boolean | null> {
+  try {
+    const res = await fetch(`${AUTH_SERVICE_URL}/superadmin/initialized`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      // Edge runtime fetch; keep it tight
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!res.ok) return null
+    const body = (await res.json()) as { initialized: boolean }
+    return body.initialized
+  } catch {
+    return null
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0]!
 
@@ -49,6 +76,58 @@ export function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl
+
+  // ── First-run initialization check ────────────────────────────
+  // Skip for the /setup page itself and public auth routes
+  const isSetupPage = pathname === '/setup' || pathname.startsWith('/setup/')
+  const isPublicRoute =
+    isSetupPage ||
+    pathname.startsWith('/u/') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon')
+
+  if (!isPublicRoute) {
+    const cookieValue = request.cookies.get(INITIALIZED_COOKIE)?.value
+
+    if (cookieValue === '0') {
+      // Cached: not initialized → redirect to setup
+      return NextResponse.redirect(new URL('/setup', request.url))
+    }
+
+    if (cookieValue !== '1') {
+      // Cookie absent or stale — fetch from API
+      const initialized = await fetchIsInitialized()
+
+      if (initialized === false) {
+        const redirectResponse = NextResponse.redirect(
+          new URL('/setup', request.url),
+        )
+        redirectResponse.cookies.set(INITIALIZED_COOKIE, '0', {
+          maxAge: UNINITIALIZED_TTL_SECONDS,
+          httpOnly: false,
+          sameSite: 'lax',
+          path: '/',
+        })
+        return redirectResponse
+      }
+
+      if (initialized === true) {
+        // Mark as initialized in cookie; continue with normal auth checks below
+        const response = NextResponse.next()
+        response.cookies.set(INITIALIZED_COOKIE, '1', {
+          maxAge: INITIALIZED_TTL_SECONDS,
+          httpOnly: false,
+          sameSite: 'lax',
+          path: '/',
+        })
+        return response
+      }
+
+      // initialized === null → network error, fail open (continue)
+    }
+  }
+
   const accessToken = getAccessTokenFromRequest(request)
 
   // ── Superadmin routes ──────────────────────────────────────

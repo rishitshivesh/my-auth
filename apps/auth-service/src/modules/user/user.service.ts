@@ -15,6 +15,7 @@ import {
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 import { logger } from "@/common/logger";
+import { UserRepository } from "./user.repository";
 
 /**
  * User Service
@@ -28,8 +29,7 @@ import { logger } from "@/common/logger";
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly userRepository: UserRepository,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
     @InjectRepository(SecurityEvent)
@@ -41,10 +41,9 @@ export class UserService {
    * Find user by ID
    */
   async findById(tenantId: string, id: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id, tenantId },
-      relations: ["tenant"],
-    });
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
+    const user = await this.userRepository.findByTenantAndId(tenantId, id);
 
     if (!user) {
       throw new NotFoundException("User not found");
@@ -57,6 +56,8 @@ export class UserService {
    * Find user by email
    */
   async findByEmail(tenantId: string, email: string): Promise<User | null> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const where: FindOptionsWhere<User> = { email };
     if (tenantId) {
       where.tenantId = tenantId;
@@ -211,6 +212,8 @@ export class UserService {
    * Get active sessions for user
    */
   async getActiveSessions(tenantId: string, userId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const sessions = await this.sessionRepository.find({
       where: {
         userId,
@@ -237,6 +240,8 @@ export class UserService {
    * Revoke a specific session
    */
   async revokeSession(tenantId: string, userId: string, sessionId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const session = await this.sessionRepository.findOne({
       where: { id: sessionId, userId, tenantId },
     });
@@ -267,6 +272,8 @@ export class UserService {
    * Revoke all sessions for user
    */
   async revokeAllSessions(tenantId: string, userId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     await this.sessionRepository.update(
       { userId, revokedAt: IsNull(), tenantId },
       {

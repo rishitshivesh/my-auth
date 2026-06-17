@@ -47,6 +47,7 @@ interface WebAuthnRegistrationResponse {
     clientDataJSON: string;
   };
   type: string;
+  clientExtensionResults?: Record<string, unknown>;
 }
 
 @ApiTags("MFA")
@@ -340,7 +341,7 @@ export class MfaController {
     const result = await this.webauthnService.finishRegistration(
       userId,
       tenantId,
-      body.response,
+      body.response as unknown as import("@simplewebauthn/server").RegistrationResponseJSON,
       body.deviceName,
     );
 

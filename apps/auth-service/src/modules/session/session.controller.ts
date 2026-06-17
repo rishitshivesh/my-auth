@@ -43,7 +43,7 @@ export class SessionController {
   async getActiveSessions(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
-    const currentSessionId = req.user.sessionId;
+    const currentSessionId = req.user.sessionId ?? '';
 
     return this.sessionManagementService.getActiveSessions(
       userId,
@@ -102,7 +102,7 @@ export class SessionController {
   async revokeAllOtherSessions(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     const tenantId = req.tenantId;
-    const currentSessionId = req.user.sessionId;
+    const currentSessionId = req.user.sessionId ?? '';
 
     const revokedCount =
       await this.sessionManagementService.revokeAllOtherSessions(

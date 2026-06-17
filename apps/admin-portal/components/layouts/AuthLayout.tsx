@@ -46,9 +46,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       </div>
 
       {/* Right Panel: Editorial/Decorative */}
-      <div className="hidden lg:flex flex-col justify-between p-16 bg-[#1A1916] relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-between p-16 bg-[var(--editorial-bg)] relative overflow-hidden">
         {/* Radial Gradient Overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_#0D0C0B_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_var(--editorial-bg-end)_100%)]" />
 
         
         <div className="relative z-10 flex flex-col items-center justify-center flex-1">
@@ -58,7 +58,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         <div className="relative z-10 space-y-4 max-w-sm">
-          <blockquote className="text-3xl font-display font-light italic text-[#F5F4F2] leading-tight tracking-tight">
+          <blockquote className="text-3xl font-display font-light italic text-[var(--editorial-foreground)] leading-tight tracking-tight">
             "Identity, <br />
             engineered for <br />
             trust."

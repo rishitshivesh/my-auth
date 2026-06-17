@@ -4,27 +4,62 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEmailAuthFlow } from '@/hooks/use-email-auth-flow';
+import { useProviders } from '@/hooks/use-providers';
 import { useAuth } from '@scrolloop/sdk';
 import { SentryButton, SentryInput } from "@repo/ui";
 import { cn } from "@repo/ui/lib/utils";
-import { ShieldCheck, AlertCircle, Loader2, Github, Mail } from 'lucide-react';
+import { AlertCircle, Github } from 'lucide-react';
 
 
+
+function SocialIcon({ provider }: { provider: string }) {
+  if (provider === 'google') {
+    return (
+      <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.18 1-.78 1.85-1.63 2.42v2.01h2.64c1.55-1.42 2.44-3.51 2.44-5.94z" fill="#4285F4" />
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-2.64-2.01c-.73.49-1.66.78-2.64.78-2.83 0-5.23-1.92-6.08-4.5H2.18v2.08C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+        <path d="M5.92 14.61c-.22-.66-.35-1.36-.35-2.11s.13-1.45.35-2.11V8.31H2.18C1.41 9.87 1 11.61 1 13.25c0 1.64.41 3.38 1.18 4.94l3.74-3.58z" fill="#FBBC05" />
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.74 3.58c.85-2.58 3.25-4.5 6.08-4.5z" fill="#EA4335" />
+      </svg>
+    )
+  }
+  if (provider === 'github') {
+    return <Github className="h-4 w-4" />
+  }
+  if (provider === 'microsoft') {
+    return (
+      <svg className="h-4 w-4" viewBox="0 0 23 23" aria-hidden="true">
+        <path fill="var(--color-text-tertiary)" d="M1 1h10v10H1z" />
+        <path fill="var(--color-text-tertiary)" d="M12 1h10v10H12z" />
+        <path fill="var(--color-text-tertiary)" d="M1 12h10v10H1z" />
+        <path fill="var(--color-text-tertiary)" d="M12 12h10v10H12z" />
+      </svg>
+    )
+  }
+  return null
+}
 
 export function SentryAuthFlow() {
   const router = useRouter();
   const flow = useEmailAuthFlow();
-  const { client, verifyMfaLogin } = useAuth();
+  const { client, verifyMfaLogin, initiateSocialLogin } = useAuth();
+  const { data: providers } = useProviders();
 
   // MFA inline state
   const [mfaTempToken, setMfaTempToken] = React.useState<string | null>(null);
-  const [mfaScreen, setMfaScreen] = React.useState<'totp' | 'email_otp' | null>(null);
+  const [mfaScreen, setMfaScreen] = React.useState<'totp' | 'sms' | null>(null);
   const [mfaDigits, setMfaDigits] = React.useState<string[]>(['', '', '', '', '', '']);
   const [mfaLoading, setMfaLoading] = React.useState(false);
   const [mfaError, setMfaError] = React.useState<string | null>(null);
   const inputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
 
   const mfaCode = mfaDigits.join('');
+
+  const enabledSocial = (providers?.social ?? []).filter(p => p.enabled);
+
+  const handleSocialLogin = (provider: string) => {
+    initiateSocialLogin(provider);
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,18 +79,16 @@ export function SentryAuthFlow() {
     try {
       const result = await client.login({ email: flow.email, password });
 
-      if (result.mfaRequired) {
-        const tempToken = (result as any).tempToken ?? null;
-        setMfaTempToken(tempToken);
-        const mfaMethod = (result as any).mfaMethod;
-        setMfaScreen(mfaMethod === 'email_otp' ? 'email_otp' : 'totp');
+      if (result.mfaRequired && result.mfaChallenge) {
+        setMfaTempToken(result.mfaChallenge.tempToken);
+        setMfaScreen(result.mfaChallenge.methods.includes('totp') ? 'totp' : 'sms');
         setMfaDigits(['', '', '', '', '', '']);
         setMfaError(null);
         return;
       }
 
       router.push('/dashboard');
-    } catch (err: any) {
+    } catch {
       // Error handled by hook/logic
     }
   };
@@ -89,8 +122,8 @@ export function SentryAuthFlow() {
     try {
       await verifyMfaLogin(mfaTempToken, mfaCode);
       router.push('/dashboard');
-    } catch (err: any) {
-      setMfaError(err?.message || 'Invalid code. Please try again.');
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : 'Invalid code. Please try again.');
       setMfaDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
@@ -118,9 +151,9 @@ export function SentryAuthFlow() {
               Verify identity
             </h2>
             <p className="text-sm font-body text-muted-foreground">
-              {mfaScreen === 'totp' 
+              {mfaScreen === 'totp'
                 ? 'Enter the 6-digit code from your authenticator app'
-                : `Enter the code sent to ${flow.email}`}
+                : 'Enter the 6-digit code sent to your phone'}
             </p>
           </div>
 
@@ -183,12 +216,11 @@ export function SentryAuthFlow() {
 
       {/* EMAIL STEP */}
       {!mfaScreen && flow.step === 'email' && (
-        <motion.form
+        <motion.div
           key="email"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          onSubmit={handleEmailSubmit}
           className="space-y-8"
         >
           <div className="space-y-2 text-center lg:text-left">
@@ -200,7 +232,47 @@ export function SentryAuthFlow() {
             </p>
           </div>
 
-          <div className="space-y-6">
+          {enabledSocial.length > 0 && (
+            <>
+              <div
+                className={cn(
+                  'grid gap-3',
+                  enabledSocial.length === 1 && 'grid-cols-1',
+                  enabledSocial.length === 2 && 'grid-cols-2',
+                  enabledSocial.length >= 3 && 'grid-cols-3',
+                )}
+              >
+                {enabledSocial.map(p => (
+                  <SentryButton
+                    key={p.provider}
+                    variant="ghost"
+                    size="sm"
+                    className="h-10"
+                    aria-label={`Sign in with ${p.displayName ?? p.provider}`}
+                    onClick={() => handleSocialLogin(p.provider)}
+                  >
+                    <SocialIcon provider={p.provider} />
+                    {enabledSocial.length <= 2 && (
+                      <span className="ml-2 text-xs font-body capitalize">
+                        {p.displayName ?? p.provider}
+                      </span>
+                    )}
+                  </SentryButton>
+                ))}
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-[10px] font-display font-bold uppercase tracking-[0.1em]">
+                  <span className="bg-card px-3 text-muted-foreground/50">Or continue with email</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          <form onSubmit={handleEmailSubmit} className="space-y-6">
             <SentryInput
               label="Work Email"
               name="email"
@@ -220,43 +292,8 @@ export function SentryAuthFlow() {
             >
               Continue
             </SentryButton>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-[10px] font-display font-bold uppercase tracking-[0.1em]">
-              <span className="bg-card px-3 text-muted-foreground/50">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <SentryButton variant="ghost" size="sm" className="h-10" aria-label="Sign in with Google">
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.18 1-.78 1.85-1.63 2.42v2.01h2.64c1.55-1.42 2.44-3.51 2.44-5.94z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-2.64-2.01c-.73.49-1.66.78-2.64.78-2.83 0-5.23-1.92-6.08-4.5H2.18v2.08C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.92 14.61c-.22-.66-.35-1.36-.35-2.11s.13-1.45.35-2.11V8.31H2.18C1.41 9.87 1 11.61 1 13.25c0 1.64.41 3.38 1.18 4.94l3.74-3.58z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.74 3.58c.85-2.58 3.25-4.5 6.08-4.5z" fill="#EA4335" />
-              </svg>
-            </SentryButton>
-            <SentryButton variant="ghost" size="sm" className="h-10" aria-label="Sign in with GitHub">
-              <Github className="h-4 w-4" />
-            </SentryButton>
-            <SentryButton variant="ghost" size="sm" className="h-10" aria-label="Sign in with Microsoft">
-              <svg className="h-4 w-4" viewBox="0 0 23 23">
-                <path fill="#f3f2f1" d="M1 1h10v10H1z" />
-                <path fill="#f3f2f1" d="M12 1h10v10H12z" />
-                <path fill="#f3f2f1" d="M1 12h10v10H1z" />
-                <path fill="#f3f2f1" d="M12 12h10v10H12z" />
-                <path fill="#7c7c7c" d="M1 1h10v10H1z" />
-                <path fill="#7c7c7c" d="M12 1h10v10H12z" />
-                <path fill="#7c7c7c" d="M1 12h10v10H1z" />
-                <path fill="#7c7c7c" d="M12 12h10v10H12z" />
-              </svg>
-            </SentryButton>
-          </div>
-        </motion.form>
+          </form>
+        </motion.div>
       )}
 
       {/* CREDENTIALS STEP */}

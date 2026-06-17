@@ -210,8 +210,38 @@ Match these EXACT names when implementing — they correspond to Stitch frames.
 Platform schema (`public`): tenants, key_pairs, admin_users
 Tenant schemas (`fk_{slug}`): everything else (users, sessions, roles, etc.)
 
-The `TenantSchemaMiddleware` sets `search_path` on every request.
-All queries to tenant data automatically hit the right schema.
+### Two-Layer Tenant Isolation (defense-in-depth)
+
+**Layer 1 — Schema-level (search_path):**
+`TenantSchemaMiddleware` acquires a `QueryRunner` and runs:
+```sql
+SET search_path TO "fk_{slug}", public
+```
+The `QueryRunner` is stored in `AsyncLocalStorage` via `TenantContextService`.
+`TenantAwareRepository` reads from this scoped `EntityManager`.
+`search_path` is reset to `public` and the `QueryRunner` is released after the response.
+
+**Layer 2 — Row-level (tenant_id column):**
+All entity queries retain `WHERE tenant_id = ?` clauses, marked:
+```typescript
+// Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+// Both layers must match for a query to succeed
+```
+Do NOT remove these comments or clauses — they are intentional double-protection.
+
+**Request lifecycle:**
+1. `TenantResolverMiddleware` → resolves `req.tenant` from hostname/header
+2. `TenantSchemaMiddleware` → sets `search_path`, stores `QueryRunner` in `AsyncLocalStorage`
+3. Guards → validate JWT against `req.tenant`
+4. Services → use `TenantAwareRepository` (reads scoped `EntityManager`)
+5. Response → cleanup: reset `search_path`, release `QueryRunner`
+
+**Platform routes excluded from schema middleware:** `/health`, `/.well-known/*`, `/superadmin/*`
+
+**Key files:**
+- `apps/auth-service/src/core/database/tenant-context.service.ts`
+- `apps/auth-service/src/core/database/tenant-aware.repository.ts`
+- `apps/auth-service/src/common/midllewares/tenant-schema.middleware.ts`
 
 **Do not write raw SQL** unless in a migration file. Use TypeORM QueryBuilder.
 **Do not drop schemas** without explicit user confirmation.

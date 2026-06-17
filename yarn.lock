@@ -1586,40 +1586,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fortknox/sdk@workspace:*, @fortknox/sdk@workspace:packages/fortknox-sdk":
-  version: 0.0.0-use.local
-  resolution: "@fortknox/sdk@workspace:packages/fortknox-sdk"
-  dependencies:
-    "@fortknox/types": "npm:*"
-    "@types/node": "npm:^20.11.5"
-    "@types/react": "npm:^18.2.48"
-    "@types/react-dom": "npm:^18.2.18"
-    eslint: "npm:^8.56.0"
-    tsup: "npm:^8.0.1"
-    typescript: "npm:^5.3.3"
-    vitest: "npm:^1.2.0"
-  peerDependencies:
-    next: ^14.0.0 || ^15.0.0
-    react: ^18.0.0
-    react-dom: ^18.0.0
-  peerDependenciesMeta:
-    next:
-      optional: true
-    react:
-      optional: true
-    react-dom:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
-"@fortknox/types@npm:*, @fortknox/types@workspace:packages/fortknox-types":
-  version: 0.0.0-use.local
-  resolution: "@fortknox/types@workspace:packages/fortknox-types"
-  dependencies:
-    typescript: "npm:^5.3.3"
-  languageName: unknown
-  linkType: soft
-
 "@hapi/address@npm:^5.1.1":
   version: 5.1.1
   resolution: "@hapi/address@npm:5.1.1"
@@ -4812,6 +4778,40 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@scrolloop/sdk@workspace:*, @scrolloop/sdk@workspace:packages/sdk-typescript":
+  version: 0.0.0-use.local
+  resolution: "@scrolloop/sdk@workspace:packages/sdk-typescript"
+  dependencies:
+    "@scrolloop/types": "npm:*"
+    "@types/node": "npm:^20.11.5"
+    "@types/react": "npm:^18.2.48"
+    "@types/react-dom": "npm:^18.2.18"
+    eslint: "npm:^8.56.0"
+    tsup: "npm:^8.0.1"
+    typescript: "npm:^5.3.3"
+    vitest: "npm:^1.2.0"
+  peerDependencies:
+    next: ^14.0.0 || ^15.0.0
+    react: ^18.0.0
+    react-dom: ^18.0.0
+  peerDependenciesMeta:
+    next:
+      optional: true
+    react:
+      optional: true
+    react-dom:
+      optional: true
+  languageName: unknown
+  linkType: soft
+
+"@scrolloop/types@npm:*, @scrolloop/types@workspace:packages/sentry-types":
+  version: 0.0.0-use.local
+  resolution: "@scrolloop/types@workspace:packages/sentry-types"
+  dependencies:
+    typescript: "npm:^5.3.3"
+  languageName: unknown
+  linkType: soft
+
 "@simplewebauthn/browser@npm:^13.2.2":
   version: 13.2.2
   resolution: "@simplewebauthn/browser@npm:13.2.2"
@@ -6973,10 +6973,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "admin-portal@workspace:apps/admin-portal"
   dependencies:
-    "@fortknox/sdk": "workspace:*"
     "@repo/eslint-config": "npm:*"
     "@repo/typescript-config": "npm:*"
     "@repo/ui": "workspace:*"
+    "@scrolloop/sdk": "workspace:*"
     "@simplewebauthn/browser": "npm:^13.3.0"
     "@tanstack/react-query": "npm:^5.90.21"
     "@types/js-cookie": "npm:^3"

@@ -285,3 +285,48 @@ export class VerifyMagicLinkDto {
   @IsString()
   token!: string;
 }
+
+/**
+ * Query params for GET /auth/providers
+ * Tenant is resolved from request context (hostname / X-Tenant-ID header) first;
+ * these fields are only used when calling cross-tenant (e.g. superadmin tooling).
+ */
+export class GetProvidersQueryDto {
+  @ApiPropertyOptional({ description: 'Tenant UUID (resolved from context if omitted)', example: 'uuid-here' })
+  @IsOptional()
+  @IsString()
+  tenant_id?: string;
+
+  @ApiPropertyOptional({ description: 'Tenant slug (resolved from context if omitted)', example: 'acme' })
+  @IsOptional()
+  @IsString()
+  tenant_slug?: string;
+}
+
+export class SocialProviderDto {
+  @ApiProperty({ description: 'Provider identifier', example: 'google' })
+  provider!: string;
+
+  @ApiProperty({ description: 'Whether this provider is enabled for the tenant', example: true })
+  enabled!: boolean;
+
+  @ApiPropertyOptional({ description: 'Human-readable display name', example: 'Google' })
+  displayName?: string;
+}
+
+/**
+ * Response shape for GET /auth/providers
+ */
+export class GetProvidersResponseDto {
+  @ApiProperty({ description: 'Password login enabled', example: true })
+  password!: boolean;
+
+  @ApiProperty({ description: 'Magic link login enabled', example: false })
+  magicLink!: boolean;
+
+  @ApiProperty({ description: 'Passkey (WebAuthn) login enabled', example: false })
+  passkey!: boolean;
+
+  @ApiProperty({ description: 'Configured social providers', type: [SocialProviderDto] })
+  social!: SocialProviderDto[];
+}

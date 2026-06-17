@@ -4,6 +4,7 @@ import * as React from 'react';
 import { PortalLayout } from '@/components/layouts/portal-layout';
 import { PageHeader, SentryButton, SentryInput, DataTable, StatusBadge } from "@repo/ui";
 import { useTenantUsers } from '@/lib/queries';
+import type { UserListItem } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
 import { Plus, Search, MoreHorizontal, Eye, Ban, Trash2, Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,19 +19,19 @@ export default function UsersListPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
-  
+
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<string>('all');
+  const [status, setStatus] = React.useState<'all' | 'active' | 'suspended'>('all');
 
   const { data, isLoading } = useTenantUsers({
     search: search || undefined,
-    status: status === 'all' ? undefined : status,
+    status,
   });
 
   const columns = [
     {
       header: 'User',
-      accessorKey: (row: any) => (
+      accessorKey: (row: UserListItem) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-[10px] font-display font-bold text-accent">
             {row.displayName?.slice(0, 2).toUpperCase() || row.email.slice(0, 2).toUpperCase()}
@@ -48,24 +49,21 @@ export default function UsersListPage() {
     },
     {
       header: 'Status',
-      accessorKey: (row: any) => (
-        <StatusBadge status={row.status as any} />
+      accessorKey: (row: UserListItem) => (
+        <StatusBadge status={row.isActive ? 'active' : 'suspended'} />
       ),
     },
     {
-      header: 'Method',
-      accessorKey: (row: any) => (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-body text-muted-foreground capitalize">
-            {row.primaryAuthMethod || 'Password'}
-          </span>
-          {row.mfaEnabled && <StatusBadge status="mfa" className="px-1 py-0" />}
-        </div>
+      header: 'Email Verified',
+      accessorKey: (row: UserListItem) => (
+        <StatusBadge status={row.emailVerified ? 'active' : 'pending'} className="px-1 py-0">
+          {row.emailVerified ? 'Verified' : 'Unverified'}
+        </StatusBadge>
       ),
     },
     {
       header: 'Last Active',
-      accessorKey: (row: any) => (
+      accessorKey: (row: UserListItem) => (
         <span className="text-xs font-body text-muted-foreground">
           {row.lastLoginAt ? formatDistanceToNow(new Date(row.lastLoginAt), { addSuffix: true }) : 'Never'}
         </span>
@@ -74,7 +72,7 @@ export default function UsersListPage() {
     {
       header: '',
       className: 'w-[50px]',
-      accessorKey: (row: any) => (
+      accessorKey: (row: UserListItem) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <SentryButton variant="icon" size="icon" className="h-8 w-8">
@@ -110,7 +108,7 @@ export default function UsersListPage() {
       <div className="space-y-8">
         <PageHeader
           title="Users"
-          subtitle={`Manage access for ${data?.total || 0} identities in this workspace`}
+          subtitle={`Manage access for ${data?.pagination.total || 0} identities in this workspace`}
           action={
             <SentryButton variant="accent" className="gap-2">
               <Plus className="w-4 h-4" />
@@ -130,14 +128,13 @@ export default function UsersListPage() {
             />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto ml-auto">
-            <select 
+            <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => setStatus(e.target.value as 'all' | 'active' | 'suspended')}
               className="h-[42px] px-4 rounded-sm border border-transparent bg-black/5 text-sm font-body focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all cursor-pointer"
             >
               <option value="all">All Status</option>
               <option value="active">Active Only</option>
-              <option value="pending">Pending Invitation</option>
               <option value="suspended">Suspended</option>
             </select>
             <SentryButton variant="ghost" className="h-[42px] gap-2">

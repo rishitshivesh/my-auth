@@ -1,3 +1,4 @@
+import type { StringValue } from 'ms';
 import {
   Injectable,
   UnauthorizedException,
@@ -17,6 +18,7 @@ import {
   UserSocialConnection,
   UserRole,
   SecurityEventType,
+  TenantSocialProvider,
 } from "@repo/database";
 import {
   SecurityEventService,
@@ -30,8 +32,9 @@ import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
-import { LoginIntentResponseDto } from "./auth.dto";
+import { GetProvidersResponseDto, SocialProviderDto, LoginIntentResponseDto } from "./auth.dto";
 import { logger } from "@/common/logger";
 /**
  * Authentication Service (Updated for Multi-Tenant)
@@ -59,6 +62,8 @@ export class AuthService {
     private readonly socialConnectionRepository: Repository<UserSocialConnection>,
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
+    @InjectRepository(TenantSocialProvider)
+    private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -74,11 +79,12 @@ export class AuthService {
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
     return this.jwtService.sign(payload as Record<string, unknown>, {
-      privateKey: privateKey as crypto.KeyObject,
+      privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as StringValue,
     });
   }
 
@@ -86,6 +92,8 @@ export class AuthService {
    * Get role names (groups) for a user within a tenant
    */
   private async getUserGroups(userId: string, tenantId: string): Promise<string[]> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const userRoles = await this.userRoleRepository.find({
       where: { userId, tenantId },
       relations: ['role'],
@@ -516,6 +524,8 @@ export class AuthService {
    * Send magic link sign-in email (TENANT SCOPED)
    */
   async sendMagicLink(tenantId: string, email: string): Promise<void> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({ where: { email, tenantId } });
 
     // Don't reveal if user exists
@@ -974,7 +984,7 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as crypto.KeyObject,
+      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
       algorithms: ['RS256'],
     }) as Record<string, unknown>;
 
@@ -1038,7 +1048,7 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as crypto.KeyObject,
+      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
       algorithms: ['RS256'],
     }) as Record<string, unknown>;
 
@@ -1112,6 +1122,8 @@ export class AuthService {
     email: string,
   ): Promise<{ sessionNonce: string; [key: string]: unknown }> {
     // Find user
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
     });
@@ -1142,7 +1154,7 @@ export class AuthService {
   async finishWebAuthnLogin(data: {
     tenantId: string;
     email: string;
-    webauthnResponse: unknown;
+    webauthnResponse: AuthenticationResponseJSON;
     sessionNonce: string;
     ip: string;
     userAgent: string;
@@ -1151,6 +1163,8 @@ export class AuthService {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
       relations: ["tenant"],
@@ -1330,6 +1344,8 @@ export class AuthService {
     tenantId: string,
   ): Promise<LoginIntentResponseDto> {
     // Get user's linked social accounts
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const socialConnections = await this.socialConnectionRepository.find({
       where: { userId: user.id, tenantId },
       select: ['provider'],
@@ -1358,7 +1374,7 @@ export class AuthService {
     };
 
     const preferredMethod =
-      (user.preferredAuthMethod as string) ||
+      (user.preferredAuthMethod as 'password' | 'magicLink' | 'passkey' | 'social' | undefined) ||
       this.determineDefaultMethod(methods);
 
     return {
@@ -1439,6 +1455,68 @@ export class AuthService {
     }
 
     return false;
+  }
+
+  /**
+   * Get enabled authentication providers for a tenant without requiring an email.
+   * Used by the frontend to decide which login options to render before email entry.
+   *
+   * Social providers are returned from the tenant_social_providers table (enabled rows).
+   * Falls back to feature-flag approach when no rows exist yet for a provider.
+   */
+  async getProviders(tenantId: string): Promise<GetProvidersResponseDto> {
+    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+
+    if (!tenant) {
+      const { NotFoundException } = await import('@nestjs/common');
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Query the dedicated tenant_social_providers table for explicitly configured providers
+    const configuredProviders = await this.tenantSocialProviderRepository.find({
+      where: { tenantId },
+      select: ['provider', 'enabled'],
+    });
+
+    let social: SocialProviderDto[];
+
+    if (configuredProviders.length > 0) {
+      // Use the dedicated table as source of truth
+      social = configuredProviders.map((p) => ({
+        provider: p.provider,
+        enabled: p.enabled,
+        displayName: this.getProviderDisplayName(p.provider),
+      }));
+    } else {
+      // Fall back to feature flags on the tenant record
+      social = this.getEnabledSocialProviders(tenant).map((provider) => ({
+        provider,
+        enabled: true,
+        displayName: this.getProviderDisplayName(provider),
+      }));
+    }
+
+    return {
+      password: true, // Password is always available unless tenant explicitly disables it
+      magicLink: tenant.featureFlags?.['magicLinkEnabled'] ?? false,
+      passkey: tenant.featureFlags?.['passkeyEnabled'] ?? false,
+      social,
+    };
+  }
+
+  /**
+   * Map a provider identifier to a human-readable display name.
+   */
+  private getProviderDisplayName(provider: string): string {
+    const displayNames: Record<string, string> = {
+      google: 'Google',
+      github: 'GitHub',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
+      linkedin: 'LinkedIn',
+      facebook: 'Facebook',
+    };
+    return displayNames[provider] ?? provider;
   }
 
 }

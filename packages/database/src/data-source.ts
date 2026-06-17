@@ -100,6 +100,6 @@ export const dataSourceOptions: DataSourceOptions = {
 };
 
 // Create and export DataSource
-const AppDataSource = new DataSource(dataSourceOptions);
+export const AppDataSource = new DataSource(dataSourceOptions);
 
 export default AppDataSource;

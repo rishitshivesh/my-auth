@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { logger } from "src/common/logger";
 import { ResponseInterceptor } from "src/common/interceptors/response.interceptors";
 import { saveApiDoc } from "./services/utility/utility.service";
+import { CorsRefreshService } from "./cors-refresh.service";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
@@ -25,7 +26,7 @@ export class AppModule {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
 
     const isProduction = process.env.NODE_ENV === "production";
-    const allowedOrigins = parseCorsOrigins();
+    const staticOrigins = parseCorsOrigins();
 
     // Security headers
     app.use(
@@ -37,12 +38,23 @@ export class AppModule {
     // Cookie parser must be registered before interceptors
     app.use(cookieParser());
 
+    // Load per-tenant + per-client CORS origins from the database
+    const corsRefreshService = app.get(CorsRefreshService);
+    await corsRefreshService.refresh();
+    corsRefreshService.startAutoRefresh();
+
+    const dynamicOrigins = corsRefreshService.getOrigins();
+
     app.enableCors({
-      origin: (origin: any, cb: any) => {
+      origin: (
+        origin: string | undefined,
+        cb: (err: Error | null, allow?: boolean) => void,
+      ) => {
         if (!origin) return cb(null, true);
-        return allowedOrigins.includes(origin)
-          ? cb(null, true)
-          : cb(new Error(`CORS blocked for origin: ${origin}`), false);
+        if (staticOrigins.includes(origin) || dynamicOrigins.has(origin)) {
+          return cb(null, true);
+        }
+        return cb(new Error(`CORS blocked for origin: ${origin}`), false);
       },
       credentials: true,
       methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",

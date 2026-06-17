@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { HealthCheckModule } from "../health-check/health-check.module";
@@ -6,7 +6,9 @@ import { validationSchema } from "@/config/env.validation";
 import { CacheModule } from "@nestjs/cache-manager";
 import * as redisStore from "cache-manager-redis-store";
 import { TenantResolverMiddleware } from "@/common/midllewares/tenant-resolver.middleware";
+import { TenantSchemaMiddleware } from "@/common/midllewares/tenant-schema.middleware";
 import { TenantModule } from "@/modules/tenant/tenant.module";
+import { TenantContextService } from "@/core/database/tenant-context.service";
 
 @Module({
   imports: [
@@ -54,10 +56,24 @@ import { TenantModule } from "@/modules/tenant/tenant.module";
       }),
     }),
   ],
+  providers: [TenantContextService],
+  exports: [TenantContextService],
 })
 export class GlobalModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply tenant resolver to ALL routes
+    // Layer 1: resolve tenant from hostname/header → req.tenant
     consumer.apply(TenantResolverMiddleware).forRoutes("*");
+
+    // Layer 2: set PostgreSQL search_path → AsyncLocalStorage context
+    // Must run AFTER TenantResolverMiddleware so req.tenant is populated
+    consumer
+      .apply(TenantSchemaMiddleware)
+      .exclude(
+        { path: "health", method: RequestMethod.GET },
+        { path: ".well-known/jwks.json", method: RequestMethod.GET },
+        { path: ".well-known/(.*)", method: RequestMethod.GET },
+        { path: "superadmin/(.*)", method: RequestMethod.ALL },
+      )
+      .forRoutes("*");
   }
 }

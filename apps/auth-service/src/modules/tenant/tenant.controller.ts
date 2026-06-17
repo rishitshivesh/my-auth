@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
 } from "@nestjs/common";
+import { IsArray, IsOptional, IsString } from "class-validator";
 import { type Request } from "express";
 import { TenantService } from "./tenant.service";
 import { JwtAuthGuard } from "@/common/guards";
@@ -18,6 +19,22 @@ export class CreateTenantDto {
   slug!: string;
   name!: string;
   environment?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedOrigins?: string[];
+}
+
+export class UpdateTenantDto {
+  @IsOptional()
+  @IsString()
+  environment?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedOrigins?: string[];
 }
 
 export class SetCustomDomainDto {

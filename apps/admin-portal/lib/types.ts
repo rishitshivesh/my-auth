@@ -154,3 +154,61 @@ export interface BrandingConfig {
   headerWeight: HeaderWeight;
   backgroundStyle: BackgroundStyle;
 }
+
+export interface UserListItem {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  emailVerified: boolean;
+  isActive: boolean;
+  lastLoginAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserListResponse {
+  users: UserListItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+export interface RolePermissionSummary {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface Role {
+  id: string;
+  tenantId: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  scope: string;
+  isSystem: boolean;
+  isActive: boolean;
+  isDefault: boolean;
+  priority: number;
+  rolePermissions?: { permission: RolePermissionSummary }[];
+}
+
+export interface Client {
+  id: string;
+  clientId: string;
+  name: string;
+  description?: string;
+  clientType: string;
+  grantTypes: string[];
+  redirectUris: string[];
+  logoUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+}

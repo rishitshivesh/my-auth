@@ -7,16 +7,12 @@ import { cn } from "@repo/ui/lib/utils";
 
 
 import { useTenantRoles } from '@/lib/queries';
-import { 
-  Shield, 
-  Plus, 
-  Search, 
-  ChevronRight, 
-  Lock, 
-  Globe, 
-  Users,
-  Settings,
-  ShieldAlert
+import {
+  Shield,
+  Plus,
+  Search,
+  ChevronRight,
+  Lock,
 } from 'lucide-react';
 
 export default function RolesPage() {
@@ -28,7 +24,7 @@ export default function RolesPage() {
 
   React.useEffect(() => {
     if (roles && !selectedRoleId) {
-      setSelectedRoleId(roles[0]?.id);
+      setSelectedRoleId(roles[0]?.id ?? null);
     }
   }, [roles, selectedRoleId]);
 
@@ -89,7 +85,7 @@ export default function RolesPage() {
                           {role.name}
                         </p>
                         <p className="text-[10px] font-body text-muted-foreground/60">
-                          {role.userCount || 0} users assigned
+                          {role.isSystem ? 'System role' : 'Custom role'}
                         </p>
                       </div>
                     </div>
@@ -123,53 +119,20 @@ export default function RolesPage() {
                 <div className="flex-1 overflow-y-auto pr-2 space-y-8 scrollbar-hide">
                   <section className="space-y-4">
                     <h3 className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 border-b border-border/50 pb-2">
-                      Policy Configuration
+                      Granted Permissions
                     </h3>
-                    <div className="space-y-3">
-                      <div className="bg-black/5 rounded-sm p-4 border border-border">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className="text-xs font-display font-bold uppercase tracking-wider">Access Scope</span>
-                        </div>
-                        <pre className="text-[12px] font-mono text-muted-foreground/80 leading-relaxed">
-                          {JSON.stringify({
-                            "version": "2026-03-15",
-                            "statement": [
-                              {
-                                "effect": "Allow",
-                                "action": selectedRole.permissions || ["*"],
-                                "resource": ["*"]
-                              }
-                            ]
-                          }, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="space-y-4">
-                    <h3 className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 border-b border-border/50 pb-2">
-                      Functional Matrix
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        { label: 'User Management', icon: Users, enabled: true },
-                        { label: 'System Settings', icon: Settings, enabled: selectedRole.name === 'Admin' },
-                        { label: 'Security Logs', icon: ShieldAlert, enabled: true },
-                        { label: 'Global Access', icon: Globe, enabled: selectedRole.name === 'Admin' },
-                      ].map((item) => (
-                        <div key={item.label} className="flex items-center justify-between p-3 border border-border rounded-sm bg-black/5">
-                          <div className="flex items-center gap-3">
-                            <item.icon className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-body font-medium">{item.label}</span>
+                    {selectedRole.rolePermissions && selectedRole.rolePermissions.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {selectedRole.rolePermissions.map(({ permission }) => (
+                          <div key={permission.id} className="flex items-center gap-3 p-3 border border-border rounded-sm bg-black/5">
+                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-sm font-body font-medium">{permission.name}</span>
                           </div>
-                          <div className={cn(
-                            'w-3 h-3 rounded-full',
-                            item.enabled ? 'bg-accent shadow-[0_0_8px_rgba(42,191,108,0.4)]' : 'bg-muted-foreground/20'
-                          )} />
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-body text-muted-foreground">No permissions assigned to this role.</p>
+                    )}
                   </section>
                 </div>
 
