@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 
 const AUTH_SERVICE_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000";
 
 interface ApiError {
   message: string;

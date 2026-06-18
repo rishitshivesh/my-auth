@@ -41,3 +41,10 @@ yarn-error.log*
 *v0*
 
 venv
+# Build artifacts
+*.tsbuildinfo
+packages/*/dist/
+packages/*/*.js
+packages/*/*.js.map
+packages/*/*.d.ts
+packages/*/*.d.ts.map

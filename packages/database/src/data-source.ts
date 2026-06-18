@@ -31,16 +31,22 @@ import { KeyPair } from "./entities/key-pair.entity";
  * and can also be imported by the NestJS application
  */
 
-const isProduction = process.env.NODE_ENV === "production";
 const useSSL = process.env.DB_SSL === "true";
+const dbUrl = process.env.DB_URL ?? process.env.DATABASE_URL;
+
+const connectionConfig = dbUrl
+  ? { url: dbUrl }
+  : {
+      host: process.env.DATABASE_HOST || "localhost",
+      port: parseInt(process.env.DATABASE_PORT || "5432", 10),
+      username: process.env.DATABASE_USER || "postgres",
+      password: process.env.DATABASE_PASSWORD || "",
+      database: process.env.DATABASE_NAME || "postgres",
+    };
 
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
-  host: process.env.DATABASE_HOST || "localhost",
-  port: parseInt(process.env.DATABASE_PORT || "5432", 10),
-  username: process.env.DATABASE_USER || "postgres",
-  password: process.env.DATABASE_PASSWORD || "",
-  database: process.env.DATABASE_NAME || "postgres",
+  ...connectionConfig,
 
   // Entities - explicit import for reliability
   entities: [
@@ -101,5 +107,3 @@ export const dataSourceOptions: DataSourceOptions = {
 
 // Create and export DataSource
 export const AppDataSource = new DataSource(dataSourceOptions);
-
-export default AppDataSource;
