@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { logger } from 'src/common/logger';
+import { logger } from '@/common/logger';
 
 interface OriginRow {
   o: string;
