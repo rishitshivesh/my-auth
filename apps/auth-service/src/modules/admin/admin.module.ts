@@ -20,6 +20,8 @@ import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 
+import { TenantModule } from "@/modules/tenant/tenant.module";
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -34,6 +36,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
     ]),
     JwtModule.register({}),
     GuardsModule,
+    TenantModule,
   ],
   controllers: [AdminController, SuperadminSetupController],
   providers: [

@@ -29,6 +29,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { logger } from "@/common/logger";
+import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
 
 export interface PlatformMetricsDto {
   totalTenants: number;
@@ -139,6 +140,7 @@ export class AdminService implements OnModuleInit {
     private readonly jwksService: JwksService,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly jwtService: JwtService,
+    private readonly tenantSchemaService: TenantSchemaService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -685,7 +687,7 @@ export class AdminService implements OnModuleInit {
     // Create the fk_sentry schema so all tenant-scoped tables land there,
     // not in public. This matches the schema-per-tenant architecture.
     const schemaName = `fk_${SENTRY_TENANT_SLUG}`;
-    await this.dataSource.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+    await this.tenantSchemaService.createSchema(SENTRY_TENANT_SLUG);
     logger.info({ schemaName }, "Sentry tenant schema ensured");
 
     // All role/user/user_role writes happen inside a QueryRunner that sets
