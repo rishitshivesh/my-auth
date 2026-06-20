@@ -8,6 +8,8 @@ import { WizardCard } from "@/components/onboarding/WizardCard";
 import { WizardField, inputBase } from "@/components/onboarding/WizardField";
 import { PasswordStrength } from "@/components/onboarding/PasswordStrength";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { authClient } from "@/app/layout";
+import { withErrorHandler } from "@/lib/with-error-handler";
 
 const AUTH_SERVICE_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000";
@@ -89,8 +91,14 @@ export default function OnboardingPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${AUTH_SERVICE_URL}/tenants/slug-check?slug=${encodeURIComponent(slug)}`);
-        const data = (await res.json()).data as { available: boolean; reason?: string };
+        const checkSlugFn = withErrorHandler<[], { available: boolean; reason?: string }>(
+          async () => authClient.request({
+            url: `${AUTH_SERVICE_URL}/tenants/slug-check?slug=${encodeURIComponent(slug)}`,
+            method: "GET"
+          }),
+          { showErrorToast: false }
+        );
+        const data = await checkSlugFn();
         if (data.available) {
           setSlugState("available");
           setSlugReason("");
@@ -109,31 +117,38 @@ export default function OnboardingPage() {
   async function handleRegister() {
     setError(null);
     setIsLoading(true);
+
+    const registerFn = withErrorHandler<[], any>(
+      async () => {
+        const res = await authClient.request({
+          url: `${AUTH_SERVICE_URL}/tenants/register`,
+          method: "POST",
+          body: {
+            workspaceName: workspaceName.trim(),
+            slug: slug.trim(),
+            adminName: adminName.trim(),
+            adminEmail: adminEmail.trim(),
+            adminPassword,
+          },
+        });
+
+        if (res.status === 409) {
+          throw new Error("That workspace slug was just taken. Try another.");
+        }
+        if (res.status === 429) {
+          throw new Error("Too many attempts. Please try again later.");
+        }
+        return res;
+      },
+      { showErrorToast: true }
+    );
+
     try {
-      const res = await fetch(`${AUTH_SERVICE_URL}/tenants/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceName: workspaceName.trim(),
-          slug: slug.trim(),
-          adminName: adminName.trim(),
-          adminEmail: adminEmail.trim(),
-          adminPassword,
-        }),
-      });
-
-      if (res.status === 409) { setError("That workspace slug was just taken. Try another."); return; }
-      if (res.status === 429) { setError("Too many attempts. Please try again later."); return; }
-      if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        setError(typeof body.message === "string" ? body.message : "Something went wrong. Try again.");
-        return;
-      }
-
+      await registerFn();
       setCreatedSlug(slug);
       goTo(3);
-    } catch {
-      setError("Network error. Check your connection and try again.");
+    } catch (err: any) {
+      setError(err?.message ?? "Something went wrong. Try again.");
     } finally {
       setIsLoading(false);
     }

@@ -397,6 +397,8 @@ export class AuthService {
       session.id,
       user.tenant,
     );
+
+    console.log({ accessTokenPayloadData }, "Access token payload data");
     const accessToken = await this.signToken(
       accessTokenPayloadData,
       "15m",

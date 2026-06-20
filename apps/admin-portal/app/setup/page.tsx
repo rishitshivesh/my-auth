@@ -8,6 +8,8 @@ import { WizardCard } from "@/components/onboarding/WizardCard";
 import { WizardField, inputBase } from "@/components/onboarding/WizardField";
 import { PasswordStrength } from "@/components/onboarding/PasswordStrength";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { authClient } from "@/app/layout";
+import { withErrorHandler } from "@/lib/with-error-handler";
 
 const AUTH_SERVICE_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000";
@@ -49,10 +51,14 @@ export default function SetupPage() {
   // Fetch log file hint on mount
   const [logHint, setLogHint] = useState<{ path: string | null; hint: string } | null>(null);
   useEffect(() => {
-    fetch(`${AUTH_SERVICE_URL}/superadmin/setup-log-hint`)
-      .then((r) => r.json())
-      .then((d) => setLogHint(d as { path: string | null; hint: string }))
-      .catch(() => null);
+    const fetchLogHint = withErrorHandler<[], { path: string | null; hint: string }>(
+      async () => authClient.request({
+        url: `${AUTH_SERVICE_URL}/superadmin/setup-log-hint`,
+        method: "GET"
+      }),
+      { showErrorToast: false }
+    );
+    fetchLogHint().then((d) => setLogHint(d)).catch(() => null);
   }, []);
 
   const goTo = useCallback((target: Step) => {
@@ -67,36 +73,43 @@ export default function SetupPage() {
   async function handleCreate() {
     setError(null);
     setIsLoading(true);
-    try {
-      const res = await fetch(`${AUTH_SERVICE_URL}/superadmin/create-first-admin`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Setup-Token": setupToken.trim(),
-        },
-        body: JSON.stringify({
-          platformName: platformName.trim() || undefined,
-          name: name.trim(),
-          email: email.trim(),
-          password,
-        }),
-      });
 
-      if (res.status === 409) { setError("Platform already initialized."); return; }
-      if (res.status === 403) { setError("Invalid setup token. Check the auth service logs."); return; }
-      if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        setError(typeof body.message === "string" ? body.message : "An unexpected error occurred.");
-        return;
-      }
+    const createAdminFn = withErrorHandler<[], any>(
+      async () => {
+        const res = await authClient.request({
+          url: `${AUTH_SERVICE_URL}/superadmin/create-first-admin`,
+          method: "POST",
+          headers: {
+            "X-Setup-Token": setupToken.trim(),
+          },
+          body: {
+            platformName: platformName.trim() || undefined,
+            name: name.trim(),
+            email: email.trim(),
+            password,
+          },
+        });
+
+        if (res.status === 409) {
+          throw new Error("Platform already initialized.");
+        }
+        if (res.status === 403) {
+          throw new Error("Invalid setup token. Check the auth service logs.");
+        }
+        return res;
+      },
+      { showErrorToast: true }
+    );
+
+    try {
+      await createAdminFn();
 
       // Mark platform as initialized so the middleware doesn't bounce
       // the user back to /setup when they navigate to /u/login.
       document.cookie = 'sentry-initialized=1; Max-Age=300; path=/; SameSite=Lax';
       goTo(4);
-    } catch {
-      setError("Network error. Check your connection and try again.");
+    } catch (err: any) {
+      setError(err?.message ?? "Something went wrong. Try again.");
     } finally {
       setIsLoading(false);
     }

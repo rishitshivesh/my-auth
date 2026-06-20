@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/app/layout";
+import { withErrorHandler } from "./with-error-handler";
 import type {
   DashboardData,
   DashboardUser,
@@ -14,12 +15,10 @@ import type {
   AuthBreakdown,
   BrandingConfig,
   ActiveSessionDto,
-  UserListItem,
   UserListResponse,
   Role,
   Client
 } from "./types";
-
 
 function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
@@ -30,11 +29,9 @@ function apiUrl(path: string): string {
 export function useDashboard() {
   return useQuery<DashboardData>({
     queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await authClient.request({ url: apiUrl("/dashboard"), method: "GET" });
-      if (!res.ok) throw new Error("Failed to fetch dashboard");
-      return res.data.data;
-    },
+    queryFn: withErrorHandler<[], DashboardData>(
+      async () => authClient.request({ url: apiUrl("/dashboard"), method: "GET" })
+    ),
   });
 }
 
@@ -43,35 +40,31 @@ export function useDashboard() {
 export function useMfaStatus() {
   return useQuery<MfaStatus>({
     queryKey: ["mfa", "status"],
-    queryFn: async () => {
-      const res = await authClient.request({ url: apiUrl("/mfa/status"), method: "GET" });
-      if (!res.ok) throw new Error("Failed to fetch MFA status");
-      return res.data.data;
-    },
+    queryFn: withErrorHandler<[], MfaStatus>(
+      async () => authClient.request({ url: apiUrl("/mfa/status"), method: "GET" })
+    ),
   });
 }
 
 export function useSetupTotp() {
   return useMutation<TotpSetupData>({
-    mutationFn: async () => {
-      const res = await authClient.request({ url: apiUrl("/mfa/setup/totp"), method: "POST" });
-      if (!res.ok) throw new Error("Failed to start TOTP setup");
-      return res.data.data;
-    },
+    mutationFn: withErrorHandler<[], TotpSetupData>(
+      async () => authClient.request({ url: apiUrl("/mfa/setup/totp"), method: "POST" })
+    ),
   });
 }
 
 export function useVerifyTotp() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: async (token: string) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[string], void>(
+      async (token: string) => authClient.request({
         url: apiUrl("/mfa/verify/totp"),
         method: "POST",
         body: { token },
-      });
-      if (!res.ok) throw new Error("Invalid code. Please try again.");
-    },
+      }),
+      { errorMessage: "Invalid code. Please try again.", showErrorToast: true }
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mfa", "status"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -82,10 +75,10 @@ export function useVerifyTotp() {
 export function useDisableTotp() {
   const qc = useQueryClient();
   return useMutation<void>({
-    mutationFn: async () => {
-      const res = await authClient.request({ url: apiUrl("/mfa/totp"), method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to disable TOTP");
-    },
+    mutationFn: withErrorHandler<[], void>(
+      async () => authClient.request({ url: apiUrl("/mfa/totp"), method: "DELETE" }),
+      { errorMessage: "Failed to disable TOTP", showErrorToast: true }
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mfa", "status"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -98,25 +91,23 @@ export function useDisableTotp() {
 export function useTenantSettings() {
   return useQuery<TenantSettings>({
     queryKey: ["tenant", "settings"],
-    queryFn: async () => {
-      const res = await authClient.request({ url: apiUrl("/dashboard/tenant-settings"), method: "GET" });
-      if (!res.ok) throw new Error("Failed to fetch tenant settings");
-      return res.data.data;
-    },
+    queryFn: withErrorHandler<[], TenantSettings>(
+      async () => authClient.request({ url: apiUrl("/dashboard/tenant-settings"), method: "GET" })
+    ),
   });
 }
 
 export function useUpdateTenantSettings() {
   const qc = useQueryClient();
   return useMutation<void, Error, { featureFlags: Record<string, boolean> }>({
-    mutationFn: async (body) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[{ featureFlags: Record<string, boolean> }], void>(
+      async (body) => authClient.request({
         url: apiUrl("/dashboard/tenant-settings"),
         method: "PATCH",
         body,
-      });
-      if (!res.ok) throw new Error("Failed to update settings");
-    },
+      }),
+      { errorMessage: "Failed to update settings", showErrorToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "settings"] }),
   });
 }
@@ -128,14 +119,17 @@ export function useUpdateSocialProvider() {
     Error,
     { provider: string; enabled: boolean; clientId?: string; clientSecret?: string }
   >({
-    mutationFn: async ({ provider, ...body }) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<
+      [{ provider: string; enabled: boolean; clientId?: string; clientSecret?: string }],
+      void
+    >(
+      async ({ provider, ...body }) => authClient.request({
         url: apiUrl(`/dashboard/tenant-settings/social/${provider}`),
         method: "PATCH",
         body,
-      });
-      if (!res.ok) throw new Error("Failed to update social provider");
-    },
+      }),
+      { errorMessage: "Failed to update social provider", showErrorToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "settings"] }),
   });
 }
@@ -145,14 +139,19 @@ export function useUpdateSocialProvider() {
 export function useListPasskeys() {
   return useQuery<PasskeyCredential[]>({
     queryKey: ["passkeys"],
-    queryFn: () => authClient.listPasskeys(),
+    queryFn: withErrorHandler<[], PasskeyCredential[]>(
+      async () => authClient.listPasskeys()
+    ),
   });
 }
 
 export function useDeletePasskey() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (credentialId: string) => authClient.deletePasskey(credentialId),
+    mutationFn: withErrorHandler<[string], void>(
+      async (credentialId: string) => authClient.deletePasskey(credentialId),
+      { successMessage: "Passkey deleted", showSuccessToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["passkeys"] }),
   });
 }
@@ -162,14 +161,19 @@ export function useDeletePasskey() {
 export function useSocialConnections() {
   return useQuery<SocialConnection[]>({
     queryKey: ["social-connections"],
-    queryFn: () => authClient.getSocialConnections(),
+    queryFn: withErrorHandler<[], SocialConnection[]>(
+      async () => authClient.getSocialConnections()
+    ),
   });
 }
 
 export function useUnlinkSocialAccount() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (provider: string) => authClient.unlinkSocialAccount(provider),
+    mutationFn: withErrorHandler<[string], void>(
+      async (provider: string) => authClient.unlinkSocialAccount(provider),
+      { successMessage: "Account unlinked", showSuccessToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["social-connections"] }),
   });
 }
@@ -191,28 +195,24 @@ export function useTenantUsers(params: {
 
   return useQuery<UserListResponse>({
     queryKey: ["tenant", "users", params],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], UserListResponse>(
+      async () => authClient.request({
         url: apiUrl(`/users?${qs.toString()}`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch tenant users");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useTenantUser(userId: string) {
   return useQuery<DashboardUser>({
     queryKey: ["tenant", "users", userId],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], DashboardUser>(
+      async () => authClient.request({
         url: apiUrl(`/users/${userId}`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch user details");
-      return res.data.data;
-    },
+      })
+    ),
     enabled: !!userId,
   });
 }
@@ -220,119 +220,107 @@ export function useTenantUser(userId: string) {
 export function useTenantRoles() {
   return useQuery<Role[]>({
     queryKey: ["tenant", "roles"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], Role[]>(
+      async () => authClient.request({
         url: apiUrl(`/rbac/roles?loadPermissions=true`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch roles");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useTenantClients() {
   return useQuery<Client[]>({
     queryKey: ["tenant", "clients"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], Client[]>(
+      async () => authClient.request({
         url: apiUrl(`/oauth/clients`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch clients");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 // ─── Invitations ─────────────────────────────────────────────
 
+export interface InviteData {
+  tenantName: string;
+  tenantSlug: string;
+  email: string;
+}
+
 export function useValidateInvite(token: string) {
-  return useQuery({
+  return useQuery<InviteData>({
     queryKey: ["invite", "validate", token],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], InviteData>(
+      async () => authClient.request({
         url: apiUrl(`/auth/invite/validate/${token}`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Invalid or expired invitation");
-      return res.data.data;
-    },
+      }),
+      { showErrorToast: false, errorMessage: "Invalid or expired invitation" }
+    ),
     enabled: !!token,
   });
 }
 
 export function useAcceptInvite() {
   return useMutation<void, Error, { token: string; name: string; password?: string }>({
-    mutationFn: async (body) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[{ token: string; name: string; password?: string }], void>(
+      async (body) => authClient.request({
         url: apiUrl("/auth/invite/accept"),
         method: "POST",
         body,
-      });
-      if (!res.ok) throw new Error(res.data?.message || "Failed to accept invitation");
-    },
+      }),
+      { showErrorToast: true }
+    ),
   });
 }
 
 export function useTenantMetrics() {
-
-
-
-
-
   return useQuery<TenantMetrics>({
     queryKey: ["tenant", "metrics"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], TenantMetrics>(
+      async () => authClient.request({
         url: apiUrl("/dashboard/tenant-metrics"),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch tenant metrics");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useTenantActivity(limit = 20) {
   return useQuery<ActivityEvent[]>({
     queryKey: ["tenant", "activity", limit],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], ActivityEvent[]>(
+      async () => authClient.request({
         url: apiUrl(`/dashboard/tenant-activity?limit=${limit}`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch tenant activity");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useApiCallTrend(days: 7 | 14 | 30 = 7) {
   return useQuery<TrendPoint[]>({
     queryKey: ["tenant", "api-call-trend", days],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], TrendPoint[]>(
+      async () => authClient.request({
         url: apiUrl(`/dashboard/api-call-trend?days=${days}`),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch API call trend");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useAuthBreakdown() {
   return useQuery<AuthBreakdown>({
     queryKey: ["tenant", "auth-breakdown"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], AuthBreakdown>(
+      async () => authClient.request({
         url: apiUrl("/dashboard/auth-breakdown"),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch auth breakdown");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
@@ -341,27 +329,25 @@ export function useAuthBreakdown() {
 export function useActiveSessions() {
   return useQuery<ActiveSessionDto[]>({
     queryKey: ["sessions", "active"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], ActiveSessionDto[]>(
+      async () => authClient.request({
         url: apiUrl("/sessions/active"),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch active sessions");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useRevokeSession() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: async (sessionId: string) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[string], void>(
+      async (sessionId: string) => authClient.request({
         url: apiUrl(`/sessions/${sessionId}`),
         method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to revoke session");
-    },
+      }),
+      { successMessage: "Session revoked successfully", showSuccessToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
   });
 }
@@ -369,13 +355,13 @@ export function useRevokeSession() {
 export function useRevokeAllOtherSessions() {
   const qc = useQueryClient();
   return useMutation<void, Error, void>({
-    mutationFn: async () => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[], void>(
+      async () => authClient.request({
         url: apiUrl("/sessions/all/other"),
         method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to revoke all other sessions");
-    },
+      }),
+      { successMessage: "All other sessions revoked successfully", showSuccessToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sessions", "active"] }),
   });
 }
@@ -385,35 +371,26 @@ export function useRevokeAllOtherSessions() {
 export function useBranding() {
   return useQuery<BrandingConfig>({
     queryKey: ["tenant", "branding"],
-    queryFn: async () => {
-      const res = await authClient.request({
+    queryFn: withErrorHandler<[], BrandingConfig>(
+      async () => authClient.request({
         url: apiUrl("/tenants/current/branding"),
         method: "GET",
-      });
-      if (!res.ok) throw new Error("Failed to fetch branding");
-      return res.data.data;
-    },
+      })
+    ),
   });
 }
 
 export function useUpdateBranding() {
   const qc = useQueryClient();
   return useMutation<BrandingConfig, Error, Partial<BrandingConfig>>({
-    mutationFn: async (body) => {
-      const res = await authClient.request({
+    mutationFn: withErrorHandler<[Partial<BrandingConfig>], BrandingConfig>(
+      async (body) => authClient.request({
         url: apiUrl("/tenants/current/branding"),
         method: "PUT",
         body,
-      });
-      if (!res.ok) {
-        const msg =
-          res.data?.message ??
-          res.data?.error ??
-          "Failed to save branding";
-        throw new Error(Array.isArray(msg) ? msg.join("; ") : msg);
-      }
-      return res.data.data;
-    },
+      }),
+      { successMessage: "Branding updated successfully", showSuccessToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
   });
 }
@@ -421,23 +398,18 @@ export function useUpdateBranding() {
 export function useUploadLogo() {
   const qc = useQueryClient();
   return useMutation<{ logoUrl: string }, Error, File>({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("logo", file);
-      const res = await fetch(
-        `${authClient.getBaseURL()}/tenants/current/branding/logo`,
-        {
+    mutationFn: withErrorHandler<[File], { logoUrl: string }>(
+      async (file: File) => {
+        const formData = new FormData();
+        formData.append("logo", file);
+        return authClient.request({
+          url: `${authClient.getBaseURL()}/tenants/current/branding/logo`,
           method: "POST",
           body: formData,
-          credentials: "include",
-        },
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json?.message ?? "Logo upload failed");
-      }
-      return json.data;
-    },
+        });
+      },
+      { showErrorToast: true }
+    ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
   });
 }

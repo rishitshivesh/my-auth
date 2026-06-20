@@ -8,9 +8,7 @@ import { useProviders } from '@/hooks/use-providers';
 import { useAuth } from '@scrolloop/sdk';
 import { SentryButton, SentryInput } from "@repo/ui";
 import { cn } from "@repo/ui/lib/utils";
-import { AlertCircle, Github } from 'lucide-react';
-
-
+import { AlertCircle, Github, Lock, Mail, Fingerprint, Chrome, CheckCircle, Key, Loader2 } from 'lucide-react';
 
 function SocialIcon({ provider }: { provider: string }) {
   if (provider === 'google') {
@@ -37,6 +35,134 @@ function SocialIcon({ provider }: { provider: string }) {
     )
   }
   return null
+}
+
+function MagicLinkSection({ email }: { email: string }) {
+  const { sendMagicLink } = useAuth();
+  const [stage, setStage] = React.useState<'request' | 'sent' | 'error'>('request');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSend = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await sendMagicLink(email);
+      setStage('sent');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to send magic link');
+      setStage('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (stage === 'sent') {
+    return (
+      <div className="space-y-6 text-center">
+        <div className="flex justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 border border-accent/25">
+            <CheckCircle className="h-6 w-6 text-accent" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-sm font-display font-semibold text-foreground">Check your email</h3>
+          <p className="text-xs font-body text-muted-foreground leading-relaxed">
+            We've sent a magic link to <strong className="text-foreground">{email}</strong>. Click the link in your inbox to sign in.
+          </p>
+        </div>
+        <div className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 py-2 border-t border-b border-border/40">
+          Link expires in 15 minutes
+        </div>
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={loading}
+          className="text-xs font-display font-bold uppercase tracking-[0.1em] text-accent hover:text-accent/80 transition-colors"
+        >
+          {loading ? 'Sending...' : 'Resend link'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <p className="text-xs font-body text-muted-foreground leading-relaxed">
+        We will send you a secure, passwordless magic link to <strong className="text-foreground">{email}</strong>. Clicking the link will authenticate you instantly.
+      </p>
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {error}
+        </div>
+      )}
+      <SentryButton
+        type="button"
+        onClick={handleSend}
+        className="w-full"
+        variant="primary"
+        isLoading={loading}
+      >
+        Send Magic Link
+      </SentryButton>
+    </div>
+  );
+}
+
+function PasskeySection({ email, onSuccess }: { email: string; onSuccess?: () => void }) {
+  const { startPasskeyLogin, finishPasskeyLogin } = useAuth();
+  const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handlePasskeyLogin = async () => {
+    if (!window.PublicKeyCredential) {
+      setStatus('error');
+      setError('Passkeys are not supported on this device/browser');
+      return;
+    }
+    setStatus('loading');
+    setError(null);
+    try {
+      const serverData = await startPasskeyLogin(email);
+      const { sessionNonce, ...optionsJSON } = serverData;
+      const { startAuthentication } = await import('@simplewebauthn/browser');
+      const assertion = await startAuthentication({ optionsJSON });
+      await finishPasskeyLogin(email, assertion, sessionNonce);
+      setStatus('success');
+      onSuccess?.();
+    } catch (err: any) {
+      if (err?.name === 'NotAllowedError') {
+        setStatus('idle');
+        return;
+      }
+      setStatus('error');
+      setError(err?.message ?? 'Failed to authenticate with passkey');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <p className="text-xs font-body text-muted-foreground leading-relaxed">
+        Use your registered passkey (fingerprint, face recognition, or device PIN) to sign in securely.
+      </p>
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {error}
+        </div>
+      )}
+      <SentryButton
+        type="button"
+        onClick={handlePasskeyLogin}
+        className="w-full"
+        variant="accent"
+        isLoading={status === 'loading'}
+      >
+        {status === 'loading' ? 'Waiting for passkey...' : 'Sign in with Passkey'}
+      </SentryButton>
+    </div>
+  );
 }
 
 interface SentryAuthFlowProps {
@@ -133,7 +259,7 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
     } finally {
       setMfaLoading(false);
     }
-  }, [mfaCode, mfaLoading, mfaTempToken, verifyMfaLogin, router]);
+  }, [mfaCode, mfaLoading, mfaTempToken, verifyMfaLogin, onSuccess]);
 
   React.useEffect(() => {
     if (mfaCode.length === 6 && mfaScreen) handleMfaSubmit();
@@ -300,64 +426,165 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
         </motion.div>
       )}
 
-      {/* CREDENTIALS STEP */}
-      {!mfaScreen && flow.step === 'credentials' && (
-        <motion.form
-          key="credentials"
+      {/* METHOD SELECTION STEP */}
+      {!mfaScreen && flow.step === 'method-selection' && flow.loginIntent && (
+        <motion.div
+          key="method-selection"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          onSubmit={handleCredentialsSubmit}
           className="space-y-8"
         >
           <div className="space-y-2">
             <button
               type="button"
               onClick={flow.goBack}
-              className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-accent hover:text-accent-dark transition-colors flex items-center gap-1.5 mb-4"
+              className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-accent hover:text-accent/80 transition-colors flex items-center gap-1.5 mb-4"
             >
               &larr; Back to Email
             </button>
             <h2 className="text-xl font-display font-light text-foreground">
-              Enter password
+              Choose sign-in method
+            </h2>
+            <p className="text-sm font-body text-muted-foreground">
+              Select how you want to authenticate for <span className="text-foreground font-medium">{flow.email}</span>
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              {
+                id: 'password',
+                label: 'Password',
+                description: 'Sign in with your password',
+                icon: Lock,
+                enabled: flow.loginIntent.methods.password,
+              },
+              {
+                id: 'magicLink',
+                label: 'Magic Link',
+                description: 'We will send you a login link',
+                icon: Mail,
+                enabled: flow.loginIntent.methods.magicLink,
+              },
+              {
+                id: 'passkey',
+                label: 'Passkey',
+                description: 'Use fingerprint or face ID',
+                icon: Fingerprint,
+                enabled: flow.loginIntent.methods.passkey,
+              },
+            ]
+              .filter(m => m.enabled)
+              .map(option => {
+                const Icon = option.icon;
+                const isPreferred = option.id === flow.loginIntent?.preferredMethod;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => flow.selectMethod(option.id)}
+                    className={cn(
+                      "w-full text-left p-4 rounded-sm border transition-all flex items-center justify-between group",
+                      isPreferred
+                        ? "bg-accent/5 border-accent ring-1 ring-accent/25"
+                        : "bg-black/5 hover:bg-black/10 border-border"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "p-2 rounded-sm transition-colors",
+                        isPreferred ? "bg-accent/10 text-accent" : "bg-black/5 text-muted-foreground group-hover:bg-black/10"
+                      )}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-display font-semibold text-xs uppercase tracking-wider text-foreground">{option.label}</p>
+                        <p className="text-xs font-body text-muted-foreground/80 mt-0.5">{option.description}</p>
+                      </div>
+                    </div>
+                    {isPreferred && (
+                      <span className="text-[9px] font-display font-bold uppercase tracking-widest text-accent bg-accent/10 px-2 py-0.5 rounded-sm">
+                        Preferred
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* CREDENTIALS STEP */}
+      {!mfaScreen && flow.step === 'credentials' && flow.selectedMethod && (
+        <motion.div
+          key="credentials"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="space-y-8"
+        >
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={flow.goBack}
+              className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-accent hover:text-accent/80 transition-colors flex items-center gap-1.5 mb-4"
+            >
+              &larr; Back to Methods
+            </button>
+            <h2 className="text-xl font-display font-light text-foreground">
+              {flow.selectedMethod === 'password'
+                ? 'Enter password'
+                : flow.selectedMethod === 'magicLink'
+                ? 'Check your email'
+                : 'Use passkey'}
             </h2>
             <p className="text-sm font-body text-muted-foreground">
               Welcome back, <span className="text-foreground font-medium">{flow.email}</span>
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <SentryInput
-                label="Password"
-                name="password"
-                type="password"
-                required
-                error={flow.error || undefined}
-                disabled={flow.loading}
-                autoFocus
-              />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => router.push('/u/forgot-password')}
-                  className="text-[11px] font-body text-muted-foreground hover:text-accent transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            </div>
+          <AnimatePresence mode="wait">
+            {flow.selectedMethod === 'password' && (
+              <form onSubmit={handleCredentialsSubmit} className="space-y-6">
+                <SentryInput
+                  label="Password"
+                  name="password"
+                  type="password"
+                  required
+                  error={flow.error || undefined}
+                  disabled={flow.loading}
+                  autoFocus
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/u/forgot-password')}
+                    className="text-[11px] font-body text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
 
-            <SentryButton
-              type="submit"
-              className="w-full"
-              variant="primary"
-              isLoading={flow.loading}
-            >
-              Sign In
-            </SentryButton>
-          </div>
-        </motion.form>
+                <SentryButton
+                  type="submit"
+                  className="w-full"
+                  variant="primary"
+                  isLoading={flow.loading}
+                >
+                  Sign In
+                </SentryButton>
+              </form>
+            )}
+
+            {flow.selectedMethod === 'magicLink' && (
+              <MagicLinkSection email={flow.email} />
+            )}
+
+            {flow.selectedMethod === 'passkey' && (
+              <PasskeySection email={flow.email} onSuccess={onSuccess} />
+            )}
+          </AnimatePresence>
+        </motion.div>
       )}
     </AnimatePresence>
   );
