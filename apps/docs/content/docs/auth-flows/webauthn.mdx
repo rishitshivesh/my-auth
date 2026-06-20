@@ -1,0 +1,78 @@
+---
+title: WebAuthn / Passkeys
+description: Hardware security key and biometric (passkey) authentication.
+---
+
+# WebAuthn / Passkeys
+
+Sentry implements the WebAuthn Level 2 spec via [SimpleWebAuthn](https://simplewebauthn.dev). Users can authenticate with:
+
+- Hardware keys (YubiKey, Titan Key)
+- Platform authenticators (Face ID, Touch ID, Windows Hello)
+- Passkeys synced via iCloud Keychain / Google Password Manager
+
+## Registration (enrollment)
+
+```http
+GET /api/mfa/webauthn/register/options
+Authorization: Bearer <access-token>
+
+→ 200 OK — WebAuthn PublicKeyCredentialCreationOptions
+```
+
+```http
+POST /api/mfa/webauthn/register/verify
+Authorization: Bearer <access-token>
+
+{ /* RegistrationResponseJSON from navigator.credentials.create() */ }
+
+→ 200 OK — credential stored
+```
+
+## Authentication
+
+```http
+GET /api/mfa/webauthn/authenticate/options
+x-tenant-id: acme
+
+→ 200 OK — PublicKeyCredentialRequestOptions
+```
+
+```http
+POST /api/mfa/webauthn/authenticate/verify
+x-tenant-id: acme
+
+{
+  "token": "<mfaPendingToken>",
+  "credential": { /* AuthenticationResponseJSON */ },
+  "method": "webauthn"
+}
+
+→ 200 OK
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "..."
+}
+```
+
+## Browser integration
+
+```ts
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+
+// Enrollment
+const options = await fetch('/api/mfa/webauthn/register/options').then(r => r.json());
+const credential = await startRegistration(options);
+await fetch('/api/mfa/webauthn/register/verify', {
+  method: 'POST',
+  body: JSON.stringify(credential),
+});
+
+// Authentication (after password step returns mfaPendingToken)
+const authOptions = await fetch('/api/mfa/webauthn/authenticate/options').then(r => r.json());
+const assertion = await startAuthentication(authOptions);
+const { accessToken } = await fetch('/api/mfa/webauthn/authenticate/verify', {
+  method: 'POST',
+  body: JSON.stringify({ token: mfaPendingToken, credential: assertion, method: 'webauthn' }),
+}).then(r => r.json());
+```

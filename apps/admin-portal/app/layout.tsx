@@ -14,7 +14,7 @@ export const authClient = createWebClient({
   tenant:
     process.env.NEXT_PUBLIC_SENTRY_TENANT_ID ||
     process.env.SENTRY_TENANT_ID ||
-    "220bea14-69ca-420f-a8a2-d017e600ea4b",
+    "sentry",
   debug: process.env.NODE_ENV === "development",
 });
 

@@ -362,6 +362,45 @@ Run local stack: `docker-compose up -d` (starts postgres, redis, mailhog)
 
 ---
 
+## DOCS MAINTENANCE
+
+**Location:** `apps/docs/` — Fumadocs site at port 3001.
+**Source of truth for docs content:** `apps/docs/content/docs/`
+
+After ANY of the following changes, update the relevant docs page before closing the task:
+
+| Change type | Update this doc |
+|-------------|-----------------|
+| New or changed API endpoint | `apps/docs/content/docs/api/<section>.mdx` |
+| New env variable | `apps/docs/content/docs/setup/env.mdx` |
+| New authentication flow | `apps/docs/content/docs/auth-flows/` |
+| RBAC / policy engine change | `apps/docs/content/docs/rbac/` |
+| SDK new feature or breaking change | `apps/docs/content/docs/sdks/<lang>.mdx` |
+| Architecture change | `apps/docs/content/docs/architecture/` |
+| Setup / first-run change | `apps/docs/content/docs/setup/index.mdx` |
+
+**API signatures format** (use consistently):
+```mdx
+### POST /api/auth/login
+
+**Headers:** `Content-Type: application/json`, `x-tenant-id: <slug>`
+
+**Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| email | string | ✓ | User email |
+| password | string | ✓ | Plaintext password |
+
+**Response 200:**
+\`\`\`json
+{ "accessToken": "...", "refreshToken": "...", "user": { "id": "...", "email": "..." } }
+\`\`\`
+```
+
+Do NOT skip the docs update even for small changes. The docs are a first-class deliverable.
+
+---
+
 ## CONTACTS & OWNERSHIP
 
 - **Architecture:** Rishit (CTO)

@@ -1,0 +1,114 @@
+---
+title: Node.js SDK
+description: Server-side SDK for Express, Fastify, NestJS, and other Node.js frameworks.
+---
+
+# Node.js SDK
+
+Package: `@scrolloop/sdk-node`
+
+The Node.js SDK is for **server-side use** — verifying JWTs, fetching users, and calling the Management API using client credentials.
+
+## Installation
+
+```bash
+npm install @scrolloop/sdk-node
+```
+
+## Setup
+
+```ts
+import { ScrolloopAdmin } from '@scrolloop/sdk-node';
+
+const admin = new ScrolloopAdmin({
+  domain: 'acme.sentry.scrolloop.com',
+  clientId: process.env.SENTRY_CLIENT_ID!,
+  clientSecret: process.env.SENTRY_CLIENT_SECRET!,
+});
+```
+
+## JWT verification
+
+```ts
+// Verify a token from a request header
+const payload = await admin.verifyToken(token);
+// payload: { sub, tid, sid, jti, iss, aud, iat, exp }
+
+// Throws if invalid, expired, or wrong audience
+```
+
+## Express middleware
+
+```ts
+import { sentryMiddleware } from '@scrolloop/sdk-node/express';
+
+app.use(sentryMiddleware({
+  domain: 'acme.sentry.scrolloop.com',
+  clientId: process.env.SENTRY_CLIENT_ID!,
+  clientSecret: process.env.SENTRY_CLIENT_SECRET!,
+}));
+
+// req.user is now populated if a valid token is present
+app.get('/protected', (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  res.json({ user: req.user });
+});
+```
+
+## Fastify plugin
+
+```ts
+import { sentryPlugin } from '@scrolloop/sdk-node/fastify';
+
+await fastify.register(sentryPlugin, {
+  domain: 'acme.sentry.scrolloop.com',
+  clientId: process.env.SENTRY_CLIENT_ID!,
+  clientSecret: process.env.SENTRY_CLIENT_SECRET!,
+});
+```
+
+## Management API
+
+```ts
+// Users
+const users = await admin.users.list({ page: 1, limit: 20 });
+const user = await admin.users.get(userId);
+await admin.users.update(userId, { firstName: 'Ada' });
+await admin.users.delete(userId);
+await admin.users.invite({ email: 'new@example.com', roleId });
+
+// Roles
+const roles = await admin.roles.list();
+await admin.roles.assign(userId, roleId);
+await admin.roles.revoke(userId, roleId);
+
+// Sessions
+const sessions = await admin.sessions.list(userId);
+await admin.sessions.revoke(sessionId);
+```
+
+## NestJS integration
+
+```ts
+import { SentryModule, SentryGuard, CurrentUser } from '@scrolloop/sdk-node/nestjs';
+
+@Module({
+  imports: [
+    SentryModule.forRoot({
+      domain: 'acme.sentry.scrolloop.com',
+      clientId: process.env.SENTRY_CLIENT_ID,
+      clientSecret: process.env.SENTRY_CLIENT_SECRET,
+    }),
+  ],
+})
+export class AppModule {}
+
+@Controller('profile')
+@UseGuards(SentryGuard)
+export class ProfileController {
+  @Get()
+  getProfile(@CurrentUser() user: SentryUser) {
+    return user;
+  }
+}
+```

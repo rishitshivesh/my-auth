@@ -1,0 +1,196 @@
+---
+title: RBAC API
+description: Roles, permissions, group assignments, and IAM policy management.
+---
+
+# RBAC API
+
+All endpoints require authentication. Role/permission management requires `roles:write` or `permissions:write`.
+
+---
+
+## Roles
+
+### GET /api/rbac/roles
+
+List all roles in the tenant.
+
+```http
+GET /api/rbac/roles
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:** `{ data: Role[] }`
+
+```json
+{
+  "data": [
+    { "id": "uuid", "name": "owner", "isSystem": true, "permissions": ["*"] },
+    { "id": "uuid", "name": "admin", "isSystem": true, "permissions": ["users:read", "users:write", "roles:read"] },
+    { "id": "uuid", "name": "member", "isSystem": true, "permissions": ["users:read"] }
+  ]
+}
+```
+
+---
+
+### POST /api/rbac/roles
+
+Create a custom role.
+
+```http
+POST /api/rbac/roles
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "name": "billing-admin",
+  "description": "Can view and manage billing",
+  "permissions": ["billing:read", "billing:write"]
+}
+```
+
+**Response `201`:** Created role object.
+
+---
+
+### GET /api/rbac/roles/:id
+
+Get a specific role.
+
+```http
+GET /api/rbac/roles/role-uuid
+Authorization: Bearer <access-token>
+```
+
+---
+
+### PATCH /api/rbac/roles/:id
+
+Update a role's name, description, or permissions.
+
+```http
+PATCH /api/rbac/roles/role-uuid
+Authorization: Bearer <admin-token>
+
+{
+  "permissions": ["billing:read", "billing:write", "invoices:read"]
+}
+```
+
+System roles (`owner`, `admin`, `member`) cannot be deleted or renamed.
+
+---
+
+### DELETE /api/rbac/roles/:id
+
+Delete a custom role. Users with this role lose it immediately.
+
+```http
+DELETE /api/rbac/roles/role-uuid
+Authorization: Bearer <admin-token>
+```
+
+**Response `204`:** Role deleted.
+
+---
+
+## Permissions
+
+### GET /api/rbac/permissions
+
+List all defined permissions.
+
+```http
+GET /api/rbac/permissions
+Authorization: Bearer <access-token>
+```
+
+---
+
+### POST /api/rbac/permissions
+
+Define a new permission.
+
+```http
+POST /api/rbac/permissions
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "name": "invoices:read",
+  "resource": "invoices",
+  "action": "read",
+  "description": "Read invoice records"
+}
+```
+
+---
+
+## User role assignments
+
+### POST /api/rbac/users/:userId/roles
+
+Assign a role to a user.
+
+```http
+POST /api/rbac/users/user-uuid/roles
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "roleId": "role-uuid"
+}
+```
+
+**Response `201`:** Role assigned.
+
+---
+
+### DELETE /api/rbac/users/:userId/roles/:roleId
+
+Remove a role from a user.
+
+```http
+DELETE /api/rbac/users/user-uuid/roles/role-uuid
+Authorization: Bearer <admin-token>
+```
+
+**Response `204`:** Role removed.
+
+---
+
+## Policies
+
+### GET /api/rbac/policies
+
+List IAM policies for the tenant.
+
+```http
+GET /api/rbac/policies
+Authorization: Bearer <admin-token>
+```
+
+---
+
+### POST /api/rbac/policies
+
+Create an IAM policy. See [Policy Engine](/docs/rbac/policies) for schema details.
+
+```http
+POST /api/rbac/policies
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "name": "DenyDeleteForMembers",
+  "effect": "Deny",
+  "actions": ["users:delete", "roles:delete"],
+  "resources": ["*"],
+  "conditions": {
+    "StringEquals": { "user:role": "member" }
+  }
+}
+```
+
+**Response `201`:** Created policy.

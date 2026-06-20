@@ -1,0 +1,130 @@
+---
+title: React SDK
+description: React hooks and provider for Next.js and React applications.
+---
+
+# React SDK
+
+The React SDK is included in `@scrolloop/sdk`. It exports a `ScrolloopProvider` and hooks for accessing auth state.
+
+## Installation
+
+```bash
+npm install @scrolloop/sdk
+```
+
+## Setup
+
+Wrap your application with `ScrolloopProvider`:
+
+```tsx
+// app/layout.tsx (Next.js App Router)
+import { ScrolloopProvider } from '@scrolloop/sdk';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <ScrolloopProvider
+          domain="acme.sentry.scrolloop.com"
+          clientId="your-oauth-client-id"
+        >
+          {children}
+        </ScrolloopProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+## Hooks
+
+### useAuth
+
+Access the current auth state:
+
+```tsx
+import { useAuth } from '@scrolloop/sdk';
+
+function Header() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  if (isLoading) return <Spinner />;
+  if (!isAuthenticated) return <a href="/login">Sign in</a>;
+
+  return <span>Hello, {user.firstName}</span>;
+}
+```
+
+### useUser
+
+```tsx
+import { useUser } from '@scrolloop/sdk';
+
+function Profile() {
+  const { user, isLoading } = useUser();
+  return <p>{user?.email}</p>;
+}
+```
+
+### useSentry
+
+Access the underlying SDK instance:
+
+```tsx
+import { useSentry } from '@scrolloop/sdk';
+
+function LogoutButton() {
+  const sentry = useSentry();
+
+  return (
+    <button onClick={() => sentry.auth.logout()}>
+      Sign out
+    </button>
+  );
+}
+```
+
+## Route protection
+
+### withAuth HOC
+
+```tsx
+import { withAuth } from '@scrolloop/sdk';
+
+const ProtectedPage = withAuth(function Page() {
+  return <div>Only visible when logged in</div>;
+});
+```
+
+### useRequireAuth hook
+
+```tsx
+import { useRequireAuth } from '@scrolloop/sdk';
+
+function Dashboard() {
+  useRequireAuth({ redirectTo: '/login' }); // redirects if not authed
+  return <div>Dashboard</div>;
+}
+```
+
+## Next.js App Router integration
+
+For server components and Server Actions:
+
+```ts
+// lib/auth.ts
+import { createServerClient } from '@scrolloop/sdk/next';
+
+export const auth = createServerClient({
+  domain: 'acme.sentry.scrolloop.com',
+  clientId: process.env.SENTRY_CLIENT_ID!,
+  clientSecret: process.env.SENTRY_CLIENT_SECRET!,
+});
+
+// In a Server Component:
+const user = await auth.getUser();
+
+// In a Server Action:
+const session = await auth.requireSession(); // throws if not authed
+```

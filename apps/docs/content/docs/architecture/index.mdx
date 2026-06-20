@@ -1,0 +1,126 @@
+---
+title: Architecture Overview
+description: Monorepo structure, service responsibilities, and request lifecycle.
+---
+
+# Architecture Overview
+
+## Monorepo structure
+
+```
+/
+├── apps/
+│   ├── auth-service/     NestJS 10 — auth server, all API endpoints
+│   ├── admin-portal/     Next.js 15 — admin UI + user-facing auth flows
+│   └── docs/             This documentation site (Fumadocs + Next.js)
+├── packages/
+│   ├── sdk-typescript/   Browser + React + Next.js SDK
+│   ├── sdk-node/         Node.js server SDK (JWT verify, Express/Fastify middleware)
+│   ├── sdk-vue/          Vue 3 composables
+│   ├── sdk-angular/      Angular module + guards
+│   ├── sdk-java/         Spring Boot starter
+│   ├── sdk-go/           Go HTTP middleware
+│   ├── sdk-python/       Django / FastAPI / Flask
+│   ├── sdk-ruby/         Rack middleware
+│   ├── sdk-rust/         Axum / Actix middleware
+│   └── sdk-nginx/        OpenResty Lua module
+├── helm/                 Kubernetes Helm chart
+└── docs/                 Developer documentation (static MD files)
+```
+
+## Services
+
+### auth-service (port 4000)
+
+The core auth server. Responsibilities:
+
+- All authentication flows (password, magic link, social OAuth, WebAuthn)
+- JWT issuance (RS256, per-tenant key pairs)
+- JWKS endpoint and OIDC discovery
+- OAuth 2.0 / OIDC authorization server
+- RBAC + policy engine
+- Session management (PostgreSQL + Redis dual-layer)
+- Multi-tenant schema management
+- User management API
+- Audit logging
+
+**Stack:** NestJS 10, TypeORM, PostgreSQL 16, Redis, Argon2id, AES-256-GCM, BullMQ, Pino
+
+### admin-portal (port 3000)
+
+The frontend application. Serves two audiences:
+
+1. **Platform operators** — superadmin dashboard at `/dashboard`
+2. **Tenant admins** — workspace dashboards at `/t/{slug}/dashboard`
+3. **End users** — auth flows at `/u/login`, `/u/signup`, `/mfa/enroll`
+
+**Stack:** Next.js 15 App Router, TanStack Query v5, Tailwind CSS v4, shadcn/ui
+
+## Request lifecycle
+
+```
+Browser
+  │
+  ▼
+Next.js middleware (middleware.ts)
+  │  ├─ Check sentry-initialized cookie / fetch /superadmin/initialized
+  │  ├─ Redirect to /setup if uninitialized
+  │  ├─ Subdomain routing (acme.sentry.scrolloop.com → /t/acme/...)
+  │  └─ JWT claim checks for superadmin / tenant routes
+  │
+  ▼
+Next.js page / server component
+  │
+  ▼
+auth-service API (http://localhost:4000)
+  │
+  ├─ TenantResolverMiddleware
+  │    Resolves tenant from: custom domain → subdomain → X-Tenant-ID header
+  │    Excluded for: /superadmin/*, /tenants/register, /tenants/slug-check
+  │
+  ├─ TenantSchemaMiddleware
+  │    SET search_path TO "fk_{slug}", public
+  │    Stored in AsyncLocalStorage via TenantContextService
+  │    Excluded for: same routes as above
+  │
+  ├─ Guards
+  │    JwtAuthGuard → validates RS256 JWT
+  │    TenantBindingGuard → validates JWT tid matches req.tenant
+  │    RateLimitGuard → Redis sliding window
+  │
+  ├─ Controller / Service
+  │    TenantAwareRepository → reads QueryRunner from TenantContextService
+  │
+  └─ Response
+       search_path reset to public
+       QueryRunner released to pool
+```
+
+## Database schema model
+
+```
+public schema (platform-level)
+  tenants           All workspaces
+  key_pairs         Per-tenant RSA signing keys
+  admin_users       Superadmin accounts
+
+fk_{slug} schema (per-tenant, created on workspace registration)
+  users             Workspace users
+  sessions          Active sessions
+  refresh_tokens    JWT refresh tokens
+  mfa_configs       TOTP / WebAuthn configs
+  backup_codes      MFA backup codes
+  oauth_clients     Registered OAuth applications
+  oauth_tokens      Issued tokens (AES-256-GCM encrypted)
+  webauthn_credentials
+  roles             Custom and system roles
+  permissions       Permission definitions
+  user_roles        Role assignments
+  policies          IAM-style policy documents
+  groups            User groups
+  audit_logs        Immutable audit trail
+  security_events   Security-relevant events
+  user_invites      Pending invitations
+  password_history  Previous password hashes (prevent reuse)
+  tenant_password_policy
+```

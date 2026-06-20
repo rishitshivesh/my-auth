@@ -1,0 +1,81 @@
+---
+title: Tenant Isolation
+description: How schema-per-tenant isolation works, and the defense-in-depth approach.
+---
+
+# Tenant Isolation
+
+Scrolloop Sentry uses a **schema-per-tenant** model with a second row-level filter as defense-in-depth. A bug in one layer does not expose the other.
+
+## Schema model
+
+Each workspace gets its own PostgreSQL schema named `fk_{slug}`:
+
+```sql
+-- Platform schema (shared)
+public.tenants
+public.key_pairs
+
+-- Tenant "acme" schema
+fk_acme.users
+fk_acme.sessions
+fk_acme.roles
+-- ... all tenant entities
+```
+
+Schemas are created automatically when a tenant registers via `TenantService.create()`.
+
+## Layer 1 — search_path (schema-level)
+
+`TenantSchemaMiddleware` runs on every tenant request after `TenantResolverMiddleware` has populated `req.tenant`. It acquires a connection from the TypeORM pool and executes:
+
+```sql
+SET search_path TO "fk_{slug}", public
+```
+
+This routes **all TypeORM queries** for this request to the correct tenant schema without any per-query changes. The connection is returned to the pool after the response, with `search_path` reset to `public`.
+
+Implementation detail: the `QueryRunner` is stored in `AsyncLocalStorage` via `TenantContextService`. Services use `TenantAwareRepository` (extends `Repository`) which reads from `TenantContextService` instead of the default DataSource pool.
+
+## Layer 2 — tenant_id filter (row-level)
+
+All tenant entities retain their `tenant_id` column. All service queries retain `WHERE tenant_id = ?` clauses, annotated:
+
+```typescript
+// Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+// Both layers must match for a query to succeed
+```
+
+A misconfigured `search_path` would leak nothing because the `tenant_id` filter still rejects cross-tenant rows. A missing `tenant_id` filter would fail because `search_path` already points at the right schema.
+
+## Excluded routes (platform-level)
+
+These routes operate on the `public` schema and are excluded from both middleware layers:
+
+```
+GET  /health
+GET  /.well-known/*
+ALL  /superadmin/*
+POST /tenants/register
+GET  /tenants/slug-check
+```
+
+## Tenant resolution order
+
+`TenantResolverMiddleware` resolves the tenant in this order:
+
+1. **Custom domain** — e.g. `auth.acme.com` → looks up `tenants.custom_domain`
+2. **Subdomain** — e.g. `acme.sentry.scrolloop.com` → extracts `acme` → looks up `tenants.slug`
+3. **`X-Tenant-ID` header** — development / SDK fallback, accepts slug or UUID
+
+If no tenant is found and the route is not excluded, a `404 NotFoundException` is thrown.
+
+## Key source files
+
+| File | Purpose |
+|------|---------|
+| `src/core/database/tenant-context.service.ts` | AsyncLocalStorage for QueryRunner |
+| `src/core/database/tenant-aware.repository.ts` | Base repository using scoped EntityManager |
+| `src/common/middlewares/tenant-resolver.middleware.ts` | Resolves slug/domain → `req.tenant` |
+| `src/common/middlewares/tenant-schema.middleware.ts` | Sets `search_path`, stores in ALS |
+| `src/core/modules/global/index.ts` | Middleware consumer configuration |

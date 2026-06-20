@@ -6,6 +6,7 @@ import { logger } from '@/common/logger';
 import { ResponseInterceptor } from '@/common/interceptors/response.interceptors';
 import { saveApiDoc } from "./services/utility/utility.service";
 import { CorsRefreshService } from "./cors-refresh.service";
+import { AdminService } from "@/modules/admin/admin.service";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
@@ -45,6 +46,19 @@ export class AppModule {
 
     const dynamicOrigins = corsRefreshService.getOrigins();
 
+    // Used to allow all origins during first-run bootstrap.
+    // The setup token authenticates those requests; CORS enforcement is
+    // meaningless before any tenant or admin exists.
+    const adminService = app.get(AdminService);
+
+    // Origins allowed during first-run bootstrap in addition to staticOrigins.
+    // Never reflect the request's own origin — only accept known safe values.
+    const bootstrapOrigins = new Set<string>([
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      ...(process.env['ADMIN_PORTAL_ORIGIN'] ? [process.env['ADMIN_PORTAL_ORIGIN']] : []),
+    ]);
+
     app.enableCors({
       origin: (
         origin: string | undefined,
@@ -52,6 +66,12 @@ export class AppModule {
       ) => {
         if (!origin) return cb(null, true);
         if (staticOrigins.includes(origin) || dynamicOrigins.has(origin)) {
+          return cb(null, true);
+        }
+        // During first-run bootstrap, allow localhost + the configured admin portal.
+        // The setup token authenticates these requests; CORS is a browser-only
+        // control and the token is the real secret here.
+        if (adminService.isBootstrapping() && bootstrapOrigins.has(origin)) {
           return cb(null, true);
         }
         return cb(new Error(`CORS blocked for origin: ${origin}`), false);
@@ -65,6 +85,7 @@ export class AppModule {
         "x-tenant-id",
         "x-authorization",
         "x-csrf-token",
+        "x-setup-token",
       ],
       exposedHeaders: ["set-cookie"],
       optionsSuccessStatus: 204,

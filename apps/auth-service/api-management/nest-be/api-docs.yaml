@@ -235,6 +235,70 @@
         ]
       }
     },
+    "/tenants/slug-check": {
+      "get": {
+        "operationId": "TenantRegistrationController_checkSlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability status"
+          }
+        },
+        "summary": "Check workspace slug availability",
+        "tags": [
+          "Tenant Registration"
+        ]
+      }
+    },
+    "/tenants/register": {
+      "post": {
+        "operationId": "TenantRegistrationController_registerTenant",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Workspace created, tokens returned"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Slug already taken"
+          }
+        },
+        "summary": "Create a new workspace (self-service)",
+        "tags": [
+          "Tenant Registration"
+        ]
+      }
+    },
     "/stats/system": {
       "get": {
         "operationId": "StatsController_getSystemStats",
@@ -4907,6 +4971,21 @@
         ]
       }
     },
+    "/superadmin/setup-log-hint": {
+      "get": {
+        "operationId": "SuperadminSetupController_getSetupLogHint",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "File path hint"
+          }
+        },
+        "summary": "Get the setup log file path",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
     "/superadmin/create-first-admin": {
       "post": {
         "description": "One-shot endpoint for first-run setup. Returns 409 if already initialized.",
@@ -5020,6 +5099,10 @@
             "example": "solid"
           }
         }
+      },
+      "RegisterTenantDto": {
+        "type": "object",
+        "properties": {}
       },
       "UpdateUserDto": {
         "type": "object",

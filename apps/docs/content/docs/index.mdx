@@ -1,0 +1,39 @@
+---
+title: Scrolloop Sentry
+description: Enterprise authentication platform — Auth0 competitor for self-hosted and SaaS deployments.
+---
+
+# Scrolloop Sentry
+
+Scrolloop Sentry is an enterprise-grade authentication and authorization platform built for teams that need Auth0-level capabilities with full data ownership.
+
+## What it provides
+
+- **Multi-tenant architecture** — schema-level isolation per workspace (`fk_{slug}` PostgreSQL schemas) with defense-in-depth row filtering
+- **AWS IAM-level RBAC** — roles, permissions, groups, and a full Deny/Allow policy engine with conditions
+- **MFA** — TOTP, WebAuthn/passkeys, backup codes, magic links
+- **Social login** — Google, GitHub, Microsoft OAuth2 via Passport.js
+- **RS256 JWTs** — per-tenant RSA key pairs, real JWKS endpoint, refresh token rotation with reuse detection
+- **Full OAuth 2.0 / OIDC** — Authorization Code + PKCE, Client Credentials, token introspection, discovery
+- **Self-service onboarding** — tenants register themselves at `/onboarding`
+- **SDKs** — TypeScript, React, Next.js, Node.js, Vue, Angular, Go, Python, Ruby, Rust, Nginx
+
+## Quick links
+
+| Where to start | Link |
+|----------------|------|
+| Run locally in 5 minutes | [Quickstart](/docs/setup) |
+| Environment variables | [Configuration](/docs/setup/env) |
+| How tenants are isolated | [Architecture](/docs/architecture/tenant-isolation) |
+| Login / MFA flows | [Auth Flows](/docs/auth-flows) |
+| API endpoints | [API Reference](/docs/api) |
+| Integrate in your app | [SDKs](/docs/sdks) |
+
+## Stack at a glance
+
+```
+auth-service   NestJS 10 + TypeScript, PostgreSQL 16, Redis
+admin-portal   Next.js 15 App Router
+packages/      TypeScript, Node, Vue, Angular, Go, Python, Ruby, Rust, Nginx SDKs
+helm/          Kubernetes Helm chart for production deployments
+```

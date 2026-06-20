@@ -6,8 +6,8 @@ import {
   ForbiddenException,
   OnModuleInit,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, MoreThan } from "typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
+import { Repository, IsNull, MoreThan, DataSource } from "typeorm";
 import {
   User,
   Session,
@@ -23,6 +23,9 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
 import { JwtService } from "@nestjs/jwt";
 import { PasswordService } from "@repo/security";
 import { randomBytes, timingSafeEqual } from "crypto";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { logger } from "@/common/logger";
 
 export interface PlatformMetricsDto {
@@ -96,8 +99,11 @@ const SENTRY_INTERNAL_ROLE = "sentry-internal";
 @Injectable()
 export class AdminService implements OnModuleInit {
   private setupToken: string | null = null;
+  private setupLogPath: string | null = null;
 
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
@@ -129,7 +135,28 @@ export class AdminService implements OnModuleInit {
       logger.info(
         "Use this token in the X-Setup-Token header when calling POST /superadmin/create-first-admin",
       );
+
+      try {
+        const logDir =
+          process.env["SENTRY_SETUP_LOG_DIR"] ??
+          path.join(os.homedir(), ".sentry");
+        fs.mkdirSync(logDir, { recursive: true });
+        const logPath = path.join(logDir, "setup.log");
+        fs.writeFileSync(
+          logPath,
+          `[${new Date().toISOString()}] SETUP TOKEN: ${this.setupToken}\n`,
+          { flag: "a" },
+        );
+        this.setupLogPath = logPath;
+        logger.info({ logPath }, "Setup token written to file");
+      } catch (err) {
+        logger.warn({ err }, "Could not write setup token to file — check SENTRY_SETUP_LOG_DIR");
+      }
     }
+  }
+
+  getSetupLogPath(): string | null {
+    return this.setupLogPath;
   }
 
   private validateSetupToken(token: string): boolean {
@@ -146,6 +173,11 @@ export class AdminService implements OnModuleInit {
 
   invalidateSetupToken(): void {
     this.setupToken = null;
+  }
+
+  /** True while the platform is awaiting first-run setup (token still active). */
+  isBootstrapping(): boolean {
+    return this.setupToken !== null;
   }
 
   private async getSentryTenant(): Promise<Tenant | null> {
@@ -587,6 +619,7 @@ export class AdminService implements OnModuleInit {
       throw new ConflictException("Platform is already initialized");
     }
 
+    // Ensure the sentry tenant row exists in public.tenants
     let sentryTenant = await this.getSentryTenant();
     if (!sentryTenant) {
       sentryTenant = await this.tenantRepository.save(
@@ -605,20 +638,7 @@ export class AdminService implements OnModuleInit {
       logger.info("Sentry platform tenant bootstrapped during first-run setup");
     }
 
-    const existingInternalRole = await this.getSentryInternalRole(sentryTenant.id);
-    if (!existingInternalRole) {
-      await this.roleRepository.save(
-        this.roleRepository.create({
-          name: SENTRY_INTERNAL_ROLE,
-          description: "Scrolloop Sentry platform superadmin",
-          tenantId: sentryTenant.id,
-          isSystem: true,
-        } as Partial<Role>),
-      );
-      logger.info("sentry-internal role bootstrapped during first-run setup");
-    }
-
-    // Validate password strength
+    // Validate password before doing any more writes
     const validation = PasswordService.validateStrength(dto.password);
     if (!validation.isValid) {
       throw new BadRequestException({
@@ -627,55 +647,96 @@ export class AdminService implements OnModuleInit {
       });
     }
 
-    // Check if user already exists in the sentry tenant
-    const existing = await this.userRepository.findOne({
-      where: { email: dto.email, tenantId: sentryTenant.id },
-    });
-    if (existing) {
-      throw new ConflictException("A user with this email already exists");
-    }
+    // Create the fk_sentry schema so all tenant-scoped tables land there,
+    // not in public. This matches the schema-per-tenant architecture.
+    const schemaName = `fk_${SENTRY_TENANT_SLUG}`;
+    await this.dataSource.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+    logger.info({ schemaName }, "Sentry tenant schema ensured");
 
-    const passwordHash = await PasswordService.hash(dto.password);
-    const nameParts = dto.name.trim().split(/\s+/);
-    const firstName = nameParts[0] ?? dto.name;
-    const lastName = nameParts.slice(1).join(" ") || undefined;
+    // All role/user/user_role writes happen inside a QueryRunner that sets
+    // search_path so TypeORM routes them into fk_sentry, not public.
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
 
-    const user = this.userRepository.create({
-      tenantId: sentryTenant.id,
-      email: dto.email,
-      emailVerified: true,
-      firstName,
-      lastName,
-      displayName: dto.name,
-      primaryAuthMethod: "password",
-      passwordHash,
-      isActive: true,
-      mfaEnabled: false,
-      failedLoginAttempts: 0,
-      forcePasswordChange: false,
-      passwordHistory: [],
-      metadata: { source: "first-run-setup" },
-    });
+    let savedUser: User;
+    let allSentryRoles: Role[];
 
-    const savedUser = await this.userRepository.save(user);
+    try {
+      await qr.query(`SET LOCAL search_path TO "${schemaName}", public`);
 
-    // Assign ALL roles in the sentry tenant (includes sentry-internal + Owner, etc.)
-    const allSentryRoles = await this.roleRepository.find({
-      where: { tenantId: sentryTenant.id },
-    });
-
-    for (const role of allSentryRoles) {
-      const userRole = this.userRoleRepository.create({
-        tenantId: sentryTenant.id,
-        userId: savedUser.id,
-        roleId: role.id,
-        reason: "First-run setup",
-        metadata: { source: "setup" },
+      // Check for duplicate email in the tenant schema
+      const existing = await qr.manager.findOne(User, {
+        where: { email: dto.email, tenantId: sentryTenant.id },
       });
-      await this.userRoleRepository.save(userRole);
+      if (existing) {
+        throw new ConflictException("A user with this email already exists");
+      }
+
+      // Ensure sentry-internal role exists in fk_sentry.roles
+      let internalRole = await qr.manager.findOne(Role, {
+        where: { name: SENTRY_INTERNAL_ROLE, tenantId: sentryTenant.id },
+      });
+      if (!internalRole) {
+        internalRole = await qr.manager.save(
+          qr.manager.create(Role, {
+            name: SENTRY_INTERNAL_ROLE,
+            description: "Scrolloop Sentry platform superadmin",
+            tenantId: sentryTenant.id,
+            isSystem: true,
+          } as Partial<Role>),
+        );
+        logger.info("sentry-internal role bootstrapped in fk_sentry schema");
+      }
+
+      // Create superadmin user in fk_sentry.users
+      const passwordHash = await PasswordService.hash(dto.password);
+      const nameParts = dto.name.trim().split(/\s+/);
+      const firstName = nameParts[0] ?? dto.name;
+      const lastName = nameParts.slice(1).join(" ") || undefined;
+
+      savedUser = await qr.manager.save(
+        qr.manager.create(User, {
+          tenantId: sentryTenant.id,
+          email: dto.email,
+          emailVerified: true,
+          firstName,
+          lastName,
+          displayName: dto.name,
+          primaryAuthMethod: "password",
+          passwordHash,
+          isActive: true,
+          mfaEnabled: false,
+          failedLoginAttempts: 0,
+          forcePasswordChange: false,
+          passwordHistory: [],
+          metadata: { source: "first-run-setup" },
+        } as Partial<User>),
+      );
+
+      // Assign all roles in the sentry tenant to this user
+      allSentryRoles = await qr.manager.find(Role, {
+        where: { tenantId: sentryTenant.id },
+      });
+
+      for (const role of allSentryRoles) {
+        await qr.manager.save(
+          qr.manager.create(UserRole, {
+            tenantId: sentryTenant.id,
+            userId: savedUser.id,
+            roleId: role.id,
+            reason: "First-run setup",
+            metadata: { source: "setup" },
+          } as Partial<UserRole>),
+        );
+      }
+    } finally {
+      // Always reset search_path before releasing the connection back to the pool
+      await qr.query(`SET search_path TO public`);
+      await qr.release();
     }
 
-    // Issue session + tokens
+    // Issue session + tokens (session/refresh-token writes go through their own
+    // services which use the TenantContextService / public schema as appropriate)
     const session = await this.sessionService.createSession({
       userId: savedUser.id,
       tenantId: sentryTenant.id,
@@ -697,7 +758,6 @@ export class AdminService implements OnModuleInit {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(sentryTenant.id);
     const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
 
-    // Get role names for groups claim
     const groups = allSentryRoles.map((r) => r.name).filter(Boolean);
 
     const accessToken = this.jwtService.sign(
@@ -719,6 +779,8 @@ export class AdminService implements OnModuleInit {
 
     this.invalidateSetupToken();
 
+    // Tokens are returned to the controller which sets them as httpOnly cookies.
+    // They are never included in the JSON response body.
     return {
       accessToken,
       refreshToken,

@@ -1,0 +1,68 @@
+---
+title: RBAC Overview
+description: Roles, permissions, and group-based access control.
+---
+
+# RBAC Overview
+
+Sentry ships with a two-layer authorization model:
+
+1. **RBAC** — roles with permission sets, assigned to users
+2. **IAM policy engine** — explicit Allow/Deny policies with conditions (see [Policies](/docs/rbac/policies))
+
+## Default roles
+
+Every tenant workspace is bootstrapped with three system roles:
+
+| Role | Description |
+|------|-------------|
+| `owner` | Full access to all resources. Assigned to the user who created the workspace. |
+| `admin` | Can manage users, roles, and settings. Cannot delete the workspace. |
+| `member` | Read-only access to workspace resources. |
+
+Custom roles can be created via the API or the admin portal.
+
+## Permission format
+
+Permissions follow `resource:action` notation:
+
+```
+users:read          Read user list and profiles
+users:write         Create and update users
+users:delete        Delete users
+roles:read
+roles:write
+roles:delete
+permissions:read
+permissions:write
+sessions:read
+sessions:revoke
+audit:read
+settings:read
+settings:write
+*                   Wildcard — all actions on all resources
+```
+
+## Assigning roles
+
+```http
+POST /api/rbac/users/{userId}/roles
+Authorization: Bearer <admin-token>
+
+{
+  "roleId": "role-uuid"
+}
+```
+
+A user can have multiple roles. Permissions are **additive** across roles, subject to policy engine Deny overrides.
+
+## Permission evaluation order
+
+```
+1. Collect all permissions from all assigned roles
+2. Evaluate all applicable policies (Allow / Deny)
+3. Explicit Deny in any policy → DENY (overrides all)
+4. Explicit Allow in any policy → ALLOW
+5. No matching policy → fall back to role permissions
+6. No matching role permission → DENY
+```

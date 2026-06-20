@@ -1,0 +1,219 @@
+---
+title: Authentication API
+description: Login, registration, logout, token refresh, magic links, and password reset endpoints.
+---
+
+# Authentication API
+
+All endpoints prefixed `/api/auth/`. Require `x-tenant-id` header on localhost.
+
+---
+
+## POST /api/auth/login
+
+Password-based login.
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "email": "user@example.com",
+  "password": "secret"
+}
+```
+
+**Response — success (no MFA):**
+
+```json
+{
+  "accessToken": "eyJhbGciOiJSUzI1NiJ9...",
+  "refreshToken": "...",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "firstName": "Ada",
+    "lastName": "Lovelace",
+    "tenantId": "tenant-uuid"
+  }
+}
+```
+
+**Response — MFA required:**
+
+```json
+{
+  "mfaPendingToken": "...",
+  "methods": ["totp", "backup"]
+}
+```
+
+**Errors:** `401` invalid credentials · `403` account disabled · `429` rate limited
+
+---
+
+## POST /api/auth/register
+
+Create a new user account in the tenant.
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "email": "newuser@example.com",
+  "password": "StrongPass123!",
+  "firstName": "Ada",
+  "lastName": "Lovelace"
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "accessToken": "...",
+  "refreshToken": "...",
+  "user": { "id": "uuid", "email": "newuser@example.com" }
+}
+```
+
+**Errors:** `409` email already exists · `400` password too weak
+
+---
+
+## POST /api/auth/logout
+
+Revoke the current session.
+
+```http
+POST /api/auth/logout
+Authorization: Bearer <access-token>
+```
+
+**Response `204`:** No content
+
+---
+
+## POST /api/auth/refresh
+
+Exchange a refresh token for a new access token + refresh token pair.
+
+```http
+POST /api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "..."
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "..."
+}
+```
+
+**Errors:** `401` invalid / expired / reused refresh token (reuse revokes entire family)
+
+---
+
+## POST /api/auth/magic-link
+
+Send a passwordless login link to the user's email.
+
+```http
+POST /api/auth/magic-link
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "email": "user@example.com"
+}
+```
+
+**Response `202`:**
+
+```json
+{ "message": "Magic link sent to your email" }
+```
+
+Rate limited: 3 per 10 minutes per email.
+
+---
+
+## POST /api/auth/magic-link/verify
+
+Consume a magic link token.
+
+```http
+POST /api/auth/magic-link/verify
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "token": "a3f9c2d1..."
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "accessToken": "...",
+  "refreshToken": "...",
+  "user": { ... }
+}
+```
+
+---
+
+## POST /api/auth/forgot-password
+
+Send a password reset email.
+
+```http
+POST /api/auth/forgot-password
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "email": "user@example.com"
+}
+```
+
+**Response `202`:**
+
+```json
+{ "message": "Password reset email sent" }
+```
+
+---
+
+## POST /api/auth/reset-password
+
+Complete a password reset.
+
+```http
+POST /api/auth/reset-password
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "token": "reset-token-from-email",
+  "password": "NewStrongPass123!"
+}
+```
+
+**Response `200`:**
+
+```json
+{ "message": "Password reset successful" }
+```
+
+**Errors:** `400` token expired or invalid · `400` password too weak / previously used

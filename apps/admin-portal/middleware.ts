@@ -4,10 +4,8 @@ const AUTH_SERVICE_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? 'http://localhost:4000'
 
 const INITIALIZED_COOKIE = 'sentry-initialized'
-const INITIALIZED_TTL_SECONDS = 300 // 5 minutes
-const UNINITIALIZED_TTL_SECONDS = 30 // 30 seconds — re-check quickly
-
-// Pure helpers — no SDK imports (middleware runs on Edge runtime)
+const INITIALIZED_TTL = 300   // 5 min — re-check after this
+const UNINITIALIZED_TTL = 30  // 30 s — re-check quickly
 
 function parseJwtPayload(token: string): Record<string, unknown> | null {
   try {
@@ -19,31 +17,16 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-function getAccessTokenFromRequest(request: NextRequest): string | null {
-  // Check Authorization header first
+function getAccessToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7)
-  }
-  // TODO: The access token is stored in module memory (not in any readable cookie).
-  // Middleware cannot read it from the httpOnly refresh cookie.
-  // Primary auth guard is the (admin)/layout.tsx server component which reads the
-  // httpOnly cookie server-side and calls the auth service to verify the session.
-  // This middleware provides a best-effort first-pass guard when a Bearer token
-  // is present in the request headers.
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7)
   return null
 }
 
-/**
- * Fetch initialization status from the auth service.
- * Returns null on network error (fail open — let through, don't break the app).
- */
 async function fetchIsInitialized(): Promise<boolean | null> {
   try {
     const res = await fetch(`${AUTH_SERVICE_URL}/superadmin/initialized`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      // Edge runtime fetch; keep it tight
       signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) return null
@@ -54,83 +37,103 @@ async function fetchIsInitialized(): Promise<boolean | null> {
   }
 }
 
+/** Read cached init status from cookie, or fetch fresh from API. */
+async function resolveInitialized(
+  request: NextRequest,
+): Promise<{ status: boolean | null; fromCache: boolean }> {
+  const cached = request.cookies.get(INITIALIZED_COOKIE)?.value
+  if (cached === '1') return { status: true, fromCache: true }
+  if (cached === '0') return { status: false, fromCache: true }
+  const status = await fetchIsInitialized()
+  return { status, fromCache: false }
+}
+
+function setInitCookie(
+  response: NextResponse,
+  value: '0' | '1',
+): void {
+  response.cookies.set(INITIALIZED_COOKIE, value, {
+    maxAge: value === '1' ? INITIALIZED_TTL : UNINITIALIZED_TTL,
+    httpOnly: false,
+    sameSite: 'lax',
+    path: '/',
+  })
+}
+
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0]!
+  const { pathname } = request.nextUrl
 
-  // ── Phase 4: Subdomain routing ──────────────────────────────
+  // ── Subdomain routing ──────────────────────────────────────────
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'sentry.scrolloop.com'
-
   if (hostname !== rootDomain && hostname.endsWith(`.${rootDomain}`)) {
     const slug = hostname.replace(`.${rootDomain}`, '')
-
-    // Reserved subdomains for the superadmin portal
-    if (slug === 'app' || slug === 'admin') {
-      return NextResponse.next()
-    }
-
-    // Rewrite to /t/[slug]/... path internally
+    if (slug === 'app' || slug === 'admin') return NextResponse.next()
     const url = request.nextUrl.clone()
     url.pathname = `/t/${slug}${request.nextUrl.pathname}`
     return NextResponse.rewrite(url)
   }
 
-  const { pathname } = request.nextUrl
-
-  // ── First-run initialization check ────────────────────────────
-  // Skip for the /setup page itself and public auth routes
-  const isSetupPage = pathname === '/setup' || pathname.startsWith('/setup/')
-  const isPublicRoute =
-    isSetupPage ||
-    pathname.startsWith('/u/') ||
-    pathname.startsWith('/api/') ||
+  // ── Always-pass-through paths ──────────────────────────────────
+  if (
     pathname.startsWith('/_next/') ||
-    pathname.startsWith('/favicon')
-
-  if (!isPublicRoute) {
-    const cookieValue = request.cookies.get(INITIALIZED_COOKIE)?.value
-
-    if (cookieValue === '0') {
-      // Cached: not initialized → redirect to setup
-      return NextResponse.redirect(new URL('/setup', request.url))
-    }
-
-    if (cookieValue !== '1') {
-      // Cookie absent or stale — fetch from API
-      const initialized = await fetchIsInitialized()
-
-      if (initialized === false) {
-        const redirectResponse = NextResponse.redirect(
-          new URL('/setup', request.url),
-        )
-        redirectResponse.cookies.set(INITIALIZED_COOKIE, '0', {
-          maxAge: UNINITIALIZED_TTL_SECONDS,
-          httpOnly: false,
-          sameSite: 'lax',
-          path: '/',
-        })
-        return redirectResponse
-      }
-
-      if (initialized === true) {
-        // Mark as initialized in cookie; continue with normal auth checks below
-        const response = NextResponse.next()
-        response.cookies.set(INITIALIZED_COOKIE, '1', {
-          maxAge: INITIALIZED_TTL_SECONDS,
-          httpOnly: false,
-          sameSite: 'lax',
-          path: '/',
-        })
-        return response
-      }
-
-      // initialized === null → network error, fail open (continue)
-    }
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/api/')
+  ) {
+    return NextResponse.next()
   }
 
-  const accessToken = getAccessTokenFromRequest(request)
+  const isSetupPage = pathname === '/setup' || pathname.startsWith('/setup/')
 
-  // ── Superadmin routes ──────────────────────────────────────
+  // ── /setup gate: only accessible when NOT initialized ──────────
+  // Always does a fresh check so the page correctly redirects away
+  // after setup completes (even if the uninitialized cookie is stale).
+  if (isSetupPage) {
+    const initialized = await fetchIsInitialized()
+    if (initialized === true) {
+      const res = NextResponse.redirect(new URL('/u/login', request.url))
+      setInitCookie(res, '1')
+      return res
+    }
+    // Not initialized or network error → let through
+    return NextResponse.next()
+  }
+
+  // ── Self-service flows: always accessible ──────────────────────
+  // /onboarding and /invite are for end-customers; they don't require
+  // the platform to be initialized (tenants can sign up any time).
+  if (
+    pathname === '/onboarding' ||
+    pathname.startsWith('/onboarding/') ||
+    pathname.startsWith('/invite/')
+  ) {
+    return NextResponse.next()
+  }
+
+  // ── Initialization guard for all other routes ──────────────────
+  // This includes /u/login — there is no point logging in if setup
+  // has not been completed yet.
+  const { status: initialized, fromCache } = await resolveInitialized(request)
+
+  if (initialized === false) {
+    const res = NextResponse.redirect(new URL('/setup', request.url))
+    setInitCookie(res, '0')
+    return res
+  }
+
+  if (initialized === true && !fromCache) {
+    // Cache the result so we don't hit the API on every request
+    const res = NextResponse.next()
+    setInitCookie(res, '1')
+    return res
+  }
+
+  // initialized === null (network error) → fail open and continue
+
+  // ── Auth checks ────────────────────────────────────────────────
+  const accessToken = getAccessToken(request)
+
   const isSuperAdminRoute =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/tenants') ||
@@ -139,48 +142,29 @@ export async function middleware(request: NextRequest) {
     (pathname.startsWith('/settings') && !pathname.startsWith('/t/'))
 
   if (isSuperAdminRoute) {
-    if (!accessToken) {
-      // No token in header — let the server layout component do the full check.
-      // We cannot read the httpOnly cookie here, so we pass through and rely on
-      // the (admin)/layout.tsx server component guard for enforcement.
-      return NextResponse.next()
-    }
-
+    if (!accessToken) return NextResponse.next()
     const claims = parseJwtPayload(accessToken)
-    if (!claims) {
-      return NextResponse.redirect(new URL('/u/login', request.url))
-    }
-
+    if (!claims) return NextResponse.redirect(new URL('/u/login', request.url))
     const sentryTenantId = process.env.SENTRY_TENANT_ID
     const tenantOk = sentryTenantId
       ? claims.tenantId === sentryTenantId
       : claims.tenantSlug === 'sentry'
     const groupOk = Array.isArray(claims.groups) && claims.groups.includes('sentry-internal')
-
     if (!tenantOk || !groupOk) {
-      const slug = claims.tenantSlug ?? ''
+      const slug = (claims.tenantSlug as string) ?? ''
       return NextResponse.redirect(new URL(`/t/${slug}/dashboard`, request.url))
     }
   }
 
-  // ── Tenant routes (/t/[slug]/...) ─────────────────────────
   const tenantMatch = pathname.match(/^\/t\/([^/]+)/)
   if (tenantMatch) {
     const slugFromUrl = tenantMatch[1]!
-
-    if (!accessToken) {
-      // Let the tenant layout handle the full server-side check
-      return NextResponse.next()
-    }
-
+    if (!accessToken) return NextResponse.next()
     const claims = parseJwtPayload(accessToken)
-    if (!claims) {
-      return NextResponse.redirect(new URL('/u/login', request.url))
-    }
-
+    if (!claims) return NextResponse.redirect(new URL('/u/login', request.url))
     if (claims.tenantSlug && claims.tenantSlug !== slugFromUrl) {
       return NextResponse.redirect(
-        new URL(`/t/${claims.tenantSlug}/dashboard`, request.url)
+        new URL(`/t/${claims.tenantSlug}/dashboard`, request.url),
       )
     }
   }
@@ -189,12 +173,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/tenants/:path*',
-    '/users/:path*',
-    '/audit-logs/:path*',
-    '/settings/:path*',
-    '/t/:path*',
-  ],
+  // Run on everything except Next.js internals and static files.
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico).*)'],
 }

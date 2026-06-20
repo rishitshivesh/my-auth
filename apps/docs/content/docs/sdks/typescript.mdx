@@ -1,0 +1,93 @@
+---
+title: TypeScript SDK
+description: Browser-compatible SDK for vanilla TypeScript and JavaScript applications.
+---
+
+# TypeScript SDK
+
+Package: `@scrolloop/sdk`
+
+## Installation
+
+```bash
+npm install @scrolloop/sdk
+# or
+yarn add @scrolloop/sdk
+```
+
+## Setup
+
+```ts
+import { ScrolloopSentry } from '@scrolloop/sdk';
+
+const sentry = new ScrolloopSentry({
+  domain: 'acme.sentry.scrolloop.com',
+  clientId: 'your-oauth-client-id',
+});
+```
+
+## Authentication
+
+```ts
+// Password login
+const { accessToken, user } = await sentry.auth.loginWithPassword({
+  email: 'user@example.com',
+  password: 'secret',
+});
+
+// Magic link
+await sentry.auth.sendMagicLink({ email: 'user@example.com' });
+
+// Verify magic link token (from URL)
+const { accessToken } = await sentry.auth.verifyMagicLink({ token: urlToken });
+
+// Logout
+await sentry.auth.logout();
+
+// Refresh tokens
+const { accessToken } = await sentry.auth.refresh();
+```
+
+## User
+
+```ts
+// Get current user
+const user = await sentry.users.getMe();
+
+// Update profile
+await sentry.users.updateMe({ firstName: 'Ada' });
+
+// Change password
+await sentry.users.changePassword({
+  currentPassword: 'old',
+  newPassword: 'new-strong-pass',
+});
+
+// List active sessions
+const sessions = await sentry.users.getSessions();
+
+// Revoke a session
+await sentry.users.revokeSession(sessionId);
+```
+
+## RBAC
+
+```ts
+// Check if current user has a permission
+const canDelete = await sentry.rbac.can('users:delete');
+
+// Get current user's roles
+const roles = await sentry.rbac.getRoles();
+```
+
+## Token management
+
+The SDK stores the access token in memory and the refresh token in a secure cookie. Tokens are refreshed automatically before they expire.
+
+```ts
+// Get current access token (auto-refreshes if needed)
+const token = await sentry.getAccessToken();
+
+// Verify a token using the JWKS endpoint
+const payload = await sentry.verifyToken(token);
+```

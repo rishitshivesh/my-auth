@@ -52,6 +52,23 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <SentryAuthFlow />
+      <p
+        style={{
+          marginTop: "20px",
+          textAlign: "center",
+          fontSize: "13px",
+          fontFamily: "DM Sans, sans-serif",
+          color: "#605E5A",
+        }}
+      >
+        New here?{" "}
+        <a
+          href="/onboarding"
+          style={{ color: "#2ABF6C", textDecoration: "none", fontWeight: 500 }}
+        >
+          Create a workspace →
+        </a>
+      </p>
     </AuthLayout>
   );
 }

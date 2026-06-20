@@ -1,0 +1,156 @@
+---
+title: Tenants API
+description: Workspace registration, settings, and password policy endpoints.
+---
+
+# Tenants API
+
+---
+
+## Public (no auth required)
+
+### POST /tenants/register
+
+Create a new workspace. This is the self-service onboarding endpoint.
+
+```http
+POST /tenants/register
+Content-Type: application/json
+
+{
+  "workspaceName": "Acme Corp",
+  "slug": "acme",
+  "adminName": "Ada Lovelace",
+  "adminEmail": "admin@acme.com",
+  "adminPassword": "StrongPass123!"
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "...",
+  "tenantSlug": "acme",
+  "user": {
+    "id": "uuid",
+    "email": "admin@acme.com",
+    "name": "Ada Lovelace"
+  }
+}
+```
+
+**Errors:** `409` slug taken · `400` invalid slug (reserved word, too short, invalid chars) · `429` rate limited (3/hour/IP)
+
+Slug rules: 4–63 characters, lowercase letters/numbers/hyphens only, no reserved words (`sentry`, `www`, `api`, `admin`, etc.)
+
+---
+
+### GET /tenants/slug-check
+
+Check whether a workspace slug is available. Used for real-time availability validation in the onboarding wizard.
+
+```http
+GET /tenants/slug-check?slug=acme
+```
+
+**Response `200`:**
+
+```json
+{ "available": true }
+```
+
+```json
+{ "available": false, "reason": "This slug is taken" }
+```
+
+Rate limited: 30 requests / minute / IP.
+
+---
+
+## Authenticated
+
+### GET /tenants/current
+
+Get the current tenant's settings.
+
+```http
+GET /tenants/current
+Authorization: Bearer <access-token>
+x-tenant-id: acme
+```
+
+**Response `200`:**
+
+```json
+{
+  "id": "tenant-uuid",
+  "slug": "acme",
+  "name": "Acme Corp",
+  "plan": "free",
+  "status": "active",
+  "allowedOrigins": "https://app.acme.com",
+  "customDomain": null,
+  "createdAt": "..."
+}
+```
+
+---
+
+### PATCH /tenants/current
+
+Update tenant settings. Requires `settings:write` permission.
+
+```http
+PATCH /tenants/current
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "name": "Acme Corporation",
+  "allowedOrigins": "https://app.acme.com,https://app2.acme.com"
+}
+```
+
+---
+
+### GET /tenants/current/password-policy
+
+Get the tenant's password policy.
+
+```http
+GET /tenants/current/password-policy
+Authorization: Bearer <admin-token>
+```
+
+**Response `200`:**
+
+```json
+{
+  "minLength": 8,
+  "requireUppercase": true,
+  "requireDigit": true,
+  "requireSymbol": false,
+  "maxHistoryCount": 5,
+  "maxAgeDays": 90
+}
+```
+
+---
+
+### PATCH /tenants/current/password-policy
+
+Update the tenant's password policy.
+
+```http
+PATCH /tenants/current/password-policy
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "minLength": 12,
+  "requireSymbol": true,
+  "maxHistoryCount": 10
+}
+```

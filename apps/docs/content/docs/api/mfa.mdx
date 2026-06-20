@@ -1,0 +1,137 @@
+---
+title: MFA API
+description: TOTP enrollment, verification, backup codes, and WebAuthn endpoints.
+---
+
+# MFA API
+
+---
+
+## POST /api/mfa/totp/setup
+
+Begin TOTP enrollment. Returns a secret and QR code to scan.
+
+```http
+POST /api/mfa/totp/setup
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qrCode": "data:image/png;base64,...",
+  "backupCodes": [
+    "ABCD-1234", "EFGH-5678", "IJKL-9012",
+    "MNOP-3456", "QRST-7890", "UVWX-1234",
+    "YZAB-5678", "CDEF-9012", "GHIJ-3456", "KLMN-7890"
+  ]
+}
+```
+
+---
+
+## POST /api/mfa/totp/verify
+
+Confirm TOTP enrollment with a valid code from the authenticator app.
+
+```http
+POST /api/mfa/totp/verify
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "code": "123456"
+}
+```
+
+**Response `200`:** MFA enabled on the account.
+
+---
+
+## POST /api/auth/mfa/verify
+
+Verify MFA during login (after receiving `mfaPendingToken`).
+
+```http
+POST /api/auth/mfa/verify
+Content-Type: application/json
+x-tenant-id: acme
+
+{
+  "token": "<mfaPendingToken>",
+  "code": "123456",
+  "method": "totp"
+}
+```
+
+`method` is one of: `"totp"` · `"backup"` · `"webauthn"`
+
+**Response `200`:**
+
+```json
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "..."
+}
+```
+
+---
+
+## GET /api/mfa/backup-codes
+
+List remaining backup codes (shows which have been used).
+
+```http
+GET /api/mfa/backup-codes
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:**
+
+```json
+{
+  "codes": [
+    { "code": "ABCD-1234", "used": false },
+    { "code": "EFGH-5678", "used": true }
+  ]
+}
+```
+
+---
+
+## POST /api/mfa/backup-codes/regenerate
+
+Regenerate all backup codes. All existing codes are immediately invalidated.
+
+```http
+POST /api/mfa/backup-codes/regenerate
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:**
+
+```json
+{
+  "codes": ["ABCD-1234", "EFGH-5678", ...]
+}
+```
+
+---
+
+## DELETE /api/mfa/totp
+
+Disable TOTP MFA. Requires current password confirmation.
+
+```http
+DELETE /api/mfa/totp
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "password": "current-password"
+}
+```
+
+**Response `204`:** TOTP disabled.

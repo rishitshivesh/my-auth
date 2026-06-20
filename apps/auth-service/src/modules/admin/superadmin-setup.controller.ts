@@ -7,8 +7,10 @@ import {
   HttpStatus,
   Ip,
   Headers,
+  Res,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { type Response } from "express";
 import { AdminService } from "./admin.service";
 import type { CreateFirstAdminDto } from "./admin.service";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
@@ -45,6 +47,26 @@ export class SuperadminSetupController {
   }
 
   /**
+   * Returns the filesystem path where the setup token was written, so operators
+   * can retrieve it without grepping Docker logs.
+   */
+  @Public()
+  @Get("setup-log-hint")
+  @HttpCode(HttpStatus.OK)
+  @RateLimit({ max: 3, windowMs: 60000, keyBy: "ip" })
+  @ApiOperation({ summary: "Get the setup log file path" })
+  @ApiResponse({ status: 200, description: "File path hint" })
+  getSetupLogHint(): { path: string | null; hint: string } {
+    const filePath = this.adminService.getSetupLogPath();
+    return {
+      path: filePath,
+      hint: filePath
+        ? `cat "${filePath}"`
+        : "Check SENTRY_SETUP_LOG_DIR env var or run: docker logs auth-service | grep 'SETUP TOKEN'",
+    };
+  }
+
+  /**
    * Create the very first superadmin account.
    * Returns 409 Conflict if the platform is already initialized.
    */
@@ -61,15 +83,36 @@ export class SuperadminSetupController {
   @ApiResponse({ status: 409, description: "Platform already initialized" })
   async createFirstAdmin(
     @Body() body: CreateFirstAdminDto,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
     @Headers("x-setup-token") setupToken: string,
   ) {
-    return this.adminService.createFirstAdmin(
+    const result = await this.adminService.createFirstAdmin(
       body,
       setupToken ?? "",
       ip ?? "0.0.0.0",
       userAgent ?? "unknown",
     );
+
+    const isProduction = process.env["NODE_ENV"] === "production";
+    const cookieBase = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax" as const,
+      path: "/",
+    };
+
+    // Tokens go into httpOnly cookies — never in the response body
+    res.cookie("accessToken", result.accessToken, {
+      ...cookieBase,
+      maxAge: 15 * 60 * 1000, // 15 min
+    });
+    res.cookie("refreshToken", result.refreshToken, {
+      ...cookieBase,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    return { user: result.user };
   }
 }

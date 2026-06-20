@@ -61,19 +61,29 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
 })
 export class GlobalModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // Routes that operate without a tenant context.
+    // Both middleware layers share these exclusions so they stay in sync.
+    const platformRoutes = [
+      { path: "health", method: RequestMethod.GET },
+      { path: ".well-known/(.*)", method: RequestMethod.GET },
+      // Superadmin / first-run setup — operates on the public schema, no tenant
+      { path: "superadmin/(.*)", method: RequestMethod.ALL },
+      // Self-service tenant registration — no tenant exists for these requests
+      { path: "tenants/register", method: RequestMethod.POST },
+      { path: "tenants/slug-check", method: RequestMethod.GET },
+    ];
+
     // Layer 1: resolve tenant from hostname/header → req.tenant
-    consumer.apply(TenantResolverMiddleware).forRoutes("*");
+    consumer
+      .apply(TenantResolverMiddleware)
+      .exclude(...platformRoutes)
+      .forRoutes("*");
 
     // Layer 2: set PostgreSQL search_path → AsyncLocalStorage context
     // Must run AFTER TenantResolverMiddleware so req.tenant is populated
     consumer
       .apply(TenantSchemaMiddleware)
-      .exclude(
-        { path: "health", method: RequestMethod.GET },
-        { path: ".well-known/jwks.json", method: RequestMethod.GET },
-        { path: ".well-known/(.*)", method: RequestMethod.GET },
-        { path: "superadmin/(.*)", method: RequestMethod.ALL },
-      )
+      .exclude(...platformRoutes)
       .forRoutes("*");
   }
 }

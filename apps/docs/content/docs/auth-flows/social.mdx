@@ -1,0 +1,57 @@
+---
+title: Social Login
+description: OAuth2 social login with Google, GitHub, and Microsoft.
+---
+
+# Social Login
+
+## Supported providers
+
+| Provider | Route | Env vars required |
+|----------|-------|-------------------|
+| Google | `/api/social/google` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| GitHub | `/api/social/github` | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
+| Microsoft | `/api/social/microsoft` | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` |
+
+## Flow
+
+```
+Browser
+  │
+  │── GET /api/social/google?redirect_uri=<app-url>
+  │
+  ▼
+Google OAuth consent screen
+  │
+  │── callback → /api/social/google/callback?code=...&state=...
+  │
+auth-service
+  ├─ Exchange code for tokens
+  ├─ Fetch user profile (email, name, avatar)
+  ├─ Find or create user in tenant schema
+  ├─ Issue Sentry JWT + refresh token
+  │
+  ▼
+Redirect to redirect_uri with tokens as query params (or set cookies)
+```
+
+## Implementation
+
+Social auth is implemented with Passport.js strategies. Each provider strategy:
+
+1. Validates the OAuth state parameter (CSRF protection)
+2. Fetches the user profile via the provider API
+3. Calls `SocialAuthService.findOrCreateUser()` which upserts the user in the tenant schema
+4. Issues a Sentry session + JWT via `SessionService`
+
+## Adding social login to your app
+
+Using the TypeScript SDK:
+
+```ts
+// Redirect the user to start OAuth
+window.location.href = `${SENTRY_URL}/api/social/google?redirect_uri=${encodeURIComponent(window.location.origin + '/auth/callback')}`;
+
+// On the callback page, exchange the code:
+const { accessToken } = await sentry.auth.handleSocialCallback(window.location.search);
+```
