@@ -69,6 +69,7 @@ export interface TeamMemberDto {
 }
 
 export interface CreateFirstAdminDto {
+  platformName?: string;
   name: string;
   email: string;
   password: string;
@@ -586,11 +587,35 @@ export class AdminService implements OnModuleInit {
       throw new ConflictException("Platform is already initialized");
     }
 
-    const sentryTenant = await this.getSentryTenant();
+    let sentryTenant = await this.getSentryTenant();
     if (!sentryTenant) {
-      throw new NotFoundException(
-        "Scrolloop Sentry tenant not found — run database seeds first",
+      sentryTenant = await this.tenantRepository.save(
+        this.tenantRepository.create({
+          name: dto.platformName?.trim() || "Scrolloop Sentry",
+          slug: SENTRY_TENANT_SLUG,
+          environment: "production",
+          active: true,
+          featureFlags: {
+            mfaRequired: false,
+            passwordlessEnabled: true,
+            socialProvidersEnabled: false,
+          },
+        } as Partial<Tenant>),
       );
+      logger.info("Sentry platform tenant bootstrapped during first-run setup");
+    }
+
+    const existingInternalRole = await this.getSentryInternalRole(sentryTenant.id);
+    if (!existingInternalRole) {
+      await this.roleRepository.save(
+        this.roleRepository.create({
+          name: SENTRY_INTERNAL_ROLE,
+          description: "Scrolloop Sentry platform superadmin",
+          tenantId: sentryTenant.id,
+          isSystem: true,
+        } as Partial<Role>),
+      );
+      logger.info("sentry-internal role bootstrapped during first-run setup");
     }
 
     // Validate password strength

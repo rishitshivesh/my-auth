@@ -1719,6 +1719,56 @@
         ]
       }
     },
+    "/auth/providers": {
+      "get": {
+        "description": "Returns which login methods (password, magic link, passkey, social) are enabled for the resolved tenant. Call this before showing the login screen to decide which options to render.",
+        "operationId": "AuthController_getProviders",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "required": false,
+            "in": "query",
+            "description": "Tenant UUID (resolved from context if omitted)",
+            "schema": {
+              "example": "uuid-here",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tenant_slug",
+            "required": false,
+            "in": "query",
+            "description": "Tenant slug (resolved from context if omitted)",
+            "schema": {
+              "example": "acme",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProvidersResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tenant could not be resolved from request"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "summary": "List enabled authentication providers",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/auth/login-intent": {
       "post": {
         "description": "\n      Check what authentication methods are available for a given email address.\n      This is the first step in the email-first login flow.\n      \n      Returns:\n      - Whether the user exists\n      - Available authentication methods (password, magic link, passkey, social)\n      - Whether MFA is required\n      - Preferred authentication method\n      - Tenant branding information\n      \n      Use this to dynamically show the appropriate login options to the user.\n    ",
@@ -3347,6 +3397,551 @@
         ]
       }
     },
+    "/rbac/policies": {
+      "post": {
+        "operationId": "RbacController_createPolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Policy created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create policy",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "get": {
+        "operationId": "RbacController_listPolicies",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List policies",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/policies/{id}": {
+      "get": {
+        "operationId": "RbacController_getPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get policy detail",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updatePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update policy",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deletePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete policy",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/policies/simulate": {
+      "post": {
+        "operationId": "RbacController_simulatePolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Simulate policy evaluation",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/roles/{roleId}/policies/{policyId}": {
+      "post": {
+        "operationId": "RbacController_attachPolicyToRole",
+        "parameters": [
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach policy to role",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_detachPolicyFromRole",
+        "parameters": [
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detach policy from role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups": {
+      "post": {
+        "operationId": "RbacController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Group created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "get": {
+        "operationId": "RbacController_listGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List groups (tree)",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}": {
+      "get": {
+        "operationId": "RbacController_getGroupDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get group detail with members and policies",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updateGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deleteGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}/members/{userId}": {
+      "post": {
+        "operationId": "RbacController_addGroupMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add user to group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_removeGroupMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove user from group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}/policies/{policyId}": {
+      "post": {
+        "operationId": "RbacController_attachPolicyToGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach policy to group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_detachPolicyFromGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detach policy from group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
     "/mfa/setup/totp": {
       "post": {
         "description": "Generate QR code and backup codes for TOTP setup",
@@ -3929,7 +4524,7 @@
             "cookie": []
           }
         ],
-        "summary": "Get platform-wide metrics for Fort Knox operators",
+        "summary": "Get platform-wide metrics for Scrolloop Sentry operators",
         "tags": [
           "Admin - Platform"
         ]
@@ -4193,7 +4788,7 @@
             "cookie": []
           }
         ],
-        "summary": "List fortknox-internal team members",
+        "summary": "List sentry-internal team members",
         "tags": [
           "Admin - Platform"
         ]
@@ -4214,7 +4809,7 @@
             "cookie": []
           }
         ],
-        "summary": "Add a user to the fortknox-internal team",
+        "summary": "Add a user to the sentry-internal team",
         "tags": [
           "Admin - Platform"
         ]
@@ -4246,7 +4841,7 @@
             "cookie": []
           }
         ],
-        "summary": "Remove a user from the fortknox-internal team",
+        "summary": "Remove a user from the sentry-internal team",
         "tags": [
           "Admin - Platform"
         ]
@@ -4293,6 +4888,58 @@
         "summary": "Update platform settings",
         "tags": [
           "Admin - Platform"
+        ]
+      }
+    },
+    "/superadmin/initialized": {
+      "get": {
+        "description": "Returns { initialized: true } when at least one sentry-internal user exists.",
+        "operationId": "SuperadminSetupController_checkInitialized",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Initialization status"
+          }
+        },
+        "summary": "Check if the platform has been initialized",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
+    "/superadmin/create-first-admin": {
+      "post": {
+        "description": "One-shot endpoint for first-run setup. Returns 409 if already initialized.",
+        "operationId": "SuperadminSetupController_createFirstAdmin",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-setup-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Superadmin created, access token returned"
+          },
+          "409": {
+            "description": "Platform already initialized"
+          }
+        },
+        "summary": "Create the first superadmin account",
+        "tags": [
+          "Superadmin - Setup"
         ]
       }
     }
@@ -4596,6 +5243,63 @@
           "token"
         ]
       },
+      "SocialProviderDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Provider identifier",
+            "example": "google"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this provider is enabled for the tenant",
+            "example": true
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable display name",
+            "example": "Google"
+          }
+        },
+        "required": [
+          "provider",
+          "enabled"
+        ]
+      },
+      "GetProvidersResponseDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "boolean",
+            "description": "Password login enabled",
+            "example": true
+          },
+          "magicLink": {
+            "type": "boolean",
+            "description": "Magic link login enabled",
+            "example": false
+          },
+          "passkey": {
+            "type": "boolean",
+            "description": "Passkey (WebAuthn) login enabled",
+            "example": false
+          },
+          "social": {
+            "description": "Configured social providers",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialProviderDto"
+            }
+          }
+        },
+        "required": [
+          "password",
+          "magicLink",
+          "passkey",
+          "social"
+        ]
+      },
       "LoginIntentRequestDto": {
         "type": "object",
         "properties": {
@@ -4879,7 +5583,7 @@
           "error_uri": {
             "type": "string",
             "description": "URI with error information",
-            "example": "https://docs.fortknox.io/errors/invalid_grant"
+            "example": "https://docs.scrolloop.com/errors/invalid_grant"
           }
         },
         "required": [
@@ -5039,37 +5743,37 @@
           "issuer": {
             "type": "string",
             "description": "Issuer URL",
-            "example": "https://auth.fortknox.io"
+            "example": "https://sentry.scrolloop.com"
           },
           "authorization_endpoint": {
             "type": "string",
             "description": "Authorization endpoint",
-            "example": "https://auth.fortknox.io/oauth/authorize"
+            "example": "https://sentry.scrolloop.com/oauth/authorize"
           },
           "token_endpoint": {
             "type": "string",
             "description": "Token endpoint",
-            "example": "https://auth.fortknox.io/oauth/token"
+            "example": "https://sentry.scrolloop.com/oauth/token"
           },
           "userinfo_endpoint": {
             "type": "string",
             "description": "UserInfo endpoint",
-            "example": "https://auth.fortknox.io/oauth/userinfo"
+            "example": "https://sentry.scrolloop.com/oauth/userinfo"
           },
           "jwks_uri": {
             "type": "string",
             "description": "JWKS URI",
-            "example": "https://auth.fortknox.io/oauth/jwks"
+            "example": "https://sentry.scrolloop.com/oauth/jwks"
           },
           "revocation_endpoint": {
             "type": "string",
             "description": "Revocation endpoint",
-            "example": "https://auth.fortknox.io/oauth/revoke"
+            "example": "https://sentry.scrolloop.com/oauth/revoke"
           },
           "introspection_endpoint": {
             "type": "string",
             "description": "Introspection endpoint",
-            "example": "https://auth.fortknox.io/oauth/introspect"
+            "example": "https://sentry.scrolloop.com/oauth/introspect"
           },
           "response_types_supported": {
             "description": "Supported response types",
@@ -5754,6 +6458,187 @@
         "required": [
           "role"
         ]
+      },
+      "PolicyConditionDto": {
+        "type": "object",
+        "properties": {
+          "IpAddress": {
+            "type": "object"
+          },
+          "DateGreaterThan": {
+            "type": "object"
+          },
+          "DateLessThan": {
+            "type": "object"
+          },
+          "Bool": {
+            "type": "object"
+          },
+          "StringEquals": {
+            "type": "object"
+          }
+        }
+      },
+      "PolicyStatementDto": {
+        "type": "object",
+        "properties": {
+          "Sid": {
+            "type": "string",
+            "example": "AllowUserRead"
+          },
+          "Effect": {
+            "type": "string",
+            "enum": [
+              "Allow",
+              "Deny"
+            ]
+          },
+          "Principal": {
+            "type": "object"
+          },
+          "Action": {
+            "type": "object",
+            "example": [
+              "users:read"
+            ]
+          },
+          "Resource": {
+            "type": "object",
+            "example": [
+              "sentry:tenant:*/user:*"
+            ]
+          },
+          "Condition": {
+            "$ref": "#/components/schemas/PolicyConditionDto"
+          }
+        },
+        "required": [
+          "Effect",
+          "Action",
+          "Resource"
+        ]
+      },
+      "PolicyDocumentDto": {
+        "type": "object",
+        "properties": {
+          "Version": {
+            "type": "string",
+            "example": "2024-01-01"
+          },
+          "Statement": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyStatementDto"
+            }
+          }
+        },
+        "required": [
+          "Version",
+          "Statement"
+        ]
+      },
+      "CreatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "ReadOnlyAccess"
+          },
+          "description": {
+            "type": "string",
+            "example": "Grants read-only access to all resources"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyDocumentDto"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "managed"
+            ],
+            "default": "managed"
+          }
+        },
+        "required": [
+          "name",
+          "document"
+        ]
+      },
+      "UpdatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyDocumentDto"
+          }
+        }
+      },
+      "SimulatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "example": "user-uuid"
+          },
+          "action": {
+            "type": "string",
+            "example": "users:read"
+          },
+          "resource": {
+            "type": "string",
+            "example": "sentry:tenant:acme/user:123"
+          },
+          "ipAddress": {
+            "type": "string",
+            "example": "192.168.1.1"
+          },
+          "mfaVerified": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "userId",
+          "action",
+          "resource"
+        ]
+      },
+      "CreateGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Engineering"
+          },
+          "description": {
+            "type": "string",
+            "example": "Engineering department"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "example": "parent-group-uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Updated Engineering"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          }
+        }
       },
       "SetupTotpResponseDto": {
         "type": "object",
