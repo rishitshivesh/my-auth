@@ -40,10 +40,6 @@ export function PortalLayout({
   const pathname = usePathname();
   const slug = (params.slug as string) || tenantSlug;
 
-  const tenants = [
-    { id: '1', name: slug || 'Default Workspace', slug: slug || 'default' }
-  ];
-
 
 
   const navigation = [
@@ -77,7 +73,7 @@ export function PortalLayout({
       <Sidebar navigation={navigation} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar title={pageTitle} subtitle={pageSubtitle} tenants={tenants} current={tenants[0]?.id} />
+        <Topbar title={pageTitle} subtitle={pageSubtitle} />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
 

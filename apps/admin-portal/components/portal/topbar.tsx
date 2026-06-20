@@ -6,22 +6,17 @@ import { TenantSwitcher } from './tenant-switcher';
 import { UserMenu } from './user-menu';
 import { Bell } from 'lucide-react';
 
-
-
 interface TopbarProps {
   title?: string;
   subtitle?: string;
-  tenants?: any[];
-  current?: string;
 }
 
-export function Topbar({ title, subtitle, tenants, current }: TopbarProps) {
+export function Topbar({ title, subtitle }: TopbarProps) {
   return (
     <header className="h-16 flex items-center justify-between px-8 bg-card/50 backdrop-blur-md border-b border-border z-10">
       <div className="flex items-center gap-8">
-        <TenantSwitcher tenants={tenants} current={current} />
+        <TenantSwitcher />
 
-        
         {title && (
           <div className="flex items-center gap-3">
             <div className="w-px h-6 bg-border" />

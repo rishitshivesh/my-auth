@@ -15,7 +15,7 @@ import {
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 import { logger } from "@/common/logger";
-import { UserRepository } from "./user.repository";
+import { UserRepository, OrgMembership } from "./user.repository";
 
 /**
  * User Service
@@ -780,6 +780,10 @@ export class UserService {
     });
 
     logger.info({ userId, tenantId }, "Admin unlocked user account");
+  }
+
+  async getUserOrgs(userId: string, tenantId: string): Promise<OrgMembership[]> {
+    return this.userRepository.getUserOrgs(userId, tenantId);
   }
 
   async adminDeleteUser(tenantId: string, userId: string) {

@@ -128,8 +128,8 @@ export function MFASettings({ methods, primaryColor = "#6366f1", onToggle, onReg
                 email="user@example.com"
                 secret="JBSWY3DPEBLW64TMMQ6G63JNN2HXE3J5"
                 qrCodeUrl="/placeholder.svg?height=200&width=200"
-                onVerify={(code) => {
-                  console.log("TOTP verified:", code)
+                onVerify={(_code) => {
+                  // SPRINT_N: wire to useVerifyTotp() mutation
                   setSetupOpen(false)
                 }}
                 primaryColor={primaryColor}

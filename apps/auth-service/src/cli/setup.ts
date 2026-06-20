@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   console.log("");
 
   // 4. Prompts
-  const defaultSlug = process.env["SENTRY_PLATFORM_SLUG"] ?? platformInfo?.slug ?? "sentry";
+  // defaultSlug reserved for future use when we add a slug prompt
   const defaultName = process.env["SENTRY_PLATFORM_NAME"] ?? platformInfo?.name ?? "Scrolloop Sentry";
 
   const platformName = await input({

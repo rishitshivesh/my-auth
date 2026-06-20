@@ -609,6 +609,28 @@ export class SentryClient {
   }
 
   /**
+   * Get all orgs the current user belongs to (home tenant + guest memberships)
+   */
+  async getUserOrgs(): Promise<
+    Array<{
+      tenantId: string;
+      slug: string;
+      name: string;
+      role: string;
+      isGuest: boolean;
+      logoUrl?: string;
+    }>
+  > {
+    const response = await this.request({
+      url: `${this.config.baseURL}/users/orgs`,
+      method: 'GET',
+    });
+    if (!response.ok) throw this.createError(response);
+    const payload = response.data?.data ?? response.data;
+    return Array.isArray(payload) ? payload : [];
+  }
+
+  /**
    * Get current user
    */
   async getCurrentUser(): Promise<User> {

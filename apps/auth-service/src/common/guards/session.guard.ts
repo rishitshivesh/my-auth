@@ -32,8 +32,6 @@ export class SessionGuard implements CanActivate {
     const user = request.user;
     const sessionId = user?.sessionId;
 
-    console.log({ user })
-
     if (!sessionId) {
       this.logger.error("SessionGuard: No sessionId in token payload");
       throw new UnauthorizedException(

@@ -85,6 +85,22 @@ export class UserRole extends BaseEntity {
   reason?: string;
 
   @Column({
+    type: "boolean",
+    default: false,
+    name: "is_guest",
+    comment: "Guest membership — cross-tenant invite (read-only by default)",
+  })
+  isGuest!: boolean;
+
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "invited_by",
+    comment: "User who sent the cross-tenant invite",
+  })
+  invitedBy?: string;
+
+  @Column({
     type: "jsonb",
     nullable: true,
     comment: "Additional metadata (conditions, restrictions, etc.)",

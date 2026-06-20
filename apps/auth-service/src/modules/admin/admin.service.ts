@@ -186,11 +186,10 @@ export class AdminService implements OnModuleInit {
       const a = Buffer.from(token);
       const b = Buffer.from(this.setupToken);
       
-      logger.info("Validating setup token");
-      console.log(`Validating setup token: ${token} against ${b.toString("hex")}`, {a, b, setupToken: this.setupToken});
       if (a.length !== b.length) return false;
-      logger.info("Setup token validated successfully");
-      return timingSafeEqual(a, b);
+      const ok = timingSafeEqual(a, b);
+      logger.debug({ ok }, 'setup token check');
+      return ok;
     } catch {
       return false;
     }

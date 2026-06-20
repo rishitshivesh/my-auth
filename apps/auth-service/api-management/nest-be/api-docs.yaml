@@ -538,6 +538,29 @@
         ]
       }
     },
+    "/users/orgs": {
+      "get": {
+        "operationId": "UserController_getUserOrgs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Organization memberships retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get user organization memberships",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/users": {
       "get": {
         "operationId": "UserController_listUsers",

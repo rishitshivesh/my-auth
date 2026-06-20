@@ -24,6 +24,7 @@ import {
 } from "@nestjs/swagger";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { UserService, ListUsersOptions } from "./user.service";
+import { OrgMembership } from "./user.repository";
 import {
   UpdateUserDto,
   ChangePasswordDto,
@@ -170,6 +171,17 @@ export class UserController {
       req.user.sub,
       parseInt(limit, 10),
     );
+  }
+
+  /**
+   * Get all organizations the current user is a member of (including guest memberships)
+   * Used to power the org-switcher in the portal header
+   */
+  @Get("orgs")
+  @ApiOperation({ summary: "Get user organization memberships" })
+  @ApiResponse({ status: 200, description: "Organization memberships retrieved" })
+  async getUserOrgs(@Request() req: AuthenticatedRequest): Promise<OrgMembership[]> {
+    return this.userService.getUserOrgs(req.user.sub, req.tenantId!);
   }
 
   /**

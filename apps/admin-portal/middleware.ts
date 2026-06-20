@@ -141,9 +141,6 @@ export async function middleware(request: NextRequest) {
   // ── Initialization guard for all other routes ──────────────────
   const { info, fromCache } = await resolvePlatformInfo(request)
 
-
-  console.log({info});
-
   if (info === null) {
     // Auth service unreachable — fail-closed to error page
     const url = request.nextUrl.clone()
