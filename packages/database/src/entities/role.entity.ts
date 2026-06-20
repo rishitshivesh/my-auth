@@ -159,6 +159,15 @@ export class Role extends BaseEntity {
    * Check if role has a specific permission
    */
   hasPermission(permissionName: string): boolean {
+    // Platform superadmin roles have all access by default
+    if (
+      this.name === "super_admin" ||
+      this.name === "sentry-internal" ||
+      this.name.endsWith("-internal")
+    ) {
+      return true;
+    }
+
     if (!this.permissions) {
       return false;
     }
@@ -237,6 +246,8 @@ export class Role extends BaseEntity {
     return (
       this.name === "admin" ||
       this.name === "super_admin" ||
+      this.name === "sentry-internal" ||
+      this.name.endsWith("-internal") ||
       this.hasPermission("*:*")
     );
   }

@@ -42,21 +42,48 @@ export class SessionGuard implements CanActivate {
     }
 
     // Fetch session from database
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-      select: {
-        id: true,
-        userId: true,
-        tenantId: true,
-        revokedAt: true,
-        expiresAt: true,
-        lastActivity: true,
-        ipAddress: true,
-        userAgent: true,
-        deviceId: true,
-        createdAt: true,
-      },
-    });
+    const platformSlug = process.env.SENTRY_PLATFORM_SLUG ?? "sentry";
+    const schemaName = user.isSuperAdmin ? `fk_${platformSlug}` : undefined;
+
+    let session;
+    if (schemaName) {
+      // Query the platform schema directly with raw SQL to bypass active search_path for superadmin
+      const rows = await this.sessionRepository.manager.query(
+        `SELECT * FROM "${schemaName}"."sessions" WHERE id = $1 LIMIT 1`,
+        [sessionId]
+      );
+      const rawSession = rows[0];
+      if (rawSession) {
+        session = {
+          id: rawSession.id,
+          userId: rawSession.user_id,
+          tenantId: rawSession.tenant_id,
+          revokedAt: rawSession.revoked_at ? new Date(rawSession.revoked_at) : null,
+          expiresAt: rawSession.expires_at ? new Date(rawSession.expires_at) : null,
+          lastActivity: rawSession.last_activity ? new Date(rawSession.last_activity) : null,
+          ipAddress: rawSession.ip_address,
+          userAgent: rawSession.user_agent,
+          deviceId: rawSession.device_id,
+          createdAt: rawSession.created_at ? new Date(rawSession.created_at) : null,
+        } as Session;
+      }
+    } else {
+      session = await this.sessionRepository.findOne({
+        where: { id: sessionId },
+        select: {
+          id: true,
+          userId: true,
+          tenantId: true,
+          revokedAt: true,
+          expiresAt: true,
+          lastActivity: true,
+          ipAddress: true,
+          userAgent: true,
+          deviceId: true,
+          createdAt: true,
+        },
+      });
+    }
 
     if (!session) {
       this.logger.warn("SessionGuard: Session not found", { sessionId });
@@ -89,7 +116,7 @@ export class SessionGuard implements CanActivate {
     request.sentrySession = session;
 
     // Update last activity (non-blocking)
-    this.updateLastActivity(sessionId).catch((err) => {
+    this.updateLastActivity(sessionId, schemaName).catch((err) => {
       this.logger.error("Failed to update last activity", {
         sessionId,
         error: err.message,
@@ -101,9 +128,16 @@ export class SessionGuard implements CanActivate {
     return true;
   }
 
-  private async updateLastActivity(sessionId: string): Promise<void> {
-    await this.sessionRepository.update(sessionId, {
-      lastActivity: new Date(),
-    });
+  private async updateLastActivity(sessionId: string, schemaName?: string): Promise<void> {
+    if (schemaName) {
+      await this.sessionRepository.manager.query(
+        `UPDATE "${schemaName}"."sessions" SET last_activity = $1 WHERE id = $2`,
+        [new Date(), sessionId]
+      );
+    } else {
+      await this.sessionRepository.update(sessionId, {
+        lastActivity: new Date(),
+      });
+    }
   }
 }

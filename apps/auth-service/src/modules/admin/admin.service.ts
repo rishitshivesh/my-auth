@@ -15,6 +15,8 @@ import {
   SecurityEvent,
   Role,
   UserRole,
+  Permission,
+  RolePermission,
 } from "@repo/database";
 import { RedisService } from "@/common/service/redis.service";
 import { SessionService } from "@/common/service/session.service";
@@ -719,6 +721,39 @@ export class AdminService implements OnModuleInit {
           } as Partial<Role>),
         );
         logger.info("sentry-internal role bootstrapped in fk_sentry schema");
+      }
+
+      // Ensure wildcard permission exists in fk_sentry.permissions
+      let wildcardPermission = await qr.manager.findOne(Permission, {
+        where: { tenantId: sentryTenant.id, name: "*:*" },
+      });
+      if (!wildcardPermission) {
+        wildcardPermission = await qr.manager.save(
+          qr.manager.create(Permission, {
+            resource: "*",
+            action: "*",
+            name: "*:*",
+            description: "Full wildcard permission — grants access to all resources and actions",
+            tenantId: sentryTenant.id,
+          }),
+        );
+        logger.info("wildcard permission *:* bootstrapped in fk_sentry schema");
+      }
+
+      // Ensure sentry-internal role has the wildcard permission
+      const hasWildcardPermission = await qr.manager.findOne(RolePermission, {
+        where: { tenantId: sentryTenant.id, roleId: internalRole.id, permissionId: wildcardPermission.id },
+      });
+      if (!hasWildcardPermission) {
+        await qr.manager.save(
+          qr.manager.create(RolePermission, {
+            tenantId: sentryTenant.id,
+            roleId: internalRole.id,
+            permissionId: wildcardPermission.id,
+            assignedAt: new Date(),
+          }),
+        );
+        logger.info("Assigned *:* permission to sentry-internal role in fk_sentry schema");
       }
 
       // Create superadmin user in fk_sentry.users

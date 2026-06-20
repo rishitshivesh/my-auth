@@ -1,5 +1,5 @@
 import { DataSource, Repository } from "typeorm";
-import { Tenant, Role, Permission, User, UserRole, dataSourceOptions } from "@repo/database";
+import { Tenant, Role, Permission, User, UserRole, RolePermission, dataSourceOptions } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
 
@@ -159,6 +159,40 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
           tenantId: tenant.id,
         }));
         console.log(`  ✅ Created permission: ${permName}`);
+      }
+    }
+
+    // Ensure wildcard permission exists on platform tenant and is assigned to the platform superadmin role
+    let wildcardPermission = await permissionRepo.findOne({
+      where: { tenantId: tenant.id, name: "*:*" },
+    });
+    if (!wildcardPermission) {
+      wildcardPermission = await permissionRepo.save(permissionRepo.create({
+        resource: "*",
+        action: "*",
+        name: "*:*",
+        description: "Full wildcard permission — grants access to all resources and actions",
+        tenantId: tenant.id,
+      }));
+      console.log("  ✅ Created wildcard permission: *:*");
+    }
+
+    const internalRole = await roleRepo.findOne({
+      where: { name: PLATFORM_ROLE, tenantId: tenant.id },
+    });
+    if (internalRole) {
+      const rolePermissionRepo = dataSource.getRepository(RolePermission);
+      const hasWildcardPermission = await rolePermissionRepo.findOne({
+        where: { tenantId: tenant.id, roleId: internalRole.id, permissionId: wildcardPermission.id },
+      });
+      if (!hasWildcardPermission) {
+        await rolePermissionRepo.save(rolePermissionRepo.create({
+          tenantId: tenant.id,
+          roleId: internalRole.id,
+          permissionId: wildcardPermission.id,
+          assignedAt: new Date(),
+        }));
+        console.log(`  ✅ Assigned *:* permission to role: ${PLATFORM_ROLE}`);
       }
     }
 

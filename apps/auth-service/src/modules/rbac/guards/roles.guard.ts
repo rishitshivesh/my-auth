@@ -47,6 +47,10 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("User not authenticated");
     }
 
+    if (user.isSuperAdmin) {
+      return true;
+    }
+
     if (!tenantId) {
       throw new ForbiddenException("Tenant context not found");
     }
