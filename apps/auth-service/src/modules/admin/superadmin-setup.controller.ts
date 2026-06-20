@@ -29,6 +29,23 @@ export class SuperadminSetupController {
   constructor(private readonly adminService: AdminService) {}
 
   /**
+   * Returns the platform's identity and initialization state.
+   * Used by the admin portal middleware to obtain the tenant slug and
+   * determine whether to show /setup or redirect to login.
+   */
+  @Public()
+  @Get("platform-info")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Get platform identity and initialization state",
+    description: "Returns slug, name, and initialized flag. Safe to call unauthenticated.",
+  })
+  @ApiResponse({ status: 200, description: "Platform info" })
+  async getPlatformInfo(): Promise<{ slug: string; name: string; initialized: boolean }> {
+    return this.adminService.getPlatformInfo();
+  }
+
+  /**
    * Check whether the platform has at least one superadmin account.
    * Safe to call unauthenticated — returns no sensitive data.
    */

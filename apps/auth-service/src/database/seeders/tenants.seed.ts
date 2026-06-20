@@ -1,13 +1,17 @@
-import { DataSource } from "typeorm";
-import { Tenant, Role, Permission, User, UserRole } from "@repo/database";
+import { DataSource, Repository } from "typeorm";
+import { Tenant, Role, Permission, User, UserRole, dataSourceOptions } from "@repo/database";
 import { PasswordService } from "@repo/security";
+import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
+
+const PLATFORM_NAME = process.env["SENTRY_PLATFORM_NAME"] ?? "Scrolloop Sentry";
+const PLATFORM_SLUG = process.env["SENTRY_PLATFORM_SLUG"] ?? "sentry";
+const PLATFORM_ROLE = `${PLATFORM_SLUG}-internal`;
 
 /**
- * Seed tenants, roles, permissions, and (optionally) a superadmin user.
+ * Seed the platform tenant, system roles, and permissions.
+ * Does NOT create any users — that is done via `npm run setup` (CLI) or the /setup wizard.
  *
- * If called without an existing DataSource the function creates its own
- * connection, runs the seed, and destroys it when done.  When called from
- * run-seeds.ts an already-initialised DataSource is passed so we reuse it.
+ * Safe to re-run: all inserts are idempotent (slug/name uniqueness checks).
  */
 export async function seed(existingDataSource?: DataSource): Promise<void> {
   let dataSource: DataSource;
@@ -16,339 +20,158 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
   if (existingDataSource) {
     dataSource = existingDataSource;
   } else {
+    const pgBase = dataSourceOptions as PostgresConnectionOptions;
+    const dbUrl = process.env["DB_URL"] ?? process.env["DATABASE_URL"];
+    const useSSL = process.env["DB_SSL"] === "true" || process.env["DATABASE_SSL"] === "true";
     dataSource = new DataSource({
-      type: "postgres",
-      url: process.env.DATABASE_URL,
-      entities: [Tenant, Role, Permission, User, UserRole],
-      ssl:
-        process.env.DATABASE_SSL === "true"
-          ? { rejectUnauthorized: false }
-          : false,
-    });
+      ...pgBase,
+      ...(dbUrl ? { url: dbUrl, host: undefined, port: undefined, username: undefined, password: undefined, database: undefined } : {}),
+      // Inherit SSL config from dataSourceOptions; only override when DB_SSL=true is
+      // explicitly requested (e.g. cloud-managed Postgres with self-signed CA).
+      // To trust a custom CA instead, set PGSSLROOTCERT or configure pgBase.ssl.
+      ssl: useSSL ? (pgBase.ssl ?? false) : (pgBase.ssl ?? false),
+      migrationsRun: false,
+    } as PostgresConnectionOptions);
     await dataSource.initialize();
     ownsConnection = true;
     console.log("🔌 Connected to database");
   }
 
   try {
-    // ==================================================
-    // 1. Seed Tenants
-    // ==================================================
-    console.log("🏢 Seeding tenants...");
+    const tenantRepo = dataSource.getRepository(Tenant);
 
-    const tenants = [
-      {
-        name: "Scrolloop Sentry",
-        slug: "sentry",
-        subdomain: "sentry",
-        status: "active",
-        plan: "enterprise",
-        settings: {
-          platformName: "Scrolloop Sentry",
-        },
+    // ── 1. Platform tenant ──────────────────────────────────────────
+    console.log(`🏢 Seeding platform tenant (${PLATFORM_SLUG})...`);
+
+    const adminPortalOrigin = process.env["ADMIN_PORTAL_ORIGIN"];
+    const allowedOrigins = ["http://localhost:3000"];
+    if (adminPortalOrigin) allowedOrigins.push(adminPortalOrigin);
+
+    let platformTenant = await tenantRepo.findOne({ where: { slug: PLATFORM_SLUG } });
+    if (!platformTenant) {
+      platformTenant = await tenantRepo.save(tenantRepo.create({
+        name: PLATFORM_NAME,
+        slug: PLATFORM_SLUG,
+        environment: "production",
+        active: true,
         featureFlags: {
-          mfaRequired: true,
+          mfaRequired: false,
           passwordlessEnabled: true,
           socialProvidersEnabled: false,
         },
-        allowedOrigins: ['http://localhost:3000', 'https://admin.sentry.scrolloop.com'],
-        isActive: true,
-        environment: "production",
-      },
-      {
-        name: "Default Organization",
-        slug: "default",
-        subdomain: "default",
-        status: "active",
-        plan: "free",
-        settings: {},
-        featureFlags: {
-          mfaRequired: false,
-          passwordlessEnabled: true,
-          socialProvidersEnabled: true,
-        },
-        isActive: true,
-        environment: "production",
-      },
-      {
-        name: "Acme Corporation",
-        slug: "acme",
-        subdomain: "acme",
-        customDomain: "auth.acme.com",
-        customDomainVerified: false,
-        status: "active",
-        plan: "professional",
-        settings: {
-          branding: {
-            logo: "https://acme.com/logo.png",
-            primaryColor: "#FF6B35",
-          },
-        },
-        featureFlags: {
-          mfaRequired: true,
-          passwordlessEnabled: true,
-          socialProvidersEnabled: true,
-          samlEnabled: true,
-        },
-        isActive: true,
-        environment: "production",
-      },
-      {
-        name: "Startup Inc",
-        slug: "startup",
-        subdomain: "startup",
-        status: "trial",
-        plan: "starter",
-        settings: {
-          allowSignup: true,
-          requireEmailVerification: true,
-          mfaRequired: true,
-        },
-        featureFlags: {
-          mfaRequired: false,
-          passwordlessEnabled: false,
-          socialProvidersEnabled: true,
-        },
-        isActive: true,
-        environment: "production",
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
-      },
-    ];
-
-    const tenantRepo = dataSource.getRepository(Tenant);
-
-    for (const tenantData of tenants) {
-      const existing = await tenantRepo.findOne({
-        where: { slug: tenantData.slug },
-      });
-      if (!existing) {
-        const tenant = tenantRepo.create(tenantData);
-        await tenantRepo.save(tenant);
-        console.log(`  ✅ Created tenant: ${tenant.name} (${tenant.slug})`);
-      } else {
-        console.log(`  ⏭️  Tenant exists: ${existing.name}`);
-      }
+        allowedOrigins,
+      }));
+      console.log(`  ✅ Created platform tenant: ${platformTenant.name} (${platformTenant.slug})`);
+    } else {
+      console.log(`  ⏭️  Platform tenant exists: ${platformTenant.name}`);
     }
 
-    // ==================================================
-    // 2. Seed Roles (per tenant)
-    // ==================================================
-    console.log("👥 Seeding roles...");
+    // TS non-null assertion: guaranteed non-null after the block above
+    const tenant: Tenant = platformTenant;
 
-    const allTenants = await tenantRepo.find();
+    // ── 2. System roles ─────────────────────────────────────────────
+    console.log("👥 Seeding roles...");
     const roleRepo = dataSource.getRepository(Role);
 
     const systemRoles = [
-      {
-        name: "Owner",
-        description: "Full access to everything in the organization",
-        isSystem: true,
-      },
-      {
-        name: "Admin",
-        description: "Administrative access with some limitations",
-        isSystem: true,
-      },
-      {
-        name: "Member",
-        description: "Basic member access",
-        isSystem: true,
-      },
-      {
-        name: "Developer",
-        description: "Access to API keys and developer tools",
-        isSystem: false,
-      },
-      {
-        name: "Viewer",
-        description: "Read-only access",
-        isSystem: false,
-      },
+      { name: "Owner",     description: "Full access to everything in the organization",  isSystem: true  },
+      { name: "Admin",     description: "Administrative access with some limitations",     isSystem: true  },
+      { name: "Member",    description: "Basic member access",                             isSystem: true  },
+      { name: "Developer", description: "Access to API keys and developer tools",          isSystem: false },
+      { name: "Viewer",    description: "Read-only access",                                isSystem: false },
     ];
 
-    // Seed sentry-internal role for the sentry tenant only
-    const sentryTenant = allTenants.find((t) => t.slug === "sentry");
-    if (sentryTenant) {
-      const existing = await roleRepo.findOne({
-        where: { name: "sentry-internal", tenantId: sentryTenant.id },
+    // Platform-internal superadmin role (only on platform tenant)
+    const internalRoleExists = await roleRepo.findOne({
+      where: { name: PLATFORM_ROLE, tenantId: tenant.id },
+    });
+    if (!internalRoleExists) {
+      await roleRepo.save(roleRepo.create({
+        name: PLATFORM_ROLE,
+        description: `${PLATFORM_NAME} platform superadmin — grants full portal access`,
+        tenantId: tenant.id,
+        isSystem: true,
+      }));
+      console.log(`  ✅ Created role: ${PLATFORM_SLUG}/${PLATFORM_ROLE}`);
+    }
+
+    for (const roleData of systemRoles) {
+      const exists = await roleRepo.findOne({
+        where: { name: roleData.name, tenantId: tenant.id },
       });
-      if (!existing) {
-        const role = roleRepo.create({
-          name: "sentry-internal",
-          description:
-            "Scrolloop Sentry platform superadmin — grants access to the admin portal",
-          tenantId: sentryTenant.id,
-          isSystem: true,
-        });
-        await roleRepo.save(role);
-        console.log(`  ✅ Created role: sentry/sentry-internal`);
+      if (!exists) {
+        await roleRepo.save(roleRepo.create({ ...roleData, tenantId: tenant.id }));
+        console.log(`  ✅ Created role: ${PLATFORM_SLUG}/${roleData.name}`);
       }
     }
 
-    for (const tenant of allTenants) {
-      for (const roleData of systemRoles) {
-        const existing = await roleRepo.findOne({
-          where: { name: roleData.name, tenantId: tenant.id },
-        });
-
-        if (!existing) {
-          const role = roleRepo.create({
-            ...roleData,
-            tenantId: tenant.id,
-          });
-          await roleRepo.save(role);
-          console.log(`  ✅ Created role: ${tenant.slug}/${role.name}`);
-        }
-      }
-    }
-
-    // ==================================================
-    // 3. Seed Permissions (per tenant)
-    // ==================================================
+    // ── 3. Permissions ──────────────────────────────────────────────
     console.log("🔐 Seeding permissions...");
-
     const permissionRepo = dataSource.getRepository(Permission);
 
     const basePermissions = [
-      // User management
-      { resource: "user", action: "create", description: "Create users" },
-      { resource: "user", action: "read", description: "View users" },
-      { resource: "user", action: "update", description: "Update users" },
-      { resource: "user", action: "delete", description: "Delete users" },
-      {
-        resource: "user",
-        action: "impersonate",
-        description: "Impersonate users",
-      },
-
-      // Role management
-      { resource: "role", action: "create", description: "Create roles" },
-      { resource: "role", action: "read", description: "View roles" },
-      { resource: "role", action: "update", description: "Update roles" },
-      { resource: "role", action: "delete", description: "Delete roles" },
-      {
-        resource: "role",
-        action: "assign",
-        description: "Assign roles to users",
-      },
-
-      // Permission management
-      {
-        resource: "permission",
-        action: "read",
-        description: "View permissions",
-      },
-      {
-        resource: "permission",
-        action: "assign",
-        description: "Assign permissions to roles",
-      },
-
-      // Tenant management
-      {
-        resource: "tenant",
-        action: "read",
-        description: "View tenant settings",
-      },
-      {
-        resource: "tenant",
-        action: "update",
-        description: "Update tenant settings",
-      },
-      { resource: "tenant", action: "delete", description: "Delete tenant" },
-
-      // OAuth client management
-      {
-        resource: "oauth_client",
-        action: "create",
-        description: "Create OAuth clients",
-      },
-      {
-        resource: "oauth_client",
-        action: "read",
-        description: "View OAuth clients",
-      },
-      {
-        resource: "oauth_client",
-        action: "update",
-        description: "Update OAuth clients",
-      },
-      {
-        resource: "oauth_client",
-        action: "delete",
-        description: "Delete OAuth clients",
-      },
-
-      // Provider management
-      {
-        resource: "provider",
-        action: "create",
-        description: "Add identity providers",
-      },
-      {
-        resource: "provider",
-        action: "read",
-        description: "View identity providers",
-      },
-      {
-        resource: "provider",
-        action: "update",
-        description: "Update identity providers",
-      },
-      {
-        resource: "provider",
-        action: "delete",
-        description: "Remove identity providers",
-      },
-
-      // Audit logs
-      { resource: "audit", action: "read", description: "View audit logs" },
-      { resource: "audit", action: "export", description: "Export audit logs" },
-
+      // Users
+      { resource: "user",         action: "create",   description: "Create users"              },
+      { resource: "user",         action: "read",     description: "View users"                },
+      { resource: "user",         action: "update",   description: "Update users"              },
+      { resource: "user",         action: "delete",   description: "Delete users"              },
+      { resource: "user",         action: "impersonate", description: "Impersonate users"      },
+      // Roles
+      { resource: "role",         action: "create",   description: "Create roles"              },
+      { resource: "role",         action: "read",     description: "View roles"                },
+      { resource: "role",         action: "update",   description: "Update roles"              },
+      { resource: "role",         action: "delete",   description: "Delete roles"              },
+      { resource: "role",         action: "assign",   description: "Assign roles to users"     },
+      // Permissions
+      { resource: "permission",   action: "read",     description: "View permissions"          },
+      { resource: "permission",   action: "assign",   description: "Assign permissions to roles" },
+      // Tenant
+      { resource: "tenant",       action: "read",     description: "View tenant settings"      },
+      { resource: "tenant",       action: "update",   description: "Update tenant settings"    },
+      { resource: "tenant",       action: "delete",   description: "Delete tenant"             },
+      // OAuth clients
+      { resource: "oauth_client", action: "create",   description: "Create OAuth clients"      },
+      { resource: "oauth_client", action: "read",     description: "View OAuth clients"        },
+      { resource: "oauth_client", action: "update",   description: "Update OAuth clients"      },
+      { resource: "oauth_client", action: "delete",   description: "Delete OAuth clients"      },
+      // Providers
+      { resource: "provider",     action: "create",   description: "Add identity providers"    },
+      { resource: "provider",     action: "read",     description: "View identity providers"   },
+      { resource: "provider",     action: "update",   description: "Update identity providers" },
+      { resource: "provider",     action: "delete",   description: "Remove identity providers" },
+      // Audit
+      { resource: "audit",        action: "read",     description: "View audit logs"           },
+      { resource: "audit",        action: "export",   description: "Export audit logs"         },
       // Settings
-      { resource: "settings", action: "read", description: "View settings" },
-      {
-        resource: "settings",
-        action: "update",
-        description: "Update settings",
-      },
+      { resource: "settings",     action: "read",     description: "View settings"             },
+      { resource: "settings",     action: "update",   description: "Update settings"           },
     ];
 
-    for (const tenant of allTenants) {
-      for (const permData of basePermissions) {
-        const existing = await permissionRepo.findOne({
-          where: {
-            tenantId: tenant.id,
-            resource: permData.resource,
-            action: permData.action,
-          },
-        });
-
-        if (!existing) {
-          const permission = permissionRepo.create({
-            ...permData,
-            tenantId: tenant.id,
-          });
-          await permissionRepo.save(permission);
-          console.log(
-            `  ✅ Created permission: ${tenant.slug}/${permission.resource}:${permission.action}`,
-          );
-        }
+    for (const permData of basePermissions) {
+      const permName = `${permData.resource}:${permData.action}`;
+      const exists = await permissionRepo.findOne({
+        where: { tenantId: tenant.id, name: permName },
+      });
+      if (!exists) {
+        await permissionRepo.save(permissionRepo.create({
+          ...permData,
+          name: permName,
+          tenantId: tenant.id,
+        }));
+        console.log(`  ✅ Created permission: ${permName}`);
       }
     }
 
-    // ==================================================
-    // 4. Seed Superadmin User (optional — env-gated)
-    // ==================================================
-    await seedSuperadmin(dataSource, sentryTenant ?? null, roleRepo);
+    // ── 4. Superadmin user (env-gated, CI/staging only) ─────────────
+    await seedSuperadmin(dataSource, tenant, roleRepo);
 
     console.log("");
     console.log("✅ Seeding complete!");
+    console.log(`   Platform: ${PLATFORM_NAME} (${PLATFORM_SLUG})`);
+    console.log(`   Roles: ${systemRoles.length + 1} (including ${PLATFORM_ROLE})`);
+    console.log(`   Permissions: ${basePermissions.length}`);
     console.log("");
-    console.log("📊 Summary:");
-    console.log(`   Tenants: ${allTenants.length}`);
-    console.log(`   Roles per tenant: ${systemRoles.length}`);
-    console.log(`   Permissions per tenant: ${basePermissions.length}`);
+    console.log("Next step: run `npm run setup` to create the first admin user.");
     console.log("");
   } catch (error) {
     console.error("❌ Seeding failed:", error);
@@ -360,54 +183,37 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Superadmin creation helper
-// ---------------------------------------------------------------------------
+// ─── Superadmin helper (CI/staging only) ────────────────────────────────────
 
 async function seedSuperadmin(
   dataSource: DataSource,
-  sentryTenant: Tenant | null,
-  roleRepo: ReturnType<DataSource["getRepository"]>,
+  platformTenant: Tenant,
+  roleRepo: Repository<Role>,
 ): Promise<void> {
-  const email = process.env.SEED_SUPERADMIN_EMAIL;
-  const password = process.env.SEED_SUPERADMIN_PASSWORD;
+  const email = process.env["SEED_SUPERADMIN_EMAIL"];
+  const password = process.env["SEED_SUPERADMIN_PASSWORD"];
 
   if (!email || !password) {
-    const missing = !email ? "SEED_SUPERADMIN_EMAIL" : "SEED_SUPERADMIN_PASSWORD";
-    console.warn(`⚠️  ${missing} not set — no superadmin created`);
+    console.log("ℹ️  SEED_SUPERADMIN_EMAIL not set — skipping user creation (use `npm run setup`)");
     return;
   }
 
-  if (!sentryTenant) {
-    console.warn(
-      "⚠️  Sentry tenant not found — cannot create superadmin",
-    );
-    return;
-  }
-
-  console.log("👤 Seeding superadmin user...");
-
-  // Switch to fk_sentry schema so the user lands in the correct tenant schema
-  await dataSource.query(`SET search_path TO "fk_sentry", public`);
+  console.log("👤 Seeding superadmin user (CI mode)...");
 
   const userRepo = dataSource.getRepository(User);
   const userRoleRepo = dataSource.getRepository(UserRole);
 
-  // Idempotent: skip if user already exists
   const existing = await userRepo.findOne({
-    where: { tenantId: sentryTenant.id, email },
+    where: { tenantId: platformTenant.id, email },
   });
-
   if (existing) {
     console.log(`  ⏭️  Superadmin already exists: ${email}`);
-    await dataSource.query(`SET search_path TO public`);
     return;
   }
 
   const passwordHash = await PasswordService.hash(password);
-
-  const user = userRepo.create({
-    tenantId: sentryTenant.id,
+  const user = await userRepo.save(userRepo.create({
+    tenantId: platformTenant.id,
     email,
     emailVerified: true,
     firstName: "Super",
@@ -415,56 +221,32 @@ async function seedSuperadmin(
     displayName: "Super Admin",
     primaryAuthMethod: "password",
     passwordHash,
-    status: "active",
     isActive: true,
     mfaEnabled: false,
     failedLoginAttempts: 0,
     forcePasswordChange: false,
     passwordHistory: [],
     metadata: { seeded: true },
-  });
-
-  await userRepo.save(user);
+  }));
   console.log(`  ✅ Created superadmin: ${email}`);
 
-  // Assign all roles in the sentry tenant
-  const allSentryRoles = await roleRepo.find({
-    where: { tenantId: sentryTenant.id },
-  });
-
-  for (const role of allSentryRoles) {
-    const existingAssignment = await userRoleRepo.findOne({
-      where: { userId: user.id, roleId: role.id },
-    });
-
-    if (!existingAssignment) {
-      const userRole = userRoleRepo.create({
-        tenantId: sentryTenant.id,
+  const allRoles = await roleRepo.find({ where: { tenantId: platformTenant.id } });
+  for (const role of allRoles) {
+    const exists = await userRoleRepo.findOne({ where: { userId: user.id, roleId: role.id } });
+    if (!exists) {
+      await userRoleRepo.save(userRoleRepo.create({
+        tenantId: platformTenant.id,
         userId: user.id,
         roleId: role.id,
         reason: "Seeded superadmin",
         metadata: { source: "seed" },
-      });
-      await userRoleRepo.save(userRole);
-      console.log(`  ✅ Assigned role: ${role.name}`);
+      }));
     }
   }
-
-  // Reset search_path back to public
-  await dataSource.query(`SET search_path TO public`);
+  console.log(`  ✅ Roles assigned`);
 }
 
-// ============================================================
-// Standalone entry point (for running this file directly)
-// ============================================================
+// ── Standalone entry point ───────────────────────────────────────────────────
 if (require.main === module) {
-  seed()
-    .then(() => {
-      console.log("✅ Done");
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error("❌ Error:", error);
-      process.exit(1);
-    });
+  seed().then(() => process.exit(0)).catch(() => process.exit(1));
 }

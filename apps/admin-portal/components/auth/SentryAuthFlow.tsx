@@ -39,7 +39,11 @@ function SocialIcon({ provider }: { provider: string }) {
   return null
 }
 
-export function SentryAuthFlow() {
+interface SentryAuthFlowProps {
+  onSuccess?: () => void
+}
+
+export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
   const router = useRouter();
   const flow = useEmailAuthFlow();
   const { client, verifyMfaLogin, initiateSocialLogin } = useAuth();
@@ -87,7 +91,7 @@ export function SentryAuthFlow() {
         return;
       }
 
-      router.push('/dashboard');
+      onSuccess?.();
     } catch {
       // Error handled by hook/logic
     }
@@ -121,7 +125,7 @@ export function SentryAuthFlow() {
     setMfaError(null);
     try {
       await verifyMfaLogin(mfaTempToken, mfaCode);
-      router.push('/dashboard');
+      onSuccess?.();
     } catch (err) {
       setMfaError(err instanceof Error ? err.message : 'Invalid code. Please try again.');
       setMfaDigits(['', '', '', '', '', '']);

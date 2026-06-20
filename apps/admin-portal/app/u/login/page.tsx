@@ -5,20 +5,18 @@ import { useRouter } from "next/navigation";
 import { SentryAuthFlow } from "@/components/auth/SentryAuthFlow";
 import { AuthLayout } from "@/components/layouts/AuthLayout";
 import { useAuth } from "@scrolloop/sdk";
-import type { User } from "@scrolloop/sdk";
 import { authClient } from "@/app/layout";
+import { LoginForm } from "@/components/auth/login-form";
 
-function getPostLoginRoute(user: User | null): string {
-  if (!user) return '/u/login'
+function getPostLoginRoute(): string {
   const claims = authClient.getTokenClaims()
-  const sentryTenantId = process.env.NEXT_PUBLIC_SENTRY_TENANT_ID
-  const isSentry = sentryTenantId
-    ? claims?.tenantId === sentryTenantId
-    : claims?.tenantSlug === 'sentry'
-  const isInternal = Array.isArray(claims?.groups) &&
-    claims.groups.includes('sentry-internal')
-  if (isSentry && isInternal) return '/dashboard'
-  const slug = claims?.tenantSlug ?? ''
+  if (!claims) return '/u/login'
+  const platformSlug = process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? 'sentry'
+  const isPlatformTenant = claims.tenantSlug === platformSlug
+  const isInternal = Array.isArray(claims.groups) &&
+    (claims.groups as string[]).includes(`${platformSlug}-internal`)
+  if (isPlatformTenant && isInternal) return `/t/${platformSlug}/dashboard`
+  const slug = (claims.tenantSlug as string) ?? ''
   return slug ? `/t/${slug}/dashboard` : '/u/login'
 }
 
@@ -28,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.replace(getPostLoginRoute(user));
+      router.replace(getPostLoginRoute());
     }
   }, [user, isLoading, router]);
 
@@ -51,7 +49,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <SentryAuthFlow />
+      <SentryAuthFlow onSuccess={() => router.replace(getPostLoginRoute())} />
       <p
         style={{
           marginTop: "20px",

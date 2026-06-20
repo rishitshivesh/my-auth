@@ -93,9 +93,25 @@ export interface PlatformSettingsDto {
   maintenanceMode: boolean;
 }
 
-const SENTRY_TENANT_SLUG = "sentry";
-const SENTRY_INTERNAL_ROLE = "sentry-internal";
+const SENTRY_TENANT_SLUG = process.env["SENTRY_PLATFORM_SLUG"] ?? "sentry";
+const SENTRY_INTERNAL_ROLE = `${SENTRY_TENANT_SLUG}-internal`;
+const logDir =
+          process.env["SENTRY_SETUP_LOG_DIR"] ??
+          path.join(os.homedir(), ".sentry");
 
+function readSetupToken(): string | null {
+  try {
+    const content = fs.readFileSync(logDir, "utf8");
+
+    const matches = [
+      ...content.matchAll(/SETUP TOKEN:\s*([a-f0-9]{64})/gi)
+    ];
+
+    return matches.at(-1)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
 @Injectable()
 export class AdminService implements OnModuleInit {
   private setupToken: string | null = null;
@@ -162,9 +178,14 @@ export class AdminService implements OnModuleInit {
   private validateSetupToken(token: string): boolean {
     if (!this.setupToken) return false;
     try {
+
       const a = Buffer.from(token);
       const b = Buffer.from(this.setupToken);
+      
+      logger.info("Validating setup token");
+      console.log(`Validating setup token: ${token} against ${b.toString("hex")}`, {a, b, setupToken: this.setupToken});
       if (a.length !== b.length) return false;
+      logger.info("Setup token validated successfully");
       return timingSafeEqual(a, b);
     } catch {
       return false;
@@ -599,6 +620,18 @@ export class AdminService implements OnModuleInit {
       where: { roleId: role.id, tenantId: sentryTenant.id },
     });
     return count > 0;
+  }
+
+  /**
+   * Public endpoint response: platform identity + initialization state.
+   * Used by the admin portal middleware to cache slug and skip /setup when initialized.
+   */
+  async getPlatformInfo(): Promise<{ slug: string; name: string; initialized: boolean }> {
+    const slug = SENTRY_TENANT_SLUG;
+    const tenant = await this.getSentryTenant();
+    const name = tenant?.name ?? (process.env["SENTRY_PLATFORM_NAME"] ?? "Scrolloop Sentry");
+    const initialized = await this.isInitialized();
+    return { slug, name, initialized };
   }
 
   /**

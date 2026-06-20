@@ -90,7 +90,7 @@ export default function OnboardingPage() {
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`${AUTH_SERVICE_URL}/tenants/slug-check?slug=${encodeURIComponent(slug)}`);
-        const data = (await res.json()) as { available: boolean; reason?: string };
+        const data = (await res.json()).data as { available: boolean; reason?: string };
         if (data.available) {
           setSlugState("available");
           setSlugReason("");

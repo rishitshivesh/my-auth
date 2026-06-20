@@ -4955,6 +4955,22 @@
         ]
       }
     },
+    "/superadmin/platform-info": {
+      "get": {
+        "description": "Returns slug, name, and initialized flag. Safe to call unauthenticated.",
+        "operationId": "SuperadminSetupController_getPlatformInfo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Platform info"
+          }
+        },
+        "summary": "Get platform identity and initialization state",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
     "/superadmin/initialized": {
       "get": {
         "description": "Returns { initialized: true } when at least one sentry-internal user exists.",

@@ -11,10 +11,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const authClient = createWebClient({
   baseURL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:4000",
-  tenant:
-    process.env.NEXT_PUBLIC_SENTRY_TENANT_ID ||
-    process.env.SENTRY_TENANT_ID ||
-    "sentry",
+  // tenant: process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG || "sentry",
+  tenant: "55180ffa-a05e-4ad5-ba05-a16bf834d3f3",
   debug: process.env.NODE_ENV === "development",
 });
 
