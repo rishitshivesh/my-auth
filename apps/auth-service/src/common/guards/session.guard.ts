@@ -25,12 +25,14 @@ export class SessionGuard implements CanActivate {
   constructor(
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     const sessionId = user?.sessionId;
+
+    console.log({ user })
 
     if (!sessionId) {
       this.logger.error("SessionGuard: No sessionId in token payload");

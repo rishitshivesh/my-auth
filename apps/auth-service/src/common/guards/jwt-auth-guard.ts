@@ -32,6 +32,8 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       throw new UnauthorizedException("Cross-tenant token");
     }
 
+    console.log({ user }, 'User in Jwt Auth Guard')
+
     return user;
   }
 }

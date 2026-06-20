@@ -59,16 +59,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     OAuthModule,
     ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get("JWT_SECRET"),
-        signOptions: {
-          expiresIn: "15m", // Access token expires in 15 minutes
-        },
-      }),
-    }),
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [
