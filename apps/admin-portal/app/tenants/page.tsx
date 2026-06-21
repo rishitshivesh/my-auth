@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAdminTenants } from '@/lib/admin-queries'
@@ -198,4 +198,12 @@ function TenantsPage() {
   )
 }
 
-export default withAdmin(TenantsPage)
+function TenantsPageWithSuspense() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+      <TenantsPage />
+    </Suspense>
+  )
+}
+
+export default withAdmin(TenantsPageWithSuspense)

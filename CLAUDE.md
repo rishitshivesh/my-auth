@@ -193,6 +193,55 @@ the correct schema. The `TenantSchemaMiddleware` sets `search_path` per request.
 
 ---
 
+## Tenant Isolation Architecture
+
+TWO layers of isolation are now active simultaneously (defense-in-depth):
+
+### Layer 1: Schema-level (search_path)
+`TenantSchemaMiddleware` runs on every tenant request after `TenantResolverMiddleware`.
+It acquires a connection from the TypeORM pool and executes:
+```sql
+SET search_path TO "fk_{slug}", public
+```
+This routes ALL TypeORM queries for this request to the correct tenant schema.
+The connection is returned to the pool after the response completes,
+with `search_path` reset to `public`.
+
+The `QueryRunner` is stored in `AsyncLocalStorage` via `TenantContextService`.
+Services use `TenantAwareRepository` which reads from `TenantContextService`
+instead of the default DataSource pool.
+
+### Layer 2: Row-level (tenant_id column)
+All entities retain their `tenant_id` columns.
+All services retain their `WHERE tenant_id = ?` clauses, marked:
+```typescript
+// Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+// Both layers must match for a query to succeed
+```
+This is defense-in-depth — a bug in Layer 1 does not expose Layer 2.
+
+### Request lifecycle:
+1. `TenantResolverMiddleware` → resolves slug from hostname/header → `req.tenant`
+2. `TenantSchemaMiddleware`  → sets `search_path` → stores in `AsyncLocalStorage`
+3. Guards run              → `TenantBindingGuard` validates JWT vs `req.tenant`
+4. Controller/Service      → `TenantAwareRepository` uses scoped `EntityManager`
+5. Response sent           → `search_path` reset, `QueryRunner` released
+
+### Platform routes (excluded from TenantSchemaMiddleware):
+- `GET /health`
+- `GET /.well-known/*`
+- `ALL /superadmin/*`
+
+These routes operate on the public schema (platform-level data).
+
+### Key files:
+- `apps/auth-service/src/core/database/tenant-context.service.ts` — AsyncLocalStorage
+- `apps/auth-service/src/core/database/tenant-aware.repository.ts` — base repository
+- `apps/auth-service/src/common/midllewares/tenant-schema.middleware.ts` — sets search_path
+- `apps/auth-service/src/modules/user/user.repository.ts` — proof of concept (Sprint 3a)
+
+---
+
 ## AUTHENTICATION FLOWS
 
 ### Login (password):
@@ -310,6 +359,45 @@ SMTP_PORT=1025
 ```
 
 Run local stack: `docker-compose up -d` (starts postgres, redis, mailhog)
+
+---
+
+## DOCS MAINTENANCE
+
+**Location:** `apps/docs/` — Fumadocs site at port 3001.
+**Source of truth for docs content:** `apps/docs/content/docs/`
+
+After ANY of the following changes, update the relevant docs page before closing the task:
+
+| Change type | Update this doc |
+|-------------|-----------------|
+| New or changed API endpoint | `apps/docs/content/docs/api/<section>.mdx` |
+| New env variable | `apps/docs/content/docs/setup/env.mdx` |
+| New authentication flow | `apps/docs/content/docs/auth-flows/` |
+| RBAC / policy engine change | `apps/docs/content/docs/rbac/` |
+| SDK new feature or breaking change | `apps/docs/content/docs/sdks/<lang>.mdx` |
+| Architecture change | `apps/docs/content/docs/architecture/` |
+| Setup / first-run change | `apps/docs/content/docs/setup/index.mdx` |
+
+**API signatures format** (use consistently):
+```mdx
+### POST /api/auth/login
+
+**Headers:** `Content-Type: application/json`, `x-tenant-id: <slug>`
+
+**Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| email | string | ✓ | User email |
+| password | string | ✓ | Plaintext password |
+
+**Response 200:**
+\`\`\`json
+{ "accessToken": "...", "refreshToken": "...", "user": { "id": "...", "email": "..." } }
+\`\`\`
+```
+
+Do NOT skip the docs update even for small changes. The docs are a first-class deliverable.
 
 ---
 

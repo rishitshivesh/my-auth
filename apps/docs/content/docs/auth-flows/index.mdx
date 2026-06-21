@@ -1,0 +1,49 @@
+---
+title: Authentication Flows
+description: Overview of all supported authentication methods.
+---
+
+# Authentication Flows
+
+Scrolloop Sentry supports multiple authentication methods. All flows issue RS256 JWTs signed with the tenant's private key.
+
+## Token lifecycle
+
+| Token | Lifetime | Storage |
+|-------|----------|---------|
+| Access token | 15 minutes | In-memory (SDK) / httpOnly cookie |
+| Refresh token | 7 days | PostgreSQL + Redis, httpOnly cookie |
+| MFA pending token | 15 minutes | In-memory only |
+| Setup token | Until first admin created | Server memory + `~/.sentry/setup.log` |
+
+Refresh tokens use **family tracking** — reusing a revoked token immediately revokes the entire family (reuse attack detection).
+
+## Supported flows
+
+| Flow | Endpoint | Status |
+|------|----------|--------|
+| Password login | `POST /api/auth/login` | ✅ |
+| Registration | `POST /api/auth/register` | ✅ |
+| Magic link | `POST /api/auth/magic-link` | ✅ |
+| Google OAuth | `/api/social/google` | ✅ |
+| GitHub OAuth | `/api/social/github` | ✅ |
+| Microsoft OAuth | `/api/social/microsoft` | ✅ |
+| TOTP (2FA) | `POST /api/auth/mfa/verify` | ✅ |
+| WebAuthn / Passkeys | `POST /api/mfa/webauthn/*` | ✅ |
+| Backup codes | `POST /api/auth/mfa/verify` | ✅ |
+| SAML IdP | — | 🔜 Sprint 4 |
+
+## JWT payload
+
+```json
+{
+  "sub": "user-uuid",
+  "tid": "tenant-uuid",
+  "sid": "session-uuid",
+  "jti": "token-uuid",
+  "iss": "https://sentry.scrolloop.com/t/acme",
+  "aud": "oauth-client-id",
+  "iat": 1700000000,
+  "exp": 1700000900
+}
+```

@@ -7,10 +7,12 @@ import { cn } from "@repo/ui/lib/utils";
 import { useSetupTotp, useVerifyTotp } from '@/lib/queries';
 import { ShieldCheck, Smartphone, Key, CheckCircle2, ChevronRight, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@scrolloop/sdk';
 
 
 export default function MfaEnrollPage() {
   const router = useRouter();
+  const { client } = useAuth();
   const [step, setStep] = React.useState<'method' | 'setup' | 'backup' | 'success'>('method');
   
   const { mutate: setupTotp, data: totpData, isPending: isSettingUp } = useSetupTotp();
@@ -137,7 +139,11 @@ export default function MfaEnrollPage() {
             </div>
 
             <div className="space-y-3 pt-4">
-              <SentryButton variant="ghost" className="w-full gap-2 h-10">
+              <SentryButton
+                variant="ghost"
+                className="w-full gap-2 h-10"
+                onClick={() => navigator.clipboard.writeText(totpData.backupCodes.join('\n'))}
+              >
                 <Copy className="w-3.5 h-3.5" />
                 Copy to Clipboard
               </SentryButton>
@@ -159,7 +165,14 @@ export default function MfaEnrollPage() {
               <h2 className="text-xl font-display font-semibold">Protection Active</h2>
               <p className="text-sm font-body text-muted-foreground">Your account is now secured with MFA.</p>
             </div>
-            <SentryButton variant="accent" className="w-full h-10" onClick={() => router.push('/dashboard')}>
+            <SentryButton
+              variant="accent"
+              className="w-full h-10"
+              onClick={() => {
+                const slug = client.getUserTenantSlug();
+                router.push(slug ? `/t/${slug}/dashboard` : '/u/login');
+              }}
+            >
               Go to Dashboard
             </SentryButton>
           </div>

@@ -1,119 +1,228 @@
-// apps/auth-service/src/modules/oauth/scripts/seed-oauth-client.ts
-
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "@/core/app.module";
-import { OAuthClientService } from "@/modules/oauth/services/oauth-client.service";
+import { DataSource } from "typeorm";
+import {
+  Tenant,
+  OAuthClient,
+  Role,
+  Permission,
+  User,
+  UserRole,
+} from "@repo/database";
+import * as crypto from "crypto";
+import { PasswordService } from "@repo/security";
 
 /**
- * Seed first-party OAuth client for Scrolloop Sentry Admin Portal
+ * Seed OAuth clients for the sentry tenant.
+ *
+ * Clients are inserted directly into the fk_sentry schema by setting
+ * search_path before each write. The DataSource must already be initialized.
  */
-async function seedOAuthClient() {
-  const app = await NestFactory.createApplicationContext(AppModule);
+export async function seedOAuth(dataSource: DataSource): Promise<void> {
+  // ------------------------------------------------------------------
+  // 1. Resolve the sentry tenant (public schema)
+  // ------------------------------------------------------------------
+  const tenantRepo = dataSource.getRepository(Tenant);
+  const sentryTenant = await tenantRepo.findOne({ where: { slug: "sentry" } });
 
-  const clientService = app.get(OAuthClientService);
+  if (!sentryTenant) {
+    console.warn(
+      "⚠️  Tenant with slug 'sentry' not found — skipping OAuth seed.",
+    );
+    return;
+  }
 
-  // Get default tenant ID (you may need to query this)
-  const tenantId = "your-tenant-id-here"; // TODO: Get from database
+  const tenantId = sentryTenant.id;
+  console.log(`🔑 Found sentry tenant: ${sentryTenant.name} (${tenantId})`);
 
-  try {
-    // Create Scrolloop Sentry Admin Portal client
-    const { client, clientSecret } = await clientService.createClient({
+  // ------------------------------------------------------------------
+  // 2. Switch to the fk_sentry schema so OAuth clients land there
+  // ------------------------------------------------------------------
+  await dataSource.query(`SET search_path TO "fk_sentry", public`);
+
+  const clientRepo = dataSource.getRepository(OAuthClient);
+
+  // ------------------------------------------------------------------
+  // 3. Sentry Admin Portal — public SPA, PKCE required
+  // ------------------------------------------------------------------
+  const portalClientId = "sentry_admin_portal";
+
+  const existingPortal = await clientRepo.findOne({
+    where: { tenantId, clientId: portalClientId },
+  });
+
+  if (!existingPortal) {
+    const portal = clientRepo.create({
       tenantId,
-      name: "Scrolloop Sentry Admin Portal",
+      clientId: portalClientId,
+      clientType: "public",
+      name: "Sentry Admin Portal",
       description: "First-party admin portal for Scrolloop Sentry",
-      clientType: "public", // SPA doesn't have server
       grantTypes: ["authorization_code", "refresh_token"],
       redirectUris: [
-        "http://localhost:3000/callback",
-        "http://localhost:3000/auth/callback",
-        "https://admin.sentry.scrolloop.com/callback",
+        "http://localhost:3000/u/auth/callback",
+        "https://admin.sentry.scrolloop.com/u/auth/callback",
       ],
       postLogoutRedirectUris: [
         "http://localhost:3000",
         "https://admin.sentry.scrolloop.com",
       ],
-      allowedOrigins: ["http://localhost:3000", "https://admin.sentry.scrolloop.com"],
+      allowedOrigins: [
+        "http://localhost:3000",
+        "https://admin.sentry.scrolloop.com",
+      ],
       allowedScopes: ["openid", "profile", "email", "offline_access"],
       defaultScopes: ["openid", "profile", "email"],
-      requirePkce: true, // MUST for public clients
-      requireConsent: false, // First-party app
+      requirePkce: true,
+      requireConsent: false,
       isFirstParty: true,
-      accessTokenTtl: 900, // 15 minutes
-      refreshTokenTtl: 604800, // 7 days
-      idTokenTtl: 3600, // 1 hour
+      accessTokenTtl: 900,
+      refreshTokenTtl: 604800,
+      idTokenTtl: 3600,
+      authorizationCodeTtl: 600,
+      rotateRefreshTokens: true,
+      isActive: true,
     });
-
-    console.log("✅ Created Scrolloop Sentry Admin Portal client:");
-    console.log("   Client ID:", client.clientId);
-    console.log("   Client Type:", client.clientType);
-    console.log("   Grant Types:", client.grantTypes);
-    console.log("   Redirect URIs:", client.redirectUris);
-    console.log("   Require PKCE:", client.requirePkce);
-
-    // Create a confidential client for testing
-    const { client: backendClient, clientSecret: backendSecret } =
-      await clientService.createClient({
-        tenantId,
-        name: "Scrolloop Sentry Backend Service",
-        description: "Backend service for machine-to-machine auth",
-        clientType: "confidential",
-        grantTypes: ["client_credentials"],
-        redirectUris: [], // Not needed for M2M
-        allowedScopes: ["users:read", "users:write", "api:read", "api:write"],
-        defaultScopes: ["users:read", "api:read"],
-        requirePkce: false,
-        requireConsent: false,
-        isFirstParty: true,
-        accessTokenTtl: 3600, // 1 hour for M2M
-      });
-
-    console.log("\n✅ Created Scrolloop Sentry Backend Service client:");
-    console.log("   Client ID:", backendClient.clientId);
-    console.log("   Client Secret:", backendSecret);
-    console.log("   ⚠️  SAVE THIS SECRET - IT WILL NOT BE SHOWN AGAIN!");
-    console.log("   Client Type:", backendClient.clientType);
-    console.log("   Grant Types:", backendClient.grantTypes);
-
-    // Create a third-party client example
-    const { client: thirdPartyClient, clientSecret: thirdPartySecret } =
-      await clientService.createClient({
-        tenantId,
-        name: "Example Third-Party App",
-        description: "Example third-party application",
-        logoUrl: "https://example.com/logo.png",
-        websiteUrl: "https://example.com",
-        privacyPolicyUrl: "https://example.com/privacy",
-        termsOfServiceUrl: "https://example.com/terms",
-        clientType: "confidential",
-        grantTypes: ["authorization_code", "refresh_token"],
-        redirectUris: ["https://example.com/callback"],
-        allowedScopes: ["openid", "profile", "email"],
-        requirePkce: false,
-        requireConsent: true, // Third-party MUST show consent
-        isFirstParty: false,
-        accessTokenTtl: 900,
-        refreshTokenTtl: 604800,
-      });
-
-    console.log("\n✅ Created Example Third-Party App client:");
-    console.log("   Client ID:", thirdPartyClient.clientId);
-    console.log("   Client Secret:", thirdPartySecret);
-    console.log("   Client Type:", thirdPartyClient.clientType);
-    console.log("   Require Consent:", thirdPartyClient.requireConsent);
-  } catch (error) {
-    console.error("❌ Error seeding OAuth clients:", error);
+    await clientRepo.save(portal);
+    console.log(`  ✅ Created OAuth client: ${portal.name} (${portal.clientId})`);
+  } else {
+    console.log(
+      `  ⏭️  OAuth client exists: ${existingPortal.name} (${existingPortal.clientId})`,
+    );
   }
 
-  await app.close();
+  // ------------------------------------------------------------------
+  // 4. Sentry Backend Service — confidential M2M, client_credentials
+  // ------------------------------------------------------------------
+  const backendClientId = "sentry_backend";
+
+  const existingBackend = await clientRepo.findOne({
+    where: { tenantId, clientId: backendClientId },
+  });
+
+  if (!existingBackend) {
+    const backendSecret = crypto.randomBytes(32).toString("hex");
+    const backendSecretHash = await PasswordService.hash(backendSecret);
+
+    const backend = clientRepo.create({
+      tenantId,
+      clientId: backendClientId,
+      clientSecretHash: backendSecretHash,
+      clientType: "confidential",
+      name: "Sentry Backend Service",
+      description: "Backend service for machine-to-machine auth",
+      grantTypes: ["client_credentials"],
+      redirectUris: [],
+      allowedScopes: ["users:read", "users:write", "api:read", "api:write"],
+      defaultScopes: ["users:read", "api:read"],
+      requirePkce: false,
+      requireConsent: false,
+      isFirstParty: true,
+      accessTokenTtl: 3600,
+      refreshTokenTtl: 604800,
+      idTokenTtl: 3600,
+      authorizationCodeTtl: 600,
+      rotateRefreshTokens: true,
+      isActive: true,
+    });
+    await clientRepo.save(backend);
+    console.log(`  ✅ Created OAuth client: ${backend.name} (${backend.clientId})`);
+    console.log(`     ⚠️  CLIENT SECRET (save this — shown only once):`);
+    console.log(`     ${backendSecret}`);
+  } else {
+    console.log(
+      `  ⏭️  OAuth client exists: ${existingBackend.name} (${existingBackend.clientId})`,
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 5. Example Third-Party App — confidential, consent required
+  // ------------------------------------------------------------------
+  const thirdPartyClientId = "example_client";
+
+  const existingThirdParty = await clientRepo.findOne({
+    where: { tenantId, clientId: thirdPartyClientId },
+  });
+
+  if (!existingThirdParty) {
+    const thirdPartySecret = crypto.randomBytes(32).toString("hex");
+    const thirdPartySecretHash = await PasswordService.hash(thirdPartySecret);
+
+    const thirdParty = clientRepo.create({
+      tenantId,
+      clientId: thirdPartyClientId,
+      clientSecretHash: thirdPartySecretHash,
+      clientType: "confidential",
+      name: "Example Third-Party App",
+      description: "Example third-party application",
+      logoUrl: "https://example.com/logo.png",
+      websiteUrl: "https://example.com",
+      privacyPolicyUrl: "https://example.com/privacy",
+      termsOfServiceUrl: "https://example.com/terms",
+      grantTypes: ["authorization_code", "refresh_token"],
+      redirectUris: ["https://example.com/callback"],
+      allowedScopes: ["openid", "profile", "email"],
+      requirePkce: false,
+      requireConsent: true,
+      isFirstParty: false,
+      accessTokenTtl: 900,
+      refreshTokenTtl: 604800,
+      idTokenTtl: 3600,
+      authorizationCodeTtl: 600,
+      rotateRefreshTokens: true,
+      isActive: true,
+    });
+    await clientRepo.save(thirdParty);
+    console.log(
+      `  ✅ Created OAuth client: ${thirdParty.name} (${thirdParty.clientId})`,
+    );
+    console.log(`     ⚠️  CLIENT SECRET (save this — shown only once):`);
+    console.log(`     ${thirdPartySecret}`);
+  } else {
+    console.log(
+      `  ⏭️  OAuth client exists: ${existingThirdParty.name} (${existingThirdParty.clientId})`,
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 6. Reset search_path back to public
+  // ------------------------------------------------------------------
+  await dataSource.query(`SET search_path TO public`);
 }
 
-// Run seed
-seedOAuthClient()
-  .then(() => {
-    console.log("\n✅ OAuth client seeding complete");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("❌ Fatal error:", error);
-    process.exit(1);
+// ============================================================
+// Standalone entry point (for running this file directly)
+// ============================================================
+async function run(): Promise<void> {
+  const dataSource = new DataSource({
+    type: "postgres",
+    url: process.env.DATABASE_URL,
+    entities: [Tenant, OAuthClient, Role, Permission, User, UserRole],
+    ssl:
+      process.env.DATABASE_SSL === "true"
+        ? { rejectUnauthorized: false }
+        : false,
   });
+
+  await dataSource.initialize();
+  console.log("🔌 Connected to database");
+
+  try {
+    console.log("🔑 Seeding OAuth clients...");
+    await seedOAuth(dataSource);
+    console.log("\n✅ OAuth seeding complete");
+  } catch (error) {
+    console.error("❌ OAuth seeding failed:", error);
+    throw error;
+  } finally {
+    await dataSource.destroy();
+  }
+}
+
+// Run only when executed directly (not imported as a module)
+if (require.main === module) {
+  run()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error("❌ Fatal error:", error);
+      process.exit(1);
+    });
+}

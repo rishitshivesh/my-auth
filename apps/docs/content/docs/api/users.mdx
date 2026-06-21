@@ -1,0 +1,190 @@
+---
+title: Users API
+description: User profile, session management, and admin user management endpoints.
+---
+
+# Users API
+
+---
+
+## Self-service (current user)
+
+### GET /api/users/me
+
+Get the current user's profile.
+
+```http
+GET /api/users/me
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:**
+
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "avatar": null,
+  "mfaEnabled": true,
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+---
+
+### PATCH /api/users/me
+
+Update the current user's profile.
+
+```http
+PATCH /api/users/me
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "firstName": "Ada",
+  "lastName": "King"
+}
+```
+
+**Response `200`:** Updated user object.
+
+---
+
+### POST /api/users/me/change-password
+
+Change password. Requires current password.
+
+```http
+POST /api/users/me/change-password
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{
+  "currentPassword": "old-password",
+  "newPassword": "NewStrongPass123!"
+}
+```
+
+**Response `200`:** `{ "message": "Password changed" }`
+
+**Errors:** `400` weak password · `400` password previously used (policy) · `401` wrong current password
+
+---
+
+### GET /api/users/me/sessions
+
+List all active sessions for the current user.
+
+```http
+GET /api/users/me/sessions
+Authorization: Bearer <access-token>
+```
+
+**Response `200`:**
+
+```json
+[
+  {
+    "id": "session-uuid",
+    "createdAt": "...",
+    "lastActiveAt": "...",
+    "ipAddress": "1.2.3.x",
+    "userAgent": "Mozilla/5.0...",
+    "isCurrent": true
+  }
+]
+```
+
+---
+
+### DELETE /api/users/me/sessions/:id
+
+Revoke a specific session.
+
+```http
+DELETE /api/users/me/sessions/session-uuid
+Authorization: Bearer <access-token>
+```
+
+**Response `204`:** Session revoked.
+
+---
+
+## Admin endpoints
+
+Require a role with `users:read` / `users:write` / `users:delete` permissions.
+
+### GET /api/users
+
+List workspace users (paginated).
+
+```http
+GET /api/users?page=1&limit=20&search=ada
+Authorization: Bearer <admin-token>
+```
+
+**Response `200`:** `{ data: User[], meta: { page, limit, total } }`
+
+---
+
+### GET /api/users/:id
+
+Get a specific user.
+
+```http
+GET /api/users/user-uuid
+Authorization: Bearer <admin-token>
+```
+
+---
+
+### PATCH /api/users/:id
+
+Update a user (admin action).
+
+```http
+PATCH /api/users/user-uuid
+Authorization: Bearer <admin-token>
+
+{
+  "firstName": "Ada",
+  "disabled": false
+}
+```
+
+---
+
+### DELETE /api/users/:id
+
+Delete a user and all their data from the tenant.
+
+```http
+DELETE /api/users/user-uuid
+Authorization: Bearer <admin-token>
+```
+
+**Response `204`:** User deleted.
+
+---
+
+### POST /api/users/invite
+
+Send an invitation email to a new user.
+
+```http
+POST /api/users/invite
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "roleId": "role-uuid"
+}
+```
+
+**Response `201`:** `{ "inviteToken": "...", "expiresAt": "..." }`
+
+The invited user clicks the link in the email → lands on `/invite/{token}` to complete registration.

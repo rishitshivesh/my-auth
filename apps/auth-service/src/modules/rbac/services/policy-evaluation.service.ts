@@ -171,6 +171,7 @@ export class PolicyEvaluationService {
 
     try {
       const [rangeStr, bitsStr] = cidr.split('/');
+      if (!rangeStr || !bitsStr) return false;
       const bits = parseInt(bitsStr, 10);
       if (isNaN(bits) || bits < 0 || bits > 32) return false;
       const ipNum = this.ipToNumber(ip);

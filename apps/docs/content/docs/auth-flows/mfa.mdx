@@ -1,0 +1,89 @@
+---
+title: Multi-Factor Authentication
+description: TOTP, WebAuthn, and backup codes — enrollment and verification flows.
+---
+
+# Multi-Factor Authentication
+
+## Supported methods
+
+| Method | Enrollment | Verification |
+|--------|-----------|--------------|
+| TOTP (authenticator app) | `POST /api/mfa/totp/setup` | code from app |
+| WebAuthn / passkey | `POST /api/mfa/webauthn/register` | hardware key or biometric |
+| Backup codes | auto-generated at TOTP enrollment | one-time 8-char codes |
+
+## TOTP enrollment
+
+```http
+POST /api/mfa/totp/setup
+Authorization: Bearer <access-token>
+
+→ 200 OK
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qrCode": "data:image/png;base64,...",
+  "backupCodes": [
+    "ABCD-1234", "EFGH-5678", ...
+  ]
+}
+```
+
+The user scans the QR code in any authenticator app (Google Authenticator, Authy, 1Password, etc.), then confirms with:
+
+```http
+POST /api/mfa/totp/verify
+Authorization: Bearer <access-token>
+
+{
+  "code": "123456"
+}
+
+→ 200 OK — enrollment confirmed
+```
+
+## MFA verification after login
+
+When a user with MFA enrolled completes the password step, the login response returns a short-lived `mfaPendingToken` instead of a full JWT:
+
+```json
+{
+  "mfaPendingToken": "...",
+  "methods": ["totp", "backup"]
+}
+```
+
+The client must then complete verification:
+
+```http
+POST /api/auth/mfa/verify
+
+{
+  "token": "<mfaPendingToken>",
+  "code": "123456",
+  "method": "totp"
+}
+
+→ 200 OK
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "..."
+}
+```
+
+## Backup codes
+
+- 10 codes are generated at TOTP enrollment
+- Each code is single-use
+- Codes are stored as Argon2id hashes
+- Regenerate all codes (invalidates old ones):
+
+```http
+POST /api/mfa/backup-codes/regenerate
+Authorization: Bearer <access-token>
+
+→ 200 OK
+{
+  "codes": ["ABCD-1234", ...]
+}
+```

@@ -31,6 +31,7 @@ interface AuthContextValue {
 
   // MFA
   verifyMfaLogin: (tempToken: string, code: string) => Promise<void>;
+  verifyMfaBackupLogin: (tempToken: string, code: string) => Promise<void>;
 
   // New auth methods
   initiateSocialLogin: (provider: string) => void;
@@ -197,6 +198,25 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
       setError(null);
       setIsLoading(true);
       await client.verifyMfaLogin(tempToken, code);
+      const currentUser = await client.getCurrentUser();
+      setUser(currentUser);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyMfaBackupLogin = async (tempToken: string, code: string) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      await client.request({
+        url: `${client.getBaseURL()}/auth/mfa/verify-backup`,
+        method: "POST",
+        body: { tempToken, code },
+      });
       const currentUser = await client.getCurrentUser();
       setUser(currentUser);
     } catch (err) {
@@ -377,6 +397,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     client,
     loginIntent,
     verifyMfaLogin,
+    verifyMfaBackupLogin,
     initiateSocialLogin,
     claimSocialSession,
     sendMagicLink,

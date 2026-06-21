@@ -13,9 +13,11 @@ import {
   UserSocialConnection,
   TenantSocialProvider,
   SecurityEvent,
+  UserInvite,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
+import { DatabaseModule } from "@/core/database/database.module";
 import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { AuthService } from "./auth.service";
@@ -50,7 +52,9 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       UserSocialConnection,
       TenantSocialProvider,
       SecurityEvent,
+      UserInvite,
     ]),
+    DatabaseModule,
     SecurityEventModule,
     UserModule,
     EmailModule,
@@ -59,16 +63,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     OAuthModule,
     ScheduleModule.forRoot(),
     PassportModule.register(JwtStrategy),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get("JWT_SECRET"),
-        signOptions: {
-          expiresIn: "15m", // Access token expires in 15 minutes
-        },
-      }),
-    }),
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [

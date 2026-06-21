@@ -4,7 +4,6 @@ import {
   Permission,
   Role,
   RolePermission,
-  Session,
   User,
   UserRole,
   Policy,
@@ -14,6 +13,7 @@ import {
   UserPolicy,
   RolePolicy,
 } from "@repo/database";
+import { DatabaseModule } from "@/core/database/database.module";
 import { JwtAuthGuard } from "./jwt-auth-guard";
 import { TenantBindingGuard } from "./tenant-binding.guard";
 import { SessionGuard } from "./session.guard";
@@ -44,8 +44,8 @@ import { RedisService } from "@/common/service/redis.service";
 @Global()
 @Module({
   imports: [
+    DatabaseModule,
     TypeOrmModule.forFeature([
-      Session,
       User,
       UserRole,
       Role,

@@ -56,8 +56,8 @@ export function StepBasedAuthFlow({
   const handleEmailSubmit = async (email: string) => {
     try {
       await flow.submitEmail(email);
-    } catch (err) {
-      console.error("[StepBasedAuthFlow] Email submission error:", err);
+    } catch {
+      // Error surfaces via flow.error state
     }
   };
 
@@ -77,8 +77,8 @@ export function StepBasedAuthFlow({
       }
 
       router.push("/dashboard");
-    } catch (err: any) {
-      console.error("[StepBasedAuthFlow] Login error:", err);
+    } catch {
+      // Error surfaces via auth state
     }
   };
 

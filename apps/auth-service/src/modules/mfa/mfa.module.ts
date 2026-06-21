@@ -12,7 +12,6 @@ import { MfaController } from "./mfa.controller";
 import { MfaService } from "./mfa.service";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import { EmailService } from "@/modules/email/email.service";
-import { UserService } from "@/modules/user/user.service";
 import { EmailModule } from "@/modules/email/email.module";
 import { UserModule } from "@/modules/user/user.module";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
@@ -49,7 +48,6 @@ import { SecurityEventService } from "@/common/service/security-event.service";
     SecurityEventService,
     EmailOtpService,
     EmailService,
-    UserService,
     WebAuthnService,
     RedisService,
   ],

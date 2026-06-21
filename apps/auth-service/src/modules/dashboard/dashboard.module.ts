@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   User,
-  Session,
   Tenant,
   TenantSocialProvider,
   OAuthClient,
@@ -14,12 +13,13 @@ import { DashboardController } from "./dashboard.controller";
 import { DashboardService } from "./dashboard.service";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 import { RedisService } from "@/common/service/redis.service";
+import { DatabaseModule } from "@/core/database/database.module";
 
 @Module({
   imports: [
+    DatabaseModule,
     TypeOrmModule.forFeature([
       User,
-      Session,
       Tenant,
       TenantSocialProvider,
       OAuthClient,

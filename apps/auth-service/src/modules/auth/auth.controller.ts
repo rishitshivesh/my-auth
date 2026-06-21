@@ -7,9 +7,12 @@ import {
   Ip,
   Headers,
   Get,
+  Param,
+  Query,
   UseGuards,
   Req,
   UnauthorizedException,
+  BadRequestException,
   Res,
 } from "@nestjs/common";
 import {
@@ -26,11 +29,13 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   VerifyMfaDto,
-  RefreshTokenDto,
   LoginIntentRequestDto,
   LoginIntentResponseDto,
   SendMagicLinkDto,
   VerifyMagicLinkDto,
+  GetProvidersQueryDto,
+  GetProvidersResponseDto,
+  AcceptInviteDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
@@ -38,8 +43,6 @@ import { type Request, type Response } from "express";
 import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
-import { access } from "fs";
-
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string; tenantId?: string };
@@ -65,6 +68,40 @@ interface AuthenticatedRequest {
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  /**
+   * Set both access and refresh tokens as httpOnly cookies.
+   * Tokens are NEVER returned in the response body — cookie-only per project rules.
+   *
+   * accessToken maxAge = 15 min (matches RS256 JWT TTL)
+   * refreshToken maxAge = 30 days (matches DB refresh token TTL)
+   *
+   * Set COOKIE_DOMAIN=.sentry.scrolloop.com in production so cookies are shared
+   * across tenant subdomains (acme.sentry.scrolloop.com, beta.sentry.scrolloop.com).
+   * Leave unset in development — defaults to exact hostname, works for localhost.
+   */
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+    const isProduction = process.env['NODE_ENV'] === 'production';
+    const domain = process.env['COOKIE_DOMAIN'] || undefined;
+
+    const base = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict' as const,
+      path: '/',
+      ...(domain ? { domain } : {}),
+    };
+
+    res.cookie('accessToken', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
+  }
+
+  private clearAuthCookies(res: Response): void {
+    const domain = process.env['COOKIE_DOMAIN'] || undefined;
+    const base = { httpOnly: true, path: '/', ...(domain ? { domain } : {}) };
+    res.clearCookie('accessToken', base);
+    res.clearCookie('refreshToken', base);
+  }
 
   /**
    * Register a new user
@@ -95,7 +132,7 @@ export class AuthController {
    * Login with email and password
    */
   @Post("login")
-  @RateLimit({ max: 5, windowMs: 900000, keyBy: "ip" })
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Login with email and password" })
   @ApiResponse({ status: 200, description: "Login successful" })
@@ -106,7 +143,7 @@ export class AuthController {
   @ApiResponse({ status: 423, description: "Account locked" })
   async login(
     @Req() req: Request,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Body() loginDto: LoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -123,20 +160,8 @@ export class AuthController {
       return response;
     }
 
-    if ('accessToken' in response && 'refreshToken' in response && 'user' in response) {
-      res.cookie('refreshToken', response.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        // sameSite: 'none',
-        sameSite: 'strict',
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        path: '/',
-      });  
-    }
-
-    return {...response, refreshToken: null};
-
+    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    return { user: response.user, tenantSlug: response.tenantSlug };
   }
 
   /**
@@ -149,22 +174,16 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Logout successful" })
   async logout(
     @Req() req: AuthenticatedRequest,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
     const userId = req.user.sub;
-    const sessionId = req.user.sessionId;
+    const sessionId = req.user.sessionId ?? '';
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      // sameSite: 'none',
-      sameSite: 'strict',
-      domain: req.hostname,
-    });
+    this.clearAuthCookies(res);
 
     return { message: "Logged out successfully" };
   }
@@ -254,7 +273,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
   async refresh(
     @Req() req: Request,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -263,17 +282,8 @@ export class AuthController {
 
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
-    if ('accessToken' in response && 'refreshToken' in response) {
-      res.cookie('refreshToken', response.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-
-      });
-    }
-
-    return { ...response, refreshToken: null};
+    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    return {};
   }
 
   /**
@@ -381,7 +391,7 @@ export class AuthController {
         slug: tenant?.slug,
         customDomain: tenant?.customDomain,
       },
-      session: {
+      session: session ? {
         id: session.id,
         createdAt: session.createdAt,
         lastActivity: session.lastActivity,
@@ -389,7 +399,7 @@ export class AuthController {
         ipAddress: session.ipAddress,
         userAgent: session.userAgent,
         deviceId: session.deviceId,
-      },
+      } : null,
       auth: {
         method: "jwt",
         // issuedAt: new Date(user.iat * 1000).toISOString(),
@@ -413,7 +423,7 @@ export class AuthController {
    * Verify MFA code and complete login
    */
   @Post("mfa/verify")
-  @RateLimit({ max: 5, windowMs: 300000, keyBy: "user" })
+  @RateLimit({ max: 15, windowMs: 300000, keyBy: "user" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Verify MFA code and complete login",
@@ -472,16 +482,8 @@ export class AuthController {
         userAgent,
       );
 
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
-
-      return { status: 200, data: { accessToken: result.accessToken, message: result.message } };
+      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      return { message: result.message, tenantSlug: result.tenantSlug };
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
@@ -542,6 +544,7 @@ export class AuthController {
   })
   async verifyMfaBackup(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Body() dto: VerifyMfaDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -549,13 +552,15 @@ export class AuthController {
     const tenantId = req.tenantId!;
 
     try {
-      return await this.authService.verifyMfaBackup(
+      const result = await this.authService.verifyMfaBackup(
         tenantId,
         dto.tempToken,
         dto.code,
         ip,
         userAgent,
       );
+      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      return { message: result.message, tenantSlug: result.tenantSlug, warning: result.warning };
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
@@ -663,22 +668,14 @@ export class AuthController {
     const result = await this.authService.finishWebAuthnLogin({
       tenantId,
       email: dto.email,
-      webauthnResponse: dto.response,
+      webauthnResponse: dto.response as unknown as import("@simplewebauthn/server").AuthenticationResponseJSON,
       sessionNonce: dto.sessionNonce,
       ip,
       userAgent,
     });
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      domain: req.hostname,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-
-    return { status: 200, data: { accessToken: result.accessToken } };
+    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    return { user: result.user, tenantSlug: result.tenantSlug };
   }
 
   /**
@@ -713,23 +710,51 @@ export class AuthController {
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const { accessToken, refreshToken } = await this.authService.verifyMagicLink(
+    const { accessToken, refreshToken, tenantSlug } = await this.authService.verifyMagicLink(
       tenantId,
       dto.token,
       ip,
       userAgent || "unknown",
     );
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      domain: req.hostname,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
+    this.setAuthCookies(res, accessToken, refreshToken);
+    return { tenantSlug };
+  }
 
-    return { status: 200, data: { accessToken } };
+  /**
+   * Get enabled authentication providers for a tenant.
+   *
+   * Public endpoint — no authentication required.
+   * The tenant is resolved from request context (hostname / X-Tenant-ID header).
+   * Optional query params tenant_id / tenant_slug allow cross-tenant lookup for
+   * superadmin tooling (middleware must still resolve the request tenant first).
+   */
+  @Get('providers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List enabled authentication providers',
+    description: 'Returns which login methods (password, magic link, passkey, social) are enabled for the resolved tenant. Call this before showing the login screen to decide which options to render.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Provider list returned successfully',
+    type: GetProvidersResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Tenant could not be resolved from request' })
+  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  async getProviders(
+    @Query() query: GetProvidersQueryDto,
+    @Req() req: Request,
+  ): Promise<GetProvidersResponseDto> {
+    const tenantId = query.tenant_id ?? (req as unknown as { tenantId?: string }).tenantId;
+
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Tenant could not be resolved. Pass an X-Tenant-ID header or use a tenant subdomain.',
+      );
+    }
+
+    return this.authService.getProviders(tenantId);
   }
 
   /**
@@ -801,7 +826,7 @@ export class AuthController {
         },
       },
       'New User (Signup)': {
-        "summary" : "New User (Signup)",
+        "summary": "New User (Signup)",
         value: {
           exists: false,
           email: 'newuser@example.com',
@@ -875,5 +900,40 @@ export class AuthController {
     logger.info({ email, exists: result.exists, methods: result.methods, preferredMethod: result.preferredMethod }, "Login intent result");
 
     return result;
+  }
+
+  /**
+   * Validate an invite token (public — no auth required)
+   */
+  @Get("invite/validate/:token")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Validate an invite token" })
+  @ApiResponse({ status: 200, description: "Invite metadata returned" })
+  @ApiResponse({ status: 404, description: "Invite not found or expired" })
+  async validateInvite(@Param("token") token: string) {
+    return this.authService.validateInvite(token);
+  }
+
+  /**
+   * Accept an invite and create the user account (public — no auth required)
+   */
+  @Post("invite/accept")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Accept an invite and create account" })
+  @ApiResponse({ status: 201, description: "Account created" })
+  @ApiResponse({ status: 400, description: "Expired or already accepted invite" })
+  @ApiResponse({ status: 409, description: "Email already registered" })
+  async acceptInvite(
+    @Body() dto: AcceptInviteDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    return this.authService.acceptInvite({
+      token: dto.token,
+      name: dto.name,
+      password: dto.password,
+      ip,
+      userAgent: userAgent ?? "unknown",
+    });
   }
 }

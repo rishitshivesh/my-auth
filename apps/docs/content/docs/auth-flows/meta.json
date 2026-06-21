@@ -1,0 +1,4 @@
+{
+  "title": "Auth Flows",
+  "pages": ["index", "password", "magic-link", "mfa", "social", "webauthn"]
+}

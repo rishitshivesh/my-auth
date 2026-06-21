@@ -58,6 +58,11 @@ export class TenantBindingGuard implements CanActivate {
     }
 
     // Step 3: Enforce tenant binding
+    if (user.isSuperAdmin) {
+      this.logger.debug(`Tenant binding bypassed for superadmin: ${user.email}`);
+      return true;
+    }
+
     if (tokenTenantId !== requestTenantId) {
       this.logger.warn("Tenant binding violation detected", {
         userId: user.sub,

@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   HttpException,
   Injectable,
+  Logger,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { RedisService } from "@/common/service/redis.service";
@@ -14,6 +15,8 @@ import {
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
+  private readonly logger = new Logger(RateLimitGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
     private readonly redisService: RedisService,
@@ -26,7 +29,18 @@ export class RateLimitGuard implements CanActivate {
     );
     if (!config) return true;
 
+    // Dev-only escape hatch — never active in production
+    if (
+      process.env["NODE_ENV"] === "development" &&
+      process.env["DISABLE_RATE_LIMIT"] === "true"
+    ) {
+      this.logger.debug("Rate limiting disabled via DISABLE_RATE_LIMIT env var");
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
+    const ip = request.ip;
+
     const key = this.buildKey(config, request);
 
     const limiter = new SlidingWindowRateLimiter(this.redisService.getClient());
@@ -56,6 +70,10 @@ export class RateLimitGuard implements CanActivate {
 
     return true;
   }
+
+  // Unused — kept as dead code marker; RFC1918 bypass removed (HIGH security finding).
+  // Only socket-level loopback is trusted; request.ip is X-Forwarded-For-derived
+  // and trivially spoofable. Use DISABLE_RATE_LIMIT=true in development instead.
 
   private buildKey(config: RateLimitConfig, request: Record<string, unknown>): string {
     const req = request as { ip?: string; user?: { sub?: string }; path?: string };

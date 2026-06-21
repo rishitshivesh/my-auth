@@ -1,17 +1,15 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "module": "NodeNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
-    "sourceMap": true,
+    "sourceMap": false,
+    "rootDir": "../../",
     "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
@@ -22,13 +20,17 @@
 
     "paths": {
       "@/*": ["./src/*"],
-      "@scrolloop/sdk": ["../../packages/sdk-typescript/src/index.ts"],
-      "@scrolloop/types": ["../../packages/sentry-types/src/index.ts"],
       "@repo/database": ["../../packages/database/index.ts"],
-      "@repo/shared": ["../../packages/shared/src/index.ts"],
       "@repo/security": ["../../packages/security/src/index.ts"]
     }
   },
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "node"
+    }
+  },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
+  "exclude": ["node_modules", "dist"]
 }

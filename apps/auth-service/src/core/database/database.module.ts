@@ -2,6 +2,9 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { dataSourceOptions } from "@repo/database";
+import { TenantContextService } from "./tenant-context.service";
+import { CorsRefreshService } from "@/core/cors-refresh.service";
+import { SessionRepository } from "./session.repository";
 
 @Module({
   imports: [
@@ -22,5 +25,7 @@ import { dataSourceOptions } from "@repo/database";
         }) as any,
     }),
   ],
+  providers: [TenantContextService, CorsRefreshService, SessionRepository],
+  exports: [TenantContextService, CorsRefreshService, SessionRepository],
 })
 export class DatabaseModule {}

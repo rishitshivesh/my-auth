@@ -4,10 +4,9 @@ import { OnboardingLayout } from "@/components/layouts/onboarding-layout"
 import { CreateTenantForm } from "@/components/onboarding/create-tenant-form"
 
 export default function CreateTenantPage() {
-  const handleCreateTenant = async (data: any) => {
-    console.log("Creating tenant:", data)
-    // In a real app, send to backend and navigate to portal
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  // SPRINT_N: wire to POST /tenants once onboarding flow is implemented
+  const handleCreateTenant = async (_data: unknown) => {
+    throw new Error('Tenant creation not yet implemented');
   }
 
   return (

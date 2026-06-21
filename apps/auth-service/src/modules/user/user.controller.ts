@@ -23,7 +23,8 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
-import { UserService } from "./user.service";
+import { UserService, ListUsersOptions } from "./user.service";
+import { OrgMembership } from "./user.repository";
 import {
   UpdateUserDto,
   ChangePasswordDto,
@@ -31,6 +32,7 @@ import {
   ListUsersQueryDto,
   BulkUpdateUsersDto,
   ListUsersResponseDto,
+  InviteUserDto,
 } from "./user.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
@@ -173,6 +175,17 @@ export class UserController {
   }
 
   /**
+   * Get all organizations the current user is a member of (including guest memberships)
+   * Used to power the org-switcher in the portal header
+   */
+  @Get("orgs")
+  @ApiOperation({ summary: "Get user organization memberships" })
+  @ApiResponse({ status: 200, description: "Organization memberships retrieved" })
+  async getUserOrgs(@Request() req: AuthenticatedRequest): Promise<OrgMembership[]> {
+    return this.userService.getUserOrgs(req.user.sub, req.tenantId!);
+  }
+
+  /**
    * Delete own account (soft delete)
    * Anyone authenticated can delete their own account
    */
@@ -206,15 +219,11 @@ export class UserController {
   ): Promise<ListUsersResponseDto> {
     const tenantId = req.tenantId!;
 
-    // Convert date strings to Date objects
-    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
-    if (query.createdAfter) {
-      options.createdAfter = new Date(query.createdAfter);
-    }
-    if (query.createdBefore) {
-      options.createdBefore = new Date(query.createdBefore);
-    }
-
+    const options: ListUsersOptions = {
+      ...query,
+      createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
+      createdBefore: query.createdBefore ? new Date(query.createdBefore) : undefined,
+    };
     return this.userService.listUsers(tenantId, options);
   }
 
@@ -259,14 +268,11 @@ export class UserController {
   ): Promise<string> {
     const tenantId = req.tenantId!;
 
-    const options: ListUsersQueryDto & { createdAfter?: Date; createdBefore?: Date } = { ...query };
-    if (query.createdAfter) {
-      options.createdAfter = new Date(query.createdAfter);
-    }
-    if (query.createdBefore) {
-      options.createdBefore = new Date(query.createdBefore);
-    }
-
+    const options: ListUsersOptions = {
+      ...query,
+      createdAfter: query.createdAfter ? new Date(query.createdAfter) : undefined,
+      createdBefore: query.createdBefore ? new Date(query.createdBefore) : undefined,
+    };
     return this.userService.exportUsers(tenantId, options);
   }
 
@@ -398,5 +404,24 @@ export class UserController {
     const tenantId = req.tenantId!;
     await this.userService.adminUnlockUser(tenantId, id);
     return { message: "User account unlocked" };
+  }
+
+  /**
+   * Invite a user to the workspace
+   * Requires: users:invite permission or admin role
+   */
+  @Post("invite")
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Invite a user to the workspace" })
+  @ApiResponse({ status: 201, description: "Invitation sent" })
+  @ApiResponse({ status: 409, description: "User or pending invite already exists" })
+  async inviteUser(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: InviteUserDto,
+  ) {
+    const tenantId = req.tenantId!;
+    return this.userService.inviteUser(tenantId, req.user.sub, dto);
   }
 }

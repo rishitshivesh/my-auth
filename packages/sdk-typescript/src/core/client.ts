@@ -85,7 +85,14 @@ export class SentryClient {
     // Handle MFA challenge
     if (data.mfaRequired) {
       this.log("MFA required");
-      return data;
+      return {
+        mfaRequired: true,
+        mfaChallenge: {
+          tempToken: data.tempToken,
+          methods: data.availableMethods || [],
+          preferredMethod: data.preferredMethod,
+        },
+      } as any;
     }
 
     // Set access token
@@ -125,7 +132,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { email },
     });
@@ -145,7 +152,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { otp, password },
     });
@@ -165,7 +172,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { tempToken, code },
       credentials: "include",
@@ -213,7 +220,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { ct: completionToken },
       credentials: "include",
@@ -246,7 +253,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { email },
     });
@@ -265,7 +272,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { token },
       credentials: "include",
@@ -609,6 +616,28 @@ export class SentryClient {
   }
 
   /**
+   * Get all orgs the current user belongs to (home tenant + guest memberships)
+   */
+  async getUserOrgs(): Promise<
+    Array<{
+      tenantId: string;
+      slug: string;
+      name: string;
+      role: string;
+      isGuest: boolean;
+      logoUrl?: string;
+    }>
+  > {
+    const response = await this.request({
+      url: `${this.config.baseURL}/users/orgs`,
+      method: 'GET',
+    });
+    if (!response.ok) throw this.createError(response);
+    const payload = response.data?.data ?? response.data;
+    return Array.isArray(payload) ? payload : [];
+  }
+
+  /**
    * Get current user
    */
   async getCurrentUser(): Promise<User> {
@@ -762,7 +791,7 @@ export class SentryClient {
   private addAuthHeaders(req: TransportRequest): TransportRequest {
     const headers = {
       "Content-Type": "application/json",
-      "X-Tenant-ID": this.config.tenant,
+      "X-Tenant-Slug": this.config.tenant,
       Authorization: "", // Placeholder
       ...req.headers,
     };
@@ -856,7 +885,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       credentials: "include", // This sends the refresh cookie
     });

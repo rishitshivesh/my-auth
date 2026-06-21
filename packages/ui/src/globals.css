@@ -87,6 +87,11 @@
     --shadow-xl: 0 20px 60px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
 
     --spacing: 0.25rem;
+
+    /* Editorial panel — always-dark brand surface (auth screens), same in both themes */
+    --editorial-bg: #1A1916;
+    --editorial-bg-end: #0D0C0B;
+    --editorial-foreground: #F5F4F2;
 }
 
 .dark {

@@ -1,0 +1,98 @@
+---
+title: IAM Policy Engine
+description: AWS IAM-style Allow/Deny policies with condition blocks.
+---
+
+# IAM Policy Engine
+
+Sentry's policy engine evaluates Allow/Deny policies against the requesting user, similar to AWS IAM. **Deny always wins.**
+
+## Policy structure
+
+```json
+{
+  "id": "policy-uuid",
+  "name": "ReadOnlyUsers",
+  "effect": "Allow",
+  "actions": ["users:read"],
+  "resources": ["users/*"],
+  "conditions": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `effect` | `"Allow"` \| `"Deny"` | The policy outcome |
+| `actions` | `string[]` | Permission strings, supports `*` wildcard |
+| `resources` | `string[]` | Resource patterns, supports `*` wildcard |
+| `conditions` | `object \| null` | Optional condition block |
+
+## Effect evaluation
+
+```
+User requests: users:read on users/123
+│
+├─ Collect all policies attached to user / user's roles / user's groups
+│
+├─ For each policy where action and resource match:
+│   ├─ Evaluate conditions (if any)
+│   └─ Record effect: Allow or Deny
+│
+├─ Any Deny? → DENY (Deny always wins)
+├─ Any Allow? → ALLOW
+└─ No match? → DENY (implicit deny)
+```
+
+## Wildcard matching
+
+```json
+{ "actions": ["*"] }                    // all actions
+{ "actions": ["users:*"] }              // all user actions
+{ "resources": ["users/*"] }            // all user resources
+{ "resources": ["users/123"] }          // specific resource
+```
+
+## Conditions
+
+Conditions are evaluated as key-value matches. Supported operators:
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `StringEquals` | Exact string match | `{ "StringEquals": { "user:role": "admin" } }` |
+| `StringLike` | Glob pattern match | `{ "StringLike": { "user:email": "*@acme.com" } }` |
+| `Bool` | Boolean check | `{ "Bool": { "user:mfaEnabled": "true" } }` |
+| `IpAddress` | CIDR match | `{ "IpAddress": { "request:ip": "10.0.0.0/8" } }` |
+
+Example — allow users to read only their own profile:
+
+```json
+{
+  "name": "SelfReadOnly",
+  "effect": "Allow",
+  "actions": ["users:read"],
+  "resources": ["users/${user:id}"],
+  "conditions": {
+    "StringEquals": { "resource:userId": "${user:id}" }
+  }
+}
+```
+
+## Creating policies via API
+
+```http
+POST /api/rbac/policies
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "name": "DenyDeleteForMembers",
+  "effect": "Deny",
+  "actions": ["users:delete", "roles:delete"],
+  "resources": ["*"],
+  "conditions": {
+    "StringEquals": { "user:role": "member" }
+  }
+}
+
+→ 201 Created
+```

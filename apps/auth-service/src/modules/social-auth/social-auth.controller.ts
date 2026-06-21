@@ -19,6 +19,7 @@ import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
 import * as crypto from "crypto";
+import type { StringValue } from "ms";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
@@ -52,11 +53,12 @@ export class SocialAuthController {
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
     return this.jwtService.sign(payload, {
-      privateKey: privateKey as string,
+      privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as string,
+      expiresIn: expiresIn as StringValue,
     });
   }
 
@@ -197,7 +199,7 @@ export class SocialAuthController {
       }
 
       if (parsedState.mode === "link" && parsedState.userId) {
-        const rawProfile = req.user as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
+        const rawProfile = req.user as unknown as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
         await this.socialAuthService.handleLinkCallback({
           userId: parsedState.userId as string,
           tenantId: parsedState.tenantId as string,
@@ -255,7 +257,7 @@ export class SocialAuthController {
       const result = await this.socialAuthService.handleCallback({
         tenantId,
         profile,
-        ipAddress: req.ip,
+        ipAddress: req.ip ?? '0.0.0.0',
         userAgent: req.headers["user-agent"] || "unknown",
       });
 
@@ -265,15 +267,11 @@ export class SocialAuthController {
         );
       }
 
-      // Set refresh cookie (same pattern as regular login)
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      const isProduction = process.env['NODE_ENV'] === 'production';
+      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
+      const base = { httpOnly: true, secure: isProduction, sameSite: 'strict' as const, path: '/', ...(cookieDomain ? { domain: cookieDomain } : {}) };
+      // Refresh token: set now (we have it)
+      res.cookie("refreshToken", result.refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
 
       // Create short-lived completion token (60s, one-time use by the portal)
       const completionToken = await this.signToken(
@@ -301,21 +299,35 @@ export class SocialAuthController {
   @Post("claim-session")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Claim social session using completion token" })
-  @ApiResponse({ status: 200, description: "Access token returned" })
+  @ApiResponse({ status: 200, description: "Session claimed, accessToken set as httpOnly cookie" })
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
-  async claimSession(@Body() body: { ct: string }) {
+  async claimSession(
+    @Body() body: { ct: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
-        publicKey: publicKey as string,
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         algorithms: ['RS256'],
-      });
+      }) as Record<string, unknown>;
 
-      if (payload.type !== "social_completion") {
+      if (payload['type'] !== "social_completion") {
         throw new Error("Invalid token type");
       }
 
-      return { status: 200, data: { accessToken: payload.accessToken } };
+      const isProduction = process.env['NODE_ENV'] === 'production';
+      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
+      res.cookie('accessToken', payload['accessToken'] as string, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 15 * 60 * 1000,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      });
+
+      return { tenantSlug: (payload['tenantSlug'] as string) ?? '' };
     } catch {
       throw new UnauthorizedException("Invalid or expired completion token");
     }
@@ -359,7 +371,8 @@ export class SocialAuthController {
   @Protected()
   @HttpCode(HttpStatus.OK)
   async getLinkToken(@Req() req: AuthenticatedRequest) {
-    const { userId, tenantId } = req.user;
+    const userId = req.user.userId;
+    const tenantId = req.tenantId;
     const result = await this.socialAuthService.createLinkToken(
       userId,
       tenantId,

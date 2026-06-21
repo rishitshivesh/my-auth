@@ -33,8 +33,16 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
     const tenantId = request.tenantId;
 
-    if (!user?.sub || !tenantId) {
+    if (!user || !user.sub) {
       throw new ForbiddenException('Authentication required');
+    }
+
+    if (user.isSuperAdmin) {
+      return true;
+    }
+
+    if (!tenantId) {
+      throw new ForbiddenException('Tenant context not found');
     }
 
     // Try IAM policy evaluation first

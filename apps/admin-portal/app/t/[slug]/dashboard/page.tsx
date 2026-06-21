@@ -9,17 +9,19 @@ import {
   useTenantActivity,
   useApiCallTrend,
 } from '@/lib/queries';
+import type { TrendPoint } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  Users, 
-  Activity, 
-  AppWindow, 
+import {
+  Users,
+  Activity,
+  AppWindow,
   ShieldCheck,
   Plus,
   Settings,
   History,
   TrendingUp,
-  ArrowUpRight
+  ArrowUpRight,
+  type LucideIcon,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -36,13 +38,11 @@ export default function DashboardPage() {
       label: 'Total Users',
       value: metrics?.totalUsers.toLocaleString(),
       icon: Users,
-      trend: '+12%',
     },
     {
       label: 'Active Sessions',
       value: metrics?.activeSessions.toLocaleString(),
       icon: Activity,
-      trend: '+4%',
     },
     {
       label: 'Applications',
@@ -53,7 +53,6 @@ export default function DashboardPage() {
       label: 'MFA Adoption',
       value: metrics ? `${Math.round(metrics.mfaAdoptionRate * 100)}%` : undefined,
       icon: ShieldCheck,
-      trend: '+2.4%',
     },
   ];
 
@@ -76,12 +75,6 @@ export default function DashboardPage() {
                 <div className="p-2 rounded-sm bg-black/5">
                   <stat.icon className="w-4 h-4 text-muted-foreground" />
                 </div>
-                {stat.trend && (
-                  <span className="text-[10px] font-display font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
-                    <TrendingUp className="w-2.5 h-2.5" />
-                    {stat.trend}
-                  </span>
-                )}
               </div>
               <div className="mt-4 space-y-1">
                 <p className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
@@ -231,7 +224,7 @@ export default function DashboardPage() {
   );
 }
 
-function QuickActionCard({ icon: Icon, title, desc, href }: any) {
+function QuickActionCard({ icon: Icon, title, desc, href }: { icon: LucideIcon; title: string; desc: string; href: string }) {
   return (
     <button className="group text-left focus:outline-none">
       <GlassCard tier={1} className="p-5 flex items-start gap-4 group-hover:border-accent/30 group-hover:bg-accent/[0.02] transition-all">
@@ -252,7 +245,7 @@ function QuickActionCard({ icon: Icon, title, desc, href }: any) {
   );
 }
 
-function generatePath(points: any[], w: number, h: number, lineOnly = false) {
+function generatePath(points: TrendPoint[], w: number, h: number, lineOnly = false) {
   if (!points || points.length < 2) return '';
   const max = Math.max(...points.map(p => p.count), 1);
   const step = w / (points.length - 1);

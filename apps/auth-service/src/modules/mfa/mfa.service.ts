@@ -8,7 +8,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { MfaSettings, User, SecurityEventType } from "@repo/database";
+import { MfaSettings, Tenant, User, SecurityEventType } from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import * as speakeasy from "speakeasy";
 import * as QRCode from "qrcode";
@@ -26,6 +26,22 @@ export interface VerifyTotpDto {
   token: string;
 }
 
+const GRACE_DAY_FLAGS: Array<[string, number]> = [
+  ["mfa_grace_1d", 1],
+  ["mfa_grace_3d", 3],
+  ["mfa_grace_5d", 5],
+  ["mfa_grace_7d", 7],
+  ["mfa_grace_14d", 14],
+];
+
+function resolveGraceDays(featureFlags?: Record<string, boolean>): number {
+  if (!featureFlags) return 7;
+  for (const [flag, days] of GRACE_DAY_FLAGS) {
+    if (featureFlags[flag]) return days;
+  }
+  return 7;
+}
+
 @Injectable()
 export class MfaService {
   constructor(
@@ -33,6 +49,8 @@ export class MfaService {
     private mfaRepository: Repository<MfaSettings>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Tenant)
+    private tenantRepository: Repository<Tenant>,
     private readonly securityEventService: SecurityEventService,
   ) {}
 
@@ -356,31 +374,70 @@ export class MfaService {
   }
 
   /**
-   * Get MFA status for user
+   * Get MFA status for user, including server-computed grace period state.
+   * Sets mfaGraceStartedAt on first call when MFA is not enrolled —
+   * this timestamp is immutable from the client.
    */
   async getMfaStatus(userId: string, tenantId: string) {
-    const mfaSettings = await this.mfaRepository.findOne({
-      where: { userId, tenantId },
-    });
+    const [mfaSettings, user, tenant] = await Promise.all([
+      this.mfaRepository.findOne({ where: { userId, tenantId } }),
+      this.userRepository.findOne({ where: { id: userId, tenantId } }),
+      this.tenantRepository.findOne({ where: { id: tenantId }, select: ["id", "featureFlags"] }),
+    ]);
 
-    if (!mfaSettings) {
-      return {
-        enabled: false,
-        methods: [],
-      };
-    }
+    const graceDays = resolveGraceDays(tenant?.featureFlags ?? undefined);
 
     const methods: string[] = [];
-    if (mfaSettings.totpEnabled) methods.push("totp");
-    if (mfaSettings.smsEnabled) methods.push("sms");
-    if (mfaSettings.emailEnabled) methods.push("email");
-    if (mfaSettings.webauthnEnabled) methods.push("webauthn");
+    if (mfaSettings?.totpEnabled) methods.push("totp");
+    if (mfaSettings?.smsEnabled) methods.push("sms");
+    if (mfaSettings?.emailEnabled) methods.push("email");
+    if (mfaSettings?.webauthnEnabled) methods.push("webauthn");
+
+    const mfaEnabled = methods.length > 0;
+
+    // Grace period tracking — server-side only, never derived from client storage
+    let graceStartedAt: Date | null = user?.mfaGraceStartedAt ?? null;
+
+    if (!mfaEnabled && !graceStartedAt && user) {
+      graceStartedAt = new Date();
+      await this.userRepository.update(
+        { id: userId, tenantId },
+        { mfaGraceStartedAt: graceStartedAt },
+      );
+    }
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let graceExpiresAt: Date | null = null;
+    let graceRemaining = graceDays;
+    let graceExpired = false;
+
+    if (!mfaEnabled && graceStartedAt) {
+      graceExpiresAt = new Date(graceStartedAt.getTime() + graceDays * msPerDay);
+      const elapsed = Math.floor((now - graceStartedAt.getTime()) / msPerDay);
+      graceRemaining = Math.max(0, graceDays - elapsed);
+      graceExpired = graceRemaining === 0;
+    }
+
+    // Clear grace timer when MFA is enrolled
+    if (mfaEnabled && graceStartedAt && user) {
+      await this.userRepository.update(
+        { id: userId, tenantId },
+        { mfaGraceStartedAt: null },
+      );
+    }
 
     return {
-      enabled: methods.length > 0,
+      enabled: mfaEnabled,
       methods,
-      preferredMethod: mfaSettings.preferredMethod || methods[0],
-      backupCodesRemaining: mfaSettings.backupCodes?.length || 0,
+      preferredMethod: mfaSettings?.preferredMethod || methods[0],
+      backupCodesRemaining: mfaSettings?.backupCodes?.length || 0,
+      grace: {
+        startedAt: graceStartedAt?.toISOString() ?? null,
+        expiresAt: graceExpiresAt?.toISOString() ?? null,
+        daysRemaining: graceRemaining,
+        isExpired: graceExpired,
+      },
     };
   }
 

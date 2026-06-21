@@ -17,6 +17,7 @@ import {
 } from "@repo/database";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import type { StringValue } from "ms";
 import { JwksService } from "./jwks.service";
 
 export interface CreateAuthorizationCodeDto {
@@ -77,11 +78,12 @@ export class OAuthTokenService {
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string | number, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
     return this.jwtService.sign(payload, {
-      privateKey: privateKey as crypto.KeyObject,
+      privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as string | number,
+      expiresIn: expiresIn as StringValue,
     });
   }
 
@@ -305,7 +307,7 @@ export class OAuthTokenService {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
-        publicKey: publicKey as crypto.KeyObject,
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         algorithms: ['RS256'],
       }) as Record<string, unknown>;
     } catch (error: unknown) {
@@ -678,11 +680,11 @@ export class OAuthTokenService {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
       payload = this.jwtService.verify(token, {
-        publicKey: publicKey as crypto.KeyObject,
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         algorithms: ['RS256'],
       }) as Record<string, unknown>;
 
-      const jti = payload.jti;
+      const jti = payload.jti as string;
       const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
 
       const accessToken = await this.accessTokenRepository.findOne({

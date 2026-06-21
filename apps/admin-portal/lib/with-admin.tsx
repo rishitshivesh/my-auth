@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@scrolloop/sdk'
-import { authClient } from '@/app/layout'
+import { authClient } from '@/lib/auth-client'
 
 interface AdminUser {
   tenantId: string

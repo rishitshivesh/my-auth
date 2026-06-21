@@ -52,14 +52,7 @@ import { RequirePermissions } from "../rbac/decorators/rbac.decorator";
 import { JwksService } from "./services/jwks.service";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { logger } from "@/common/logger";
-
-interface OAuthClient {
-  id: string;
-  clientType: string;
-  requirePkce: boolean;
-  accessTokenTtl: number;
-  [key: string]: unknown;
-}
+import { OAuthClient } from "@repo/database";
 
 interface JwtUser {
   sub: string;
@@ -490,7 +483,7 @@ export class OAuthController {
 
     return {
       sub: user.userId,
-      email: user.email,
+      email: user.email ?? '',
       email_verified: true, // TODO: Get from user entity
       name: user.name,
       given_name: user.given_name,
@@ -566,7 +559,7 @@ export class OAuthController {
     }
     await this.clientService.validateClient(clientId, clientSecret);
 
-    return this.tokenService.introspectToken(body.token, body.token_type_hint);
+    return this.tokenService.introspectToken(body.token, body.token_type_hint) as unknown as Promise<IntrospectTokenResponseDto>;
   }
 
   // ============================================================

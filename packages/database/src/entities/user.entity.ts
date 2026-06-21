@@ -302,6 +302,16 @@ export class User extends BaseEntity {
   })
   mfaEnabled!: boolean;
 
+  // Server-side MFA grace period start — set on first login when MFA is not enrolled.
+  // Client code must never set this; it is immutable from the client.
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    name: 'mfa_grace_started_at',
+    comment: 'When the MFA enrollment grace period began for this user',
+  })
+  mfaGraceStartedAt?: Date | null;
+
   // ============================================================
   // RBAC HELPER METHODS - NEW
   // ============================================================

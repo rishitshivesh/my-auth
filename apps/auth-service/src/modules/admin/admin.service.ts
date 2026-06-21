@@ -3,9 +3,11 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
+  OnModuleInit,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, MoreThan } from "typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
+import { Repository, IsNull, MoreThan, DataSource } from "typeorm";
 import {
   User,
   Session,
@@ -13,8 +15,21 @@ import {
   SecurityEvent,
   Role,
   UserRole,
+  Permission,
+  RolePermission,
 } from "@repo/database";
 import { RedisService } from "@/common/service/redis.service";
+import { SessionService } from "@/common/service/session.service";
+import { JwksService } from "@/modules/oauth/services/jwks.service";
+import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { JwtService } from "@nestjs/jwt";
+import { PasswordService } from "@repo/security";
+import { randomBytes, timingSafeEqual } from "crypto";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { logger } from "@/common/logger";
+import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
 
 export interface PlatformMetricsDto {
   totalTenants: number;
@@ -35,7 +50,7 @@ export interface TenantListItemDto {
   customDomain?: string;
 }
 
-interface RecentActivityItem {
+export interface RecentActivityItem {
   id: string;
   eventType: string;
   actorEmail?: string;
@@ -59,6 +74,19 @@ export interface TeamMemberDto {
   addedAt?: Date;
 }
 
+export interface CreateFirstAdminDto {
+  platformName?: string;
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface FirstAdminResultDto {
+  accessToken: string;
+  refreshToken: string;
+  user: { id: string; email: string; name: string };
+}
+
 export interface PlatformSettingsDto {
   platformName: string;
   smtpConfigured: boolean;
@@ -68,12 +96,33 @@ export interface PlatformSettingsDto {
   maintenanceMode: boolean;
 }
 
-const SENTRY_TENANT_SLUG = "sentry";
-const SENTRY_INTERNAL_ROLE = "sentry-internal";
+const SENTRY_TENANT_SLUG = process.env["SENTRY_PLATFORM_SLUG"] ?? "sentry";
+const SENTRY_INTERNAL_ROLE = `${SENTRY_TENANT_SLUG}-internal`;
+const logDir =
+          process.env["SENTRY_SETUP_LOG_DIR"] ??
+          path.join(os.homedir(), ".sentry");
 
+function readSetupToken(): string | null {
+  try {
+    const content = fs.readFileSync(logDir, "utf8");
+
+    const matches = [
+      ...content.matchAll(/SETUP TOKEN:\s*([a-f0-9]{64})/gi)
+    ];
+
+    return matches.at(-1)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
+  private setupToken: string | null = null;
+  private setupLogPath: string | null = null;
+
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Session)
@@ -87,7 +136,73 @@ export class AdminService {
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
     private readonly redisService: RedisService,
+    private readonly sessionService: SessionService,
+    private readonly jwksService: JwksService,
+    private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
+    private readonly jwtService: JwtService,
+    private readonly tenantSchemaService: TenantSchemaService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.initSetupToken();
+  }
+
+  async initSetupToken(): Promise<void> {
+    const initialized = await this.isInitialized();
+    if (!initialized) {
+      this.setupToken = randomBytes(32).toString("hex");
+      logger.info(`=== FIRST RUN SETUP TOKEN: ${this.setupToken} ===`);
+      logger.info(
+        "Use this token in the X-Setup-Token header when calling POST /superadmin/create-first-admin",
+      );
+
+      try {
+        const logDir =
+          process.env["SENTRY_SETUP_LOG_DIR"] ??
+          path.join(os.homedir(), ".sentry");
+        fs.mkdirSync(logDir, { recursive: true });
+        const logPath = path.join(logDir, "setup.log");
+        fs.writeFileSync(
+          logPath,
+          `[${new Date().toISOString()}] SETUP TOKEN: ${this.setupToken}\n`,
+          { flag: "a" },
+        );
+        this.setupLogPath = logPath;
+        logger.info({ logPath }, "Setup token written to file");
+      } catch (err) {
+        logger.warn({ err }, "Could not write setup token to file — check SENTRY_SETUP_LOG_DIR");
+      }
+    }
+  }
+
+  getSetupLogPath(): string | null {
+    return this.setupLogPath;
+  }
+
+  private validateSetupToken(token: string): boolean {
+    if (!this.setupToken) return false;
+    try {
+
+      const a = Buffer.from(token);
+      const b = Buffer.from(this.setupToken);
+      
+      if (a.length !== b.length) return false;
+      const ok = timingSafeEqual(a, b);
+      logger.debug({ ok }, 'setup token check');
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  invalidateSetupToken(): void {
+    this.setupToken = null;
+  }
+
+  /** True while the platform is awaiting first-run setup (token still active). */
+  isBootstrapping(): boolean {
+    return this.setupToken !== null;
+  }
 
   private async getSentryTenant(): Promise<Tenant | null> {
     return this.tenantRepository.findOne({
@@ -459,13 +574,13 @@ export class AdminService {
     const stored = (sentryTenant as unknown as Record<string, unknown>)?.settings as Record<string, unknown> ?? {};
 
     return {
-      platformName: stored.platformName ?? "Scrolloop Sentry",
+      platformName: (stored.platformName as string | undefined) ?? "Scrolloop Sentry",
       smtpConfigured: !!(process.env.SMTP_HOST || stored.smtpHost),
-      smtpHost: stored.smtpHost ?? process.env.SMTP_HOST ?? undefined,
+      smtpHost: (stored.smtpHost as string | undefined) ?? process.env.SMTP_HOST ?? undefined,
       supportEmail:
-        stored.supportEmail ?? process.env.SUPPORT_EMAIL ?? undefined,
-      allowPublicSignup: stored.allowPublicSignup ?? false,
-      maintenanceMode: stored.maintenanceMode ?? false,
+        (stored.supportEmail as string | undefined) ?? process.env.SUPPORT_EMAIL ?? undefined,
+      allowPublicSignup: (stored.allowPublicSignup as boolean | undefined) ?? false,
+      maintenanceMode: (stored.maintenanceMode as boolean | undefined) ?? false,
     };
   }
 
@@ -490,5 +605,259 @@ export class AdminService {
       settings: updated,
     } as Partial<Tenant>);
     return this.getPlatformSettings();
+  }
+
+  // ─── First-Run Setup ─────────────────────────────────────────────
+
+  /**
+   * Check whether the platform has been initialized (at least one sentry-internal user exists).
+   */
+  async isInitialized(): Promise<boolean> {
+    const sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) return false;
+
+    const role = await this.getSentryInternalRole(sentryTenant.id);
+    if (!role) return false;
+
+    const count = await this.userRoleRepository.count({
+      where: { roleId: role.id, tenantId: sentryTenant.id },
+    });
+    return count > 0;
+  }
+
+  /**
+   * Public endpoint response: platform identity + initialization state.
+   * Used by the admin portal middleware to cache slug and skip /setup when initialized.
+   */
+  async getPlatformInfo(): Promise<{ slug: string; name: string; initialized: boolean }> {
+    const slug = SENTRY_TENANT_SLUG;
+    const tenant = await this.getSentryTenant();
+    const name = tenant?.name ?? (process.env["SENTRY_PLATFORM_NAME"] ?? "Scrolloop Sentry");
+    const initialized = await this.isInitialized();
+    return { slug, name, initialized };
+  }
+
+  /**
+   * Create the very first superadmin. Only callable when isInitialized() === false.
+   * Requires a valid X-Setup-Token header obtained from the auth service startup logs.
+   */
+  async createFirstAdmin(
+    dto: CreateFirstAdminDto,
+    setupToken: string,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<FirstAdminResultDto> {
+    if (!this.validateSetupToken(setupToken)) {
+      throw new ForbiddenException("Invalid or expired setup token");
+    }
+
+    if (await this.isInitialized()) {
+      throw new ConflictException("Platform is already initialized");
+    }
+
+    // Ensure the sentry tenant row exists in public.tenants
+    let sentryTenant = await this.getSentryTenant();
+    if (!sentryTenant) {
+      sentryTenant = await this.tenantRepository.save(
+        this.tenantRepository.create({
+          name: dto.platformName?.trim() || "Scrolloop Sentry",
+          slug: SENTRY_TENANT_SLUG,
+          environment: "production",
+          active: true,
+          featureFlags: {
+            mfaRequired: false,
+            passwordlessEnabled: true,
+            socialProvidersEnabled: false,
+          },
+        } as Partial<Tenant>),
+      );
+      logger.info("Sentry platform tenant bootstrapped during first-run setup");
+    }
+
+    // Validate password before doing any more writes
+    const validation = PasswordService.validateStrength(dto.password);
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+      });
+    }
+
+    // Create the fk_sentry schema so all tenant-scoped tables land there,
+    // not in public. This matches the schema-per-tenant architecture.
+    const schemaName = `fk_${SENTRY_TENANT_SLUG}`;
+    await this.tenantSchemaService.createSchema(SENTRY_TENANT_SLUG);
+    logger.info({ schemaName }, "Sentry tenant schema ensured");
+
+    // All role/user/user_role writes happen inside a QueryRunner that sets
+    // search_path so TypeORM routes them into fk_sentry, not public.
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+
+    let savedUser: User;
+    let allSentryRoles: Role[];
+
+    try {
+      await qr.query(`SET LOCAL search_path TO "${schemaName}", public`);
+
+      // Check for duplicate email in the tenant schema
+      const existing = await qr.manager.findOne(User, {
+        where: { email: dto.email, tenantId: sentryTenant.id },
+      });
+      if (existing) {
+        throw new ConflictException("A user with this email already exists");
+      }
+
+      // Ensure sentry-internal role exists in fk_sentry.roles
+      let internalRole = await qr.manager.findOne(Role, {
+        where: { name: SENTRY_INTERNAL_ROLE, tenantId: sentryTenant.id },
+      });
+      if (!internalRole) {
+        internalRole = await qr.manager.save(
+          qr.manager.create(Role, {
+            name: SENTRY_INTERNAL_ROLE,
+            description: "Scrolloop Sentry platform superadmin",
+            tenantId: sentryTenant.id,
+            isSystem: true,
+          } as Partial<Role>),
+        );
+        logger.info("sentry-internal role bootstrapped in fk_sentry schema");
+      }
+
+      // Ensure wildcard permission exists in fk_sentry.permissions
+      let wildcardPermission = await qr.manager.findOne(Permission, {
+        where: { tenantId: sentryTenant.id, name: "*:*" },
+      });
+      if (!wildcardPermission) {
+        wildcardPermission = await qr.manager.save(
+          qr.manager.create(Permission, {
+            resource: "*",
+            action: "*",
+            name: "*:*",
+            description: "Full wildcard permission — grants access to all resources and actions",
+            tenantId: sentryTenant.id,
+          }),
+        );
+        logger.info("wildcard permission *:* bootstrapped in fk_sentry schema");
+      }
+
+      // Ensure sentry-internal role has the wildcard permission
+      const hasWildcardPermission = await qr.manager.findOne(RolePermission, {
+        where: { tenantId: sentryTenant.id, roleId: internalRole.id, permissionId: wildcardPermission.id },
+      });
+      if (!hasWildcardPermission) {
+        await qr.manager.save(
+          qr.manager.create(RolePermission, {
+            tenantId: sentryTenant.id,
+            roleId: internalRole.id,
+            permissionId: wildcardPermission.id,
+            assignedAt: new Date(),
+          }),
+        );
+        logger.info("Assigned *:* permission to sentry-internal role in fk_sentry schema");
+      }
+
+      // Create superadmin user in fk_sentry.users
+      const passwordHash = await PasswordService.hash(dto.password);
+      const nameParts = dto.name.trim().split(/\s+/);
+      const firstName = nameParts[0] ?? dto.name;
+      const lastName = nameParts.slice(1).join(" ") || undefined;
+
+      savedUser = await qr.manager.save(
+        qr.manager.create(User, {
+          tenantId: sentryTenant.id,
+          email: dto.email,
+          emailVerified: true,
+          firstName,
+          lastName,
+          displayName: dto.name,
+          primaryAuthMethod: "password",
+          passwordHash,
+          isActive: true,
+          mfaEnabled: false,
+          failedLoginAttempts: 0,
+          forcePasswordChange: false,
+          passwordHistory: [],
+          metadata: { source: "first-run-setup" },
+        } as Partial<User>),
+      );
+
+      // Assign all roles in the sentry tenant to this user
+      allSentryRoles = await qr.manager.find(Role, {
+        where: { tenantId: sentryTenant.id },
+      });
+
+      for (const role of allSentryRoles) {
+        await qr.manager.save(
+          qr.manager.create(UserRole, {
+            tenantId: sentryTenant.id,
+            userId: savedUser.id,
+            roleId: role.id,
+            reason: "First-run setup",
+            metadata: { source: "setup" },
+          } as Partial<UserRole>),
+        );
+      }
+    } finally {
+      // Always reset search_path before releasing the connection back to the pool
+      await qr.query(`SET search_path TO public`);
+      await qr.release();
+    }
+
+    // Issue session + tokens (session/refresh-token writes go through their own
+    // services which use the TenantContextService / public schema as appropriate)
+    const session = await this.sessionService.createSession({
+      userId: savedUser.id,
+      tenantId: sentryTenant.id,
+      email: savedUser.email,
+      ipAddress,
+      userAgent,
+    });
+
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId: sentryTenant.id,
+      userId: savedUser.id,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress,
+      userAgent,
+      expiresInDays: 30,
+    });
+
+    const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(sentryTenant.id);
+    const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
+
+    const groups = allSentryRoles.map((r) => r.name).filter(Boolean);
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: savedUser.id,
+        email: savedUser.email,
+        tenantId: sentryTenant.id,
+        tenantSlug: sentryTenant.slug,
+        groups,
+        sessionId: session.id,
+      },
+      {
+        privateKey: privateKeyPem,
+        algorithm: "RS256",
+        header: { alg: "RS256", kid },
+        expiresIn: "15m",
+      },
+    );
+
+    this.invalidateSetupToken();
+
+    // Tokens are returned to the controller which sets them as httpOnly cookies.
+    // They are never included in the JSON response body.
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: savedUser.id,
+        email: savedUser.email,
+        name: dto.name,
+      },
+    };
   }
 }

@@ -2,19 +2,26 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In, FindOptionsWhere } from "typeorm";
 import {
   User,
-  Session,
+  Tenant,
   SecurityEventType,
   SecurityEvent,
+  UserInvite,
 } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
+import { EmailService } from "@/modules/email/email.service";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 import { logger } from "@/common/logger";
+import { UserRepository, OrgMembership } from "./user.repository";
 
 /**
  * User Service
@@ -28,23 +35,26 @@ import { logger } from "@/common/logger";
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly userRepository: UserRepository,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(SecurityEvent)
     private readonly securityEventRepository: Repository<SecurityEvent>,
+    @InjectRepository(UserInvite)
+    private readonly userInviteRepository: Repository<UserInvite>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
     private readonly securityEventService: SecurityEventService,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
    * Find user by ID
    */
   async findById(tenantId: string, id: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id, tenantId },
-      relations: ["tenant"],
-    });
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
+    const user = await this.userRepository.findByTenantAndId(tenantId, id);
 
     if (!user) {
       throw new NotFoundException("User not found");
@@ -57,6 +67,8 @@ export class UserService {
    * Find user by email
    */
   async findByEmail(tenantId: string, email: string): Promise<User | null> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const where: FindOptionsWhere<User> = { email };
     if (tenantId) {
       where.tenantId = tenantId;
@@ -211,6 +223,8 @@ export class UserService {
    * Get active sessions for user
    */
   async getActiveSessions(tenantId: string, userId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const sessions = await this.sessionRepository.find({
       where: {
         userId,
@@ -237,6 +251,8 @@ export class UserService {
    * Revoke a specific session
    */
   async revokeSession(tenantId: string, userId: string, sessionId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const session = await this.sessionRepository.findOne({
       where: { id: sessionId, userId, tenantId },
     });
@@ -267,6 +283,8 @@ export class UserService {
    * Revoke all sessions for user
    */
   async revokeAllSessions(tenantId: string, userId: string) {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     await this.sessionRepository.update(
       { userId, revokedAt: IsNull(), tenantId },
       {
@@ -775,6 +793,10 @@ export class UserService {
     logger.info({ userId, tenantId }, "Admin unlocked user account");
   }
 
+  async getUserOrgs(userId: string, tenantId: string): Promise<OrgMembership[]> {
+    return this.userRepository.getUserOrgs(userId, tenantId);
+  }
+
   async adminDeleteUser(tenantId: string, userId: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
@@ -807,6 +829,68 @@ export class UserService {
   /**
    * Export users to CSV format
    */
+  /**
+   * Invite a user to the tenant by email
+   */
+  async inviteUser(
+    tenantId: string,
+    invitedBy: string,
+    data: { email: string; roleIds?: string[]; expiresInDays?: number },
+  ): Promise<{ message: string }> {
+    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    const existing = await this.userRepository.findOne({
+      where: { email: data.email, tenantId },
+    });
+    if (existing) {
+      throw new ConflictException("A user with this email already exists in this workspace");
+    }
+
+    const pending = await this.userInviteRepository.findOne({
+      where: { email: data.email, tenantId },
+    });
+    if (pending && pending.expiresAt > new Date() && !pending.acceptedAt) {
+      throw new ConflictException("An active invitation already exists for this email");
+    }
+
+    const inviter = await this.userRepository.findOne({ where: { id: invitedBy, tenantId } });
+    const inviterFullName = `${inviter?.firstName ?? ''} ${inviter?.lastName ?? ''}`.trim();
+    const inviterName = inviter
+      ? (inviter.displayName ?? (inviterFullName || inviter.email))
+      : 'A workspace admin';
+
+    const expiresInDays = data.expiresInDays ?? 7;
+    const token = crypto.randomBytes(64).toString('hex');
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+    const invite = this.userInviteRepository.create({
+      tenantId,
+      email: data.email,
+      token,
+      roleIds: data.roleIds ?? [],
+      invitedBy,
+      expiresAt,
+    });
+    await this.userInviteRepository.save(invite);
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const inviteUrl = `${frontendUrl}/invite/${token}`;
+
+    await this.emailService.sendInviteEmail({
+      to: data.email,
+      inviterName,
+      tenantName: tenant.name,
+      tenantId,
+      inviteUrl,
+      expiresInDays,
+    });
+
+    return { message: "Invitation sent" };
+  }
+
   async exportUsers(
     tenantId: string,
     options: ListUsersOptions = {},

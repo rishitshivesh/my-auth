@@ -27,7 +27,8 @@ export default function InviteAcceptPage() {
     acceptInvite({ token, name, password }, {
       onSuccess: () => {
         setSuccess(true);
-        setTimeout(() => router.push('/dashboard'), 2000);
+        const slug = invite?.tenantSlug;
+        setTimeout(() => router.push(slug ? `/t/${slug}/dashboard` : '/u/login'), 2000);
       },
       onError: (err) => setError(err.message)
     });

@@ -1,0 +1,97 @@
+---
+title: API Reference
+description: REST API overview — base URL, authentication, and response format.
+---
+
+# API Reference
+
+Live interactive docs (Swagger UI) are available at `http://localhost:4000/api-docs` when running in development mode.
+
+## Base URLs
+
+| Environment | URL |
+|-------------|-----|
+| Local dev | `http://localhost:4000` |
+| Production | `https://api.sentry.scrolloop.com` |
+
+## Authentication
+
+All authenticated endpoints require a Bearer token in the `Authorization` header:
+
+```http
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+```
+
+Tokens are RS256-signed JWTs. Verify them using the tenant's JWKS endpoint:
+
+```
+GET /.well-known/jwks.json
+```
+
+## Tenant context
+
+Most endpoints require the tenant to be resolved. On localhost (no subdomain), pass the tenant slug via header:
+
+```http
+x-tenant-id: acme
+```
+
+In production with subdomain routing, the tenant is resolved automatically from the hostname.
+
+## Response envelope
+
+All responses are wrapped:
+
+```json
+{
+  "data": { ... },
+  "meta": {
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "requestId": "uuid"
+  }
+}
+```
+
+Paginated responses include:
+
+```json
+{
+  "data": [...],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 142,
+    "totalPages": 8
+  }
+}
+```
+
+## Error responses
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "errors": ["email must be a valid email"]
+}
+```
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Bad request / validation error |
+| `401` | Missing or invalid JWT |
+| `403` | Authenticated but unauthorized |
+| `404` | Resource not found |
+| `409` | Conflict (e.g. email already exists) |
+| `429` | Rate limit exceeded |
+| `500` | Internal server error |
+
+## Rate limits
+
+| Endpoint group | Limit |
+|----------------|-------|
+| Auth (login, register) | 5 req / 15 min / IP |
+| Magic link | 3 req / 10 min / email |
+| Tenant registration | 3 req / hour / IP |
+| Setup token | 5 req / min / IP |
+| General API | 100 req / min / user |

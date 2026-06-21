@@ -80,7 +80,7 @@ export function redirectToSocialLogin(
  * Handle OAuth callback
  * Extracts tokens from URL and stores them
  */
-export function handleOAuthCallback(client: SentryClient): void {
+export function handleOAuthCallback(_client: SentryClient): void {
   if (typeof window === 'undefined') return;
   
   const params = new URLSearchParams(window.location.search);

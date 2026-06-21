@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
-import { OAuthRefreshToken } from "@repo/database";
+import { OAuthRefreshToken, Tenant } from "@repo/database";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 
@@ -24,6 +24,18 @@ export class OAuthRefreshTokenService {
     @InjectRepository(OAuthRefreshToken)
     private readonly refreshTokenRepository: Repository<OAuthRefreshToken>,
   ) {}
+
+  private async getSchemaName(tenantId: string): Promise<string> {
+    const platformSlug = process.env.SENTRY_PLATFORM_SLUG ?? "sentry";
+    if (!tenantId) {
+      return `fk_${platformSlug}`;
+    }
+    const tenant = await this.refreshTokenRepository.manager.findOne(Tenant, {
+      where: { id: tenantId }
+    });
+    const slug = tenant?.slug ?? platformSlug;
+    return `fk_${slug.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+  }
 
   /**
    * Create a new refresh token
@@ -52,13 +64,42 @@ export class OAuthRefreshTokenService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+    const schemaName = await this.getSchemaName(params.tenantId);
+
     // Store in database
-    const entity = await this.refreshTokenRepository.save({
-      ...rest,
+    const query = `
+      INSERT INTO "${schemaName}"."oauth_refresh_tokens" (
+        "tenant_id", "user_id", "session_id", "client_id", "scope",
+        "token_hash", "family_id", "expires_at", "ip_address", "user_agent", "device_id"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+    `;
+    const rows = await this.refreshTokenRepository.manager.query(query, [
+      params.tenantId,
+      params.userId,
+      params.sessionId,
+      params.clientId || null,
+      params.scope || null,
       tokenHash,
       familyId,
       expiresAt,
-    });
+      params.ipAddress || null,
+      params.userAgent || null,
+      params.deviceId || null,
+    ]);
+    const rawEntity = rows[0];
+    const entity = {
+      id: rawEntity.id,
+      tenantId: rawEntity.tenant_id,
+      userId: rawEntity.user_id,
+      sessionId: rawEntity.session_id,
+      clientId: rawEntity.client_id,
+      scope: rawEntity.scope,
+      tokenHash: rawEntity.token_hash,
+      familyId: rawEntity.family_id,
+      expiresAt: rawEntity.expires_at ? new Date(rawEntity.expires_at) : null,
+      createdAt: rawEntity.created_at ? new Date(rawEntity.created_at) : null,
+    } as OAuthRefreshToken;
 
     this.logger.log(`Created refresh token for user ${params.userId}`, {
       tokenId: entity.id,
@@ -85,19 +126,51 @@ export class OAuthRefreshTokenService {
     // Hash incoming token
     const tokenHash = this.hashToken(token);
 
-    // Find token in database
-    const storedToken = await this.refreshTokenRepository.findOne({
-      where: {
-        tenantId,
-        tokenHash,
-      },
-      relations: ["user", "session"],
-    });
+    const schemaName = await this.getSchemaName(tenantId);
 
-    if (!storedToken) {
+    // Find token in database
+    const rows = await this.refreshTokenRepository.manager.query(
+      `SELECT t.*, u.email as "userEmail" FROM "${schemaName}"."oauth_refresh_tokens" t
+       LEFT JOIN "${schemaName}"."users" u ON u.id = t.user_id
+       WHERE t.tenant_id = $1 AND t.token_hash = $2 LIMIT 1`,
+      [tenantId, tokenHash]
+    );
+    const rawToken = rows[0];
+
+    if (!rawToken) {
       this.logger.warn("Refresh token not found", { tenantId });
       throw new UnauthorizedException("Invalid refresh token");
     }
+
+    // Fetch session
+    const sessionRows = await this.refreshTokenRepository.manager.query(
+      `SELECT id, revoked_at FROM "${schemaName}"."sessions" WHERE id = $1 LIMIT 1`,
+      [rawToken.session_id]
+    );
+    const session = sessionRows[0];
+
+    const storedToken = {
+      id: rawToken.id,
+      tenantId: rawToken.tenant_id,
+      userId: rawToken.user_id,
+      sessionId: rawToken.session_id,
+      clientId: rawToken.client_id,
+      scope: rawToken.scope,
+      tokenHash: rawToken.token_hash,
+      familyId: rawToken.family_id,
+      parentTokenId: rawToken.parent_token_id,
+      usedAt: rawToken.used_at ? new Date(rawToken.used_at) : null,
+      revokedAt: rawToken.revoked_at ? new Date(rawToken.revoked_at) : null,
+      revokedReason: rawToken.revoked_reason,
+      expiresAt: rawToken.expires_at ? new Date(rawToken.expires_at) : null,
+      session: session ? {
+        id: session.id,
+        revokedAt: session.revoked_at ? new Date(session.revoked_at) : null,
+      } : null,
+      user: {
+        email: rawToken.userEmail || "",
+      },
+    } as any;
 
     // ============================================================
     // REUSE DETECTION
@@ -152,8 +225,11 @@ export class OAuthRefreshTokenService {
     // ============================================================
 
     // Mark current token as USED
-    storedToken.usedAt = new Date();
-    await this.refreshTokenRepository.save(storedToken);
+    const usedAt = new Date();
+    await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens" SET used_at = $1 WHERE id = $2`,
+      [usedAt, storedToken.id]
+    );
 
     this.logger.debug("Marked refresh token as used", {
       tokenId: storedToken.id,
@@ -162,30 +238,35 @@ export class OAuthRefreshTokenService {
     // Generate NEW refresh token (same family)
     const newToken = crypto.randomBytes(32).toString("hex");
     const newTokenHash = this.hashToken(newToken);
+    const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
     // Store new token
-    const newRefreshToken = await this.refreshTokenRepository.save({
-      tenantId,
-      userId: storedToken.userId,
-      sessionId: storedToken.sessionId,
-      clientId: storedToken.clientId,
-      scope: storedToken.scope,
-      tokenHash: newTokenHash,
-      familyId: storedToken.familyId, // SAME family
-      parentTokenId: storedToken.id, // Link to parent
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      ipAddress,
-      userAgent,
-    });
+    await this.refreshTokenRepository.manager.query(
+      `INSERT INTO "${schemaName}"."oauth_refresh_tokens" (
+        "tenant_id", "user_id", "session_id", "client_id", "scope",
+        "token_hash", "family_id", "parent_token_id", "expires_at", "ip_address", "user_agent"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        tenantId,
+        storedToken.userId,
+        storedToken.sessionId,
+        storedToken.clientId || null,
+        storedToken.scope || null,
+        newTokenHash,
+        storedToken.familyId,
+        storedToken.id,
+        newExpiresAt,
+        ipAddress || null,
+        userAgent || null,
+      ]
+    );
 
     this.logger.log("Rotated refresh token", {
       oldTokenId: storedToken.id,
-      newTokenId: newRefreshToken.id,
       familyId: storedToken.familyId,
     });
 
     // Return payload for new access token
-    // groups and tenantSlug are resolved by AuthService.refreshToken using this payload
     const accessTokenPayload = {
       sub: storedToken.userId,
       email: storedToken.user.email,
@@ -208,12 +289,12 @@ export class OAuthRefreshTokenService {
     tenantId: string,
     reason: string = "manual_revocation",
   ): Promise<void> {
-    await this.refreshTokenRepository.update(
-      { tokenHash, tenantId },
-      {
-        revokedAt: new Date(),
-        revokedReason: reason,
-      },
+    const schemaName = await this.getSchemaName(tenantId);
+    await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens"
+       SET revoked_at = $1, revoked_reason = $2
+       WHERE token_hash = $3 AND tenant_id = $4`,
+      [new Date(), reason, tokenHash, tenantId]
     );
 
     this.logger.log("Revoked refresh token", { tokenHash, reason });
@@ -223,18 +304,18 @@ export class OAuthRefreshTokenService {
    * Revoke entire token family (for reuse detection)
    */
   async revokeTokenFamily(familyId: string, tenantId: string): Promise<void> {
-    const result = await this.refreshTokenRepository.update(
-      { familyId, tenantId },
-      {
-        revokedAt: new Date(),
-        revokedReason: "family_revoked_reuse_detection",
-      },
+    const schemaName = await this.getSchemaName(tenantId);
+    const result = await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens"
+       SET revoked_at = $1, revoked_reason = $2
+       WHERE family_id = $3 AND tenant_id = $4`,
+      [new Date(), "family_revoked_reuse_detection", familyId, tenantId]
     );
 
     this.logger.warn("🔥 Revoked entire token family", {
       familyId,
       tenantId,
-      tokensRevoked: result.affected,
+      tokensRevoked: result[1] || 0,
     });
   }
 
@@ -246,18 +327,17 @@ export class OAuthRefreshTokenService {
     tenantId: string,
     reason: string = "user_logout_all",
   ): Promise<void> {
-    const result = await this.refreshTokenRepository.update(
-      { userId, tenantId, revokedAt: IsNull() },
-      {
-        revokedAt: new Date(),
-        revokedReason: reason,
-      },
+    const schemaName = await this.getSchemaName(tenantId);
+    await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens"
+       SET revoked_at = $1, revoked_reason = $2
+       WHERE user_id = $3 AND tenant_id = $4 AND revoked_at IS NULL`,
+      [new Date(), reason, userId, tenantId]
     );
 
     this.logger.log("Revoked all user tokens", {
       userId,
       tenantId,
-      tokensRevoked: result.affected,
     });
   }
 
@@ -269,18 +349,17 @@ export class OAuthRefreshTokenService {
     tenantId: string,
     reason: string = "session_logout",
   ): Promise<void> {
-    const result = await this.refreshTokenRepository.update(
-      { sessionId, tenantId, revokedAt: IsNull() },
-      {
-        revokedAt: new Date(),
-        revokedReason: reason,
-      },
+    const schemaName = await this.getSchemaName(tenantId);
+    await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens"
+       SET revoked_at = $1, revoked_reason = $2
+       WHERE session_id = $3 AND tenant_id = $4 AND revoked_at IS NULL`,
+      [new Date(), reason, sessionId, tenantId]
     );
 
     this.logger.log("Revoked session tokens", {
       sessionId,
       tenantId,
-      tokensRevoked: result.affected,
     });
   }
 
@@ -291,38 +370,41 @@ export class OAuthRefreshTokenService {
     userId: string,
     tenantId: string,
   ): Promise<OAuthRefreshToken[]> {
-    return this.refreshTokenRepository.find({
-      where: {
-        userId,
-        tenantId,
-        revokedAt: IsNull(),
-      },
-      order: {
-        createdAt: "DESC",
-      },
-    });
+    const schemaName = await this.getSchemaName(tenantId);
+    const rows = await this.refreshTokenRepository.manager.query(
+      `SELECT * FROM "${schemaName}"."oauth_refresh_tokens"
+       WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+       ORDER BY created_at DESC`,
+      [userId, tenantId]
+    );
+    return rows.map((raw: any) => ({
+      id: raw.id,
+      tenantId: raw.tenant_id,
+      userId: raw.user_id,
+      sessionId: raw.session_id,
+      clientId: raw.client_id,
+      scope: raw.scope,
+      tokenHash: raw.token_hash,
+      familyId: raw.family_id,
+      parentTokenId: raw.parent_token_id,
+      expiresAt: raw.expires_at ? new Date(raw.expires_at) : null,
+      createdAt: raw.created_at ? new Date(raw.created_at) : null,
+    })) as OAuthRefreshToken[];
   }
 
   /**
    * Clean up expired tokens (run as cron job)
    */
   async cleanupExpiredTokens(tenantId?: string): Promise<number> {
-    const query = this.refreshTokenRepository.createQueryBuilder("token");
-
-    query.where("token.expiresAt < :now", { now: new Date() });
-
     if (tenantId) {
-      query.andWhere("token.tenantId = :tenantId", { tenantId });
+      const schemaName = await this.getSchemaName(tenantId);
+      const result = await this.refreshTokenRepository.manager.query(
+        `DELETE FROM "${schemaName}"."oauth_refresh_tokens" WHERE expires_at < $1 AND tenant_id = $2`,
+        [new Date(), tenantId]
+      );
+      return result[1] || 0;
     }
-
-    const result = await query.delete().execute();
-
-    this.logger.log("Cleaned up expired tokens", {
-      tenantId,
-      tokensDeleted: result.affected,
-    });
-
-    return result.affected || 0;
+    return 0;
   }
 
   /**

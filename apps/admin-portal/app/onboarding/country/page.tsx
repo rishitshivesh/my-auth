@@ -7,11 +7,9 @@ import { CountrySelector } from "@/components/onboarding/country-selector"
 export default function CountryPage() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
 
-  const handleCountrySelect = async (country: string) => {
+  // SPRINT_N: wire to POST /tenants/onboarding/country once onboarding flow is implemented
+  const handleCountrySelect = (country: string) => {
     setSelectedCountry(country)
-    // In a real app, save the selection and navigate
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    console.log("Selected country:", country)
   }
 
   return (

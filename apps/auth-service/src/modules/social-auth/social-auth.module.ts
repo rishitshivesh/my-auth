@@ -34,14 +34,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     ]),
     SecurityEventModule,
     OAuthModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>("JWT_SECRET"),
-        signOptions: { expiresIn: "15m" },
-      }),
-      inject: [ConfigService],
-    }),
+    JwtModule.register({}),
   ],
   controllers: [SocialAuthController],
   providers: [

@@ -1,5 +1,6 @@
 import {
   IsString,
+  IsEmail,
   IsOptional,
   MinLength,
   MaxLength,
@@ -10,6 +11,8 @@ import {
   IsEnum,
   IsBoolean,
   IsDateString,
+  IsArray,
+  IsUUID,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
@@ -275,6 +278,28 @@ export class UserStatsDto {
 
   @ApiProperty({ example: 45, description: "Users logged in last 7 days" })
   recentLogins!: number;
+}
+
+/**
+ * Invite user DTO
+ */
+export class InviteUserDto {
+  @ApiProperty({ example: "jane@acme.com" })
+  @IsEmail()
+  email!: string;
+
+  @ApiPropertyOptional({ example: ["role-uuid-1"] })
+  @IsArray()
+  @IsUUID("4", { each: true })
+  @IsOptional()
+  roleIds?: string[];
+
+  @ApiPropertyOptional({ example: 7 })
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  @IsOptional()
+  expiresInDays?: number;
 }
 
 /**

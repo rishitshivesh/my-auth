@@ -1,6 +1,11 @@
 import "reflect-metadata";
+import * as dotenv from "dotenv";
 import { DataSource, DataSourceOptions } from "typeorm";
 import * as path from "path";
+
+// Load the monorepo root .env so `yarn workspace @repo/database migration:run`
+// works without needing a local .env in packages/database.
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 // Import all entities explicitly
 import { Tenant } from "./entities/tenant.entity";
@@ -23,6 +28,18 @@ import { TenantSocialProvider } from "./entities/tenant-social-providers.entity"
 import { UserSocialConnection } from "./entities/user-social-connections.entity";
 import { TenantBranding } from "./entities/tenant-branding.entity";
 import { KeyPair } from "./entities/key-pair.entity";
+import { UserInvite } from "./entities/user-invite.entity";
+import { WebhookEndpoint } from "./entities/webhook-endpoint.entity";
+import { WebhookDelivery } from "./entities/webhook-delivery.entity";
+import { SamlServiceProvider } from "./entities/saml-service-provider.entity";
+import { ScimToken } from "./entities/scim-token.entity";
+import { LdapConnection } from "./entities/ldap-connection.entity";
+import { Policy } from "./entities/policy.entity";
+import { Group } from "./entities/group.entity";
+import { UserGroup } from "./entities/user-group.entity";
+import { GroupPolicy } from "./entities/group-policy.entity";
+import { UserPolicy } from "./entities/user-policy.entity";
+import { RolePolicy } from "./entities/role-policy.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -31,16 +48,22 @@ import { KeyPair } from "./entities/key-pair.entity";
  * and can also be imported by the NestJS application
  */
 
-const isProduction = process.env.NODE_ENV === "production";
 const useSSL = process.env.DB_SSL === "true";
+const dbUrl = process.env.DB_URL ?? process.env.DATABASE_URL;
+
+const connectionConfig = dbUrl
+  ? { url: dbUrl }
+  : {
+      host: process.env.DATABASE_HOST || "localhost",
+      port: parseInt(process.env.DATABASE_PORT || "5432", 10),
+      username: process.env.DATABASE_USER || "postgres",
+      password: process.env.DATABASE_PASSWORD || "",
+      database: process.env.DATABASE_NAME || "postgres",
+    };
 
 export const dataSourceOptions: DataSourceOptions = {
   type: "postgres",
-  host: process.env.DATABASE_HOST || "localhost",
-  port: parseInt(process.env.DATABASE_PORT || "5432", 10),
-  username: process.env.DATABASE_USER || "postgres",
-  password: process.env.DATABASE_PASSWORD || "",
-  database: process.env.DATABASE_NAME || "postgres",
+  ...connectionConfig,
 
   // Entities - explicit import for reliability
   entities: [
@@ -64,6 +87,18 @@ export const dataSourceOptions: DataSourceOptions = {
     User,
     TenantBranding,
     KeyPair,
+    UserInvite,
+    WebhookEndpoint,
+    WebhookDelivery,
+    SamlServiceProvider,
+    ScimToken,
+    LdapConnection,
+    Policy,
+    Group,
+    UserGroup,
+    GroupPolicy,
+    UserPolicy,
+    RolePolicy,
   ],
 
   // Migrations
@@ -100,6 +135,4 @@ export const dataSourceOptions: DataSourceOptions = {
 };
 
 // Create and export DataSource
-const AppDataSource = new DataSource(dataSourceOptions);
-
-export default AppDataSource;
+export const AppDataSource = new DataSource(dataSourceOptions);

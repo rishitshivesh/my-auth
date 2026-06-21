@@ -235,6 +235,70 @@
         ]
       }
     },
+    "/tenants/slug-check": {
+      "get": {
+        "operationId": "TenantRegistrationController_checkSlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability status"
+          }
+        },
+        "summary": "Check workspace slug availability",
+        "tags": [
+          "Tenant Registration"
+        ]
+      }
+    },
+    "/tenants/register": {
+      "post": {
+        "operationId": "TenantRegistrationController_registerTenant",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterTenantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Workspace created, tokens returned"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Slug already taken"
+          }
+        },
+        "summary": "Create a new workspace (self-service)",
+        "tags": [
+          "Tenant Registration"
+        ]
+      }
+    },
     "/stats/system": {
       "get": {
         "operationId": "StatsController_getSystemStats",
@@ -469,6 +533,29 @@
           }
         ],
         "summary": "Get security event history",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/orgs": {
+      "get": {
+        "operationId": "UserController_getUserOrgs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Organization memberships retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get user organization memberships",
         "tags": [
           "Users"
         ]
@@ -1052,6 +1139,76 @@
         "summary": "Unlock user account (Admin)",
         "tags": [
           "Users"
+        ]
+      }
+    },
+    "/users/invite": {
+      "post": {
+        "operationId": "UserController_inviteUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation sent"
+          },
+          "409": {
+            "description": "User or pending invite already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Invite a user to the workspace",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/email/test": {
+      "get": {
+        "operationId": "EmailController_testEmail",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "Email type to test",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Recipient email",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Test email sending (development only)",
+        "tags": [
+          "Email (Development)"
         ]
       }
     },
@@ -1719,6 +1876,56 @@
         ]
       }
     },
+    "/auth/providers": {
+      "get": {
+        "description": "Returns which login methods (password, magic link, passkey, social) are enabled for the resolved tenant. Call this before showing the login screen to decide which options to render.",
+        "operationId": "AuthController_getProviders",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "required": false,
+            "in": "query",
+            "description": "Tenant UUID (resolved from context if omitted)",
+            "schema": {
+              "example": "uuid-here",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tenant_slug",
+            "required": false,
+            "in": "query",
+            "description": "Tenant slug (resolved from context if omitted)",
+            "schema": {
+              "example": "acme",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProvidersResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tenant could not be resolved from request"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "summary": "List enabled authentication providers",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/auth/login-intent": {
       "post": {
         "description": "\n      Check what authentication methods are available for a given email address.\n      This is the first step in the email-first login flow.\n      \n      Returns:\n      - Whether the user exists\n      - Available authentication methods (password, magic link, passkey, social)\n      - Whether MFA is required\n      - Preferred authentication method\n      - Tenant branding information\n      \n      Use this to dynamically show the appropriate login options to the user.\n    ",
@@ -1881,24 +2088,14 @@
         ]
       }
     },
-    "/email/test": {
+    "/auth/invite/validate/{token}": {
       "get": {
-        "operationId": "EmailController_testEmail",
+        "operationId": "AuthController_validateInvite",
         "parameters": [
           {
-            "name": "type",
+            "name": "token",
             "required": true,
-            "in": "query",
-            "description": "Email type to test",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "to",
-            "required": true,
-            "in": "query",
-            "description": "Recipient email",
+            "in": "path",
             "schema": {
               "type": "string"
             }
@@ -1906,12 +2103,55 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Invite metadata returned"
+          },
+          "404": {
+            "description": "Invite not found or expired"
           }
         },
-        "summary": "Test email sending (development only)",
+        "summary": "Validate an invite token",
         "tags": [
-          "Email (Development)"
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/invite/accept": {
+      "post": {
+        "operationId": "AuthController_acceptInvite",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created"
+          },
+          "400": {
+            "description": "Expired or already accepted invite"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        },
+        "summary": "Accept an invite and create account",
+        "tags": [
+          "Authentication"
         ]
       }
     },
@@ -3347,6 +3587,551 @@
         ]
       }
     },
+    "/rbac/policies": {
+      "post": {
+        "operationId": "RbacController_createPolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Policy created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create policy",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "get": {
+        "operationId": "RbacController_listPolicies",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List policies",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/policies/{id}": {
+      "get": {
+        "operationId": "RbacController_getPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get policy detail",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updatePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update policy",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deletePolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete policy",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/policies/simulate": {
+      "post": {
+        "operationId": "RbacController_simulatePolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulatePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Simulate policy evaluation",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/roles/{roleId}/policies/{policyId}": {
+      "post": {
+        "operationId": "RbacController_attachPolicyToRole",
+        "parameters": [
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach policy to role",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_detachPolicyFromRole",
+        "parameters": [
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detach policy from role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups": {
+      "post": {
+        "operationId": "RbacController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Group created"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "get": {
+        "operationId": "RbacController_listGroups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List groups (tree)",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}": {
+      "get": {
+        "operationId": "RbacController_getGroupDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get group detail with members and policies",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "put": {
+        "operationId": "RbacController_updateGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_deleteGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}/members/{userId}": {
+      "post": {
+        "operationId": "RbacController_addGroupMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add user to group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_removeGroupMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove user from group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
+    "/rbac/groups/{id}/policies/{policyId}": {
+      "post": {
+        "operationId": "RbacController_attachPolicyToGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach policy to group",
+        "tags": [
+          "RBAC"
+        ]
+      },
+      "delete": {
+        "operationId": "RbacController_detachPolicyFromGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "policyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detach policy from group",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
     "/mfa/setup/totp": {
       "post": {
         "description": "Generate QR code and backup codes for TOTP setup",
@@ -3929,7 +4714,7 @@
             "cookie": []
           }
         ],
-        "summary": "Get platform-wide metrics for Fort Knox operators",
+        "summary": "Get platform-wide metrics for Scrolloop Sentry operators",
         "tags": [
           "Admin - Platform"
         ]
@@ -4193,7 +4978,7 @@
             "cookie": []
           }
         ],
-        "summary": "List fortknox-internal team members",
+        "summary": "List sentry-internal team members",
         "tags": [
           "Admin - Platform"
         ]
@@ -4214,7 +4999,7 @@
             "cookie": []
           }
         ],
-        "summary": "Add a user to the fortknox-internal team",
+        "summary": "Add a user to the sentry-internal team",
         "tags": [
           "Admin - Platform"
         ]
@@ -4246,7 +5031,7 @@
             "cookie": []
           }
         ],
-        "summary": "Remove a user from the fortknox-internal team",
+        "summary": "Remove a user from the sentry-internal team",
         "tags": [
           "Admin - Platform"
         ]
@@ -4293,6 +5078,898 @@
         "summary": "Update platform settings",
         "tags": [
           "Admin - Platform"
+        ]
+      }
+    },
+    "/superadmin/platform-info": {
+      "get": {
+        "description": "Returns slug, name, and initialized flag. Safe to call unauthenticated.",
+        "operationId": "SuperadminSetupController_getPlatformInfo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Platform info"
+          }
+        },
+        "summary": "Get platform identity and initialization state",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
+    "/superadmin/initialized": {
+      "get": {
+        "description": "Returns { initialized: true } when at least one sentry-internal user exists.",
+        "operationId": "SuperadminSetupController_checkInitialized",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Initialization status"
+          }
+        },
+        "summary": "Check if the platform has been initialized",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
+    "/superadmin/setup-log-hint": {
+      "get": {
+        "operationId": "SuperadminSetupController_getSetupLogHint",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "File path hint"
+          }
+        },
+        "summary": "Get the setup log file path",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
+    "/superadmin/create-first-admin": {
+      "post": {
+        "description": "One-shot endpoint for first-run setup. Returns 409 if already initialized.",
+        "operationId": "SuperadminSetupController_createFirstAdmin",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-setup-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Superadmin created, access token returned"
+          },
+          "409": {
+            "description": "Platform already initialized"
+          }
+        },
+        "summary": "Create the first superadmin account",
+        "tags": [
+          "Superadmin - Setup"
+        ]
+      }
+    },
+    "/webhooks": {
+      "post": {
+        "operationId": "WebhookController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      },
+      "get": {
+        "operationId": "WebhookController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhooks/{id}": {
+      "get": {
+        "operationId": "WebhookController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      },
+      "patch": {
+        "operationId": "WebhookController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      },
+      "delete": {
+        "operationId": "WebhookController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhooks/{id}/rotate-secret": {
+      "post": {
+        "operationId": "WebhookController_rotateSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhooks/{id}/deliveries": {
+      "get": {
+        "operationId": "WebhookController_getDeliveries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhooks/{id}/deliveries/{deliveryId}/redeliver": {
+      "post": {
+        "operationId": "WebhookController_redeliver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/webhooks/{id}/test": {
+      "post": {
+        "operationId": "WebhookController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Webhook"
+        ]
+      }
+    },
+    "/saml/metadata/{tenantSlug}": {
+      "get": {
+        "operationId": "SamlController_getMetadata",
+        "parameters": [
+          {
+            "name": "tenantSlug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      }
+    },
+    "/saml/sso/{spId}": {
+      "post": {
+        "operationId": "SamlController_handlePostSSO",
+        "parameters": [
+          {
+            "name": "spId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      }
+    },
+    "/saml/sps": {
+      "get": {
+        "operationId": "SamlController_listSPs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      },
+      "post": {
+        "operationId": "SamlController_registerSP",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterSPDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      }
+    },
+    "/saml/sps/{id}": {
+      "patch": {
+        "operationId": "SamlController_updateSP",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSPDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      },
+      "delete": {
+        "operationId": "SamlController_deleteSP",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Saml"
+        ]
+      }
+    },
+    "/scim/tokens": {
+      "post": {
+        "operationId": "ScimController_createToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScimTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "get": {
+        "operationId": "ScimController_listTokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/tokens/{id}": {
+      "delete": {
+        "operationId": "ScimController_revokeToken",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/v2/Users": {
+      "get": {
+        "operationId": "ScimController_listUsers",
+        "parameters": [
+          {
+            "name": "startIndex",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "count",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "post": {
+        "operationId": "ScimController_createUser",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/v2/Users/{id}": {
+      "get": {
+        "operationId": "ScimController_getUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "put": {
+        "operationId": "ScimController_replaceUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "patch": {
+        "operationId": "ScimController_patchUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "delete": {
+        "operationId": "ScimController_deleteUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/v2/Groups": {
+      "get": {
+        "operationId": "ScimController_listGroups",
+        "parameters": [
+          {
+            "name": "startIndex",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "count",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "post": {
+        "operationId": "ScimController_createGroup",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/v2/Groups/{id}": {
+      "get": {
+        "operationId": "ScimController_getGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "patch": {
+        "operationId": "ScimController_patchGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      },
+      "delete": {
+        "operationId": "ScimController_deleteGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/scim/v2/ServiceProviderConfig": {
+      "get": {
+        "operationId": "ScimController_serviceProviderConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Scim"
+        ]
+      }
+    },
+    "/ldap/connections": {
+      "post": {
+        "operationId": "LdapController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLdapConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
+        ]
+      },
+      "get": {
+        "operationId": "LdapController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
+        ]
+      }
+    },
+    "/ldap/connections/{id}": {
+      "patch": {
+        "operationId": "LdapController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLdapConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
+        ]
+      },
+      "delete": {
+        "operationId": "LdapController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
+        ]
+      }
+    },
+    "/ldap/connections/{id}/test": {
+      "post": {
+        "operationId": "LdapController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
+        ]
+      }
+    },
+    "/ldap/connections/{id}/sync": {
+      "post": {
+        "operationId": "LdapController_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ldap"
         ]
       }
     }
@@ -4373,6 +6050,10 @@
             "example": "solid"
           }
         }
+      },
+      "RegisterTenantDto": {
+        "type": "object",
+        "properties": {}
       },
       "UpdateUserDto": {
         "type": "object",
@@ -4492,6 +6173,31 @@
           "isActive"
         ]
       },
+      "InviteUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "jane@acme.com"
+          },
+          "roleIds": {
+            "example": [
+              "role-uuid-1"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expiresInDays": {
+            "type": "number",
+            "example": 7
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -4594,6 +6300,63 @@
         },
         "required": [
           "token"
+        ]
+      },
+      "SocialProviderDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Provider identifier",
+            "example": "google"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this provider is enabled for the tenant",
+            "example": true
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable display name",
+            "example": "Google"
+          }
+        },
+        "required": [
+          "provider",
+          "enabled"
+        ]
+      },
+      "GetProvidersResponseDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "boolean",
+            "description": "Password login enabled",
+            "example": true
+          },
+          "magicLink": {
+            "type": "boolean",
+            "description": "Magic link login enabled",
+            "example": false
+          },
+          "passkey": {
+            "type": "boolean",
+            "description": "Passkey (WebAuthn) login enabled",
+            "example": false
+          },
+          "social": {
+            "description": "Configured social providers",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SocialProviderDto"
+            }
+          }
+        },
+        "required": [
+          "password",
+          "magicLink",
+          "passkey",
+          "social"
         ]
       },
       "LoginIntentRequestDto": {
@@ -4761,6 +6524,31 @@
           "methods"
         ]
       },
+      "AcceptInviteDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "abc123...",
+            "description": "128-hex invite token"
+          },
+          "name": {
+            "type": "string",
+            "example": "Jane Doe",
+            "description": "Full name for the new account"
+          },
+          "password": {
+            "type": "string",
+            "example": "MySecurePass!123",
+            "description": "Password for the new account"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "password"
+        ]
+      },
       "TokenRequestDto": {
         "type": "object",
         "properties": {
@@ -4879,7 +6667,7 @@
           "error_uri": {
             "type": "string",
             "description": "URI with error information",
-            "example": "https://docs.fortknox.io/errors/invalid_grant"
+            "example": "https://docs.scrolloop.com/errors/invalid_grant"
           }
         },
         "required": [
@@ -5039,37 +6827,37 @@
           "issuer": {
             "type": "string",
             "description": "Issuer URL",
-            "example": "https://auth.fortknox.io"
+            "example": "https://sentry.scrolloop.com"
           },
           "authorization_endpoint": {
             "type": "string",
             "description": "Authorization endpoint",
-            "example": "https://auth.fortknox.io/oauth/authorize"
+            "example": "https://sentry.scrolloop.com/oauth/authorize"
           },
           "token_endpoint": {
             "type": "string",
             "description": "Token endpoint",
-            "example": "https://auth.fortknox.io/oauth/token"
+            "example": "https://sentry.scrolloop.com/oauth/token"
           },
           "userinfo_endpoint": {
             "type": "string",
             "description": "UserInfo endpoint",
-            "example": "https://auth.fortknox.io/oauth/userinfo"
+            "example": "https://sentry.scrolloop.com/oauth/userinfo"
           },
           "jwks_uri": {
             "type": "string",
             "description": "JWKS URI",
-            "example": "https://auth.fortknox.io/oauth/jwks"
+            "example": "https://sentry.scrolloop.com/oauth/jwks"
           },
           "revocation_endpoint": {
             "type": "string",
             "description": "Revocation endpoint",
-            "example": "https://auth.fortknox.io/oauth/revoke"
+            "example": "https://sentry.scrolloop.com/oauth/revoke"
           },
           "introspection_endpoint": {
             "type": "string",
             "description": "Introspection endpoint",
-            "example": "https://auth.fortknox.io/oauth/introspect"
+            "example": "https://sentry.scrolloop.com/oauth/introspect"
           },
           "response_types_supported": {
             "description": "Supported response types",
@@ -5755,6 +7543,187 @@
           "role"
         ]
       },
+      "PolicyConditionDto": {
+        "type": "object",
+        "properties": {
+          "IpAddress": {
+            "type": "object"
+          },
+          "DateGreaterThan": {
+            "type": "object"
+          },
+          "DateLessThan": {
+            "type": "object"
+          },
+          "Bool": {
+            "type": "object"
+          },
+          "StringEquals": {
+            "type": "object"
+          }
+        }
+      },
+      "PolicyStatementDto": {
+        "type": "object",
+        "properties": {
+          "Sid": {
+            "type": "string",
+            "example": "AllowUserRead"
+          },
+          "Effect": {
+            "type": "string",
+            "enum": [
+              "Allow",
+              "Deny"
+            ]
+          },
+          "Principal": {
+            "type": "object"
+          },
+          "Action": {
+            "type": "object",
+            "example": [
+              "users:read"
+            ]
+          },
+          "Resource": {
+            "type": "object",
+            "example": [
+              "sentry:tenant:*/user:*"
+            ]
+          },
+          "Condition": {
+            "$ref": "#/components/schemas/PolicyConditionDto"
+          }
+        },
+        "required": [
+          "Effect",
+          "Action",
+          "Resource"
+        ]
+      },
+      "PolicyDocumentDto": {
+        "type": "object",
+        "properties": {
+          "Version": {
+            "type": "string",
+            "example": "2024-01-01"
+          },
+          "Statement": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyStatementDto"
+            }
+          }
+        },
+        "required": [
+          "Version",
+          "Statement"
+        ]
+      },
+      "CreatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "ReadOnlyAccess"
+          },
+          "description": {
+            "type": "string",
+            "example": "Grants read-only access to all resources"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyDocumentDto"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "managed"
+            ],
+            "default": "managed"
+          }
+        },
+        "required": [
+          "name",
+          "document"
+        ]
+      },
+      "UpdatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          },
+          "document": {
+            "$ref": "#/components/schemas/PolicyDocumentDto"
+          }
+        }
+      },
+      "SimulatePolicyDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "example": "user-uuid"
+          },
+          "action": {
+            "type": "string",
+            "example": "users:read"
+          },
+          "resource": {
+            "type": "string",
+            "example": "sentry:tenant:acme/user:123"
+          },
+          "ipAddress": {
+            "type": "string",
+            "example": "192.168.1.1"
+          },
+          "mfaVerified": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "userId",
+          "action",
+          "resource"
+        ]
+      },
+      "CreateGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Engineering"
+          },
+          "description": {
+            "type": "string",
+            "example": "Engineering department"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "example": "parent-group-uuid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Updated Engineering"
+          },
+          "description": {
+            "type": "string",
+            "example": "Updated description"
+          }
+        }
+      },
       "SetupTotpResponseDto": {
         "type": "object",
         "properties": {
@@ -5875,6 +7844,34 @@
           "preferredMethod",
           "backupCodesRemaining"
         ]
+      },
+      "CreateWebhookDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateWebhookDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RegisterSPDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateSPDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateScimTokenDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateLdapConnectionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateLdapConnectionDto": {
+        "type": "object",
+        "properties": {}
       }
     }
   },

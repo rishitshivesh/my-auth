@@ -5,17 +5,25 @@ import { PortalLayout } from '@/components/layouts/portal-layout';
 import { GlassCard, PageHeader, SentryButton, SentryInput, DataTable, StatusBadge, AuditTimeline } from "@repo/ui";
 
 import { useTenantActivity } from '@/lib/queries';
-import { Download, Search, Filter, Shield, Clock, MapPin, Monitor } from 'lucide-react';
+import type { ActivityEvent } from '@/lib/types';
+import { Download, Search, Filter, Shield, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function AuditLogPage() {
   const [search, setSearch] = React.useState('');
   const { data: activity, isLoading } = useTenantActivity(50);
 
+  const filtered = activity?.filter((a) =>
+    !search ||
+    a.eventType.toLowerCase().includes(search.toLowerCase()) ||
+    a.actorEmail?.toLowerCase().includes(search.toLowerCase()) ||
+    a.ipAddress.toLowerCase().includes(search.toLowerCase())
+  );
+
   const columns = [
     {
       header: 'Event',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <div className="flex items-center gap-3">
           <div className="p-1.5 rounded-sm bg-black/5">
             <Shield className="w-3.5 h-3.5 text-muted-foreground" />
@@ -28,7 +36,7 @@ export default function AuditLogPage() {
     },
     {
       header: 'Actor',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <span className="text-xs font-body text-foreground">
           {row.actorEmail || 'System'}
         </span>
@@ -36,7 +44,7 @@ export default function AuditLogPage() {
     },
     {
       header: 'Location',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <MapPin className="w-3 h-3" />
           <span className="text-xs font-body">{row.location || 'Unknown'}</span>
@@ -45,7 +53,7 @@ export default function AuditLogPage() {
     },
     {
       header: 'IP Address',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <code className="text-[11px] font-mono text-muted-foreground bg-black/5 px-1.5 py-0.5 rounded-sm">
           {row.ipAddress}
         </code>
@@ -53,7 +61,7 @@ export default function AuditLogPage() {
     },
     {
       header: 'Timestamp',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <span className="text-xs font-body text-muted-foreground whitespace-nowrap">
           {format(new Date(row.createdAt), 'MMM dd, HH:mm:ss')}
         </span>
@@ -61,7 +69,7 @@ export default function AuditLogPage() {
     },
     {
       header: 'Severity',
-      accessorKey: (row: any) => (
+      accessorKey: (row: ActivityEvent) => (
         <StatusBadge status={row.severity === 'critical' ? 'suspended' : row.severity === 'warning' ? 'pending' : 'active'}>
           {row.severity}
         </StatusBadge>
@@ -103,7 +111,7 @@ export default function AuditLogPage() {
 
             <DataTable
               columns={columns}
-              data={activity || []}
+              data={filtered || []}
               isLoading={isLoading}
             />
           </div>
@@ -113,21 +121,15 @@ export default function AuditLogPage() {
               Real-time Pulse
             </h2>
             <GlassCard tier={1} className="p-6">
-               <AuditTimeline 
-                 events={activity?.slice(0, 8).map(a => ({
+               <AuditTimeline
+                 events={filtered?.slice(0, 8).map(a => ({
                    id: a.id,
                    type: a.eventType,
                    description: `${a.actorEmail || 'System'} accessed via ${a.ipAddress}`,
                    timestamp: a.createdAt,
-                 })) || []} 
+                 })) || []}
                />
             </GlassCard>
-            
-            <div className="p-4 rounded-sm bg-accent/5 border border-accent/10">
-              <p className="text-[11px] font-body text-muted-foreground leading-relaxed">
-                <span className="font-display font-bold text-accent uppercase tracking-wider">Note:</span> Audit logs are retained for 365 days on your current plan.
-              </p>
-            </div>
           </div>
         </div>
       </div>

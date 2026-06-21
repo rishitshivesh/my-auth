@@ -45,6 +45,22 @@ export * from "./src/entities/group-policy.entity";
 export * from "./src/entities/user-policy.entity";
 export * from "./src/entities/role-policy.entity";
 
+// Invites
+export * from "./src/entities/user-invite.entity";
+
+// Sprint 4 — Webhooks
+export * from "./src/entities/webhook-endpoint.entity";
+export * from "./src/entities/webhook-delivery.entity";
+
+// Sprint 4 — SAML IdP
+export * from "./src/entities/saml-service-provider.entity";
+
+// Sprint 4 — SCIM
+export * from "./src/entities/scim-token.entity";
+
+// Sprint 4 — LDAP
+export * from "./src/entities/ldap-connection.entity";
+
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";
 export { User } from "./src/entities/user.entity";

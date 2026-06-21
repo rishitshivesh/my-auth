@@ -1,3 +1,4 @@
+import type { StringValue } from 'ms';
 import {
   Injectable,
   UnauthorizedException,
@@ -7,16 +8,18 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
+import { SessionRepository } from "@/core/database/session.repository";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
   User,
-  Session,
   Tenant,
   OAuthRefreshToken,
   UserSocialConnection,
   UserRole,
   SecurityEventType,
+  TenantSocialProvider,
+  UserInvite,
 } from "@repo/database";
 import {
   SecurityEventService,
@@ -30,8 +33,9 @@ import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
-import { LoginIntentResponseDto } from "./auth.dto";
+import { GetProvidersResponseDto, SocialProviderDto, LoginIntentResponseDto } from "./auth.dto";
 import { logger } from "@/common/logger";
 /**
  * Authentication Service (Updated for Multi-Tenant)
@@ -49,8 +53,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(OAuthRefreshToken)
@@ -59,6 +62,10 @@ export class AuthService {
     private readonly socialConnectionRepository: Repository<UserSocialConnection>,
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
+    @InjectRepository(UserInvite)
+    private readonly userInviteRepository: Repository<UserInvite>,
+    @InjectRepository(TenantSocialProvider)
+    private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordService: PasswordService,
@@ -74,11 +81,12 @@ export class AuthService {
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
+    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
     return this.jwtService.sign(payload as Record<string, unknown>, {
-      privateKey: privateKey as crypto.KeyObject,
+      privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn,
+      expiresIn: expiresIn as StringValue,
     });
   }
 
@@ -86,6 +94,8 @@ export class AuthService {
    * Get role names (groups) for a user within a tenant
    */
   private async getUserGroups(userId: string, tenantId: string): Promise<string[]> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const userRoles = await this.userRoleRepository.find({
       where: { userId, tenantId },
       relations: ['role'],
@@ -230,7 +240,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
+    | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | {
         mfaRequired: boolean;
         tempToken: string;
@@ -389,6 +399,7 @@ export class AuthService {
       session.id,
       user.tenant,
     );
+
     const accessToken = await this.signToken(
       accessTokenPayloadData,
       "15m",
@@ -417,6 +428,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: user.tenant?.slug ?? '',
       user: {
         email: user.email,
         firstName: user.firstName,
@@ -516,6 +528,8 @@ export class AuthService {
    * Send magic link sign-in email (TENANT SCOPED)
    */
   async sendMagicLink(tenantId: string, email: string): Promise<void> {
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({ where: { email, tenantId } });
 
     // Don't reveal if user exists
@@ -545,7 +559,7 @@ export class AuthService {
     rawToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     const user = await this.userRepository
@@ -560,10 +574,10 @@ export class AuthService {
       throw new UnauthorizedException("Invalid or expired magic link");
     }
 
-    // Clear the token (one-time use)
+    // Clear the token (one-time use) and mark email as verified
     await this.userRepository.update(
       { id: user.id, tenantId },
-      { magicLinkToken: undefined, magicLinkExpiresAt: undefined },
+      { magicLinkToken: undefined, magicLinkExpiresAt: undefined, emailVerified: true },
     );
 
     const session = await this.sessionService.createSession({
@@ -604,7 +618,7 @@ export class AuthService {
       metadata: { authMethod: "magic_link", sessionId: session.id },
     });
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, tenantSlug: (magicLinkPayload.tenantSlug as string) ?? '' };
   }
 
   /**
@@ -775,7 +789,7 @@ export class AuthService {
     refreshToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
     // Use OAuthRefreshTokenService for rotation
     let accessTokenPayload: Record<string, unknown>;
     let newToken: string;
@@ -849,7 +863,8 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken: newToken, // NEW token to client
+      refreshToken: newToken,
+      tenantSlug: (enrichedPayload.tenantSlug as string) ?? '',
     };
   }
 
@@ -885,31 +900,6 @@ export class AuthService {
         slug: user.tenant.slug, // ← Use 'slug' not 'subdomain'
       },
     };
-  }
-
-  /**
-   * Create session (TENANT SCOPED) - PRIVATE METHOD
-   */
-  private async createSession(data: {
-    tenantId: string;
-    userId: string;
-    ipAddress?: string;
-    userAgent?: string;
-  }): Promise<Session> {
-    const refreshTokenFamilyId = crypto.randomUUID();
-    const deviceId = crypto.randomBytes(16).toString("hex");
-
-    const session = this.sessionRepository.create({
-      tenantId: data.tenantId, // ← Always set tenant
-      userId: data.userId,
-      refreshTokenFamilyId,
-      deviceId,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    });
-
-    return this.sessionRepository.save(session);
   }
 
   /**
@@ -974,7 +964,7 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as crypto.KeyObject,
+      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
       algorithms: ['RS256'],
     }) as Record<string, unknown>;
 
@@ -1021,6 +1011,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: (mfaPayload.tenantSlug as string) ?? '',
       message: "MFA verified successfully",
     };
   }
@@ -1038,7 +1029,7 @@ export class AuthService {
     // Step 1: Verify temporary token
     const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
     const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey as crypto.KeyObject,
+      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
       algorithms: ['RS256'],
     }) as Record<string, unknown>;
 
@@ -1089,6 +1080,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: (backupPayload.tenantSlug as string) ?? '',
       message: "Backup code verified successfully",
       warning:
         remaining <= 2
@@ -1112,6 +1104,8 @@ export class AuthService {
     email: string,
   ): Promise<{ sessionNonce: string; [key: string]: unknown }> {
     // Find user
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
     });
@@ -1142,15 +1136,17 @@ export class AuthService {
   async finishWebAuthnLogin(data: {
     tenantId: string;
     email: string;
-    webauthnResponse: unknown;
+    webauthnResponse: AuthenticationResponseJSON;
     sessionNonce: string;
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
+  }): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({
       where: { email, tenantId },
       relations: ["tenant"],
@@ -1231,6 +1227,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: user.tenant?.slug ?? '',
       user: {
         email: user.email,
         firstName: user.firstName,
@@ -1330,6 +1327,8 @@ export class AuthService {
     tenantId: string,
   ): Promise<LoginIntentResponseDto> {
     // Get user's linked social accounts
+    // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
+    // Both layers must match for a query to succeed
     const socialConnections = await this.socialConnectionRepository.find({
       where: { userId: user.id, tenantId },
       select: ['provider'],
@@ -1341,10 +1340,8 @@ export class AuthService {
       // Password: User has set a password
       password: !!user.passwordHash,
 
-      // Magic Link: Tenant enabled + email verified (or verification not required)
-      magicLink:
-        (tenant.featureFlags?.['magicLinkEnabled'] ?? false) &&
-        (user.emailVerified || !(tenant.settings?.requireEmailVerification ?? false)),
+      // Magic Link: Tenant enabled
+      magicLink: tenant.featureFlags?.['magicLinkEnabled'] ?? false,
 
       // Passkey: Would need to check webauthn_credentials table (not in current schema)
       // For now, set to false
@@ -1358,7 +1355,7 @@ export class AuthService {
     };
 
     const preferredMethod =
-      (user.preferredAuthMethod as string) ||
+      (user.preferredAuthMethod as 'password' | 'magicLink' | 'passkey' | 'social' | undefined) ||
       this.determineDefaultMethod(methods);
 
     return {
@@ -1439,6 +1436,193 @@ export class AuthService {
     }
 
     return false;
+  }
+
+  /**
+   * Get enabled authentication providers for a tenant without requiring an email.
+   * Used by the frontend to decide which login options to render before email entry.
+   *
+   * Social providers are returned from the tenant_social_providers table (enabled rows).
+   * Falls back to feature-flag approach when no rows exist yet for a provider.
+   */
+  async getProviders(tenantId: string): Promise<GetProvidersResponseDto> {
+    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+
+    if (!tenant) {
+      const { NotFoundException } = await import('@nestjs/common');
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Query the dedicated tenant_social_providers table for explicitly configured providers
+    const configuredProviders = await this.tenantSocialProviderRepository.find({
+      where: { tenantId },
+      select: ['provider', 'enabled'],
+    });
+
+    let social: SocialProviderDto[];
+
+    if (configuredProviders.length > 0) {
+      // Use the dedicated table as source of truth
+      social = configuredProviders.map((p) => ({
+        provider: p.provider,
+        enabled: p.enabled,
+        displayName: this.getProviderDisplayName(p.provider),
+      }));
+    } else {
+      // Fall back to feature flags on the tenant record
+      social = this.getEnabledSocialProviders(tenant).map((provider) => ({
+        provider,
+        enabled: true,
+        displayName: this.getProviderDisplayName(provider),
+      }));
+    }
+
+    return {
+      password: true, // Password is always available unless tenant explicitly disables it
+      magicLink: tenant.featureFlags?.['magicLinkEnabled'] ?? false,
+      passkey: tenant.featureFlags?.['passkeyEnabled'] ?? false,
+      social,
+    };
+  }
+
+  /**
+   * Map a provider identifier to a human-readable display name.
+   */
+  private getProviderDisplayName(provider: string): string {
+    const displayNames: Record<string, string> = {
+      google: 'Google',
+      github: 'GitHub',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
+      linkedin: 'LinkedIn',
+      facebook: 'Facebook',
+    };
+    return displayNames[provider] ?? provider;
+  }
+
+  /**
+   * Validate an invite token — returns invite metadata for the accept form.
+   * Public endpoint (no auth required).
+   */
+  async validateInvite(token: string): Promise<{
+    email: string;
+    tenantName: string;
+    tenantSlug: string;
+  }> {
+    const invite = await this.userInviteRepository.findOne({
+      where: { token },
+      relations: ['tenant'],
+    });
+
+    if (!invite) {
+      throw new NotFoundException("Invitation not found");
+    }
+    if (invite.acceptedAt) {
+      throw new BadRequestException("This invitation has already been used");
+    }
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestException("This invitation has expired");
+    }
+
+    return {
+      email: invite.email,
+      tenantName: invite.tenant?.name ?? '',
+      tenantSlug: invite.tenant?.slug ?? '',
+    };
+  }
+
+  /**
+   * Accept an invite — creates the user account and assigns roles.
+   * Public endpoint (no auth required).
+   */
+  async acceptInvite(data: {
+    token: string;
+    name: string;
+    password: string;
+    ip: string;
+    userAgent: string;
+  }): Promise<{ message: string }> {
+    const invite = await this.userInviteRepository.findOne({
+      where: { token: data.token },
+      relations: ['tenant'],
+    });
+
+    if (!invite) {
+      throw new NotFoundException("Invitation not found");
+    }
+    if (invite.acceptedAt) {
+      throw new BadRequestException("This invitation has already been used");
+    }
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestException("This invitation has expired");
+    }
+
+    const tenant = invite.tenant;
+    if (!tenant || !tenant.active) {
+      throw new BadRequestException("The workspace associated with this invitation is no longer active");
+    }
+
+    const existing = await this.userRepository.findOne({
+      where: { email: invite.email, tenantId: tenant.id },
+    });
+    if (existing) {
+      throw new ConflictException("An account with this email already exists in this workspace");
+    }
+
+    const validation = PasswordService.validateStrength(data.password);
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+        score: validation.score,
+      });
+    }
+
+    const [firstName, ...rest] = data.name.trim().split(' ');
+    const lastName = rest.join(' ') || undefined;
+
+    const passwordHash = await PasswordService.hash(data.password);
+
+    const user = this.userRepository.create({
+      tenantId: tenant.id,
+      email: invite.email,
+      passwordHash,
+      firstName,
+      lastName,
+      emailVerified: true,
+      isActive: true,
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    // Assign invited roles
+    if (invite.roleIds.length > 0) {
+      const userRoles = invite.roleIds.map((roleId) =>
+        this.userRoleRepository.create({
+          userId: savedUser.id,
+          tenantId: tenant.id,
+          roleId,
+          invitedBy: invite.invitedBy,
+          isGuest: false,
+        }),
+      );
+      await this.userRoleRepository.save(userRoles);
+    }
+
+    // Mark invite as accepted
+    await this.userInviteRepository.update(invite.id, { acceptedAt: new Date() });
+
+    this.securityEventService.log({
+      userId: savedUser.id,
+      tenantId: tenant.id,
+      actorEmail: savedUser.email,
+      eventType: SecurityEventType.USER_REGISTERED,
+      severity: "info",
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: { via: "invite", inviteToken: data.token.slice(0, 8) + '...' },
+    });
+
+    return { message: "Account created successfully" };
   }
 
 }

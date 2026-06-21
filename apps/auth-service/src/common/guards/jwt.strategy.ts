@@ -63,12 +63,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!payload.sub) {
       throw new UnauthorizedException("Invalid token payload");
     }
+
+    const roles = payload.roles || [];
+    const groups = payload.groups || [];
+
+    const platformSlug = process.env.SENTRY_PLATFORM_SLUG ?? "sentry";
+    const platformRole = `${platformSlug}-internal`;
+    const isSuperAdmin =
+      groups.includes(platformRole) ||
+      roles.includes(platformRole) ||
+      groups.includes("sentry-internal") ||
+      roles.includes("sentry-internal") ||
+      groups.includes("super_admin") ||
+      roles.includes("super_admin");
+
     return {
+      sub: payload.sub,
       userId: payload.sub,
       tenantId: payload.tenantId,
+      tenantSlug: payload.tenantSlug,
+      sessionId: payload.sessionId,
       email: payload.email,
-      roles: payload.roles || [],
-      groups: payload.groups || [],
+      roles,
+      groups,
+      isSuperAdmin: !!isSuperAdmin,
     };
   }
 }

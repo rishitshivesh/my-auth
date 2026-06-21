@@ -2,9 +2,11 @@ import { Module, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppApiModule } from "./modules/app-module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { logger } from "src/common/logger";
-import { ResponseInterceptor } from "src/common/interceptors/response.interceptors";
+import { logger } from '@/common/logger';
+import { ResponseInterceptor } from '@/common/interceptors/response.interceptors';
 import { saveApiDoc } from "./services/utility/utility.service";
+import { CorsRefreshService } from "./cors-refresh.service";
+import { AdminService } from "@/modules/admin/admin.service";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
@@ -25,7 +27,7 @@ export class AppModule {
     const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
 
     const isProduction = process.env.NODE_ENV === "production";
-    const allowedOrigins = parseCorsOrigins();
+    const staticOrigins = parseCorsOrigins();
 
     // Security headers
     app.use(
@@ -37,12 +39,42 @@ export class AppModule {
     // Cookie parser must be registered before interceptors
     app.use(cookieParser());
 
+    // Load per-tenant + per-client CORS origins from the database
+    const corsRefreshService = app.get(CorsRefreshService);
+    await corsRefreshService.refresh();
+    corsRefreshService.startAutoRefresh();
+
+    const dynamicOrigins = corsRefreshService.getOrigins();
+
+    // Used to allow all origins during first-run bootstrap.
+    // The setup token authenticates those requests; CORS enforcement is
+    // meaningless before any tenant or admin exists.
+    const adminService = app.get(AdminService);
+
+    // Origins allowed during first-run bootstrap in addition to staticOrigins.
+    // Never reflect the request's own origin — only accept known safe values.
+    const bootstrapOrigins = new Set<string>([
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      ...(process.env['ADMIN_PORTAL_ORIGIN'] ? [process.env['ADMIN_PORTAL_ORIGIN']] : []),
+    ]);
+
     app.enableCors({
-      origin: (origin: any, cb: any) => {
+      origin: (
+        origin: string | undefined,
+        cb: (err: Error | null, allow?: boolean) => void,
+      ) => {
         if (!origin) return cb(null, true);
-        return allowedOrigins.includes(origin)
-          ? cb(null, true)
-          : cb(new Error(`CORS blocked for origin: ${origin}`), false);
+        if (staticOrigins.includes(origin) || dynamicOrigins.has(origin)) {
+          return cb(null, true);
+        }
+        // During first-run bootstrap, allow localhost + the configured admin portal.
+        // The setup token authenticates these requests; CORS is a browser-only
+        // control and the token is the real secret here.
+        if (adminService.isBootstrapping() && bootstrapOrigins.has(origin)) {
+          return cb(null, true);
+        }
+        return cb(new Error(`CORS blocked for origin: ${origin}`), false);
       },
       credentials: true,
       methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
@@ -51,8 +83,10 @@ export class AppModule {
         "Authorization",
         "X-Requested-With",
         "x-tenant-id",
+        "x-tenant-slug",
         "x-authorization",
         "x-csrf-token",
+        "x-setup-token",
       ],
       exposedHeaders: ["set-cookie"],
       optionsSuccessStatus: 204,

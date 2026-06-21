@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { PortalLayout } from "@/components/layouts/portal-layout";
 import { SentryButton, SentrySkeleton, Label } from "@repo/ui";
 import { MFASettings } from "@/components/portal/mfa-settings";
@@ -29,7 +30,9 @@ import { formatRelativeTime, formatEventDescription } from "@/lib/utils";
 // Trusted devices have no backend endpoint yet — kept as empty placeholder
 const TRUSTED_DEVICES: TrustedDevice[] = [];
 
-export default function SecurityPage({ params }: { params: { slug: string } }) {
+export default function SecurityPage() {
+  const params = useParams();
+  const slug = params.slug as string;
   const { data: mfaStatusData, isLoading: mfaLoading } = useMfaStatus();
   const {
     data: rawSessions = [],
@@ -146,10 +149,10 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
 
   return (
     <PortalLayout
-      tenantSlug={params.slug}
+      tenantSlug={slug}
       pageTitle="Security"
       pageSubtitle="Manage your account security and authentication methods"
-      currentPath={`/t/${params.slug}/security`}
+      currentPath={`/t/${slug}/security`}
       primaryAction={{
         label: "Save Settings",
         onClick: () => {},
@@ -173,9 +176,7 @@ export default function SecurityPage({ params }: { params: { slug: string } }) {
           ) : mfaStatusData ? (
             <MFASettings
               methods={mfaMethods}
-              primaryColor="#6366f1"
-              onToggle={() => {}}
-              onRegenerateCodes={() => {}}
+              primaryColor="#2ABF6C"
             />
           ) : (
             <p className="text-sm text-muted-foreground">
