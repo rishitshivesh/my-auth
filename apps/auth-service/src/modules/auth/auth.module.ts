@@ -13,6 +13,7 @@ import {
   UserSocialConnection,
   TenantSocialProvider,
   SecurityEvent,
+  UserInvite,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -51,6 +52,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       UserSocialConnection,
       TenantSocialProvider,
       SecurityEvent,
+      UserInvite,
     ]),
     DatabaseModule,
     SecurityEventModule,

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You've been invited to join {{tenantName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #2ABF6C 0%, #1D8F50 100%); padding: 30px 40px; text-align: center; }
+        .email-header h2 { color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #2ABF6C 0%, #1D8F50 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <h2>{{tenantName}}</h2>
+            </div>
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>You've been invited</h1>
+                    <p><strong>{{inviterName}}</strong> has invited you to join <strong>{{tenantName}}</strong> on Scrolloop Sentry.</p>
+                    <p>Click the button below to accept your invitation and set up your account.</p>
+                    <div style="text-align: center;">
+                        <a href="{{actionUrl}}" class="btn">Accept Invitation</a>
+                    </div>
+                    <p class="text-muted">This invitation expires in {{expiresIn}}. If you did not expect this invitation, you can safely ignore this email.</p>
+                    <p class="text-muted" style="margin-top: 16px; font-size: 12px; word-break: break-all;">
+                        Or copy this link: {{actionUrl}}
+                    </p>
+                </div>
+            </div>
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} Scrolloop Sentry. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

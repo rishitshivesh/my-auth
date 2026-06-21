@@ -1,6 +1,11 @@
 import "reflect-metadata";
+import * as dotenv from "dotenv";
 import { DataSource, DataSourceOptions } from "typeorm";
 import * as path from "path";
+
+// Load the monorepo root .env so `yarn workspace @repo/database migration:run`
+// works without needing a local .env in packages/database.
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 // Import all entities explicitly
 import { Tenant } from "./entities/tenant.entity";
@@ -23,6 +28,7 @@ import { TenantSocialProvider } from "./entities/tenant-social-providers.entity"
 import { UserSocialConnection } from "./entities/user-social-connections.entity";
 import { TenantBranding } from "./entities/tenant-branding.entity";
 import { KeyPair } from "./entities/key-pair.entity";
+import { UserInvite } from "./entities/user-invite.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -70,6 +76,7 @@ export const dataSourceOptions: DataSourceOptions = {
     User,
     TenantBranding,
     KeyPair,
+    UserInvite,
   ],
 
   // Migrations

@@ -19,6 +19,7 @@ import {
   UserRole,
   SecurityEventType,
   TenantSocialProvider,
+  UserInvite,
 } from "@repo/database";
 import {
   SecurityEventService,
@@ -61,6 +62,8 @@ export class AuthService {
     private readonly socialConnectionRepository: Repository<UserSocialConnection>,
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
+    @InjectRepository(UserInvite)
+    private readonly userInviteRepository: Repository<UserInvite>,
     @InjectRepository(TenantSocialProvider)
     private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly jwtService: JwtService,
@@ -1493,6 +1496,131 @@ export class AuthService {
       facebook: 'Facebook',
     };
     return displayNames[provider] ?? provider;
+  }
+
+  /**
+   * Validate an invite token — returns invite metadata for the accept form.
+   * Public endpoint (no auth required).
+   */
+  async validateInvite(token: string): Promise<{
+    email: string;
+    tenantName: string;
+    tenantSlug: string;
+  }> {
+    const invite = await this.userInviteRepository.findOne({
+      where: { token },
+      relations: ['tenant'],
+    });
+
+    if (!invite) {
+      throw new NotFoundException("Invitation not found");
+    }
+    if (invite.acceptedAt) {
+      throw new BadRequestException("This invitation has already been used");
+    }
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestException("This invitation has expired");
+    }
+
+    return {
+      email: invite.email,
+      tenantName: invite.tenant?.name ?? '',
+      tenantSlug: invite.tenant?.slug ?? '',
+    };
+  }
+
+  /**
+   * Accept an invite — creates the user account and assigns roles.
+   * Public endpoint (no auth required).
+   */
+  async acceptInvite(data: {
+    token: string;
+    name: string;
+    password: string;
+    ip: string;
+    userAgent: string;
+  }): Promise<{ message: string }> {
+    const invite = await this.userInviteRepository.findOne({
+      where: { token: data.token },
+      relations: ['tenant'],
+    });
+
+    if (!invite) {
+      throw new NotFoundException("Invitation not found");
+    }
+    if (invite.acceptedAt) {
+      throw new BadRequestException("This invitation has already been used");
+    }
+    if (invite.expiresAt < new Date()) {
+      throw new BadRequestException("This invitation has expired");
+    }
+
+    const tenant = invite.tenant;
+    if (!tenant || !tenant.active) {
+      throw new BadRequestException("The workspace associated with this invitation is no longer active");
+    }
+
+    const existing = await this.userRepository.findOne({
+      where: { email: invite.email, tenantId: tenant.id },
+    });
+    if (existing) {
+      throw new ConflictException("An account with this email already exists in this workspace");
+    }
+
+    const validation = PasswordService.validateStrength(data.password);
+    if (!validation.isValid) {
+      throw new BadRequestException({
+        message: "Password does not meet security requirements",
+        errors: validation.errors,
+        score: validation.score,
+      });
+    }
+
+    const [firstName, ...rest] = data.name.trim().split(' ');
+    const lastName = rest.join(' ') || undefined;
+
+    const passwordHash = await PasswordService.hash(data.password);
+
+    const user = this.userRepository.create({
+      tenantId: tenant.id,
+      email: invite.email,
+      passwordHash,
+      firstName,
+      lastName,
+      emailVerified: true,
+      isActive: true,
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    // Assign invited roles
+    if (invite.roleIds.length > 0) {
+      const userRoles = invite.roleIds.map((roleId) =>
+        this.userRoleRepository.create({
+          userId: savedUser.id,
+          tenantId: tenant.id,
+          roleId,
+          invitedBy: invite.invitedBy,
+          isGuest: false,
+        }),
+      );
+      await this.userRoleRepository.save(userRoles);
+    }
+
+    // Mark invite as accepted
+    await this.userInviteRepository.update(invite.id, { acceptedAt: new Date() });
+
+    this.securityEventService.log({
+      userId: savedUser.id,
+      tenantId: tenant.id,
+      actorEmail: savedUser.email,
+      eventType: SecurityEventType.USER_REGISTERED,
+      severity: "info",
+      ipAddress: data.ip,
+      userAgent: data.userAgent,
+      metadata: { via: "invite", inviteToken: data.token.slice(0, 8) + '...' },
+    });
+
+    return { message: "Account created successfully" };
   }
 
 }

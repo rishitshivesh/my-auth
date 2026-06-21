@@ -32,6 +32,7 @@ import {
   ListUsersQueryDto,
   BulkUpdateUsersDto,
   ListUsersResponseDto,
+  InviteUserDto,
 } from "./user.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
@@ -403,5 +404,24 @@ export class UserController {
     const tenantId = req.tenantId!;
     await this.userService.adminUnlockUser(tenantId, id);
     return { message: "User account unlocked" };
+  }
+
+  /**
+   * Invite a user to the workspace
+   * Requires: users:invite permission or admin role
+   */
+  @Post("invite")
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions("users:write")
+  @ApiOperation({ summary: "Invite a user to the workspace" })
+  @ApiResponse({ status: 201, description: "Invitation sent" })
+  @ApiResponse({ status: 409, description: "User or pending invite already exists" })
+  async inviteUser(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: InviteUserDto,
+  ) {
+    const tenantId = req.tenantId!;
+    return this.userService.inviteUser(tenantId, req.user.sub, dto);
   }
 }

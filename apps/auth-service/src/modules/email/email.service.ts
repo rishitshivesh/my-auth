@@ -376,6 +376,33 @@ export class EmailService {
   }
 
   /**
+   * Send user invite email
+   */
+  async sendInviteEmail(data: {
+    to: string;
+    inviterName: string;
+    tenantName: string;
+    tenantId: string;
+    inviteUrl: string;
+    expiresInDays: number;
+  }): Promise<boolean> {
+    const html = await this.renderTemplate("invite", {
+      inviterName: data.inviterName,
+      tenantName: data.tenantName,
+      actionUrl: data.inviteUrl,
+      expiresIn: `${data.expiresInDays} days`,
+    });
+
+    return this.sendEmail({
+      to: data.to,
+      subject: `You've been invited to join ${data.tenantName}`,
+      html,
+      tenantId: data.tenantId,
+      emailType: "invite",
+    });
+  }
+
+  /**
    * Send account deleted confirmation
    */
   async sendAccountDeletedEmail(user: User): Promise<boolean> {

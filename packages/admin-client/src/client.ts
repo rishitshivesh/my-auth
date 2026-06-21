@@ -33,7 +33,7 @@ export class SentryAdminClient {
       this.transport.delete(`/api/admin/users/${id}`),
 
     invite: (data: { email: string; roleIds?: string[] }): Promise<void> =>
-      this.transport.post('/api/admin/users/invite', data),
+      this.transport.post('/users/invite', data),
   };
 
   readonly sessions = {

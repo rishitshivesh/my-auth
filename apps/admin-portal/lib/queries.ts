@@ -241,6 +241,41 @@ export function useTenantClients() {
   });
 }
 
+// ─── Registration ────────────────────────────────────────────
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export function useRegister() {
+  return useMutation<{ message: string }, Error, RegisterData>({
+    mutationFn: withErrorHandler<[RegisterData], { message: string }>(
+      async (body) => authClient.request({
+        url: apiUrl("/auth/register"),
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+      { showErrorToast: true }
+    ),
+  });
+}
+
+export function useVerifyEmail() {
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (token) => authClient.request({
+        url: apiUrl("/auth/verify-email"),
+        method: "POST",
+        body: JSON.stringify({ token }),
+      }),
+      { showErrorToast: false }
+    ),
+  });
+}
+
 // ─── Invitations ─────────────────────────────────────────────
 
 export interface InviteData {

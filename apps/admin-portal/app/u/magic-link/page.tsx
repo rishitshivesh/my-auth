@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@scrolloop/sdk"
+import { authClient } from "@/lib/auth-client"
 
 function MagicLinkInner() {
   const router = useRouter()
@@ -25,7 +26,9 @@ function MagicLinkInner() {
     verifyMagicLink(token)
       .then(() => {
         setStatus("success")
-        setTimeout(() => router.replace("/dashboard"), 1500)
+        const claims = authClient.getTokenClaims()
+        const slug = (claims?.tenantSlug as string) ?? process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? "sentry"
+        setTimeout(() => router.replace(`/t/${slug}/dashboard`), 1500)
       })
       .catch((err: unknown) => {
         setStatus("error")

@@ -45,6 +45,9 @@ export * from "./src/entities/group-policy.entity";
 export * from "./src/entities/user-policy.entity";
 export * from "./src/entities/role-policy.entity";
 
+// Invites
+export * from "./src/entities/user-invite.entity";
+
 // Re-export for convenience
 export { Tenant } from "./src/entities/tenant.entity";
 export { User } from "./src/entities/user.entity";

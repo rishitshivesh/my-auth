@@ -72,6 +72,7 @@ export class TenantSchemaService {
       "user_policies",
       "role_policies",
       "user_social_connections",
+      "user_invites",
     ];
 
     for (const table of tables) {

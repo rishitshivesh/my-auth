@@ -330,3 +330,20 @@ export class GetProvidersResponseDto {
   @ApiProperty({ description: 'Configured social providers', type: [SocialProviderDto] })
   social!: SocialProviderDto[];
 }
+
+export class AcceptInviteDto {
+  @ApiProperty({ example: 'abc123...', description: '128-hex invite token' })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @ApiProperty({ example: 'Jane Doe', description: 'Full name for the new account' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ example: 'MySecurePass!123', description: 'Password for the new account' })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}

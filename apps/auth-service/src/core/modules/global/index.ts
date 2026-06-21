@@ -14,7 +14,8 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [".env"],
+      // Root .env first so it sets all shared vars; local .env overrides when present.
+      envFilePath: ["../../.env", ".env"],
       validationSchema,
     }),
 

@@ -7,6 +7,7 @@ import {
   Ip,
   Headers,
   Get,
+  Param,
   Query,
   UseGuards,
   Req,
@@ -28,13 +29,13 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   VerifyMfaDto,
-  RefreshTokenDto,
   LoginIntentRequestDto,
   LoginIntentResponseDto,
   SendMagicLinkDto,
   VerifyMagicLinkDto,
   GetProvidersQueryDto,
   GetProvidersResponseDto,
+  AcceptInviteDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
@@ -913,5 +914,40 @@ export class AuthController {
     logger.info({ email, exists: result.exists, methods: result.methods, preferredMethod: result.preferredMethod }, "Login intent result");
 
     return result;
+  }
+
+  /**
+   * Validate an invite token (public — no auth required)
+   */
+  @Get("invite/validate/:token")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Validate an invite token" })
+  @ApiResponse({ status: 200, description: "Invite metadata returned" })
+  @ApiResponse({ status: 404, description: "Invite not found or expired" })
+  async validateInvite(@Param("token") token: string) {
+    return this.authService.validateInvite(token);
+  }
+
+  /**
+   * Accept an invite and create the user account (public — no auth required)
+   */
+  @Post("invite/accept")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Accept an invite and create account" })
+  @ApiResponse({ status: 201, description: "Account created" })
+  @ApiResponse({ status: 400, description: "Expired or already accepted invite" })
+  @ApiResponse({ status: 409, description: "Email already registered" })
+  async acceptInvite(
+    @Body() dto: AcceptInviteDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    return this.authService.acceptInvite({
+      token: dto.token,
+      name: dto.name,
+      password: dto.password,
+      ip,
+      userAgent: userAgent ?? "unknown",
+    });
   }
 }
