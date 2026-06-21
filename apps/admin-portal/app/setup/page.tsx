@@ -108,8 +108,8 @@ export default function SetupPage() {
       // the user back to /setup when they navigate to /u/login.
       document.cookie = 'sentry-initialized=1; Max-Age=300; path=/; SameSite=Lax';
       goTo(4);
-    } catch (err: any) {
-      setError(err?.message ?? "Something went wrong. Try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setIsLoading(false);
     }

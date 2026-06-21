@@ -87,8 +87,8 @@ export default function SecuritySettingsPage() {
       setDeletingId(credentialId);
       await deletePasskeyMutation.mutateAsync(credentialId);
       flash("Passkey removed");
-    } catch (err: any) {
-      flash(err?.message || "Failed to remove passkey", true);
+    } catch (err: unknown) {
+      flash(err instanceof Error ? err.message : "Failed to remove passkey", true);
     } finally {
       setDeletingId(null);
     }

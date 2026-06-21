@@ -147,8 +147,8 @@ export default function OnboardingPage() {
       await registerFn();
       setCreatedSlug(slug);
       goTo(3);
-    } catch (err: any) {
-      setError(err?.message ?? "Something went wrong. Try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setIsLoading(false);
     }

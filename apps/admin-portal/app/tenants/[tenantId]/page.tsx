@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAdminTenant, useUpdateTenant, useDeleteTenant } from '@/lib/admin-queries'
+import type { ActivityEvent } from '@/lib/admin-queries'
 import { formatRelativeTime, formatEventDescription } from '@/lib/utils'
 
 function tenantColor(slug: string): string {
@@ -172,7 +173,7 @@ export default function TenantDetailPage() {
                   <h2 className="text-sm font-semibold text-foreground mb-4">Recent Activity</h2>
                   {tenant.recentActivity.length > 0 ? (
                     <div className="space-y-3">
-                      {tenant.recentActivity.map((event: any) => (
+                      {tenant.recentActivity.map((event: ActivityEvent) => (
                         <div key={event.id} className="flex gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
                           <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
                           <div>

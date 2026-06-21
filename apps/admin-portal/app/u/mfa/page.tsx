@@ -54,8 +54,8 @@ export default function MFAPage() {
       await verifyMfaLogin(tempToken, code)
       sessionStorage.removeItem("_sentry_mfa_temp_token")
       router.push("/dashboard")
-    } catch (err: any) {
-      setError(err?.message || "Invalid code. Please try again.")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid code. Please try again.")
       setDigits(["", "", "", "", "", ""])
       inputRefs.current[0]?.focus()
     } finally {
