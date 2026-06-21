@@ -574,10 +574,10 @@ export class AuthService {
       throw new UnauthorizedException("Invalid or expired magic link");
     }
 
-    // Clear the token (one-time use)
+    // Clear the token (one-time use) and mark email as verified
     await this.userRepository.update(
       { id: user.id, tenantId },
-      { magicLinkToken: undefined, magicLinkExpiresAt: undefined },
+      { magicLinkToken: undefined, magicLinkExpiresAt: undefined, emailVerified: true },
     );
 
     const session = await this.sessionService.createSession({
@@ -1336,10 +1336,8 @@ export class AuthService {
       // Password: User has set a password
       password: !!user.passwordHash,
 
-      // Magic Link: Tenant enabled + email verified (or verification not required)
-      magicLink:
-        (tenant.featureFlags?.['magicLinkEnabled'] ?? false) &&
-        (user.emailVerified || !(tenant.settings?.requireEmailVerification ?? false)),
+      // Magic Link: Tenant enabled
+      magicLink: tenant.featureFlags?.['magicLinkEnabled'] ?? false,
 
       // Passkey: Would need to check webauthn_credentials table (not in current schema)
       // For now, set to false

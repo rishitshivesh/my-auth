@@ -85,7 +85,14 @@ export class SentryClient {
     // Handle MFA challenge
     if (data.mfaRequired) {
       this.log("MFA required");
-      return data;
+      return {
+        mfaRequired: true,
+        mfaChallenge: {
+          tempToken: data.tempToken,
+          methods: data.availableMethods || [],
+          preferredMethod: data.preferredMethod,
+        },
+      } as any;
     }
 
     // Set access token

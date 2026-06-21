@@ -6,22 +6,29 @@ import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AuthLayout } from "@/components/layouts/AuthLayout"
 import { SentryButton } from "@repo/ui"
-import { useVerifyEmail } from "@/lib/queries"
-import { CheckCircle2, AlertCircle } from "lucide-react"
+import { useVerifyEmail, useResendVerification } from "@/lib/queries"
+import { useAuth } from "@scrolloop/sdk"
+import { CheckCircle2, AlertCircle, Mail, LogOut } from "lucide-react"
 
 function VerifyEmailInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, logout } = useAuth()
   const { mutate: verifyEmail } = useVerifyEmail()
-  const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying")
+  const { mutate: resendVerification, isPending: resending } = useResendVerification()
+  const [status, setStatus] = useState<"verifying" | "success" | "error" | "prompt">("verifying")
   const [errorMsg, setErrorMsg] = useState("")
 
   useEffect(() => {
     const token = searchParams.get("token")
 
     if (!token) {
-      setStatus("error")
-      setErrorMsg("No verification token found in this link.")
+      if (user && !user.emailVerified) {
+        setStatus("prompt")
+      } else {
+        setStatus("error")
+        setErrorMsg("No verification token found in this link.")
+      }
       return
     }
 
@@ -32,7 +39,18 @@ function VerifyEmailInner() {
         setErrorMsg(err.message || "This verification link has expired or already been used.")
       },
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleResend = () => {
+    if (user?.email) {
+      resendVerification(user.email)
+    }
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    router.push("/u/login")
+  }
 
   return (
     <AuthLayout>
@@ -57,9 +75,43 @@ function VerifyEmailInner() {
                 Your account is active. You can now sign in.
               </p>
             </div>
-            <SentryButton variant="accent" className="w-full" onClick={() => router.push("/u/login")}>
+            <SentryButton variant="accent" className="w-full font-display" onClick={() => router.push("/u/login")}>
               Sign In
             </SentryButton>
+          </>
+        )}
+
+        {status === "prompt" && user && (
+          <>
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                <Mail className="w-8 h-8" strokeWidth={1.5} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-display font-semibold text-neutral-900">Verify your email</h2>
+              <p className="text-sm font-body text-neutral-600">
+                Please verify your email address to access the portal. We sent a verification link to <strong className="text-neutral-800">{user.email}</strong>.
+              </p>
+            </div>
+            <div className="space-y-3 pt-4">
+              <SentryButton
+                variant="accent"
+                className="w-full font-display text-xs"
+                onClick={handleResend}
+                isLoading={resending}
+              >
+                Resend Verification Link
+              </SentryButton>
+              <SentryButton
+                variant="ghost"
+                className="w-full font-display text-xs text-neutral-600 hover:text-neutral-900 flex items-center justify-center gap-2 border border-border/40"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </SentryButton>
+            </div>
           </>
         )}
 
@@ -74,7 +126,7 @@ function VerifyEmailInner() {
               <h2 className="text-xl font-display font-semibold">Verification failed</h2>
               <p className="text-sm font-body text-muted-foreground">{errorMsg}</p>
             </div>
-            <SentryButton variant="ghost" className="w-full" onClick={() => router.push("/u/login")}>
+            <SentryButton variant="ghost" className="w-full font-display text-xs border border-border/40" onClick={() => router.push("/u/login")}>
               Back to Sign In
             </SentryButton>
           </>
@@ -99,3 +151,4 @@ export default function VerifyEmailPage() {
     </Suspense>
   )
 }
+

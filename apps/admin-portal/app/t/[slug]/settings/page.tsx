@@ -62,6 +62,32 @@ export default function SettingsPage() {
     }
   }, [branding]);
 
+  const [graceDays, setGraceDays] = React.useState('7');
+  React.useEffect(() => {
+    if (settings?.featureFlags) {
+      if (settings.featureFlags.mfa_grace_1d) setGraceDays('1');
+      else if (settings.featureFlags.mfa_grace_3d) setGraceDays('3');
+      else if (settings.featureFlags.mfa_grace_5d) setGraceDays('5');
+      else if (settings.featureFlags.mfa_grace_7d) setGraceDays('7');
+      else if (settings.featureFlags.mfa_grace_14d) setGraceDays('14');
+    }
+  }, [settings]);
+
+  const handleGraceDaysChange = (value: string) => {
+    setGraceDays(value);
+    updateSettings({
+      featureFlags: {
+        ...settings?.featureFlags,
+        mfa_grace_1d: value === '1',
+        mfa_grace_3d: value === '3',
+        mfa_grace_5d: value === '5',
+        mfa_grace_7d: value === '7',
+        mfa_grace_14d: value === '14',
+      }
+    });
+  };
+
+
   return (
     <PortalLayout>
       <div className="space-y-8">
@@ -311,6 +337,98 @@ export default function SettingsPage() {
                 ) : (
                   <p className="text-xs font-body text-muted-foreground">No social login providers configured for this workspace.</p>
                 )}
+              </GlassCard>
+
+              <GlassCard tier={1} className="p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-display font-semibold text-neutral-900">Passwordless Sign-In</h3>
+                  <SentryButton
+                    variant="accent"
+                    size="sm"
+                    isLoading={settingsSaving}
+                    onClick={() => updateSettings({
+                      featureFlags: {
+                        ...settings?.featureFlags,
+                        magicLinkEnabled: !!featureFlags['magicLinkEnabled'],
+                        passkeyEnabled: !!featureFlags['passkeyEnabled']
+                      }
+                    })}
+                  >
+                    <Save className="w-3.5 h-3.5 mr-2" />
+                    Save Settings
+                  </SentryButton>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* Magic Link Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-body font-medium">Magic Link Sign-In</p>
+                      <p className="text-xs font-body text-neutral-500">
+                        Allow users to receive a secure, one-time sign-in link via email.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setFeatureFlags((prev) => ({ ...prev, magicLinkEnabled: !prev.magicLinkEnabled }))}
+                      className={cn(
+                        'w-10 h-5 rounded-full relative cursor-pointer transition-colors',
+                        featureFlags['magicLinkEnabled'] ? 'bg-accent shadow-[0_0_8px_rgba(42,191,108,0.3)]' : 'bg-black/10'
+                      )}
+                    >
+                      <div className={cn(
+                        'absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all',
+                        featureFlags['magicLinkEnabled'] ? 'right-0.5' : 'left-0.5'
+                      )} />
+                    </button>
+                  </div>
+
+                  {/* Passkey Toggle */}
+                  <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-body font-medium">Passkey & Biometrics Sign-In</p>
+                      <p className="text-xs font-body text-muted-foreground">
+                        Allow users to register and sign in using biometrics (Touch ID / Face ID) or hardware keys.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setFeatureFlags((prev) => ({ ...prev, passkeyEnabled: !prev.passkeyEnabled }))}
+                      className={cn(
+                        'w-10 h-5 rounded-full relative cursor-pointer transition-colors',
+                        featureFlags['passkeyEnabled'] ? 'bg-accent shadow-[0_0_8px_rgba(42,191,108,0.3)]' : 'bg-black/10'
+                      )}
+                    >
+                      <div className={cn(
+                        'absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all',
+                        featureFlags['passkeyEnabled'] ? 'right-0.5' : 'left-0.5'
+                      )} />
+                    </button>
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard tier={1} className="p-8 space-y-6">
+                <h3 className="text-sm font-display font-semibold">MFA & Authentication Policies</h3>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-display font-bold uppercase tracking-[0.09em] text-muted-foreground block">
+                      MFA Grace Period
+                    </label>
+                    <select
+                      value={graceDays}
+                      onChange={(e) => handleGraceDaysChange(e.target.value)}
+                      className="w-full h-[42px] px-4 rounded-sm border border-border bg-black/5 text-sm font-body focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all cursor-pointer"
+                    >
+                      <option value="1">1 Day</option>
+                      <option value="3">3 Days</option>
+                      <option value="5">5 Days</option>
+                      <option value="7">7 Days (Default)</option>
+                      <option value="14">14 Days</option>
+                    </select>
+                    <p className="text-xs font-body text-muted-foreground mt-1.5">
+                      The maximum duration (grace period) a user can log in and access this tenant's console without enabling multi-factor authentication (MFA).
+                    </p>
+                  </div>
+                </div>
               </GlassCard>
             </div>
           )}

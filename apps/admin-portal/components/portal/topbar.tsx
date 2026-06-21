@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@scrolloop/sdk';
 import { ThemeToggle, SentryButton } from "@repo/ui";
 import { TenantSwitcher } from './tenant-switcher';
 import { UserMenu } from './user-menu';
@@ -12,6 +14,22 @@ interface TopbarProps {
 }
 
 export function Topbar({ title, subtitle }: TopbarProps) {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      // ignore
+    }
+    router.push('/u/login');
+  };
+
+  const name = user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'User';
+
   return (
     <header className="h-16 flex items-center justify-between px-8 bg-card/50 backdrop-blur-md border-b border-border z-10">
       <div className="flex items-center gap-8">
@@ -43,7 +61,14 @@ export function Topbar({ title, subtitle }: TopbarProps) {
           <ThemeToggle />
         </div>
         <div className="w-px h-6 bg-border mx-2" />
-        <UserMenu />
+        <UserMenu
+          userName={name}
+          userEmail={user?.email || ''}
+          userAvatar={user?.avatarUrl}
+          profileHref={slug ? `/t/${slug}/security` : '/profile'}
+          settingsHref={slug ? `/t/${slug}/settings` : '/settings'}
+          onLogout={handleLogout}
+        />
       </div>
     </header>
   );

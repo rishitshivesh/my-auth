@@ -25,7 +25,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.replace(getPostLoginRoute());
+      if (!user.emailVerified) {
+        router.replace("/u/verify-email");
+      } else {
+        router.replace(getPostLoginRoute());
+      }
     }
   }, [user, isLoading, router]);
 

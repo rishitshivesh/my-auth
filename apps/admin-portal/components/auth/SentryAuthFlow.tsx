@@ -172,12 +172,14 @@ interface SentryAuthFlowProps {
 export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
   const router = useRouter();
   const flow = useEmailAuthFlow();
-  const { client, verifyMfaLogin, initiateSocialLogin } = useAuth();
+  const { client, verifyMfaLogin, verifyMfaBackupLogin, initiateSocialLogin } = useAuth();
   const { data: providers } = useProviders();
 
   // MFA inline state
   const [mfaTempToken, setMfaTempToken] = React.useState<string | null>(null);
   const [mfaScreen, setMfaScreen] = React.useState<'totp' | 'sms' | null>(null);
+  const [mfaMode, setMfaMode] = React.useState<'totp' | 'backup'>('totp');
+  const [backupCode, setBackupCode] = React.useState('');
   const [mfaDigits, setMfaDigits] = React.useState<string[]>(['', '', '', '', '', '']);
   const [mfaLoading, setMfaLoading] = React.useState(false);
   const [mfaError, setMfaError] = React.useState<string | null>(null);
@@ -261,9 +263,25 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
     }
   }, [mfaCode, mfaLoading, mfaTempToken, verifyMfaLogin, onSuccess]);
 
+  const handleBackupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!backupCode || mfaLoading || !mfaTempToken) return;
+    setMfaLoading(true);
+    setMfaError(null);
+    try {
+      await verifyMfaBackupLogin(mfaTempToken, backupCode.trim());
+      onSuccess?.();
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : 'Invalid backup code. Please try again.');
+      setBackupCode('');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
   React.useEffect(() => {
-    if (mfaCode.length === 6 && mfaScreen) handleMfaSubmit();
-  }, [mfaCode, mfaScreen, handleMfaSubmit]);
+    if (mfaCode.length === 6 && mfaScreen && mfaMode === 'totp') handleMfaSubmit();
+  }, [mfaCode, mfaScreen, mfaMode, handleMfaSubmit]);
 
   return (
     <AnimatePresence mode="wait">
@@ -281,34 +299,52 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
               Verify identity
             </h2>
             <p className="text-sm font-body text-muted-foreground">
-              {mfaScreen === 'totp'
-                ? 'Enter the 6-digit code from your authenticator app'
-                : 'Enter the 6-digit code sent to your phone'}
+              {mfaMode === 'totp' ? (
+                mfaScreen === 'totp'
+                  ? 'Enter the 6-digit code from your authenticator app'
+                  : 'Enter the 6-digit code sent to your phone'
+              ) : (
+                'Enter one of your 8-character backup codes'
+              )}
             </p>
           </div>
 
-          <div className="flex gap-2 justify-between">
-            {mfaDigits.map((digit, i) => (
-              <input
-                key={i}
-                ref={(el) => { inputRefs.current[i] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleMfaChange(i, e.target.value)}
-                onKeyDown={(e) => handleMfaKeyDown(i, e)}
-                onFocus={(e) => e.target.select()}
+          {mfaMode === 'totp' ? (
+            <div className="flex gap-2 justify-between">
+              {mfaDigits.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => { inputRefs.current[i] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleMfaChange(i, e.target.value)}
+                  onKeyDown={(e) => handleMfaKeyDown(i, e)}
+                  onFocus={(e) => e.target.select()}
+                  disabled={mfaLoading}
+                  className={cn(
+                    'h-14 w-12 rounded-sm border text-center text-xl font-display font-medium',
+                    'bg-black/5 transition-all outline-none',
+                    digit ? 'border-accent ring-2 ring-accent/10' : 'border-border',
+                    mfaLoading && 'opacity-50 grayscale'
+                  )}
+                />
+              ))}
+            </div>
+          ) : (
+            <form onSubmit={handleBackupSubmit}>
+              <SentryInput
+                label="Backup Code"
+                placeholder="XXXX-XXXX"
+                value={backupCode}
+                onChange={(e) => setBackupCode(e.target.value)}
+                required
                 disabled={mfaLoading}
-                className={cn(
-                  'h-14 w-12 rounded-sm border text-center text-xl font-display font-medium',
-                  'bg-black/5 transition-all outline-none',
-                  digit ? 'border-accent ring-2 ring-accent/10' : 'border-border',
-                  mfaLoading && 'opacity-50 grayscale'
-                )}
+                autoFocus
               />
-            ))}
-          </div>
+            </form>
+          )}
 
           {mfaError && (
             <div className="flex items-center gap-2 text-xs text-destructive animate-fade-in">
@@ -322,11 +358,24 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
               className="w-full"
               variant="accent"
               isLoading={mfaLoading}
-              onClick={handleMfaSubmit}
-              disabled={mfaCode.length !== 6}
+              onClick={mfaMode === 'totp' ? handleMfaSubmit : handleBackupSubmit}
+              disabled={mfaMode === 'totp' ? mfaCode.length !== 6 : !backupCode}
             >
               Verify
             </SentryButton>
+
+            <button
+              type="button"
+              className="w-full text-center text-xs font-body text-accent hover:text-accent/80 transition-colors"
+              onClick={() => {
+                setMfaMode(mfaMode === 'totp' ? 'backup' : 'totp');
+                setMfaError(null);
+                setMfaDigits(['', '', '', '', '', '']);
+                setBackupCode('');
+              }}
+            >
+              {mfaMode === 'totp' ? 'Use a backup code instead' : 'Use authenticator code instead'}
+            </button>
             
             <button
               type="button"
@@ -336,6 +385,8 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
                 setMfaTempToken(null);
                 setMfaDigits(['', '', '', '', '', '']);
                 setMfaError(null);
+                setMfaMode('totp');
+                setBackupCode('');
               }}
             >
               Use another method
