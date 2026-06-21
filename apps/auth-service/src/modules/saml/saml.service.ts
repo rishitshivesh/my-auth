@@ -12,11 +12,20 @@ import { SamlServiceProvider, KeyPair, User } from "@repo/database";
 import { RegisterSPDto, UpdateSPDto } from "./saml.dto";
 import { logger } from "@/common/logger";
 
-// Minimal SAML 2.0 namespace declarations
-const NS = {
-  samlp: "urn:oasis:names:tc:SAML:2.0:protocol",
-  saml: "urn:oasis:names:tc:SAML:2.0:assertion",
-};
+function xmlEsc(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function validateSlug(slug: string): void {
+  if (!/^[a-z0-9-]{1,64}$/.test(slug)) {
+    throw new BadRequestException("Invalid tenant slug format");
+  }
+}
 
 @Injectable()
 export class SamlService {
@@ -57,10 +66,11 @@ export class SamlService {
   }
 
   async getIdpMetadata(tenantSlug: string): Promise<string> {
+    validateSlug(tenantSlug);
     const { publicKeyPem } = await this.getActiveKeyPair();
-    const entityId = `${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`;
-    const ssoUrl = `${this.issuerBaseUrl}/saml/sso`;
-    const sloUrl = `${this.issuerBaseUrl}/saml/slo`;
+    const entityId = xmlEsc(`${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`);
+    const ssoUrl = xmlEsc(`${this.issuerBaseUrl}/saml/sso`);
+    const sloUrl = xmlEsc(`${this.issuerBaseUrl}/saml/slo`);
 
     const certBody = publicKeyPem
       .replace(/-----BEGIN PUBLIC KEY-----/, "")
@@ -160,23 +170,23 @@ export class SamlService {
       .map(([samlAttr, userField]) => {
         const val = (user as unknown as Record<string, unknown>)[userField];
         if (!val) return "";
-        return `<saml:Attribute Name="${samlAttr}"><saml:AttributeValue>${val}</saml:AttributeValue></saml:Attribute>`;
+        return `<saml:Attribute Name="${xmlEsc(samlAttr)}"><saml:AttributeValue>${xmlEsc(String(val))}</saml:AttributeValue></saml:Attribute>`;
       })
       .filter(Boolean)
       .join("");
 
     const assertion = `<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-    ID="${assertionId}" Version="2.0" IssueInstant="${now.toISOString()}">
-  <saml:Issuer>${issuer}</saml:Issuer>
+    ID="${xmlEsc(assertionId)}" Version="2.0" IssueInstant="${xmlEsc(now.toISOString())}">
+  <saml:Issuer>${xmlEsc(issuer)}</saml:Issuer>
   <saml:Subject>
-    <saml:NameID Format="${sp.nameIdFormat}">${user.email}</saml:NameID>
+    <saml:NameID Format="${xmlEsc(sp.nameIdFormat)}">${xmlEsc(user.email)}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-      <saml:SubjectConfirmationData NotOnOrAfter="${notOnOrAfter}" Recipient="${sp.acsUrl}"/>
+      <saml:SubjectConfirmationData NotOnOrAfter="${xmlEsc(notOnOrAfter)}" Recipient="${xmlEsc(sp.acsUrl)}"/>
     </saml:SubjectConfirmation>
   </saml:Subject>
-  <saml:Conditions NotBefore="${now.toISOString()}" NotOnOrAfter="${notOnOrAfter}">
+  <saml:Conditions NotBefore="${xmlEsc(now.toISOString())}" NotOnOrAfter="${xmlEsc(notOnOrAfter)}">
     <saml:AudienceRestriction>
-      <saml:Audience>${sp.entityId}</saml:Audience>
+      <saml:Audience>${xmlEsc(sp.entityId)}</saml:Audience>
     </saml:AudienceRestriction>
   </saml:Conditions>
   <saml:AttributeStatement>${attributes}</saml:AttributeStatement>
@@ -184,9 +194,9 @@ export class SamlService {
 
     const response = `<?xml version="1.0"?>
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-    ID="${responseId}" Version="2.0" IssueInstant="${now.toISOString()}"
-    Destination="${sp.acsUrl}">
-  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">${issuer}</saml:Issuer>
+    ID="${xmlEsc(responseId)}" Version="2.0" IssueInstant="${xmlEsc(now.toISOString())}"
+    Destination="${xmlEsc(sp.acsUrl)}">
+  <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">${xmlEsc(issuer)}</saml:Issuer>
   <samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>
   ${assertion}
 </samlp:Response>`;

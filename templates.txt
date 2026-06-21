@@ -1,0 +1,798 @@
+CODE CONSOLIDATION REPORT
+Generated: 2026-06-21T06:06:31.881Z
+Input Directory: /Users/rishitshivesh/Projects/Personal/my-auth/apps/auth-service/templates
+================================================================================
+
+
+================================================================================
+FILE: apps/auth-service/templates/account-deleted.html
+SIZE: 3.22 KB | LINES: 69
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Deleted</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .sad-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="sad-icon">👋</div>
+
+                    <h1>Account Deleted</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>This is to confirm that your account <strong>{{userEmail}}</strong> has been permanently deleted from <strong>{{tenantName}}</strong>.</p>
+
+                    <div class="alert">
+                        <strong>⚠️ Important:</strong> All your data has been removed from our systems and cannot be recovered.
+                    </div>
+
+                    <p>We're sorry to see you go. If you have any feedback about your experience, we'd love to hear from you.</p>
+
+                    <p>You're always welcome to create a new account if you change your mind.</p>
+
+                    <p>Thank you for being part of our community.</p>
+
+                    <p>Best wishes,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/base.html
+SIZE: 4.47 KB | LINES: 191
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{subject}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            background-color: #f4f4f4;
+            padding: 40px 20px;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .email-header img {
+            max-width: 180px;
+            height: auto;
+        }
+
+        .email-body {
+            padding: 40px;
+        }
+
+        .email-content {
+            color: #555555;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .email-footer p {
+            color: #6c757d;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 32px;
+            margin: 24px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .code-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        .code {
+            font-family: 'Courier New', monospace;
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 8px;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 30px 0;
+        }
+
+        .text-muted {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .powered-by {
+            color: #adb5bd;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-wrapper {
+                padding: 20px 10px;
+            }
+
+            .email-body {
+                padding: 30px 20px;
+            }
+
+            .email-footer {
+                padding: 20px;
+            }
+
+            .btn {
+                display: block;
+                width: 100%;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a1a1a;
+                color: #e0e0e0;
+            }
+
+            .email-wrapper {
+                background-color: #1a1a1a;
+            }
+
+            .email-container {
+                background-color: #2d2d2d;
+            }
+
+            .email-content {
+                color: #e0e0e0;
+            }
+
+            .email-footer {
+                background-color: #242424;
+                border-top-color: #3a3a3a;
+            }
+
+            .code-box {
+                background-color: #242424;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    {{content}}
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/invite.html
+SIZE: 3.13 KB | LINES: 56
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You've been invited to join {{tenantName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #2ABF6C 0%, #1D8F50 100%); padding: 30px 40px; text-align: center; }
+        .email-header h2 { color: #ffffff; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #2ABF6C 0%, #1D8F50 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <h2>{{tenantName}}</h2>
+            </div>
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>You've been invited</h1>
+                    <p><strong>{{inviterName}}</strong> has invited you to join <strong>{{tenantName}}</strong> on Scrolloop Sentry.</p>
+                    <p>Click the button below to accept your invitation and set up your account.</p>
+                    <div style="text-align: center;">
+                        <a href="{{actionUrl}}" class="btn">Accept Invitation</a>
+                    </div>
+                    <p class="text-muted">This invitation expires in {{expiresIn}}. If you did not expect this invitation, you can safely ignore this email.</p>
+                    <p class="text-muted" style="margin-top: 16px; font-size: 12px; word-break: break-all;">
+                        Or copy this link: {{actionUrl}}
+                    </p>
+                </div>
+            </div>
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} Scrolloop Sentry. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/magic-link.html
+SIZE: 3.27 KB | LINES: 68
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Magic Link</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .magic-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="magic-icon">✨</div>
+
+                    <h1>Your Magic Link to Sign In</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Click the button below to instantly sign in to your <strong>{{tenantName}}</strong> account:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Sign In with Magic Link</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}. If you didn't request this magic link, please ignore this email.</p>
+
+                    <p><strong>Note:</strong> This link can only be used once and will automatically log you in.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/otp.html
+SIZE: 3.26 KB | LINES: 68
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Verification Code</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .code-box { background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; margin: 24px 0; text-align: center; }
+        .code { font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .code { font-size: 24px; letter-spacing: 4px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Your Verification Code 🔢</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Use the verification code below to complete your action on <strong>{{tenantName}}</strong>:</p>
+
+                    <div class="code-box">
+                        <div class="code">{{code}}</div>
+                    </div>
+
+                    <p class="text-muted">This code will expire in {{expiresIn}}. Do not share this code with anyone.</p>
+
+                    <p><strong>Security Tip:</strong> {{tenantName}} will never ask you for this code via email, phone, or text message.</p>
+
+                    <p>If you didn't request this code, please ignore this email.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/password-changed.html
+SIZE: 3.24 KB | LINES: 67
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Changed</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <div class="success-icon">✅</div>
+
+                    <h1>Password Successfully Changed</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>This is a confirmation that the password for your account <strong>{{userEmail}}</strong> at <strong>{{tenantName}}</strong> has been successfully changed.</p>
+
+                    <p>If you made this change, no further action is required.</p>
+
+                    <div class="alert">
+                        <strong>🔒 Security Notice:</strong> If you did NOT change your password, please contact our support team immediately. Your account may have been compromised.
+                    </div>
+
+                    <p>For your security, all active sessions have been logged out. You'll need to sign in again with your new password.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/password-reset.html
+SIZE: 3.46 KB | LINES: 70
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your Password</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .alert { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Reset Your Password 🔐</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>We received a request to reset the password for your account at <strong>{{tenantName}}</strong>.</p>
+
+                    <p>Click the button below to choose a new password:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Reset Password</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}.</p>
+
+                    <div class="alert">
+                        <strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email and ensure your account is secure. Your password will not be changed unless you click the link above.
+                    </div>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/verify-email.html
+SIZE: 3.14 KB | LINES: 65
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Verify Your Email Address 📧</h1>
+
+                    <p>Hello {{userName}},</p>
+
+                    <p>Please verify your email address to complete your registration with <strong>{{tenantName}}</strong>.</p>
+
+                    <p>Click the button below to verify <strong>{{userEmail}}</strong>:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Verify Email</a>
+                    </center>
+
+                    <p class="text-muted">This verification link will expire in {{expiresIn}}. If you didn't request this verification, please ignore this email.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+FILE: apps/auth-service/templates/welcome.html
+SIZE: 3.31 KB | LINES: 67
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{tenantName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+        .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 40px 20px; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .email-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center; }
+        .email-header img { max-width: 180px; height: auto; }
+        .email-body { padding: 40px; }
+        .email-content { color: #555555; font-size: 16px; line-height: 1.8; }
+        .email-footer { background-color: #f8f9fa; padding: 30px 40px; text-align: center; border-top: 1px solid #e9ecef; }
+        .email-footer p { color: #6c757d; font-size: 14px; margin: 5px 0; }
+        .btn { display: inline-block; padding: 14px 32px; margin: 24px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; }
+        .text-muted { color: #6c757d; font-size: 14px; }
+        .powered-by { color: #adb5bd; font-size: 12px; margin-top: 10px; }
+        h1 { color: #333333; font-size: 24px; margin-bottom: 20px; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { padding: 20px 10px; }
+            .email-body { padding: 30px 20px; }
+            .email-footer { padding: 20px; }
+            .btn { display: block; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <img src="{{tenantLogo}}" alt="{{tenantName}}" />
+            </div>
+
+            <div class="email-body">
+                <div class="email-content">
+                    <h1>Welcome, {{userName}}! 👋</h1>
+
+                    <p>Thank you for joining <strong>{{tenantName}}</strong>! We're excited to have you on board.</p>
+
+                    <p>Your account has been successfully created with the email address: <strong>{{userEmail}}</strong></p>
+
+                    <p>To get started and verify your email address, please click the button below:</p>
+
+                    <center>
+                        <a href="{{actionUrl}}" class="btn">Verify Email Address</a>
+                    </center>
+
+                    <p class="text-muted">This link will expire in {{expiresIn}}. If you didn't create this account, please ignore this email.</p>
+
+                    <p>If you have any questions, feel free to reach out to our support team.</p>
+
+                    <p>Best regards,<br><strong>The {{tenantName}} Team</strong></p>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+                <p class="powered-by">Powered by Fort Knox</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+================================================================================
+CONSOLIDATION SUMMARY
+================================================================================
+Files Processed: 9
+Total Lines: 721
+Files Skipped: 0
+Errors: 0
+Generated: 2026-06-21T06:06:31.881Z

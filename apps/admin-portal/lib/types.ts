@@ -212,3 +212,69 @@ export interface Client {
   isActive: boolean;
   createdAt: string;
 }
+
+// ── Sprint 4 types ────────────────────────────────────────────────────────────
+
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  events: string[];
+  active: boolean;
+  failedCount: number;
+  lastDeliveryAt?: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  endpointId: string;
+  eventType: string;
+  status: "pending" | "success" | "failed" | "retrying";
+  attempts: number;
+  responseStatus?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  durationMs?: number;
+  createdAt: string;
+}
+
+export interface SamlServiceProvider {
+  id: string;
+  name: string;
+  entityId: string;
+  acsUrl: string;
+  sloUrl?: string;
+  nameIdFormat: string;
+  attributeMapping: Record<string, string>;
+  active: boolean;
+  signAssertions: boolean;
+  createdAt: string;
+}
+
+export interface ScimToken {
+  id: string;
+  name: string;
+  active: boolean;
+  lastUsedAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+export interface LdapConnection {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  bindDn: string;
+  baseDn: string;
+  userFilter: string;
+  syncSchedule: string;
+  active: boolean;
+  useTls: boolean;
+  lastSyncAt?: string;
+  lastSyncStatus?: string;
+  lastSyncUsersCreated?: number;
+  lastSyncUsersUpdated?: number;
+  createdAt: string;
+}

@@ -1,65 +1,110 @@
 "use client"
 
-import { useState } from "react"
-import { Button, Input, Label } from "@repo/ui"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@repo/ui"
+import { CircleHelp, LogOut, Settings, User } from "lucide-react"
 
 interface UserMenuProps {
   userName?: string
   userEmail?: string
   userAvatar?: string
-  onLogout?: () => void
+  profileHref?: string
+  settingsHref?: string
+  supportHref?: string
+  onLogout?: () => void | Promise<void>
 }
 
 export function UserMenu({
   userName = "John Doe",
   userEmail = "john@example.com",
   userAvatar,
+  profileHref = "/profile",
+  settingsHref = "/settings",
+  supportHref = "/support",
   onLogout,
 }: UserMenuProps) {
-  const [open, setOpen] = useState(false)
+  const initials = userName
+    .split(" ")
+    .map((name) => name[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 
   return (
-    <div className="relative inline-block">
-      <Button variant="ghost" size="sm" onClick={() => setOpen(!open)} className="h-10 w-10 rounded-full p-0">
-        {userAvatar ? (
-          <img src={userAvatar || "/placeholder.svg"} alt={userName} className="h-full w-full rounded-full" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
-            {userName.charAt(0)}
-          </div>
-        )}
-      </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-10 rounded-full"
+          aria-label="Open user menu"
+        >
+          <Avatar className="size-9">
+            <AvatarImage src={userAvatar} alt={userName} />
+            <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-border bg-card shadow-lg z-50">
-          <div className="border-b border-border px-4 py-3">
-            <div className="text-sm font-medium text-foreground">{userName}</div>
-            <div className="text-xs text-muted-foreground">{userEmail}</div>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium leading-none">{userName}</span>
+            <span className="text-xs leading-none text-muted-foreground">
+              {userEmail}
+            </span>
           </div>
+        </DropdownMenuLabel>
 
-          <div className="space-y-1 p-1">
-            <a href="#" className="block rounded px-4 py-2 text-sm text-foreground hover:bg-accent">
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
+          <DropdownMenuItem asChild>
+            <a href={profileHref}>
+              <User className="size-4" />
               Profile
             </a>
-            <a href="#" className="block rounded px-4 py-2 text-sm text-foreground hover:bg-accent">
+          </DropdownMenuItem>
+
+          <DropdownMenuItem asChild>
+            <a href={settingsHref}>
+              <Settings className="size-4" />
               Account settings
             </a>
-            <a href="#" className="block rounded px-4 py-2 text-sm text-foreground hover:bg-accent">
+          </DropdownMenuItem>
+
+          <DropdownMenuItem asChild>
+            <a href={supportHref}>
+              <CircleHelp className="size-4" />
               Help & support
             </a>
-          </div>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
 
-          <button
-            onClick={() => {
-              onLogout?.()
-              setOpen(false)
-            }}
-            className="w-full border-t border-border px-4 py-2 text-left text-sm text-destructive hover:bg-accent"
-          >
-            Sign out
-          </button>
-        </div>
-      )}
-    </div>
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={() => void onLogout?.()}
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
+

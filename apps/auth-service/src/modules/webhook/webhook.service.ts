@@ -2,15 +2,59 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import * as crypto from "crypto";
+import * as dns from "dns/promises";
+import * as net from "net";
 import { WebhookEndpoint, WebhookDelivery } from "@repo/database";
 import { CreateWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 import { logger } from "@/common/logger";
+
+const PRIVATE_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fd[0-9a-f]{2}:/i,
+  /^fe80:/i,
+  /^0\.0\.0\.0$/,
+];
+
+async function validateWebhookUrl(url: string): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new BadRequestException("Invalid webhook URL");
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new BadRequestException("Webhook URL must use http or https");
+  }
+
+  const hostname = parsed.hostname;
+  if (net.isIP(hostname)) {
+    if (PRIVATE_RANGES.some((r) => r.test(hostname))) {
+      throw new BadRequestException("Webhook URL must not point to a private or reserved IP address");
+    }
+    return;
+  }
+
+  const addrs = await dns.lookup(hostname, { all: true }).catch(() => []);
+  for (const { address } of addrs) {
+    if (PRIVATE_RANGES.some((r) => r.test(address))) {
+      throw new BadRequestException("Webhook URL resolves to a private or reserved IP address");
+    }
+  }
+}
 
 export const WEBHOOK_QUEUE = "webhook-delivery";
 
@@ -37,6 +81,7 @@ export class WebhookService {
   ) {}
 
   async create(tenantId: string, dto: CreateWebhookDto): Promise<WebhookEndpoint> {
+    await validateWebhookUrl(dto.url);
     const secret = crypto.randomBytes(32).toString("hex");
     const endpoint = this.endpointRepo.create({
       tenantId,
@@ -63,6 +108,7 @@ export class WebhookService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateWebhookDto): Promise<WebhookEndpoint> {
+    if (dto.url) await validateWebhookUrl(dto.url);
     const endpoint = await this.findOne(tenantId, id);
     Object.assign(endpoint, dto);
     return this.endpointRepo.save(endpoint);

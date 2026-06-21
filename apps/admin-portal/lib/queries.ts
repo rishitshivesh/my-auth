@@ -17,7 +17,12 @@ import type {
   ActiveSessionDto,
   UserListResponse,
   Role,
-  Client
+  Client,
+  WebhookEndpoint,
+  WebhookDelivery,
+  SamlServiceProvider,
+  ScimToken,
+  LdapConnection,
 } from "./types";
 
 function apiUrl(path: string): string {
