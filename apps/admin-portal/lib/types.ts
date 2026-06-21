@@ -4,6 +4,12 @@ export interface MfaStatus {
   methods: string[];
   preferredMethod?: string;
   backupCodesRemaining: number;
+  grace: {
+    startedAt: string | null;
+    expiresAt: string | null;
+    daysRemaining: number;
+    isExpired: boolean;
+  };
 }
 
 export interface DashboardUser {
