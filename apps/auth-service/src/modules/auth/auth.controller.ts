@@ -67,7 +67,7 @@ interface AuthenticatedRequest {
 @ApiTags("Authentication")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * Register a new user
@@ -98,7 +98,7 @@ export class AuthController {
    * Login with email and password
    */
   @Post("login")
-  @RateLimit({ max: 5, windowMs: 900000, keyBy: "ip" })
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Login with email and password" })
   @ApiResponse({ status: 200, description: "Login successful" })
@@ -109,7 +109,7 @@ export class AuthController {
   @ApiResponse({ status: 423, description: "Account locked" })
   async login(
     @Req() req: Request,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Body() loginDto: LoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -135,10 +135,10 @@ export class AuthController {
         domain: req.hostname,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         path: '/',
-      });  
+      });
     }
 
-    return {...response, refreshToken: null};
+    return { ...response, refreshToken: null };
 
   }
 
@@ -152,7 +152,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Logout successful" })
   async logout(
     @Req() req: AuthenticatedRequest,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -257,7 +257,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
   async refresh(
     @Req() req: Request,
-    @Res({passthrough: true}) res: Response,
+    @Res({ passthrough: true }) res: Response,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -276,7 +276,7 @@ export class AuthController {
       });
     }
 
-    return { ...response, refreshToken: null};
+    return { ...response, refreshToken: null };
   }
 
   /**
@@ -416,7 +416,7 @@ export class AuthController {
    * Verify MFA code and complete login
    */
   @Post("mfa/verify")
-  @RateLimit({ max: 5, windowMs: 300000, keyBy: "user" })
+  @RateLimit({ max: 15, windowMs: 300000, keyBy: "user" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Verify MFA code and complete login",
@@ -840,7 +840,7 @@ export class AuthController {
         },
       },
       'New User (Signup)': {
-        "summary" : "New User (Signup)",
+        "summary": "New User (Signup)",
         value: {
           exists: false,
           email: 'newuser@example.com',

@@ -18,7 +18,7 @@ function createMockContext(overrides?: {
   user?: { sub: string };
 }): ExecutionContext {
   const req = {
-    ip: overrides?.ip ?? "127.0.0.1",
+    ip: overrides?.ip ?? "203.0.113.1",
     path: overrides?.path ?? "/auth/login",
     user: overrides?.user,
   };
@@ -135,12 +135,79 @@ describe("RateLimitGuard", () => {
       resetAt: new Date("2026-01-01T00:05:00Z"),
     });
 
-    const ctx = createMockContext({ ip: "10.0.0.1", path: "/auth/login" });
+    const ctx = createMockContext({ ip: "203.0.113.1", path: "/auth/login" });
     await guard.canActivate(ctx);
 
     expect(mockIsAllowed).toHaveBeenCalledWith(
-      "10.0.0.1:/auth/login",
+      "203.0.113.1:/auth/login",
       expect.objectContaining({ maxRequests: 5 }),
     );
+  });
+
+  it("does NOT bypass rate limiting for RFC1918 private IPs (spoofable via X-Forwarded-For)", async () => {
+    (reflector.get as jest.Mock).mockReturnValue({
+      max: 5,
+      windowMs: 900000,
+      keyBy: "ip",
+    });
+    mockIsAllowed.mockResolvedValue({
+      allowed: true,
+      remaining: 4,
+      resetAt: new Date("2026-01-01T00:15:00Z"),
+    });
+
+    const privateIps = ["192.168.1.100", "10.0.0.1", "172.16.5.5", "172.31.255.254"];
+
+    for (const ip of privateIps) {
+      mockIsAllowed.mockClear();
+      const ctx = createMockContext({ ip });
+      await guard.canActivate(ctx);
+      // Must hit Redis — no IP-based bypass for private ranges
+      expect(mockIsAllowed).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("bypasses rate limiting when DISABLE_RATE_LIMIT=true in development", async () => {
+    const originalEnv = process.env["NODE_ENV"];
+    process.env["NODE_ENV"] = "development";
+    process.env["DISABLE_RATE_LIMIT"] = "true";
+
+    (reflector.get as jest.Mock).mockReturnValue({
+      max: 5,
+      windowMs: 900000,
+      keyBy: "ip",
+    });
+
+    const ctx = createMockContext();
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+    expect(mockIsAllowed).not.toHaveBeenCalled();
+
+    process.env["NODE_ENV"] = originalEnv;
+    delete process.env["DISABLE_RATE_LIMIT"];
+  });
+
+  it("does NOT bypass rate limiting when DISABLE_RATE_LIMIT=true in production", async () => {
+    const originalEnv = process.env["NODE_ENV"];
+    process.env["NODE_ENV"] = "production";
+    process.env["DISABLE_RATE_LIMIT"] = "true";
+
+    (reflector.get as jest.Mock).mockReturnValue({
+      max: 5,
+      windowMs: 900000,
+      keyBy: "ip",
+    });
+    mockIsAllowed.mockResolvedValue({
+      allowed: true,
+      remaining: 4,
+      resetAt: new Date("2026-01-01T00:15:00Z"),
+    });
+
+    const ctx = createMockContext();
+    await guard.canActivate(ctx);
+    expect(mockIsAllowed).toHaveBeenCalledTimes(1);
+
+    process.env["NODE_ENV"] = originalEnv;
+    delete process.env["DISABLE_RATE_LIMIT"];
   });
 });

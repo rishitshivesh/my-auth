@@ -179,3 +179,10 @@ Every session must append an entry at its start and update it at completion.
 **Work done:**
 - Diagnosed login loop after authenticator verification and silent login error handling.
 **Outcome:** in-progress
+
+## Session: 2026-06-21 — Gemini (Antigravity)
+**Prompt:** Disable rate limiting on local devices.
+**Files touched:** TBD
+**Work done:**
+- Initialized session to disable rate limiting on local devices.
+**Outcome:** in-progress
