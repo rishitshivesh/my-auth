@@ -269,6 +269,11 @@ export interface LdapConnection {
   bindDn: string;
   baseDn: string;
   userFilter: string;
+  groupFilter?: string;
+  emailAttribute: string;
+  displayNameAttribute?: string;
+  firstNameAttribute?: string;
+  lastNameAttribute?: string;
   syncSchedule: string;
   active: boolean;
   useTls: boolean;

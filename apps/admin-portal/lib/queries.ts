@@ -61,8 +61,8 @@ export function useSetupTotp() {
 
 export function useVerifyTotp() {
   const qc = useQueryClient();
-  return useMutation<void, Error, string>({
-    mutationFn: withErrorHandler<[string], void>(
+  return useMutation<{ backupCodes: string[]; message?: string }, Error, string>({
+    mutationFn: withErrorHandler<[string], { backupCodes: string[]; message?: string }>(
       async (token: string) => authClient.request({
         url: apiUrl("/mfa/verify/totp"),
         method: "POST",
@@ -87,6 +87,63 @@ export function useDisableTotp() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mfa", "status"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useRequestEmailOtp() {
+  return useMutation<{ message: string; expiresIn: string }, Error, void>({
+    mutationFn: withErrorHandler<[], { message: string; expiresIn: string }>(
+      async () => authClient.request({ url: apiUrl("/mfa/request-email-otp"), method: "POST" }),
+      { successMessage: "Verification code sent to your email", showSuccessToast: true }
+    ),
+  });
+}
+
+export function useVerifyEmailOtp() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (code: string) => authClient.request({
+        url: apiUrl("/mfa/verify-email-otp"),
+        method: "POST",
+        body: { code },
+      }),
+      { successMessage: "Email MFA enabled successfully", showSuccessToast: true, errorMessage: "Invalid or expired code. Please try again.", showErrorToast: true }
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mfa", "status"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useDisableAllMfa() {
+  const qc = useQueryClient();
+  return useMutation<void>({
+    mutationFn: withErrorHandler<[], void>(
+      async () => authClient.request({ url: apiUrl("/mfa/all"), method: "DELETE" }),
+      { successMessage: "All MFA methods disabled successfully", showSuccessToast: true, errorMessage: "Failed to disable MFA", showErrorToast: true }
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mfa", "status"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useRegenerateBackupCodes() {
+  const qc = useQueryClient();
+  return useMutation<{ backupCodes: string[]; count: number }, Error, void>({
+    mutationFn: withErrorHandler<[], { backupCodes: string[]; count: number }>(
+      async () => authClient.request({
+        url: apiUrl("/mfa/backup-codes/regenerate"),
+        method: "POST",
+      }),
+      { successMessage: "Backup codes regenerated successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mfa", "status"] });
     },
   });
 }
@@ -234,6 +291,50 @@ export function useTenantRoles() {
   });
 }
 
+export function useCreateRole() {
+  const qc = useQueryClient();
+  return useMutation<Role, Error, { name: string; description?: string }>({
+    mutationFn: withErrorHandler<[{ name: string; description?: string }], Role>(
+      async (body) => authClient.request({
+        url: apiUrl("/rbac/roles"),
+        method: "POST",
+        body,
+      }),
+      { successMessage: "Role created successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "roles"] }),
+  });
+}
+
+export function useUpdateRole() {
+  const qc = useQueryClient();
+  return useMutation<Role, Error, { id: string; name: string; description?: string }>({
+    mutationFn: withErrorHandler<[{ id: string; name: string; description?: string }], Role>(
+      async ({ id, ...body }) => authClient.request({
+        url: apiUrl(`/rbac/roles/${id}`),
+        method: "PUT",
+        body,
+      }),
+      { successMessage: "Role updated successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "roles"] }),
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id) => authClient.request({
+        url: apiUrl(`/rbac/roles/${id}`),
+        method: "DELETE",
+      }),
+      { successMessage: "Role deleted successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "roles"] }),
+  });
+}
+
 export function useTenantClients() {
   return useQuery<Client[]>({
     queryKey: ["tenant", "clients"],
@@ -242,6 +343,62 @@ export function useTenantClients() {
         url: apiUrl(`/oauth/clients`),
         method: "GET",
       })
+    ),
+  });
+}
+
+export function useCreateTenantClient() {
+  const qc = useQueryClient();
+  return useMutation<Client & { clientSecret: string }, Error, { name: string; clientType: string; redirectUris?: string[]; grantTypes?: string[] }>({
+    mutationFn: withErrorHandler<[{ name: string; clientType: string; redirectUris?: string[]; grantTypes?: string[] }], Client & { clientSecret: string }>(
+      async (body) => authClient.request({
+        url: apiUrl("/oauth/clients"),
+        method: "POST",
+        body,
+      }),
+      { successMessage: "Client created successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "clients"] }),
+  });
+}
+
+export function useUpdateTenantClient() {
+  const qc = useQueryClient();
+  return useMutation<Client, Error, { id: string; name?: string; redirectUris?: string[]; grantTypes?: string[]; isActive?: boolean }>({
+    mutationFn: withErrorHandler<[{ id: string; name?: string; redirectUris?: string[]; grantTypes?: string[]; isActive?: boolean }], Client>(
+      async ({ id, ...body }) => authClient.request({
+        url: apiUrl(`/oauth/clients/${id}`),
+        method: "PUT",
+        body,
+      }),
+      { successMessage: "Client updated successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "clients"] }),
+  });
+}
+
+export function useDeleteTenantClient() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id) => authClient.request({
+        url: apiUrl(`/oauth/clients/${id}`),
+        method: "DELETE",
+      }),
+      { successMessage: "Client deleted successfully", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "clients"] }),
+  });
+}
+
+export function useRotateClientSecret() {
+  return useMutation<{ clientSecret: string }, Error, string>({
+    mutationFn: withErrorHandler<[string], { clientSecret: string }>(
+      async (id) => authClient.request({
+        url: apiUrl(`/oauth/clients/${id}/rotate`),
+        method: "POST",
+      }),
+      { successMessage: "Client secret rotated successfully", showSuccessToast: true }
     ),
   });
 }
@@ -277,6 +434,19 @@ export function useVerifyEmail() {
         body: JSON.stringify({ token }),
       }),
       { showErrorToast: false }
+    ),
+  });
+}
+
+export function useResendVerification() {
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (email) => authClient.request({
+        url: apiUrl("/auth/resend-verification"),
+        method: "POST",
+        body: { email },
+      }),
+      { successMessage: "Verification email resent successfully", showSuccessToast: true }
     ),
   });
 }
@@ -451,5 +621,197 @@ export function useUploadLogo() {
       { showErrorToast: true }
     ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
+  });
+}
+
+// ── Sprint 4: Webhooks ────────────────────────────────────────
+
+export function useWebhooks() {
+  return useQuery<WebhookEndpoint[]>({
+    queryKey: ["webhooks"],
+    queryFn: withErrorHandler<[], WebhookEndpoint[]>(
+      async () => authClient.request({ url: apiUrl("/webhooks"), method: "GET" })
+    ),
+  });
+}
+
+export function useWebhookDeliveries(endpointId: string) {
+  return useQuery<WebhookDelivery[]>({
+    queryKey: ["webhooks", endpointId, "deliveries"],
+    queryFn: withErrorHandler<[], WebhookDelivery[]>(
+      async () => authClient.request({ url: apiUrl(`/webhooks/${endpointId}/deliveries`), method: "GET" })
+    ),
+    enabled: !!endpointId,
+  });
+}
+
+export function useCreateWebhook() {
+  const qc = useQueryClient();
+  return useMutation<WebhookEndpoint, Error, { url: string; events: string[]; description?: string }>({
+    mutationFn: withErrorHandler<[{ url: string; events: string[]; description?: string }], WebhookEndpoint>(
+      async (body) => authClient.request({ url: apiUrl("/webhooks"), method: "POST", body }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["webhooks"] }),
+  });
+}
+
+export function useDeleteWebhook() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id: string) => authClient.request({ url: apiUrl(`/webhooks/${id}`), method: "DELETE" }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["webhooks"] }),
+  });
+}
+
+export function useTestWebhook() {
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id: string) => authClient.request({ url: apiUrl(`/webhooks/${id}/test`), method: "POST" }),
+      { successMessage: "Test event sent", showSuccessToast: true }
+    ),
+  });
+}
+
+export function useRotateWebhookSecret() {
+  const qc = useQueryClient();
+  return useMutation<{ secret: string }, Error, string>({
+    mutationFn: withErrorHandler<[string], { secret: string }>(
+      async (id: string) => authClient.request({ url: apiUrl(`/webhooks/${id}/rotate-secret`), method: "POST" }),
+      { successMessage: "Secret rotated", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["webhooks"] }),
+  });
+}
+
+// ── Sprint 4: SAML ────────────────────────────────────────────
+
+export function useSamlSPs() {
+  return useQuery<SamlServiceProvider[]>({
+    queryKey: ["saml", "sps"],
+    queryFn: withErrorHandler<[], SamlServiceProvider[]>(
+      async () => authClient.request({ url: apiUrl("/saml/sps"), method: "GET" })
+    ),
+  });
+}
+
+export function useCreateSamlSP() {
+  const qc = useQueryClient();
+  return useMutation<
+    SamlServiceProvider,
+    Error,
+    { name: string; entityId: string; acsUrl: string; sloUrl?: string; certificate?: string; metadataUrl?: string }
+  >({
+    mutationFn: withErrorHandler<
+      [{ name: string; entityId: string; acsUrl: string; sloUrl?: string; certificate?: string; metadataUrl?: string }],
+      SamlServiceProvider
+    >(
+      async (body) => authClient.request({ url: apiUrl("/saml/sps"), method: "POST", body }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["saml", "sps"] }),
+  });
+}
+
+export function useDeleteSamlSP() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id: string) => authClient.request({ url: apiUrl(`/saml/sps/${id}`), method: "DELETE" }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["saml", "sps"] }),
+  });
+}
+
+// ── Sprint 4: SCIM ────────────────────────────────────────────
+
+export function useScimTokens() {
+  return useQuery<ScimToken[]>({
+    queryKey: ["scim", "tokens"],
+    queryFn: withErrorHandler<[], ScimToken[]>(
+      async () => authClient.request({ url: apiUrl("/scim/tokens"), method: "GET" })
+    ),
+  });
+}
+
+export function useCreateScimToken() {
+  const qc = useQueryClient();
+  return useMutation<{ token: string } & ScimToken, Error, { name: string; expiresAt?: string }>({
+    mutationFn: withErrorHandler<[{ name: string; expiresAt?: string }], { token: string } & ScimToken>(
+      async (body) => authClient.request({ url: apiUrl("/scim/tokens"), method: "POST", body }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["scim", "tokens"] }),
+  });
+}
+
+export function useRevokeScimToken() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id: string) => authClient.request({ url: apiUrl(`/scim/tokens/${id}`), method: "DELETE" }),
+      { successMessage: "Token revoked", showSuccessToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["scim", "tokens"] }),
+  });
+}
+
+// ── Sprint 4: LDAP ────────────────────────────────────────────
+
+export function useLdapConnections() {
+  return useQuery<LdapConnection[]>({
+    queryKey: ["ldap", "connections"],
+    queryFn: withErrorHandler<[], LdapConnection[]>(
+      async () => authClient.request({ url: apiUrl("/ldap/connections"), method: "GET" })
+    ),
+  });
+}
+
+export function useCreateLdapConnection() {
+  const qc = useQueryClient();
+  return useMutation<LdapConnection, Error, Partial<LdapConnection> & { bindPassword: string }>({
+    mutationFn: withErrorHandler<[Partial<LdapConnection> & { bindPassword: string }], LdapConnection>(
+      async (body) => authClient.request({ url: apiUrl("/ldap/connections"), method: "POST", body }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ldap", "connections"] }),
+  });
+}
+
+export function useDeleteLdapConnection() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id: string) => authClient.request({ url: apiUrl(`/ldap/connections/${id}`), method: "DELETE" }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ldap", "connections"] }),
+  });
+}
+
+export function useTestLdapConnection() {
+  return useMutation<{ success: boolean; message: string }, Error, string>({
+    mutationFn: withErrorHandler<[string], { success: boolean; message: string }>(
+      async (id: string) => authClient.request({ url: apiUrl(`/ldap/connections/${id}/test`), method: "POST" }),
+      { showErrorToast: true }
+    ),
+  });
+}
+
+export function useSyncLdap() {
+  const qc = useQueryClient();
+  return useMutation<{ usersCreated: number; usersUpdated: number }, Error, string>({
+    mutationFn: withErrorHandler<[string], { usersCreated: number; usersUpdated: number }>(
+      async (id: string) => authClient.request({ url: apiUrl(`/ldap/connections/${id}/sync`), method: "POST" }),
+      { successMessage: "LDAP sync started", showSuccessToast: true }
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ldap", "connections"] });
+      qc.invalidateQueries({ queryKey: ["tenant", "users"] });
+    },
   });
 }
