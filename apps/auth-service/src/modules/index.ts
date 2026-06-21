@@ -8,6 +8,10 @@ import { MfaModule } from "@/modules/mfa/mfa.module";
 import { SessionModule } from "@/modules/session/session.module";
 import { DashboardModule } from "@/modules/dashboard/dashboard.module";
 import { AdminModule } from "@/modules/admin/admin.module";
+import { WebhookModule } from "@/modules/webhook/webhook.module";
+import { SamlModule } from "@/modules/saml/saml.module";
+import { ScimModule } from "@/modules/scim/scim.module";
+import { LdapModule } from "@/modules/ldap/ldap.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -21,6 +25,10 @@ import { ScheduleModule } from "@nestjs/schedule";
     SessionModule,
     DashboardModule,
     AdminModule,
+    WebhookModule,
+    SamlModule,
+    ScimModule,
+    LdapModule,
     ScheduleModule.forRoot(),
   ],
 })

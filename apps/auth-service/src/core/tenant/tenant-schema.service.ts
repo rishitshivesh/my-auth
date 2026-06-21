@@ -73,6 +73,11 @@ export class TenantSchemaService {
       "role_policies",
       "user_social_connections",
       "user_invites",
+      "webhook_endpoints",
+      "webhook_deliveries",
+      "saml_service_providers",
+      "scim_tokens",
+      "ldap_connections",
     ];
 
     for (const table of tables) {

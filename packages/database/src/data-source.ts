@@ -29,6 +29,17 @@ import { UserSocialConnection } from "./entities/user-social-connections.entity"
 import { TenantBranding } from "./entities/tenant-branding.entity";
 import { KeyPair } from "./entities/key-pair.entity";
 import { UserInvite } from "./entities/user-invite.entity";
+import { WebhookEndpoint } from "./entities/webhook-endpoint.entity";
+import { WebhookDelivery } from "./entities/webhook-delivery.entity";
+import { SamlServiceProvider } from "./entities/saml-service-provider.entity";
+import { ScimToken } from "./entities/scim-token.entity";
+import { LdapConnection } from "./entities/ldap-connection.entity";
+import { Policy } from "./entities/policy.entity";
+import { Group } from "./entities/group.entity";
+import { UserGroup } from "./entities/user-group.entity";
+import { GroupPolicy } from "./entities/group-policy.entity";
+import { UserPolicy } from "./entities/user-policy.entity";
+import { RolePolicy } from "./entities/role-policy.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -77,6 +88,17 @@ export const dataSourceOptions: DataSourceOptions = {
     TenantBranding,
     KeyPair,
     UserInvite,
+    WebhookEndpoint,
+    WebhookDelivery,
+    SamlServiceProvider,
+    ScimToken,
+    LdapConnection,
+    Policy,
+    Group,
+    UserGroup,
+    GroupPolicy,
+    UserPolicy,
+    RolePolicy,
   ],
 
   // Migrations

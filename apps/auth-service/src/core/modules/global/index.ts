@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { BullModule } from "@nestjs/bullmq";
 import { HealthCheckModule } from "../health-check/health-check.module";
 import { validationSchema } from "@/config/env.validation";
 import { CacheModule } from "@nestjs/cache-manager";
@@ -33,6 +34,20 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
         port: configService.get("REDIS_PORT", 6379),
         password: configService.get("REDIS_PASSWORD"),
         ttl: 300, // 5 minutes default
+      }),
+    }),
+
+    // BullMQ (webhook delivery queue)
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get("REDIS_HOST", "localhost"),
+          port: configService.get<number>("REDIS_PORT", 6379),
+          password: configService.get("REDIS_PASSWORD") || undefined,
+          db: configService.get<number>("REDIS_DB", 0),
+        },
       }),
     }),
 
