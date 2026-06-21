@@ -267,15 +267,11 @@ export class SocialAuthController {
         );
       }
 
-      // Set refresh cookie (same pattern as regular login)
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
+      const isProduction = process.env['NODE_ENV'] === 'production';
+      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
+      const base = { httpOnly: true, secure: isProduction, sameSite: 'strict' as const, path: '/', ...(cookieDomain ? { domain: cookieDomain } : {}) };
+      // Refresh token: set now (we have it)
+      res.cookie("refreshToken", result.refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
 
       // Create short-lived completion token (60s, one-time use by the portal)
       const completionToken = await this.signToken(
@@ -303,21 +299,35 @@ export class SocialAuthController {
   @Post("claim-session")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Claim social session using completion token" })
-  @ApiResponse({ status: 200, description: "Access token returned" })
+  @ApiResponse({ status: 200, description: "Session claimed, accessToken set as httpOnly cookie" })
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
-  async claimSession(@Body() body: { ct: string }) {
+  async claimSession(
+    @Body() body: { ct: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(body.ct);
       const payload = this.jwtService.verify(body.ct, {
         publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         algorithms: ['RS256'],
-      });
+      }) as Record<string, unknown>;
 
-      if (payload.type !== "social_completion") {
+      if (payload['type'] !== "social_completion") {
         throw new Error("Invalid token type");
       }
 
-      return { status: 200, data: { accessToken: payload.accessToken } };
+      const isProduction = process.env['NODE_ENV'] === 'production';
+      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
+      res.cookie('accessToken', payload['accessToken'] as string, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 15 * 60 * 1000,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      });
+
+      return { tenantSlug: (payload['tenantSlug'] as string) ?? '' };
     } catch {
       throw new UnauthorizedException("Invalid or expired completion token");
     }

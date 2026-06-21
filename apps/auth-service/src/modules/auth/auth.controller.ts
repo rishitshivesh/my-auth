@@ -67,7 +67,41 @@ interface AuthenticatedRequest {
 @ApiTags("Authentication")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
+
+  /**
+   * Set both access and refresh tokens as httpOnly cookies.
+   * Tokens are NEVER returned in the response body — cookie-only per project rules.
+   *
+   * accessToken maxAge = 15 min (matches RS256 JWT TTL)
+   * refreshToken maxAge = 30 days (matches DB refresh token TTL)
+   *
+   * Set COOKIE_DOMAIN=.sentry.scrolloop.com in production so cookies are shared
+   * across tenant subdomains (acme.sentry.scrolloop.com, beta.sentry.scrolloop.com).
+   * Leave unset in development — defaults to exact hostname, works for localhost.
+   */
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+    const isProduction = process.env['NODE_ENV'] === 'production';
+    const domain = process.env['COOKIE_DOMAIN'] || undefined;
+
+    const base = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict' as const,
+      path: '/',
+      ...(domain ? { domain } : {}),
+    };
+
+    res.cookie('accessToken', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
+  }
+
+  private clearAuthCookies(res: Response): void {
+    const domain = process.env['COOKIE_DOMAIN'] || undefined;
+    const base = { httpOnly: true, path: '/', ...(domain ? { domain } : {}) };
+    res.clearCookie('accessToken', base);
+    res.clearCookie('refreshToken', base);
+  }
 
   /**
    * Register a new user
@@ -126,20 +160,8 @@ export class AuthController {
       return response;
     }
 
-    if ('accessToken' in response && 'refreshToken' in response && 'user' in response) {
-      res.cookie('refreshToken', response.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        // sameSite: 'none',
-        sameSite: 'strict',
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        path: '/',
-      });
-    }
-
-    return { ...response, refreshToken: null };
-
+    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    return { user: response.user, tenantSlug: response.tenantSlug };
   }
 
   /**
@@ -161,13 +183,7 @@ export class AuthController {
     const sessionId = req.user.sessionId ?? '';
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      // sameSite: 'none',
-      sameSite: 'strict',
-      domain: req.hostname,
-    });
+    this.clearAuthCookies(res);
 
     return { message: "Logged out successfully" };
   }
@@ -266,17 +282,8 @@ export class AuthController {
 
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
-    if ('accessToken' in response && 'refreshToken' in response) {
-      res.cookie('refreshToken', response.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-
-      });
-    }
-
-    return { ...response, refreshToken: null };
+    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    return {};
   }
 
   /**
@@ -475,16 +482,8 @@ export class AuthController {
         userAgent,
       );
 
-      res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        domain: req.hostname,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        path: "/",
-      });
-
-      return { status: 200, data: { accessToken: result.accessToken, message: result.message } };
+      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      return { message: result.message, tenantSlug: result.tenantSlug };
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
@@ -545,6 +544,7 @@ export class AuthController {
   })
   async verifyMfaBackup(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Body() dto: VerifyMfaDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -552,13 +552,15 @@ export class AuthController {
     const tenantId = req.tenantId!;
 
     try {
-      return await this.authService.verifyMfaBackup(
+      const result = await this.authService.verifyMfaBackup(
         tenantId,
         dto.tempToken,
         dto.code,
         ip,
         userAgent,
       );
+      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      return { message: result.message, tenantSlug: result.tenantSlug, warning: result.warning };
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
@@ -672,16 +674,8 @@ export class AuthController {
       userAgent,
     });
 
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      domain: req.hostname,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-
-    return { status: 200, data: { accessToken: result.accessToken } };
+    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    return { user: result.user, tenantSlug: result.tenantSlug };
   }
 
   /**
@@ -716,23 +710,15 @@ export class AuthController {
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const { accessToken, refreshToken } = await this.authService.verifyMagicLink(
+    const { accessToken, refreshToken, tenantSlug } = await this.authService.verifyMagicLink(
       tenantId,
       dto.token,
       ip,
       userAgent || "unknown",
     );
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      domain: req.hostname,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
-
-    return { status: 200, data: { accessToken } };
+    this.setAuthCookies(res, accessToken, refreshToken);
+    return { tenantSlug };
   }
 
   /**

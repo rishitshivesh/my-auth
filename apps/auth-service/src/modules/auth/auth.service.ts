@@ -240,7 +240,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
+    | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | {
         mfaRequired: boolean;
         tempToken: string;
@@ -400,7 +400,6 @@ export class AuthService {
       user.tenant,
     );
 
-    console.log({ accessTokenPayloadData }, "Access token payload data");
     const accessToken = await this.signToken(
       accessTokenPayloadData,
       "15m",
@@ -429,6 +428,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: user.tenant?.slug ?? '',
       user: {
         email: user.email,
         firstName: user.firstName,
@@ -559,7 +559,7 @@ export class AuthService {
     rawToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     const user = await this.userRepository
@@ -618,7 +618,7 @@ export class AuthService {
       metadata: { authMethod: "magic_link", sessionId: session.id },
     });
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, tenantSlug: (magicLinkPayload.tenantSlug as string) ?? '' };
   }
 
   /**
@@ -789,7 +789,7 @@ export class AuthService {
     refreshToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
     // Use OAuthRefreshTokenService for rotation
     let accessTokenPayload: Record<string, unknown>;
     let newToken: string;
@@ -863,7 +863,8 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken: newToken, // NEW token to client
+      refreshToken: newToken,
+      tenantSlug: (enrichedPayload.tenantSlug as string) ?? '',
     };
   }
 
@@ -1010,6 +1011,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: (mfaPayload.tenantSlug as string) ?? '',
       message: "MFA verified successfully",
     };
   }
@@ -1078,6 +1080,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: (backupPayload.tenantSlug as string) ?? '',
       message: "Backup code verified successfully",
       warning:
         remaining <= 2
@@ -1138,7 +1141,7 @@ export class AuthService {
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
+  }): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
@@ -1224,6 +1227,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
+      tenantSlug: user.tenant?.slug ?? '',
       user: {
         email: user.email,
         firstName: user.firstName,
