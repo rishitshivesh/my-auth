@@ -186,3 +186,40 @@ Every session must append an entry at its start and update it at completion.
 **Work done:**
 - Initialized session to disable rate limiting on local devices.
 **Outcome:** in-progress
+
+## Session: 2026-06-21 — Claude Sonnet 4.6 (Sprint 4 + Security hardening)
+**Prompt:** Sprint 4 frontend — SAML, SCIM, LDAP, Webhooks pages. Complete all pending tasks #6–#12. Security review.
+**Files touched:**
+- `apps/admin-portal/lib/queries.ts` — Sprint 4 hooks appended (webhooks, SAML, SCIM, LDAP)
+- `apps/admin-portal/lib/types.ts` — `LdapConnection` extended; `MfaStatus.grace` server-side shape added
+- `apps/admin-portal/app/t/[slug]/webhooks/page.tsx` — NEW: endpoint list, delivery log, create/rotate/test
+- `apps/admin-portal/app/t/[slug]/connections/saml/page.tsx` — NEW: SP registration, IdP metadata URL
+- `apps/admin-portal/app/t/[slug]/connections/scim/page.tsx` — NEW: token lifecycle, SCIM base URL
+- `apps/admin-portal/app/t/[slug]/connections/ldap/page.tsx` — NEW: config, TLS toggle, test, sync-now
+- `apps/admin-portal/lib/use-mfa-grace.ts` — Rewrote: localStorage removed, reads `mfaStatus.grace` from server
+- `apps/auth-service/src/modules/webhook/webhook.service.ts` — SSRF: DNS fail-closed, IPv4-mapped IPv6, normalizeIp()
+- `apps/auth-service/src/modules/webhook/webhook.processor.ts` — SSRF: same fixes + maxRedirects: 0
+- `apps/auth-service/src/common/guards/rate-limit.guard.ts` — RFC1918 bypass removed; DISABLE_RATE_LIMIT env gate
+- `apps/auth-service/src/common/guards/rate-limit.guard.spec.ts` — Updated tests for new bypass model
+- `apps/auth-service/src/modules/mfa/mfa.service.ts` — Server-side grace: mfaGraceStartedAt set/cleared in getMfaStatus()
+- `packages/database/src/entities/user.entity.ts` — Added mfaGraceStartedAt column
+- `packages/database/src/migrations/1910000000000-AddMfaGraceStartedAt.ts` — NEW migration (public + all fk_* schemas)
+- `apps/auth-service/list-users.js` — DELETED (leaked Supabase credentials; was untracked)
+**Work done:**
+- Sprint 4 frontend: 4 new pages (webhooks, SAML, SCIM, LDAP) fully wired to React Query hooks
+- All Sprint 4 React Query hooks added to queries.ts + types.ts
+- Verified tasks #6–#12 already implemented in prior sessions (seeder, JWT tenantSlug, authClient slug, post-login redirect, middleware fail-closed, CLI, GET /user/orgs + TenantSwitcher)
+- SSRF hardening: DNS fail-closed in webhook service and processor; IPv4-mapped IPv6 bypass fixed; redirect follow disabled
+- MFA grace period moved from localStorage (client-bypassable) to server-side mfa_grace_started_at DB column
+- RFC1918 rate-limit bypass removed; replaced with NODE_ENV=development && DISABLE_RATE_LIMIT=true env gate
+- Leaked Supabase credentials deleted from working tree (was never committed)
+- TODO.md rewritten with full completed/pending sections
+**Security findings fixed:**
+- SSRF DNS fail-open (.catch(() => []) → throws BadRequestException)
+- SSRF IPv4-mapped IPv6 bypass (::ffff:192.168.x now caught by normalizeIp())
+- SSRF redirect bypass (maxRedirects: 0 on axios webhook delivery calls)
+- Rate-limit RFC1918 bypass (X-Forwarded-For spoofable private IPs no longer bypass Redis check)
+- MFA grace localStorage bypass (client could clear storage to extend grace indefinitely)
+- Leaked credential (plaintext Supabase connection string in list-users.js)
+**Outcome:** completed
+**Action required:** Rotate Supabase database password (plaintext connection string was in deleted list-users.js)
