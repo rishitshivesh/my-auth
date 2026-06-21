@@ -28,6 +28,17 @@ const PRIVATE_RANGES = [
   /^0\.0\.0\.0$/,
 ];
 
+// Strip IPv4-mapped IPv6 prefix (::ffff:192.168.1.1 → 192.168.1.1) before range check
+// to prevent bypasses via IPv4-mapped notation
+function normalizeIp(address: string): string {
+  const v4mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
+  return v4mapped?.[1] ?? address;
+}
+
+function isPrivateIp(address: string): boolean {
+  return PRIVATE_RANGES.some((r) => r.test(normalizeIp(address)));
+}
+
 async function validateWebhookUrl(url: string): Promise<void> {
   let parsed: URL;
   try {
@@ -42,15 +53,19 @@ async function validateWebhookUrl(url: string): Promise<void> {
 
   const hostname = parsed.hostname;
   if (net.isIP(hostname)) {
-    if (PRIVATE_RANGES.some((r) => r.test(hostname))) {
+    if (isPrivateIp(hostname)) {
       throw new BadRequestException("Webhook URL must not point to a private or reserved IP address");
     }
     return;
   }
 
-  const addrs = await dns.lookup(hostname, { all: true }).catch(() => []);
+  // Do NOT swallow DNS errors — an unresolvable hostname should be rejected,
+  // not silently accepted (which would be a fail-open SSRF bypass)
+  const addrs = await dns.lookup(hostname, { all: true }).catch(() => {
+    throw new BadRequestException("Webhook URL hostname could not be resolved");
+  });
   for (const { address } of addrs) {
-    if (PRIVATE_RANGES.some((r) => r.test(address))) {
+    if (isPrivateIp(address)) {
       throw new BadRequestException("Webhook URL resolves to a private or reserved IP address");
     }
   }
