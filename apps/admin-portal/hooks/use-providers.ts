@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { authClient } from "@/app/layout"
+import { authClient } from "@/lib/auth-client"
 import { withErrorHandler } from "@/lib/with-error-handler"
 
 export interface SocialProvider {

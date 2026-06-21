@@ -38,16 +38,12 @@ export class TenantSchemaMiddleware implements NestMiddleware {
     res.on('close', cleanup);
 
     try {
-      // Auto-heal: if schema or tables don't exist, create/heal them on-demand
-      const exists = await this.tenantSchemaService.schemaExists(slug);
-      let tablesExist = false;
-      if (exists) {
-        tablesExist = await this.tenantSchemaService.tablesExist(slug);
-      }
-
-      if (!exists || !tablesExist) {
+      // Single DB query on first access; in-process cache hit (0 queries) on every subsequent request.
+      const ready = await this.tenantSchemaService.isVerifiedAndReady(slug);
+      if (!ready) {
         this.logger.warn({ slug, schemaName }, 'Tenant schema or tables missing — auto-healing');
         await this.tenantSchemaService.createSchema(slug);
+        this.tenantSchemaService.markVerified(slug);
       }
 
       await qr.query(`SET search_path TO "${schemaName}", public`);

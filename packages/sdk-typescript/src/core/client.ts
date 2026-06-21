@@ -125,7 +125,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { email },
     });
@@ -145,7 +145,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { otp, password },
     });
@@ -165,7 +165,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { tempToken, code },
       credentials: "include",
@@ -213,7 +213,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { ct: completionToken },
       credentials: "include",
@@ -246,7 +246,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { email },
     });
@@ -265,7 +265,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       body: { token },
       credentials: "include",
@@ -784,7 +784,7 @@ export class SentryClient {
   private addAuthHeaders(req: TransportRequest): TransportRequest {
     const headers = {
       "Content-Type": "application/json",
-      "X-Tenant-ID": this.config.tenant,
+      "X-Tenant-Slug": this.config.tenant,
       Authorization: "", // Placeholder
       ...req.headers,
     };
@@ -878,7 +878,7 @@ export class SentryClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tenant-ID": this.config.tenant,
+        "X-Tenant-Slug": this.config.tenant,
       },
       credentials: "include", // This sends the refresh cookie
     });

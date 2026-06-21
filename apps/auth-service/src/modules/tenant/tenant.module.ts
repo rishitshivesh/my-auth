@@ -27,6 +27,8 @@ import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { GuardsModule } from "@/common/guards/guards.module";
+import { SessionRepository } from "@/core/database/session.repository";
+import { TenantContextService } from "@/core/database/tenant-context.service";
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { GuardsModule } from "@/common/guards/guards.module";
       UserRole,
       OAuthRefreshToken,
       KeyPair,
+      SessionRepository,
     ]),
     CacheModule.register({
       ttl: 300000,
@@ -58,6 +61,8 @@ import { GuardsModule } from "@/common/guards/guards.module";
     SessionService,
     JwksService,
     OAuthRefreshTokenService,
+    SessionRepository,
+    TenantContextService,
   ],
   controllers: [
     TenantController,
@@ -65,6 +70,6 @@ import { GuardsModule } from "@/common/guards/guards.module";
     PublicBrandingController,
     TenantRegistrationController,
   ],
-  exports: [TenantService, TenantBrandingService, TenantSchemaService],
+  exports: [TenantService, TenantBrandingService, TenantSchemaService, TenantContextService, SessionRepository],
 })
 export class TenantModule {}

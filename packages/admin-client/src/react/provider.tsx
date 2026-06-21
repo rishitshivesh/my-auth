@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useMemo } from 'react';
 import type React from 'react';
-import { SentryAdminClient } from '../client.js';
+import { SentryAdminClient } from '../client';
 import { SentryAxiosTransport } from '@scrolloop/sentry-config/transport';
 import { resolveSentryConfig } from '@scrolloop/sentry-config';
 

@@ -5,9 +5,8 @@ import {
   UnauthorizedException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
 import { Session } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 
 /**
  * SessionGuard
@@ -22,10 +21,7 @@ import { Session } from "@repo/database";
 export class SessionGuard implements CanActivate {
   private readonly logger = new Logger(SessionGuard.name);
 
-  constructor(
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
-  ) { }
+  constructor(private readonly sessionRepository: SessionRepository) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -43,29 +39,31 @@ export class SessionGuard implements CanActivate {
     const platformSlug = process.env.SENTRY_PLATFORM_SLUG ?? "sentry";
     const schemaName = user.isSuperAdmin ? `fk_${platformSlug}` : undefined;
 
-    let session;
+    let session: Session | null = null;
     if (schemaName) {
-      // Query the platform schema directly with raw SQL to bypass active search_path for superadmin
-      const rows = await this.sessionRepository.manager.query(
+      // Superadmin: query platform schema directly — TenantSchemaMiddleware does not run on superadmin routes
+      const rows = await this.sessionRepository.executeRaw<Record<string, unknown>>(
         `SELECT * FROM "${schemaName}"."sessions" WHERE id = $1 LIMIT 1`,
-        [sessionId]
+        [sessionId],
       );
-      const rawSession = rows[0];
-      if (rawSession) {
+      const raw = rows[0];
+      if (raw) {
         session = {
-          id: rawSession.id,
-          userId: rawSession.user_id,
-          tenantId: rawSession.tenant_id,
-          revokedAt: rawSession.revoked_at ? new Date(rawSession.revoked_at) : null,
-          expiresAt: rawSession.expires_at ? new Date(rawSession.expires_at) : null,
-          lastActivity: rawSession.last_activity ? new Date(rawSession.last_activity) : null,
-          ipAddress: rawSession.ip_address,
-          userAgent: rawSession.user_agent,
-          deviceId: rawSession.device_id,
-          createdAt: rawSession.created_at ? new Date(rawSession.created_at) : null,
+          id: raw['id'],
+          userId: raw['user_id'],
+          tenantId: raw['tenant_id'],
+          revokedAt: raw['revoked_at'] ? new Date(raw['revoked_at'] as string) : null,
+          expiresAt: raw['expires_at'] ? new Date(raw['expires_at'] as string) : null,
+          lastActivity: raw['last_activity'] ? new Date(raw['last_activity'] as string) : null,
+          ipAddress: raw['ip_address'],
+          userAgent: raw['user_agent'],
+          deviceId: raw['device_id'],
+          createdAt: raw['created_at'] ? new Date(raw['created_at'] as string) : null,
         } as Session;
       }
     } else {
+      // Regular tenant user: TenantSchemaMiddleware has already set search_path via AsyncLocalStorage.
+      // SessionRepository uses the schema-scoped EntityManager — correct schema guaranteed.
       session = await this.sessionRepository.findOne({
         where: { id: sessionId },
         select: {
@@ -88,7 +86,6 @@ export class SessionGuard implements CanActivate {
       throw new UnauthorizedException("Session not found. Please login again.");
     }
 
-    // Check if session is revoked
     if (session.revokedAt) {
       this.logger.warn("SessionGuard: Session revoked", {
         sessionId,
@@ -99,7 +96,6 @@ export class SessionGuard implements CanActivate {
       );
     }
 
-    // Check if session is expired
     if (session.expiresAt && session.expiresAt < new Date()) {
       this.logger.warn("SessionGuard: Session expired", {
         sessionId,
@@ -110,11 +106,9 @@ export class SessionGuard implements CanActivate {
       );
     }
 
-    // Attach session to request
     request.sentrySession = session;
 
-    // Update last activity (non-blocking)
-    this.updateLastActivity(sessionId, schemaName).catch((err) => {
+    this.updateLastActivity(sessionId, schemaName).catch((err: Error) => {
       this.logger.error("Failed to update last activity", {
         sessionId,
         error: err.message,
@@ -128,9 +122,9 @@ export class SessionGuard implements CanActivate {
 
   private async updateLastActivity(sessionId: string, schemaName?: string): Promise<void> {
     if (schemaName) {
-      await this.sessionRepository.manager.query(
+      await this.sessionRepository.executeRaw(
         `UPDATE "${schemaName}"."sessions" SET last_activity = $1 WHERE id = $2`,
-        [new Date(), sessionId]
+        [new Date(), sessionId],
       );
     } else {
       await this.sessionRepository.update(sessionId, {

@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { dataSourceOptions } from "@repo/database";
 import { TenantContextService } from "./tenant-context.service";
 import { CorsRefreshService } from "@/core/cors-refresh.service";
+import { SessionRepository } from "./session.repository";
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { CorsRefreshService } from "@/core/cors-refresh.service";
         }) as any,
     }),
   ],
-  providers: [TenantContextService, CorsRefreshService],
-  exports: [TenantContextService, CorsRefreshService],
+  providers: [TenantContextService, CorsRefreshService, SessionRepository],
+  exports: [TenantContextService, CorsRefreshService, SessionRepository],
 })
 export class DatabaseModule {}

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authClient } from "@/app/layout";
+import { authClient } from "@/lib/auth-client";
 import { withErrorHandler } from "./with-error-handler";
 import type {
   DashboardData,

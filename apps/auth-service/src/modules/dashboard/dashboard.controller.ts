@@ -2,7 +2,8 @@ import { Controller, Get, Patch, Param, Body, Request, Query } from "@nestjs/com
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
-import { User, Session, Tenant, TenantSocialProvider } from "@repo/database";
+import { User, Tenant, TenantSocialProvider } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 import { type SocialProvider } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { MfaService } from "@/modules/mfa/mfa.service";
@@ -23,8 +24,7 @@ export class DashboardController {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(TenantSocialProvider)

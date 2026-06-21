@@ -92,7 +92,14 @@ export class TenantResolverMiddleware implements NestMiddleware {
       if (subdomainTenant) return subdomainTenant;
     }
 
-    // ── 3. X-Tenant-ID header (dev / explicitly enabled) ─────────────────────
+    // ── 3. X-Tenant-Slug header (always accepted — slug is not a secret) ────────
+    const slugHeader = req.headers["x-tenant-slug"] as string | undefined;
+    if (slugHeader) {
+      const tenant = await this.tenantService.findBySlug(slugHeader);
+      if (tenant) return tenant;
+    }
+
+    // ── 4. X-Tenant-ID header (dev / explicitly enabled) ─────────────────────
     if (this.allowTenantIdHeader) {
       const tenantIdHeader = req.headers["x-tenant-id"] as string | undefined;
       if (tenantIdHeader) {

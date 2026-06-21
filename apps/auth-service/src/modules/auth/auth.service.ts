@@ -8,11 +8,11 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
+import { SessionRepository } from "@/core/database/session.repository";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
   User,
-  Session,
   Tenant,
   OAuthRefreshToken,
   UserSocialConnection,
@@ -52,8 +52,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(OAuthRefreshToken)
@@ -897,31 +896,6 @@ export class AuthService {
         slug: user.tenant.slug, // ← Use 'slug' not 'subdomain'
       },
     };
-  }
-
-  /**
-   * Create session (TENANT SCOPED) - PRIVATE METHOD
-   */
-  private async createSession(data: {
-    tenantId: string;
-    userId: string;
-    ipAddress?: string;
-    userAgent?: string;
-  }): Promise<Session> {
-    const refreshTokenFamilyId = crypto.randomUUID();
-    const deviceId = crypto.randomBytes(16).toString("hex");
-
-    const session = this.sessionRepository.create({
-      tenantId: data.tenantId, // ← Always set tenant
-      userId: data.userId,
-      refreshTokenFamilyId,
-      deviceId,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    });
-
-    return this.sessionRepository.save(session);
   }
 
   /**

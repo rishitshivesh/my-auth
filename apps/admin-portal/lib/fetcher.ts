@@ -2,7 +2,7 @@
  * Authenticated fetcher for admin API calls.
  * Attaches the current access token via the SDK and handles 401s.
  */
-import { authClient } from '@/app/layout'
+import { authClient } from '@/lib/auth-client'
 import { withErrorHandler } from './with-error-handler'
 
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:4000'

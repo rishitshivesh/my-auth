@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import type { SentrySDKConfig } from './index.js';
+import type { SentrySDKConfig } from './index';
 
 export class SentryAPIError extends Error {
   constructor(

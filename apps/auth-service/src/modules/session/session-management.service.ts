@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, LessThan, In } from "typeorm";
 import { Session, OAuthRefreshToken } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 import * as geoip from "geoip-lite";
 import { UAParser } from "ua-parser-js";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
@@ -44,8 +45,7 @@ export class SessionManagementService {
   private readonly logger = new Logger(SessionManagementService.name);
 
   constructor(
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(OAuthRefreshToken)
     private readonly refreshTokenRepository: Repository<OAuthRefreshToken>,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
@@ -325,7 +325,7 @@ export class SessionManagementService {
     const lastActivity =
       activeSessions.length > 0
         ? activeSessions.reduce((latest, session) => {
-            return session.lastActivity > (latest as any)
+            return session.lastActivity > (latest as Date)
               ? session.lastActivity
               : latest;
           }, activeSessions?.[0]?.lastActivity)
@@ -369,7 +369,7 @@ export class SessionManagementService {
     const ids = expired.map((s) => s.id);
     let tokensRevoked = 0;
 
-    await this.sessionRepository.manager.transaction(async (manager) => {
+    await this.sessionRepository.transaction(async (manager) => {
       await manager.softDelete(Session, ids);
 
       const result = await manager.update(

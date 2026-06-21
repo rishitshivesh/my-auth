@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
   User,
-  Session,
   UserRole,
   Role,
   RolePermission,
@@ -34,7 +33,6 @@ import { DatabaseModule } from "@/core/database/database.module";
   imports: [
     TypeOrmModule.forFeature([
       User,
-      Session,
       UserRole,
       Role,
       RolePermission,

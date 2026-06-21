@@ -8,7 +8,7 @@ import { WizardCard } from "@/components/onboarding/WizardCard";
 import { WizardField, inputBase } from "@/components/onboarding/WizardField";
 import { PasswordStrength } from "@/components/onboarding/PasswordStrength";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
-import { authClient } from "@/app/layout";
+import { authClient } from "@/lib/auth-client";
 import { withErrorHandler } from "@/lib/with-error-handler";
 
 const AUTH_SERVICE_URL =

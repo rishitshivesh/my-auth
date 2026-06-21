@@ -83,6 +83,7 @@ export class AppModule {
         "Authorization",
         "X-Requested-With",
         "x-tenant-id",
+        "x-tenant-slug",
         "x-authorization",
         "x-csrf-token",
         "x-setup-token",

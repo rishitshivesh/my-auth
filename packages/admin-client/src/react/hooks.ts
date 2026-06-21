@@ -5,13 +5,13 @@ import {
   useQueryClient,
   useInfiniteQuery,
 } from '@tanstack/react-query';
-import { useAdminClient } from './provider.js';
+import { useAdminClient } from './provider';
 import type {
   UserFilters,
   AuditFilters,
   TenantDetail,
   PasswordPolicy,
-} from '../types.js';
+} from '../types';
 
 export function useUsers(filters?: UserFilters) {
   const client = useAdminClient();

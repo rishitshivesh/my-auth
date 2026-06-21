@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SentryAuthFlow } from "@/components/auth/SentryAuthFlow";
 import { AuthLayout } from "@/components/layouts/AuthLayout";
 import { useAuth } from "@scrolloop/sdk";
-import { authClient } from "@/app/layout";
+import { authClient } from "@/lib/auth-client";
 
 function getPostLoginRoute(): string {
   const claims = authClient.getTokenClaims()

@@ -16,6 +16,7 @@ import {
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
+import { DatabaseModule } from "@/core/database/database.module";
 import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { AuthService } from "./auth.service";
@@ -51,6 +52,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       TenantSocialProvider,
       SecurityEvent,
     ]),
+    DatabaseModule,
     SecurityEventModule,
     UserModule,
     EmailModule,

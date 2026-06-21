@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@scrolloop/sdk';
-import { authClient } from '@/app/layout';
+import { authClient } from '@/lib/auth-client';
 import { ChevronDown, Building2, Plus } from 'lucide-react';
 
 interface OrgMembership {

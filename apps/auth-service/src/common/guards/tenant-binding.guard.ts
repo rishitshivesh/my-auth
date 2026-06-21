@@ -27,6 +27,12 @@ export class TenantBindingGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
 
+    console.log("TenantBindingGuard: Checking tenant binding for request", {
+      tenantId: request.tenantId,
+      userId: request.user?.sub,
+      request
+    });
+
     // Step 1: Verify prerequisites
     const requestTenantId = request.tenantId;
     const user = request.user;

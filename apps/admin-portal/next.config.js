@@ -5,7 +5,10 @@ const nextConfig = {
     "@fortknox/sdk",
     "@fortknox/types",
     "@repo/shared",
-    "@repo/security"
+    "@repo/security",
+    "@scrolloop/admin-client",
+    "@scrolloop/sentry-config",
+    "@scrolloop/types"
   ],
   env: {
     SENTRY_TENANT_ID: process.env.SENTRY_TENANT_ID,

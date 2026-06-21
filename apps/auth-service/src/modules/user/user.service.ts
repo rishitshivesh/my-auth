@@ -8,10 +8,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In, FindOptionsWhere } from "typeorm";
 import {
   User,
-  Session,
   SecurityEventType,
   SecurityEvent,
 } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { PasswordService } from "@repo/security";
 import { logger } from "@/common/logger";
@@ -30,8 +30,7 @@ import { UserRepository, OrgMembership } from "./user.repository";
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(SecurityEvent)
     private readonly securityEventRepository: Repository<SecurityEvent>,
     private readonly securityEventService: SecurityEventService,

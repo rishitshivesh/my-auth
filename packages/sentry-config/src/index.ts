@@ -43,4 +43,4 @@ export function resolveSentryConfig(overrides?: Partial<SentrySDKConfig>): Sentr
   };
 }
 
-export { SentryAxiosTransport, SentryAPIError } from './transport.js';
+export { SentryAxiosTransport, SentryAPIError } from './transport';

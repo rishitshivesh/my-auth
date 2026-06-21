@@ -3,12 +3,12 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, MoreThan } from "typeorm";
 import {
   User,
-  Session,
   OAuthClient,
   SecurityEvent,
   UserSocialConnection,
   WebAuthnCredential,
 } from "@repo/database";
+import { SessionRepository } from "@/core/database/session.repository";
 import { RedisService } from "@/common/service/redis.service";
 
 export interface TenantMetricsDto {
@@ -50,8 +50,7 @@ export class DashboardService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
+    private readonly sessionRepository: SessionRepository,
     @InjectRepository(OAuthClient)
     private readonly oauthClientRepository: Repository<OAuthClient>,
     @InjectRepository(SecurityEvent)
