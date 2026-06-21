@@ -44,7 +44,7 @@ export default function ScimPage({ params }: { params: Promise<{ slug: string }>
   const [expiresAt, setExpiresAt] = React.useState("");
   const [newToken, setNewToken] = React.useState<string | null>(null);
 
-  const scimBaseUrl = `${process.env.NEXT_PUBLIC_AUTH_URL ?? ""}/scim/v2`;
+  const scimBaseUrl = `${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000"}/scim/v2`;
 
   async function handleCreate() {
     if (!tokenName) return;

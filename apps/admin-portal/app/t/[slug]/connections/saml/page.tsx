@@ -44,7 +44,7 @@ export default function SamlPage({ params }: { params: Promise<{ slug: string }>
   const [certificate, setCertificate] = React.useState("");
   const [metadataUrl, setMetadataUrl] = React.useState("");
 
-  const idpMetadataUrl = `${process.env.NEXT_PUBLIC_AUTH_URL ?? ""}/saml/metadata/${slug}`;
+  const idpMetadataUrl = `${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000"}/saml/metadata/${slug}`;
 
   async function handleCreate() {
     if (!name || !entityId || !acsUrl) return;

@@ -54,6 +54,11 @@ export default function UserDetailPage() {
 
   type Tab = 'overview' | 'sessions' | 'devices' | 'audit';
   const [activeTab, setActiveTab] = React.useState<Tab>('overview');
+  const [totpDevices, setTotpDevices] = React.useState<ReturnType<typeof listTotpDevices>>([]);
+
+  React.useEffect(() => {
+    setTotpDevices(listTotpDevices(userId));
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -214,31 +219,25 @@ export default function UserDetailPage() {
                     {/* TOTP Authenticator Devices */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-display font-bold uppercase tracking-wider text-neutral-400">Authenticator Apps (TOTP)</h4>
-                      {(() => {
-                        const devices = listTotpDevices(userId);
-                        if (devices.length === 0) {
-                          return (
-                            <p className="text-xs font-body text-neutral-400 italic">
-                              No authenticator apps registered in browser cache for this user.
-                            </p>
-                          );
-                        }
-                        return (
-                          <div className="divide-y divide-neutral-100">
-                            {devices.map((device) => (
-                              <div key={device.id} className="flex items-center justify-between py-2.5 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Smartphone className="w-4 h-4 text-neutral-400" />
-                                  <span className="font-body font-medium text-neutral-800">{device.name}</span>
-                                </div>
-                                <span className="text-xs font-body text-neutral-500">
-                                  Added {new Date(device.createdAt).toLocaleDateString()}
-                                </span>
+                      {totpDevices.length === 0 ? (
+                        <p className="text-xs font-body text-neutral-400 italic">
+                          No authenticator apps registered in browser cache for this user.
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-neutral-100">
+                          {totpDevices.map((device) => (
+                            <div key={device.id} className="flex items-center justify-between py-2.5 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Smartphone className="w-4 h-4 text-neutral-400" />
+                                <span className="font-body font-medium text-neutral-800">{device.name}</span>
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+                              <span className="text-xs font-body text-neutral-500">
+                                Added {new Date(device.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* General MFA Status */}

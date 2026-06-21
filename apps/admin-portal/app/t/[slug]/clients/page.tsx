@@ -220,8 +220,8 @@ export default function ClientsPage() {
                       <label className="text-[9px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
                         Grant Types
                       </label>
-                      <p className="text-xs font-body text-foreground truncate max-w-[200px]" title={client.grantTypes.join(', ')}>
-                        {client.grantTypes.join(', ') || '—'}
+                      <p className="text-xs font-body text-foreground truncate max-w-[200px]" title={(client.grantTypes ?? []).join(', ')}>
+                        {(client.grantTypes ?? []).join(', ') || '—'}
                       </p>
                     </div>
                     <div className="space-y-1">

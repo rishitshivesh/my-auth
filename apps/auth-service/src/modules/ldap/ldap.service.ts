@@ -56,7 +56,7 @@ export class LdapService {
     );
     const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"));
     decipher.setAuthTag(Buffer.from(tagHex, "hex"));
-    return decipher.update(Buffer.from(encHex, "hex")).toString("utf8") + decipher.final("utf8");
+    return Buffer.concat([decipher.update(Buffer.from(encHex, "hex")), decipher.final()]).toString("utf8");
   }
 
   async create(tenantId: string, dto: CreateLdapConnectionDto): Promise<LdapConnection> {
@@ -119,6 +119,7 @@ export class LdapService {
       });
 
       client.on("error", (err: Error) => {
+        client.destroy();
         resolve({ success: false, message: err.message });
       });
 
@@ -208,7 +209,10 @@ export class LdapService {
         timeout: 30_000,
       });
 
-      client.on("error", reject);
+      client.on("error", (err: Error) => {
+        client.destroy();
+        reject(err);
+      });
 
       client.bind(conn.bindDn, password, (err) => {
         if (err) {

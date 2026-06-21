@@ -238,12 +238,12 @@ export default function RolesPage() {
                     </h3>
                     {selectedRole.rolePermissions && selectedRole.rolePermissions.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {selectedRole.rolePermissions.map(({ permission }) => (
+                        {selectedRole.rolePermissions.map(({ permission }) => permission ? (
                           <div key={permission.id} className="flex items-center gap-3 p-3 border border-border rounded-sm bg-black/5">
                             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                             <span className="text-sm font-body font-medium">{permission.name}</span>
                           </div>
-                        ))}
+                        ) : null)}
                       </div>
                     ) : (
                       <div className="flex items-start gap-2.5 p-3 rounded-sm bg-black/5 text-muted-foreground text-xs font-body">

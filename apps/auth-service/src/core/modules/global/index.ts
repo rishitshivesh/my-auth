@@ -87,6 +87,8 @@ export class GlobalModule implements NestModule {
       // Self-service tenant registration — no tenant exists for these requests
       { path: "tenants/register", method: RequestMethod.POST },
       { path: "tenants/slug-check", method: RequestMethod.GET },
+      // SAML IdP metadata: tenant slug comes from the path, not the request host/header
+      { path: "saml/metadata/(.*)", method: RequestMethod.GET },
     ];
 
     // Layer 1: resolve tenant from hostname/header → req.tenant
