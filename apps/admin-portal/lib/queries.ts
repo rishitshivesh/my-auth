@@ -421,7 +421,7 @@ export function useRotateClientSecret() {
   return useMutation<{ clientSecret: string }, Error, string>({
     mutationFn: withErrorHandler<[string], { clientSecret: string }>(
       async (id) => authClient.request({
-        url: apiUrl(`/oauth/clients/${id}/rotate`),
+        url: apiUrl(`/oauth/clients/${id}/rotate-secret`),
         method: "POST",
       }),
       { successMessage: "Client secret rotated successfully", showSuccessToast: true }

@@ -72,11 +72,16 @@ export interface Group {
 
 export interface OAuthClient {
   id: string;
-  name: string;
   clientId: string;
-  type: 'spa' | 'm2m' | 'web';
+  name: string;
+  clientType: 'confidential' | 'public';
+  grantTypes: string[];
   redirectUris: string[];
-  tenantId: string;
+  logoutUris?: string[];
+  accessTokenTtl?: number;
+  refreshTokenTtl?: number;
+  isActive: boolean;
+  isFirstParty: boolean;
   createdAt: string;
 }
 
@@ -222,12 +227,14 @@ export interface CreateGroupDto {
 
 export interface CreateClientDto {
   name: string;
-  type: OAuthClient['type'];
+  clientType: OAuthClient['clientType'];
+  grantTypes?: string[];
   redirectUris?: string[];
   postLogoutRedirectUris?: string[];
   allowedWebOrigins?: string[];
   accessTokenLifetime?: number;
   refreshTokenLifetime?: number;
+  isFirstParty?: boolean;
 }
 
 export interface UpdateClientDto {
