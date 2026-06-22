@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Inject,
   BadRequestException,
+  InternalServerErrorException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -145,8 +146,16 @@ export class TenantService {
     try {
       await this.tenantSchemaService.createSchema(saved.slug);
       logger.info({ tenantId: saved.id, slug: saved.slug }, "tenant_schema_created");
-    } catch (err) {
-      logger.error({ err, tenantId: saved.id }, "Failed to create tenant schema");
+    } catch (schemaError) {
+      // Compensating action: delete the tenant record so the slug is freed
+      await this.tenantRepository.delete(saved.id).catch((delErr) => {
+        logger.error({ delErr, tenantId: saved.id }, "Failed to rollback tenant after schema error");
+      });
+      logger.error(
+        { err: schemaError instanceof Error ? schemaError.message : String(schemaError), tenantId: saved.id },
+        "Schema creation failed — tenant rolled back",
+      );
+      throw new InternalServerErrorException('Workspace provisioning failed. Please try again.');
     }
 
     return saved;

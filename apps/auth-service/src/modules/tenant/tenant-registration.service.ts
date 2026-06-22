@@ -33,6 +33,7 @@ export class RegisterTenantDto {
   adminName!: string;
   adminEmail!: string;
   adminPassword!: string;
+  idempotencyKey!: string;
 }
 
 export interface TenantRegistrationResult {
