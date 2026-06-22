@@ -223,3 +223,17 @@ Every session must append an entry at its start and update it at completion.
 - Leaked credential (plaintext Supabase connection string in list-users.js)
 **Outcome:** completed
 **Action required:** Rotate Supabase database password (plaintext connection string was in deleted list-users.js)
+
+## Session: 2026-06-22 — Claude Sonnet 4.6 (Sprint 4 — Close the Gaps)
+**Prompt:** Implement docs/sprints/sprint-4.md — 6 parallel tracks, close all P0 backlog items
+**Files touched:** See `docs/logs/sprint-4.md` for complete file list
+**Work done:**
+- Track 1: permissions.catalog.ts (single source of truth); system-roles.ts (Owner/Admin/Member IAM policies); @RequirePermissions on all controllers (webhook, ldap, scim, saml, user, oauth, dashboard); resource variable substitution in policy engine; gitignore cleanup
+- Track 2: Serialized refresh lock (one refresh in flight, concurrent 401s queue); proactive token refresh 60s before expiry; RefreshTokenRepository migration (no more raw SQL in OAuthRefreshTokenService); GET /api/user/workspaces endpoint; tenant registration inserts into user_tenant_memberships; React Query never retries 401/403
+- Track 3: 4-step MFA enroll wizard (CodeInput + factor-select + totp-setup + backup-codes + success) all shadcn; /u/mfa redirects to /u/login; TenantMfaPolicy entity + MfaPolicyService + enforcement check in auth.service.ts; MFA policy UI section in settings (RadioGroup)
+- Track 4: User detail danger zone wired (Suspend/Restore/ForceReset/ResetMFA/Delete) with shadcn AlertDialog/Dialog; permissions trace tab added; audit page server-side filters (Select, debounced Input, date range, filter pills, cursor pagination, CSV export)
+- Track 5: useUserWorkspaces hook; TenantSwitcher verified wired; tenantLogo prop rendered on login form; SSR branding Server Component; /onboarding/create-tenant redirect; user_tenant_memberships migration
+- Track 6: MFA policy endpoints in tenant controller (GET/PUT); StatsService + StatsController (dashboard, login-activity); verify-schema-isolation.ts script; TenantMfaPolicy exported from database package
+- Mid-sprint correction: replaced hand-rolled SimpleModal with shadcn Dialog; rule enforced across all track prompts
+**Outcome:** completed
+**Full log:** docs/logs/sprint-4.md
