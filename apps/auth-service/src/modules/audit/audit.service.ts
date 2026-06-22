@@ -50,6 +50,11 @@ export class AuditService {
       .take(10000)
       .getMany();
 
+    const sanitizeCsvValue = (v: unknown): string => {
+      const s = String(v ?? '');
+      return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    };
+
     const header =
       'timestamp,eventType,severity,actorEmail,userId,ipAddress,resourceType,resourceId\n';
     const rows = items.map((e) =>
@@ -63,7 +68,7 @@ export class AuditService {
         e.resourceType ?? '',
         e.resourceId ?? '',
       ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .map((v) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`)
         .join(','),
     );
 
