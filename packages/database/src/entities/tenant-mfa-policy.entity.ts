@@ -1,6 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, Index } from 'typeorm';
 
-@Entity('tenant_mfa_policy')
+// schema: 'public' forces TypeORM to qualify with public. regardless of search_path
+// (TenantSchemaMiddleware sets search_path = fk_{slug} on auth routes)
+@Entity({ name: 'tenant_mfa_policy', schema: 'public' })
 @Index(['tenantId'], { unique: true })
 export class TenantMfaPolicy {
   @PrimaryGeneratedColumn('uuid')

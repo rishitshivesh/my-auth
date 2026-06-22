@@ -1475,21 +1475,15 @@ export class AuthService {
 
     let social: SocialProviderDto[];
 
-    if (configuredProviders.length > 0) {
-      // Use the dedicated table as source of truth
-      social = configuredProviders.map((p) => ({
+    // Only show providers explicitly configured in tenant_social_providers.
+    // No fallback to featureFlags — unconfigured tenants show no social buttons.
+    social = configuredProviders
+      .filter((p) => p.enabled)
+      .map((p) => ({
         provider: p.provider,
         enabled: p.enabled,
         displayName: this.getProviderDisplayName(p.provider),
       }));
-    } else {
-      // Fall back to feature flags on the tenant record
-      social = this.getEnabledSocialProviders(tenant).map((provider) => ({
-        provider,
-        enabled: true,
-        displayName: this.getProviderDisplayName(provider),
-      }));
-    }
 
     return {
       password: true, // Password is always available unless tenant explicitly disables it
