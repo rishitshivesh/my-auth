@@ -7,7 +7,8 @@ import * as crypto from "crypto";
 
 const cookieExtractor = (req: Request): string | null => {
   if (req && req.cookies) {
-    return req.cookies["auth_token"] || null;
+    // Cookie name matches what setAuthCookies() sets: 'accessToken'
+    return req.cookies["accessToken"] || null;
   }
   return null;
 };

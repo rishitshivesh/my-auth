@@ -161,7 +161,10 @@ export class AuthController {
     }
 
     this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    return { user: response.user, tenantSlug: response.tenantSlug };
+    // Return access token in body so SDK clients can cache it in state.
+    // Bearer token auth requires the SDK to hold the token in memory;
+    // the httpOnly cookie provides fallback for server-side cookie auth.
+    return { user: response.user, tenantSlug: response.tenantSlug, accessToken: response.accessToken };
   }
 
   /**
@@ -283,7 +286,9 @@ export class AuthController {
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
     this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    return {};
+    // Return the access token in the body so SDK clients can cache it in memory.
+    // The httpOnly cookie is the authoritative token; this is a convenience copy.
+    return { accessToken: response.accessToken };
   }
 
   /**
