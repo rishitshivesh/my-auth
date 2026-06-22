@@ -32,9 +32,11 @@ import {
   useUserEffectivePermissions,
   useSuspendUser,
   useDeleteTenantUser,
+  useAdminUserSessions,
+  useAdminRevokeUserSession,
+  useAdminUserAudit,
 } from '@/lib/queries';
 import { listTotpDevices } from '@/lib/mfa-device-store';
-import { useUserSessions, useRevokeSession, useAuditLog } from '@scrolloop/admin-client';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ChevronLeft,
@@ -69,16 +71,9 @@ export default function UserDetailPage() {
   const userId = params.id as string;
 
   const { data: user, isLoading } = useTenantUser(userId);
-  const { data: sessions, isLoading: sessionsLoading } = useUserSessions(userId);
-  const {
-    data: auditData,
-    isLoading: auditLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage
-  } = useAuditLog({ userId });
-
-  const revokeSessionMutation = useRevokeSession();
+  const { data: sessions, isLoading: sessionsLoading } = useAdminUserSessions(userId);
+  const { data: auditEvents, isLoading: auditLoading } = useAdminUserAudit(userId);
+  const revokeSessionMutation = useAdminRevokeUserSession();
 
   // Roles & Permissions tab data
   const { data: userRoles, isLoading: rolesLoading } = useUserRoles(userId);
@@ -107,10 +102,8 @@ export default function UserDetailPage() {
   const deleteUser = useDeleteTenantUser();
 
   const handleRevokeSession = (sessionId: string) => {
-    revokeSessionMutation.mutate({ sessionId, userId });
+    revokeSessionMutation.mutate({ userId, sessionId });
   };
-
-  const auditEvents = auditData?.pages.flatMap((page) => page.items) || [];
 
   type Tab = 'overview' | 'sessions' | 'devices' | 'audit' | 'roles';
   const [activeTab, setActiveTab] = React.useState<Tab>('overview');
@@ -507,34 +500,20 @@ export default function UserDetailPage() {
                       <SentrySkeleton className="h-12 w-full" />
                       <SentrySkeleton className="h-12 w-full" />
                     </div>
-                  ) : auditEvents.length === 0 ? (
+                  ) : !auditEvents || auditEvents.length === 0 ? (
                     <div className="py-12 text-center text-muted-foreground font-body text-sm">
                       No audit events found for this user.
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                      <AuditTimeline
-                        events={auditEvents.map(a => ({
-                          id: a.id,
-                          type: a.eventType,
-                          description: `Accessed from IP ${a.ipAddress || 'unknown'}`,
-                          timestamp: a.createdAt,
-                          metadata: a.metadata,
-                        }))}
-                      />
-                      {hasNextPage && (
-                        <div className="flex justify-center pt-4">
-                          <SentryButton
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => fetchNextPage()}
-                            isLoading={isFetchingNextPage}
-                          >
-                            Load More
-                          </SentryButton>
-                        </div>
-                      )}
-                    </div>
+                    <AuditTimeline
+                      events={auditEvents.map(a => ({
+                        id: a.id,
+                        type: a.eventType,
+                        description: `Accessed from IP ${a.ipAddress || 'unknown'}`,
+                        timestamp: a.createdAt,
+                        metadata: a.metadata,
+                      }))}
+                    />
                   )}
                 </GlassCard>
               )}

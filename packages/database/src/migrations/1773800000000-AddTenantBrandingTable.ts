@@ -11,6 +11,7 @@ export class AddTenantBrandingTable1773800000000 implements MigrationInterface {
   name = "AddTenantBrandingTable1773800000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     await queryRunner.query(`
       CREATE TABLE "tenant_branding" (
         "id"               UUID          NOT NULL DEFAULT gen_random_uuid(),
@@ -37,6 +38,7 @@ export class AddTenantBrandingTable1773800000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_tenant_branding_tenant_id";`);
     await queryRunner.query(`DROP TABLE IF EXISTS "tenant_branding";`);
   }

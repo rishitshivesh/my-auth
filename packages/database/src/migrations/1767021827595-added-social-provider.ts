@@ -4,6 +4,7 @@ export class AddedSocialProvider1767021827595 implements MigrationInterface {
     name = 'AddedSocialProvider1767021827595'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
         await queryRunner.query(`CREATE TABLE "user_social_connections" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "tenant_id" uuid NOT NULL, "user_id" uuid NOT NULL, "provider" character varying(50) NOT NULL, "provider_id" character varying(255) NOT NULL, "email" character varying(255) NOT NULL, "display_name" character varying(255), "avatar_url" character varying(500), "access_token" text, "refresh_token" text, "token_expires_at" TIMESTAMP WITH TIME ZONE, "scopes" text, "metadata" jsonb, "primary" boolean NOT NULL DEFAULT false, "last_used_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_d7021f41e26777eeb91370d592a" PRIMARY KEY ("id")); COMMENT ON COLUMN "user_social_connections"."provider" IS 'Social provider (google, github, etc.)'; COMMENT ON COLUMN "user_social_connections"."provider_id" IS 'User ID at the provider'; COMMENT ON COLUMN "user_social_connections"."email" IS 'Email from provider'; COMMENT ON COLUMN "user_social_connections"."display_name" IS 'Display name from provider'; COMMENT ON COLUMN "user_social_connections"."avatar_url" IS 'Avatar URL from provider'; COMMENT ON COLUMN "user_social_connections"."access_token" IS 'Encrypted access token'; COMMENT ON COLUMN "user_social_connections"."refresh_token" IS 'Encrypted refresh token'; COMMENT ON COLUMN "user_social_connections"."token_expires_at" IS 'When access token expires'; COMMENT ON COLUMN "user_social_connections"."scopes" IS 'Granted scopes (space-separated)'; COMMENT ON COLUMN "user_social_connections"."metadata" IS 'Provider-specific metadata'; COMMENT ON COLUMN "user_social_connections"."primary" IS 'Is this the primary auth method?'; COMMENT ON COLUMN "user_social_connections"."last_used_at" IS 'When this connection was last used to login'`);
         await queryRunner.query(`CREATE INDEX "IDX_cd68f461affb0e8e3232f5b7c8" ON "user_social_connections" ("email") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_fdeed009ab54540f0382ab83f2" ON "user_social_connections" ("tenant_id", "provider", "provider_id") `);
@@ -24,6 +25,7 @@ export class AddedSocialProvider1767021827595 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "social_link_requests" DROP CONSTRAINT "FK_3110c40eb496bb3547e24dbf9c7"`);
         await queryRunner.query(`ALTER TABLE "social_link_requests" DROP CONSTRAINT "FK_f1e34369b507dc55c7a64cca182"`);
         await queryRunner.query(`ALTER TABLE "tenant_social_providers" DROP CONSTRAINT "FK_cb56d98f8fb5571d82e3a69f08d"`);
@@ -32,14 +34,14 @@ export class AddedSocialProvider1767021827595 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "password_hash" SET NOT NULL`);
         await queryRunner.query(`COMMENT ON COLUMN "users"."primary_auth_method" IS 'Primary authentication method'`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "primary_auth_method"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_329dce005a16fe212c2f8e085f"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_58a440bdd91e424e499fd6ccc8"`);
+        await queryRunner.query(`DROP INDEX "IDX_329dce005a16fe212c2f8e085f"`);
+        await queryRunner.query(`DROP INDEX "IDX_58a440bdd91e424e499fd6ccc8"`);
         await queryRunner.query(`DROP TABLE "social_link_requests"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_88ae55aaa3284254302359d1d2"`);
+        await queryRunner.query(`DROP INDEX "IDX_88ae55aaa3284254302359d1d2"`);
         await queryRunner.query(`DROP TABLE "tenant_social_providers"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_c0a90523a682924e31433309de"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_fdeed009ab54540f0382ab83f2"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_cd68f461affb0e8e3232f5b7c8"`);
+        await queryRunner.query(`DROP INDEX "IDX_c0a90523a682924e31433309de"`);
+        await queryRunner.query(`DROP INDEX "IDX_fdeed009ab54540f0382ab83f2"`);
+        await queryRunner.query(`DROP INDEX "IDX_cd68f461affb0e8e3232f5b7c8"`);
         await queryRunner.query(`DROP TABLE "user_social_connections"`);
     }
 

@@ -4,8 +4,9 @@ export class AddUserTenantMemberships1920000000000 implements MigrationInterface
   name = 'AddUserTenantMemberships1920000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO public, extensions`);
     await queryRunner.query(`
-      CREATE TABLE IF NOT EXISTS public.user_tenant_memberships (
+      CREATE TABLE IF NOT EXISTS user_tenant_memberships (
         id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id     UUID NOT NULL,
         user_email  TEXT NOT NULL,
@@ -19,14 +20,15 @@ export class AddUserTenantMemberships1920000000000 implements MigrationInterface
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_utm_user_email ON public.user_tenant_memberships(user_email)
+      CREATE INDEX IF NOT EXISTS idx_utm_user_email ON user_tenant_memberships(user_email)
     `);
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_utm_tenant_id ON public.user_tenant_memberships(tenant_id)
+      CREATE INDEX IF NOT EXISTS idx_utm_tenant_id ON user_tenant_memberships(tenant_id)
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS public.user_tenant_memberships`);
+    await queryRunner.query(`SET search_path TO public, extensions`);
+    await queryRunner.query(`DROP TABLE IF EXISTS user_tenant_memberships`);
   }
 }

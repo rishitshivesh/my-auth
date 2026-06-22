@@ -4,6 +4,7 @@ export class AddSessionApplicationId1773620000000 implements MigrationInterface 
   name = "AddSessionApplicationId1773620000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     await queryRunner.query(`
       ALTER TABLE "sessions"
       ADD COLUMN IF NOT EXISTS "application_id" uuid NULL
@@ -30,6 +31,7 @@ export class AddSessionApplicationId1773620000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_sessions_expires_revoked"`);
     await queryRunner.query(
       `ALTER TABLE "sessions" DROP CONSTRAINT IF EXISTS "FK_sessions_application_id"`,

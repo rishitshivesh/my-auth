@@ -28,7 +28,7 @@
     "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts",
     "db:seed": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/run-seeds.ts",
     "db:seed:demo": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/demo.seed.ts",
-    "db:reset": "npm run db:drop && npm run db:migrate && npm run db:seed",
+    "db:reset": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/db-reset.ts",
     "setup": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/cli/setup.ts"
   },
   "dependencies": {

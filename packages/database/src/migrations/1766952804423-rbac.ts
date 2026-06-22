@@ -4,6 +4,7 @@ export class RbacClean1766953000000 implements MigrationInterface {
   name = "RbacClean1766953000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     // ============================================================
     // 1. UPDATE PERMISSIONS TABLE
     // ============================================================
@@ -223,6 +224,7 @@ export class RbacClean1766953000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     // Drop user_roles table
     await queryRunner.query(`DROP TABLE IF EXISTS "user_roles" CASCADE`);
 

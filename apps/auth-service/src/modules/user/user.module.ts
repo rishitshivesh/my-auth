@@ -20,6 +20,7 @@ import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { DatabaseModule } from "@/core/database/database.module";
 import { EmailModule } from "@/modules/email/email.module";
+import { SessionModule } from "@/modules/session/session.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { EmailModule } from "@/modules/email/email.module";
     SecurityEventModule,
     DatabaseModule,
     EmailModule,
+    SessionModule,
   ],
   controllers: [UserController],
   providers: [

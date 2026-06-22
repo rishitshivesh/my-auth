@@ -129,8 +129,8 @@ export const dataSourceOptions: DataSourceOptions = {
       }
     : false,
 
-  // Schema
-  schema: process.env.DATABASE_SCHEMA || "public",
+  // Schema (omitted to let PostgreSQL resolve tables via active search_path)
+  // schema: process.env.DATABASE_SCHEMA || "public",
 
   // Synchronize (NEVER use in production!)
   synchronize: false,

@@ -1178,6 +1178,118 @@
         ]
       }
     },
+    "/users/{id}/sessions": {
+      "get": {
+        "operationId": "UserController_getUserSessions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sessions retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List active sessions for a user (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "UserController_revokeUserSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Session revoked"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revoke a session for a user (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/security-events": {
+      "get": {
+        "operationId": "UserController_getUserSecurityEvents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Security events retrieved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get security event history for a user (Admin)",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
     "/email/test": {
       "get": {
         "operationId": "EmailController_testEmail",
@@ -1209,6 +1321,134 @@
         "summary": "Test email sending (development only)",
         "tags": [
           "Email (Development)"
+        ]
+      }
+    },
+    "/sessions/active": {
+      "get": {
+        "description": "List all active sessions/devices for the current user",
+        "operationId": "SessionController_getActiveSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of active sessions"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get active sessions",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/analytics": {
+      "get": {
+        "operationId": "SessionController_getSessionAnalytics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Get session analytics",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/{sessionId}": {
+      "delete": {
+        "description": "Logout from a specific device/session",
+        "operationId": "SessionController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Revoke a session",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all/other": {
+      "delete": {
+        "description": "Revoke all sessions except the current one",
+        "operationId": "SessionController_revokeAllOtherSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all other devices",
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/sessions/all": {
+      "delete": {
+        "description": "Revoke all sessions including the current one",
+        "operationId": "SessionController_revokeAllSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Logout all devices",
+        "tags": [
+          "Sessions"
         ]
       }
     },
@@ -2152,134 +2392,6 @@
         "summary": "Accept an invite and create account",
         "tags": [
           "Authentication"
-        ]
-      }
-    },
-    "/sessions/active": {
-      "get": {
-        "description": "List all active sessions/devices for the current user",
-        "operationId": "SessionController_getActiveSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of active sessions"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Get active sessions",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/analytics": {
-      "get": {
-        "operationId": "SessionController_getSessionAnalytics",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Get session analytics",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/{sessionId}": {
-      "delete": {
-        "description": "Logout from a specific device/session",
-        "operationId": "SessionController_revokeSession",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Revoke a session",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/all/other": {
-      "delete": {
-        "description": "Revoke all sessions except the current one",
-        "operationId": "SessionController_revokeAllOtherSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Logout all other devices",
-        "tags": [
-          "Sessions"
-        ]
-      }
-    },
-    "/sessions/all": {
-      "delete": {
-        "description": "Revoke all sessions including the current one",
-        "operationId": "SessionController_revokeAllSessions",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          }
-        ],
-        "summary": "Logout all devices",
-        "tags": [
-          "Sessions"
         ]
       }
     },

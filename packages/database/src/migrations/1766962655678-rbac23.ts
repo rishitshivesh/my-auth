@@ -4,28 +4,29 @@ export class Rbac231766962655678 implements MigrationInterface {
     name = 'Rbac231766962655678'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "permissions" DROP CONSTRAINT "FK_c9d5c0d09e27afdb707a2a8837b"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_17022daf3f885f7d35423e9971e"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_178199805b901ccd220ab7740ec"`);
         await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "FK_e59a01f4fe46ebbece575d9a0fc"`);
         await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT "FK_user_roles_role_id"`);
         await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT "FK_user_roles_user_id"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_permissions_tenant_name"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_permissions_resource"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_permissions_action"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_97e8245c6892a1bf6b088b8c86"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_role_permissions_tenant_id"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_role_permissions_role_permission"`);
-        await queryRunner.query(`DROP INDEX "public"."UQ_roles_tenant_name"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_roles_is_system"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_c555146b304b5f51a7de6e18de"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_user_roles_user_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_user_roles_role_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_user_roles_tenant_id"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_user_roles_expires_at"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_40ec4dea118345e4d95fb836ad"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_cf96ca0dc9c97fdc2ae06831d8"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_3676155292d72c67cd4e090514"`);
+        await queryRunner.query(`DROP INDEX "UQ_permissions_tenant_name"`);
+        await queryRunner.query(`DROP INDEX "IDX_permissions_resource"`);
+        await queryRunner.query(`DROP INDEX "IDX_permissions_action"`);
+        await queryRunner.query(`DROP INDEX "IDX_97e8245c6892a1bf6b088b8c86"`);
+        await queryRunner.query(`DROP INDEX "IDX_role_permissions_tenant_id"`);
+        await queryRunner.query(`DROP INDEX "UQ_role_permissions_role_permission"`);
+        await queryRunner.query(`DROP INDEX "UQ_roles_tenant_name"`);
+        await queryRunner.query(`DROP INDEX "IDX_roles_is_system"`);
+        await queryRunner.query(`DROP INDEX "IDX_c555146b304b5f51a7de6e18de"`);
+        await queryRunner.query(`DROP INDEX "IDX_user_roles_user_id"`);
+        await queryRunner.query(`DROP INDEX "IDX_user_roles_role_id"`);
+        await queryRunner.query(`DROP INDEX "IDX_user_roles_tenant_id"`);
+        await queryRunner.query(`DROP INDEX "IDX_user_roles_expires_at"`);
+        await queryRunner.query(`DROP INDEX "IDX_40ec4dea118345e4d95fb836ad"`);
+        await queryRunner.query(`DROP INDEX "IDX_cf96ca0dc9c97fdc2ae06831d8"`);
+        await queryRunner.query(`DROP INDEX "IDX_3676155292d72c67cd4e090514"`);
         await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT "UQ_user_roles_user_role"`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "email_verification_expires_at"`);
         await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "password_reset_expires_at"`);
@@ -36,7 +37,7 @@ export class Rbac231766962655678 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "users" ADD "password_reset_expires" TIMESTAMP WITH TIME ZONE`);
         await queryRunner.query(`ALTER TABLE "users" ADD "is_active" boolean NOT NULL DEFAULT true`);
         await queryRunner.query(`ALTER TABLE "permissions" ALTER COLUMN "name" SET NOT NULL`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_89456a09b598ce8915c702c528"`);
+        await queryRunner.query(`DROP INDEX "IDX_89456a09b598ce8915c702c528"`);
         await queryRunner.query(`ALTER TABLE "permissions" DROP COLUMN "resource"`);
         await queryRunner.query(`ALTER TABLE "permissions" ADD "resource" character varying(50) NOT NULL`);
         await queryRunner.query(`COMMENT ON COLUMN "permissions"."resource" IS 'Resource type (e.g., users, clients, api)'`);
@@ -66,6 +67,7 @@ export class Rbac231766962655678 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT "FK_b23c65e50a758245a33ee35fda1"`);
         await queryRunner.query(`ALTER TABLE "user_roles" DROP CONSTRAINT "FK_87b8888186ca9769c960e926870"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "FK_17022daf3f885f7d35423e9971e"`);
@@ -74,14 +76,14 @@ export class Rbac231766962655678 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "roles" DROP CONSTRAINT "UQ_c555146b304b5f51a7de6e18de2"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "UQ_25d24010f53bb80b78e412c9656"`);
         await queryRunner.query(`ALTER TABLE "permissions" DROP CONSTRAINT "UQ_92ed4e4dc2d950b2f736e97f8b5"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_97672ac88f789774dd47f7c8be"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_87b8888186ca9769c960e92687"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_b23c65e50a758245a33ee35fda"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_156cd3e5710ec8c0a4bbe7865f"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_32cbb6f005afc7507c7864e8b4"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d6fcb39857e2116aff96b97df0"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_89456a09b598ce8915c702c528"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_1c1e0637ecf1f6401beb9a68ab"`);
+        await queryRunner.query(`DROP INDEX "IDX_97672ac88f789774dd47f7c8be"`);
+        await queryRunner.query(`DROP INDEX "IDX_87b8888186ca9769c960e92687"`);
+        await queryRunner.query(`DROP INDEX "IDX_b23c65e50a758245a33ee35fda"`);
+        await queryRunner.query(`DROP INDEX "IDX_156cd3e5710ec8c0a4bbe7865f"`);
+        await queryRunner.query(`DROP INDEX "IDX_32cbb6f005afc7507c7864e8b4"`);
+        await queryRunner.query(`DROP INDEX "IDX_d6fcb39857e2116aff96b97df0"`);
+        await queryRunner.query(`DROP INDEX "IDX_89456a09b598ce8915c702c528"`);
+        await queryRunner.query(`DROP INDEX "IDX_1c1e0637ecf1f6401beb9a68ab"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "PK_84059017c90bfcb701b8fa42297"`);
         await queryRunner.query(`ALTER TABLE "role_permissions" ADD CONSTRAINT "PK_role_permissions" PRIMARY KEY ("permission_id", "id")`);
         await queryRunner.query(`ALTER TABLE "role_permissions" DROP CONSTRAINT "PK_role_permissions"`);

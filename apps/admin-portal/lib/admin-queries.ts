@@ -108,7 +108,14 @@ export function useCreateTenant() {
   return useMutation<
     TenantDetail,
     Error,
-    { name: string; slug: string; plan: string; ownerEmail?: string }
+    {
+      name: string;
+      slug: string;
+      plan: string;
+      ownerEmail?: string;
+      useCurrentUserAsAdmin?: boolean;
+      migrateProfile?: boolean;
+    }
   >({
     mutationFn: (body) => authMutate(apiUrl('/admin/tenants'), 'POST', body),
     onSuccess: () => {

@@ -47,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           }
 
           const publicKey = crypto.createPublicKey({
-            key: jwk as any,
+            key: jwk as unknown as crypto.JsonWebKey,
             format: "jwk",
           });
 
@@ -60,13 +60,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
-    if (!payload.sub) {
+  async validate(payload: Record<string, unknown>) {
+    if (!payload.sub || typeof payload.sub !== "string") {
       throw new UnauthorizedException("Invalid token payload");
     }
 
-    const roles = payload.roles || [];
-    const groups = payload.groups || [];
+    const roles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
+    const groups = Array.isArray(payload.groups) ? (payload.groups as string[]) : [];
 
     const platformSlug = process.env.SENTRY_PLATFORM_SLUG ?? "sentry";
     const platformRole = `${platformSlug}-internal`;
@@ -81,10 +81,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       sub: payload.sub,
       userId: payload.sub,
-      tenantId: payload.tenantId,
-      tenantSlug: payload.tenantSlug,
-      sessionId: payload.sessionId,
-      email: payload.email,
+      tenantId: payload.tenantId as string | undefined,
+      tenantSlug: payload.tenantSlug as string | undefined,
+      sessionId: payload.sessionId as string | undefined,
+      email: payload.email as string | undefined,
       roles,
       groups,
       isSuperAdmin: !!isSuperAdmin,

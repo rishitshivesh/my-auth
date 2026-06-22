@@ -14,6 +14,7 @@ export class HardenSecurityEventAudit1735500000000
   name = "HardenSecurityEventAudit1735500000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     console.log("🔒 HardenSecurityEventAudit: starting migration…");
 
     // ── 1. New audit columns ──────────────────────────────────────────────
@@ -73,7 +74,7 @@ export class HardenSecurityEventAudit1735500000000
 
     const oauthTableExists: Array<{ to_regclass: string | null }> =
       await queryRunner.query(
-        `SELECT to_regclass('public.oauth_clients') AS to_regclass;`,
+        `SELECT to_regclass('oauth_clients') AS to_regclass;`,
       );
 
     if (oauthTableExists[0]?.to_regclass) {
@@ -116,6 +117,7 @@ export class HardenSecurityEventAudit1735500000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     console.log("⏪ HardenSecurityEventAudit: reverting migration…");
 
     // Drop indexes

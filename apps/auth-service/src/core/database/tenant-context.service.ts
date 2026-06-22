@@ -7,16 +7,16 @@ interface TenantContext {
   schemaName: string;
 }
 
+export const tenantStorage = new AsyncLocalStorage<TenantContext>();
+
 @Injectable()
 export class TenantContextService {
-  private readonly storage = new AsyncLocalStorage<TenantContext>();
-
   run<T>(context: TenantContext, callback: () => T): T {
-    return this.storage.run(context, callback);
+    return tenantStorage.run(context, callback);
   }
 
   getContext(): TenantContext | null {
-    return this.storage.getStore() ?? null;
+    return tenantStorage.getStore() ?? null;
   }
 
   getQueryRunner(): QueryRunner | null {

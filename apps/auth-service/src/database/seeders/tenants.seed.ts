@@ -1,4 +1,4 @@
-import { DataSource, Repository } from "typeorm";
+import { DataSource, Repository, EntityManager, QueryRunner } from "typeorm";
 import { Tenant, Role, Permission, User, UserRole, RolePermission, dataSourceOptions } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
@@ -15,6 +15,7 @@ const PLATFORM_ROLE = `${PLATFORM_SLUG}-internal`;
  */
 export async function seed(existingDataSource?: DataSource): Promise<void> {
   let dataSource: DataSource;
+  let queryRunner: QueryRunner | null = null;
   let ownsConnection = false;
 
   if (existingDataSource) {
@@ -26,9 +27,6 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
     dataSource = new DataSource({
       ...pgBase,
       ...(dbUrl ? { url: dbUrl, host: undefined, port: undefined, username: undefined, password: undefined, database: undefined } : {}),
-      // Inherit SSL config from dataSourceOptions; only override when DB_SSL=true is
-      // explicitly requested (e.g. cloud-managed Postgres with self-signed CA).
-      // To trust a custom CA instead, set PGSSLROOTCERT or configure pgBase.ssl.
       ssl: useSSL ? (pgBase.ssl ?? false) : (pgBase.ssl ?? false),
       migrationsRun: false,
     } as PostgresConnectionOptions);
@@ -38,7 +36,122 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
   }
 
   try {
-    const tenantRepo = dataSource.getRepository(Tenant);
+    queryRunner = dataSource.createQueryRunner();
+    await queryRunner.connect();
+
+    const schemaName = `fk_${PLATFORM_SLUG}`;
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+
+    const tables = [
+      "users",
+      "sessions",
+      "roles",
+      "permissions",
+      "user_roles",
+      "role_permissions",
+      "mfa_settings",
+      "webauthn_credentials",
+      "security_events",
+      "oauth_clients",
+      "oauth_authorization_codes",
+      "oauth_access_tokens",
+      "oauth_refresh_tokens",
+      "oauth_consents",
+      "tenant_branding",
+      "tenant_social_providers",
+      "social_link_requests",
+      "policies",
+      "groups",
+      "user_groups",
+      "group_policies",
+      "user_policies",
+      "role_policies",
+      "user_social_connections",
+      "user_invites",
+      "webhook_endpoints",
+      "webhook_deliveries",
+      "saml_service_providers",
+      "scim_tokens",
+      "ldap_connections",
+      "tenant_mfa_policy",
+    ];
+
+    for (const table of tables) {
+      await queryRunner.query(
+        `CREATE TABLE IF NOT EXISTS "${schemaName}"."${table}" (LIKE template."${table}" INCLUDING ALL)`
+      );
+    }
+
+    // Recreate foreign key constraints in the newly cloned tenant schema
+    const fkQuery = `
+      SELECT
+          tc.table_name,
+          kcu.column_name,
+          ccu.table_schema AS foreign_table_schema,
+          ccu.table_name AS foreign_table_name,
+          ccu.column_name AS foreign_column_name,
+          tc.constraint_name,
+          rc.update_rule,
+          rc.delete_rule
+      FROM
+          information_schema.table_constraints AS tc
+          JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+          JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.constraint_schema = tc.table_schema
+          JOIN information_schema.referential_constraints AS rc
+            ON rc.constraint_name = tc.constraint_name
+            AND rc.constraint_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'template'
+    `;
+
+    interface ForeignKeyRow {
+      table_name: string;
+      column_name: string;
+      foreign_table_schema: string;
+      foreign_table_name: string;
+      foreign_column_name: string;
+      constraint_name: string;
+      update_rule: string;
+      delete_rule: string;
+    }
+
+    const fkeys = (await queryRunner.query(fkQuery)) as ForeignKeyRow[];
+
+    const existingConstraints = (await queryRunner.query(
+      `SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema = $1`,
+      [schemaName],
+    )) as Array<{ constraint_name: string }>;
+    const existingConstraintNames = new Set(existingConstraints.map((c) => c.constraint_name));
+
+    for (const fk of fkeys) {
+      if (existingConstraintNames.has(fk.constraint_name)) {
+        continue;
+      }
+      const targetSchema = fk.foreign_table_schema === "template" ? schemaName : fk.foreign_table_schema;
+      const addFkQuery = `
+        ALTER TABLE "${schemaName}"."${fk.table_name}"
+        ADD CONSTRAINT "${fk.constraint_name}"
+        FOREIGN KEY ("${fk.column_name}")
+        REFERENCES "${targetSchema}"."${fk.foreign_table_name}" ("${fk.foreign_column_name}")
+        ON UPDATE ${fk.update_rule}
+        ON DELETE ${fk.delete_rule}
+      `;
+      try {
+        await queryRunner.query(addFkQuery);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        if (!errMsg.includes("already exists")) {
+          throw err;
+        }
+      }
+    }
+
+    await queryRunner.query(`SET search_path TO "${schemaName}", public, extensions`);
+
+    const tenantRepo = queryRunner.manager.getRepository(Tenant);
 
     // ── 1. Platform tenant ──────────────────────────────────────────
     console.log(`🏢 Seeding platform tenant (${PLATFORM_SLUG})...`);
@@ -71,7 +184,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
 
     // ── 2. System roles ─────────────────────────────────────────────
     console.log("👥 Seeding roles...");
-    const roleRepo = dataSource.getRepository(Role);
+    const roleRepo = queryRunner.manager.getRepository(Role);
 
     const systemRoles = [
       { name: "Owner",     description: "Full access to everything in the organization",  isSystem: true  },
@@ -107,7 +220,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
 
     // ── 3. Permissions ──────────────────────────────────────────────
     console.log("🔐 Seeding permissions...");
-    const permissionRepo = dataSource.getRepository(Permission);
+    const permissionRepo = queryRunner.manager.getRepository(Permission);
 
     const basePermissions = [
       // Users
@@ -181,7 +294,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
       where: { name: PLATFORM_ROLE, tenantId: tenant.id },
     });
     if (internalRole) {
-      const rolePermissionRepo = dataSource.getRepository(RolePermission);
+      const rolePermissionRepo = queryRunner.manager.getRepository(RolePermission);
       const hasWildcardPermission = await rolePermissionRepo.findOne({
         where: { tenantId: tenant.id, roleId: internalRole.id, permissionId: wildcardPermission.id },
       });
@@ -197,7 +310,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
     }
 
     // ── 4. Superadmin user (env-gated, CI/staging only) ─────────────
-    await seedSuperadmin(dataSource, tenant, roleRepo);
+    await seedSuperadmin(queryRunner.manager, tenant, roleRepo);
 
     console.log("");
     console.log("✅ Seeding complete!");
@@ -211,6 +324,9 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
     console.error("❌ Seeding failed:", error);
     throw error;
   } finally {
+    if (queryRunner) {
+      await queryRunner.release();
+    }
     if (ownsConnection) {
       await dataSource.destroy();
     }
@@ -220,7 +336,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
 // ─── Superadmin helper (CI/staging only) ────────────────────────────────────
 
 async function seedSuperadmin(
-  dataSource: DataSource,
+  manager: EntityManager,
   platformTenant: Tenant,
   roleRepo: Repository<Role>,
 ): Promise<void> {
@@ -234,8 +350,8 @@ async function seedSuperadmin(
 
   console.log("👤 Seeding superadmin user (CI mode)...");
 
-  const userRepo = dataSource.getRepository(User);
-  const userRoleRepo = dataSource.getRepository(UserRole);
+  const userRepo = manager.getRepository(User);
+  const userRoleRepo = manager.getRepository(UserRole);
 
   const existing = await userRepo.findOne({
     where: { tenantId: platformTenant.id, email },

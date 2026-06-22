@@ -13,6 +13,7 @@ export class AddWebAuthnCredentialsTable1773700000000
   name = "AddWebAuthnCredentialsTable1773700000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     // 1. Create the new table
     await queryRunner.query(`
       CREATE TABLE "webauthn_credentials" (
@@ -99,6 +100,7 @@ export class AddWebAuthnCredentialsTable1773700000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     // Re-add the JSONB column
     await queryRunner.query(`
       ALTER TABLE "mfa_settings"

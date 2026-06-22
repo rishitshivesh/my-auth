@@ -358,7 +358,17 @@ export class AdminService implements OnModuleInit {
     plan?: string;
     ownerEmail?: string;
     environment?: string;
+    useCurrentUserAsAdmin?: boolean;
+    migrateProfile?: boolean;
+    currentUserId?: string;
   }): Promise<TenantDetailDto> {
+    // Validate slug format before any DB or SQL use (defense against identifier injection)
+    if (!/^[a-z0-9][a-z0-9-]{2,62}[a-z0-9]$/.test(dto.slug)) {
+      throw new BadRequestException(
+        "Slug must be 4–63 characters, lowercase letters/numbers/hyphens, and cannot start or end with a hyphen",
+      );
+    }
+
     const existing = await this.tenantRepository.findOne({
       where: { slug: dto.slug },
     });
@@ -378,7 +388,98 @@ export class AdminService implements OnModuleInit {
     if (dto.plan) (tenant as unknown as Record<string, unknown>).plan = dto.plan;
 
     const saved = await this.tenantRepository.save(tenant);
+
+    if (dto.currentUserId) {
+      await this.provisionAdminUser(saved.id, dto.slug, dto.currentUserId);
+    }
+
     return this.getTenantById(saved.id);
+  }
+
+  private async provisionAdminUser(
+    tenantId: string,
+    slug: string,
+    adminUserId: string,
+  ): Promise<void> {
+    // Escape double-quotes within identifier names (PostgreSQL: "" inside "…")
+    const escId = (name: string) => name.replace(/"/g, '""');
+    const schemaName = `fk_${slug}`;
+    const sentrySchemaName = `fk_${SENTRY_TENANT_SLUG}`;
+    await this.tenantSchemaService.createSchema(slug);
+
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    try {
+      // Load source user from sentry schema
+      await qr.query(`SET search_path TO "${escId(sentrySchemaName)}", public, extensions`);
+      const rows = (await qr.query(
+        `SELECT id, email, password_hash, first_name, last_name, display_name, avatar_url
+         FROM users WHERE id = $1 LIMIT 1`,
+        [adminUserId],
+      )) as Array<Record<string, string | null>>;
+
+      if (!rows.length) {
+        logger.warn({ adminUserId }, "provisionAdminUser: source user not found, skipping");
+        return;
+      }
+      const src = rows[0]!;
+
+      await qr.startTransaction();
+      await qr.query(`SET search_path TO "${escId(schemaName)}", public, extensions`);
+
+      // Create Owner role
+      const roleRows = (await qr.query(
+        `INSERT INTO roles (id, tenant_id, name, display_name, description, is_system, priority, scope, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, 'owner', 'Owner', 'Full control over the workspace', true, 100, 'tenant', now(), now())
+         ON CONFLICT (tenant_id, name) DO UPDATE SET display_name = EXCLUDED.display_name
+         RETURNING id`,
+        [tenantId],
+      )) as Array<{ id: string }>;
+      const ownerRoleId = roleRows[0]!.id;
+
+      // Create user in new schema (same credentials)
+      const userRows = (await qr.query(
+        `INSERT INTO users (id, tenant_id, email, email_verified, first_name, last_name, display_name, avatar_url, password_hash, primary_auth_method, is_active, mfa_enabled, failed_login_attempts, force_password_change, password_history, metadata, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, $2, true, $3, $4, $5, $6, $7, 'password', true, false, 0, false, '[]', $8, now(), now())
+         ON CONFLICT (tenant_id, email) DO NOTHING
+         RETURNING id`,
+        [
+          tenantId,
+          src['email'],
+          src['first_name'],
+          src['last_name'],
+          src['display_name'],
+          src['avatar_url'],
+          src['password_hash'],
+          JSON.stringify({ source: 'admin-provision', sourceUserId: adminUserId }),
+        ],
+      )) as Array<{ id: string }>;
+
+      if (!userRows.length) {
+        // User already exists (edge case: email collision)
+        await qr.rollbackTransaction();
+        return;
+      }
+      const newUserId = userRows[0]!.id;
+
+      // Assign Owner role
+      await qr.query(
+        `INSERT INTO user_roles (id, tenant_id, user_id, role_id, reason, metadata, created_at, updated_at)
+         VALUES (uuid_generate_v4(), $1, $2, $3, 'Admin provisioned', '{"source":"admin-provision"}', now(), now())
+         ON CONFLICT DO NOTHING`,
+        [tenantId, newUserId, ownerRoleId],
+      );
+
+      await qr.commitTransaction();
+      logger.info({ tenantId, slug, adminUserId, newUserId }, "Admin user provisioned in new tenant");
+    } catch (err) {
+      try { await qr.rollbackTransaction(); } catch {}
+      logger.error({ err, tenantId, slug, adminUserId }, "provisionAdminUser failed");
+      // Non-fatal: tenant was already created; admin can log in via the portal
+    } finally {
+      try { await qr.query(`SET search_path TO public`); } catch {}
+      await qr.release();
+    }
   }
 
   async updateTenant(
@@ -613,16 +714,40 @@ export class AdminService implements OnModuleInit {
    * Check whether the platform has been initialized (at least one sentry-internal user exists).
    */
   async isInitialized(): Promise<boolean> {
-    const sentryTenant = await this.getSentryTenant();
-    if (!sentryTenant) return false;
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    try {
+      // 1. Get the platform tenant from public (tenants table is in public schema, which is in search_path)
+      await qr.query(`SET search_path TO public, extensions`);
+      const tenantRepo = qr.manager.getRepository(Tenant);
+      const sentryTenant = await tenantRepo.findOne({
+        where: { slug: SENTRY_TENANT_SLUG },
+      });
+      if (!sentryTenant) return false;
 
-    const role = await this.getSentryInternalRole(sentryTenant.id);
-    if (!role) return false;
+      // 2. Query role and userRole in fk_sentry schema
+      await qr.query(`SET search_path TO "fk_${SENTRY_TENANT_SLUG}", public, extensions`);
+      const roleRepo = qr.manager.getRepository(Role);
+      const role = await roleRepo.findOne({
+        where: { name: SENTRY_INTERNAL_ROLE, tenantId: sentryTenant.id },
+      });
+      if (!role) return false;
 
-    const count = await this.userRoleRepository.count({
-      where: { roleId: role.id, tenantId: sentryTenant.id },
-    });
-    return count > 0;
+      const userRoleRepo = qr.manager.getRepository(UserRole);
+      const count = await userRoleRepo.count({
+        where: { roleId: role.id, tenantId: sentryTenant.id },
+      });
+      return count > 0;
+    } catch (err) {
+      logger.warn({ err }, "Platform initialization check failed (database may not be fully migrated or seeded)");
+      return false;
+    } finally {
+      // Reset search_path before returning the connection to the pool.
+      // If we set it to fk_sentry and then don't reset, the next request that
+      // picks up this pooled connection will run queries in the wrong schema.
+      try { await qr.query(`SET search_path TO public`); } catch {}
+      await qr.release();
+    }
   }
 
   /**
@@ -698,7 +823,10 @@ export class AdminService implements OnModuleInit {
     let allSentryRoles: Role[];
 
     try {
-      await qr.query(`SET LOCAL search_path TO "${schemaName}", public`);
+      // SET LOCAL only takes effect within a transaction; outside one it is a no-op.
+      // Use a plain SET so the search_path persists for the life of this connection.
+      await qr.query(`SET search_path TO "${schemaName}", public, extensions`);
+      await qr.startTransaction();
 
       // Check for duplicate email in the tenant schema
       const existing = await qr.manager.findOne(User, {
@@ -798,9 +926,15 @@ export class AdminService implements OnModuleInit {
           } as Partial<UserRole>),
         );
       }
+
+      await qr.commitTransaction();
+    } catch (err) {
+      try { await qr.rollbackTransaction(); } catch {}
+      throw err;
     } finally {
-      // Always reset search_path before releasing the connection back to the pool
-      await qr.query(`SET search_path TO public`);
+      // Reset search_path before returning the connection to the pool.
+      // Guard each operation independently so a broken connection can't block release().
+      try { await qr.query(`SET search_path TO public`); } catch {}
       await qr.release();
     }
 
