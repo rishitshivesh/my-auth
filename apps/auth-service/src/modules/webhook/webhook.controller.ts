@@ -17,13 +17,14 @@ import {
 import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { WebhookService } from "./webhook.service";
+import { CreateWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 
 interface AuthenticatedRequest {
   tenantId?: string;
   user: { sub: string; tid: string };
 }
-import { WebhookService } from "./webhook.service";
-import { CreateWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 
 @Controller("webhooks")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -31,26 +32,26 @@ export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
   @Post()
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   @HttpCode(HttpStatus.CREATED)
   create(@Request() req: AuthenticatedRequest, @Body() dto: CreateWebhookDto) {
     return this.webhookService.create(req.tenantId!, dto);
   }
 
   @Get()
-  @RequirePermissions("webhooks:read")
+  @RequirePermissions(Permissions.WEBHOOKS_READ)
   list(@Request() req: AuthenticatedRequest) {
     return this.webhookService.list(req.tenantId!);
   }
 
   @Get(":id")
-  @RequirePermissions("webhooks:read")
+  @RequirePermissions(Permissions.WEBHOOKS_READ)
   findOne(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.webhookService.findOne(req.tenantId!, id);
   }
 
   @Patch(":id")
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   update(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
@@ -60,20 +61,20 @@ export class WebhookController {
   }
 
   @Post(":id/rotate-secret")
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   rotateSecret(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.webhookService.rotateSecret(req.tenantId!, id);
   }
 
   @Delete(":id")
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.webhookService.delete(req.tenantId!, id);
   }
 
   @Get(":id/deliveries")
-  @RequirePermissions("webhooks:read")
+  @RequirePermissions(Permissions.WEBHOOKS_READ)
   getDeliveries(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
@@ -83,7 +84,7 @@ export class WebhookController {
   }
 
   @Post(":id/deliveries/:deliveryId/redeliver")
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   @HttpCode(HttpStatus.ACCEPTED)
   redeliver(
     @Request() req: AuthenticatedRequest,
@@ -94,7 +95,7 @@ export class WebhookController {
   }
 
   @Post(":id/test")
-  @RequirePermissions("webhooks:write")
+  @RequirePermissions(Permissions.WEBHOOKS_WRITE)
   @HttpCode(HttpStatus.ACCEPTED)
   test(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.webhookService.sendTestEvent(req.tenantId!, id);

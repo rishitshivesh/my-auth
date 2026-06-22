@@ -49,6 +49,7 @@ import { ConfigService } from "@nestjs/config";
 import { type Request, type Response } from "express";
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { RequirePermissions } from "../rbac/decorators/rbac.decorator";
+import { Permissions } from "../rbac/constants/permissions.catalog";
 import { JwksService } from "./services/jwks.service";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { logger } from "@/common/logger";
@@ -725,7 +726,7 @@ export class OAuthController {
    */
   @Post("clients")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:write")
+  @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Create OAuth Client (Requires: clients:write)",
@@ -763,7 +764,7 @@ export class OAuthController {
    */
   @Get("clients")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:read")
+  @RequirePermissions(Permissions.CLIENTS_READ)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "List OAuth Clients (Requires: clients:read)",
@@ -791,7 +792,7 @@ export class OAuthController {
    */
   @Get("clients/:clientId")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:read")
+  @RequirePermissions(Permissions.CLIENTS_READ)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Get OAuth Client (Requires: clients:read)",
@@ -813,7 +814,7 @@ export class OAuthController {
    */
   @Put("clients/:clientId")
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:write")
+  @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Update OAuth Client (Requires: clients:write)",
@@ -839,7 +840,7 @@ export class OAuthController {
   @Delete("clients/:clientId")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:delete")
+  @RequirePermissions(Permissions.CLIENTS_DELETE)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Delete OAuth Client (Requires: clients:delete)",
@@ -860,7 +861,7 @@ export class OAuthController {
   @Post("clients/:clientId/rotate-secret")
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions("clients:write")
+  @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Rotate Client Secret (Requires: clients:write)",

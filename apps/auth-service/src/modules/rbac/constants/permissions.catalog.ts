@@ -45,6 +45,19 @@ export const Permissions = {
 
   PERMISSIONS_READ: 'permissions:read',
   PERMISSIONS_WRITE: 'permissions:write',
+
+  WEBHOOKS_READ: 'webhooks:read',
+  WEBHOOKS_WRITE: 'webhooks:write',
+  WEBHOOKS_DELETE: 'webhooks:delete',
+
+  LDAP_READ: 'ldap:read',
+  LDAP_WRITE: 'ldap:write',
+
+  SCIM_READ: 'scim:read',
+  SCIM_WRITE: 'scim:write',
+
+  SAML_READ: 'saml:read',
+  SAML_WRITE: 'saml:write',
 } as const;
 
 export type PermissionString = typeof Permissions[keyof typeof Permissions];

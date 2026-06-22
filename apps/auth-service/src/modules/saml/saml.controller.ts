@@ -19,12 +19,13 @@ import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Public } from "@/common/decorators/public.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { SamlService } from "./saml.service";
 
 interface AuthenticatedRequest {
   tenantId?: string;
   user: { sub: string; tid: string };
 }
-import { SamlService } from "./saml.service";
 import { RegisterSPDto, UpdateSPDto } from "./saml.dto";
 
 @Controller("saml")
@@ -61,14 +62,14 @@ export class SamlController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get("sps")
-  @RequirePermissions("saml:read")
+  @RequirePermissions(Permissions.SAML_READ)
   listSPs(@Request() req: AuthenticatedRequest) {
     return this.samlService.listSPs(req.tenantId!);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post("sps")
-  @RequirePermissions("saml:write")
+  @RequirePermissions(Permissions.SAML_WRITE)
   @HttpCode(HttpStatus.CREATED)
   registerSP(@Request() req: AuthenticatedRequest, @Body() dto: RegisterSPDto) {
     return this.samlService.registerSP(req.tenantId!, dto);
@@ -76,7 +77,7 @@ export class SamlController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Patch("sps/:id")
-  @RequirePermissions("saml:write")
+  @RequirePermissions(Permissions.SAML_WRITE)
   updateSP(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
@@ -87,7 +88,7 @@ export class SamlController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Delete("sps/:id")
-  @RequirePermissions("saml:write")
+  @RequirePermissions(Permissions.SAML_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteSP(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.samlService.deleteSP(req.tenantId!, id);

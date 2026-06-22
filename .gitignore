@@ -48,3 +48,7 @@ packages/*/*.js
 packages/*/*.js.map
 packages/*/*.d.ts
 packages/*/*.d.ts.map
+
+# Generated analysis artifacts
+graphify-out/
+apps/auth-service/build_output.txt

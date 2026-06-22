@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, Request, Query } from "@nestjs/common";
+import { Controller, Get, Patch, Param, Body, Request, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
@@ -8,6 +8,9 @@ import { type SocialProvider } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { DashboardService } from "./dashboard.service";
+import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
+import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -91,6 +94,8 @@ export class DashboardController {
   }
 
   @Patch("tenant-settings")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   @ApiOperation({ summary: "Update tenant feature flags for login methods" })
   async updateTenantSettings(
     @Request() req: AuthenticatedRequest,
@@ -142,6 +147,8 @@ export class DashboardController {
   }
 
   @Patch("tenant-settings/social/:provider")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   @ApiOperation({ summary: "Enable/disable and configure a social provider for this tenant" })
   async updateSocialProvider(
     @Request() req: AuthenticatedRequest,

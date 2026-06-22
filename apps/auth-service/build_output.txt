@@ -1,8 +1,0 @@
-
-> auth-service@0.0.1 prebuild
-> (cd ../../packages/database && npx tsc) && (cd ../../packages/security && npx tsc)
-
-
-> auth-service@0.0.1 build
-> nest build
-
