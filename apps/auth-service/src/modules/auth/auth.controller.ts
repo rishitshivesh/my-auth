@@ -156,7 +156,7 @@ export class AuthController {
       userAgent: userAgent || "unknown",
     });
 
-    if ('mfaRequired' in response) {
+    if (!('accessToken' in response)) {
       return response;
     }
 
