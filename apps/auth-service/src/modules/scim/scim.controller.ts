@@ -18,12 +18,13 @@ import type { Request as ExpressRequest } from "express";
 import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { ScimService } from "./scim.service";
 
 interface AuthenticatedRequest {
   tenantId?: string;
   user: { sub: string; tid: string };
 }
-import { ScimService } from "./scim.service";
 import { ScimTokenService } from "./scim-token.service";
 import { ScimAuthGuard } from "./scim.guard";
 import {
@@ -50,7 +51,7 @@ export class ScimController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post("tokens")
-  @RequirePermissions("scim:write")
+  @RequirePermissions(Permissions.SCIM_WRITE)
   @HttpCode(HttpStatus.CREATED)
   createToken(@Request() req: AuthenticatedRequest, @Body() dto: CreateScimTokenDto) {
     return this.scimTokenService.createToken(req.tenantId!, dto.name, dto.expiresInDays);
@@ -58,14 +59,14 @@ export class ScimController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get("tokens")
-  @RequirePermissions("scim:read")
+  @RequirePermissions(Permissions.SCIM_READ)
   listTokens(@Request() req: AuthenticatedRequest) {
     return this.scimTokenService.listTokens(req.tenantId!);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Delete("tokens/:id")
-  @RequirePermissions("scim:write")
+  @RequirePermissions(Permissions.SCIM_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)
   revokeToken(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.scimTokenService.revokeToken(req.tenantId!, id);

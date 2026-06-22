@@ -37,6 +37,7 @@ import {
 import { JwtAuthGuard } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Protected } from "@/common/decorators/protected.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -209,7 +210,7 @@ export class UserController {
    */
   @Get()
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "List all users (Admin)" })
   @ApiResponse({ status: 200, description: "Users retrieved" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
@@ -232,7 +233,7 @@ export class UserController {
    */
   @Get("stats")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({
     summary: "Get user statistics (Admin)",
     description: "Get aggregate statistics about users",
@@ -253,7 +254,7 @@ export class UserController {
    */
   @Get("export")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @Header("Content-Type", "text/csv")
   @Header("Content-Disposition", 'attachment; filename="users.csv"')
   @ApiOperation({
@@ -282,7 +283,7 @@ export class UserController {
   @Post("bulk/update-status")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({
     summary: "Bulk update user status (Admin)",
     description: "Activate or deactivate multiple users at once",
@@ -311,7 +312,7 @@ export class UserController {
    */
   @Get(":id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Get user by ID (Admin)" })
   @ApiResponse({ status: 200, description: "User retrieved" })
   @ApiResponse({ status: 404, description: "User not found" })
@@ -327,7 +328,7 @@ export class UserController {
    */
   @Put(":id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Update user by ID (Admin)" })
   @ApiResponse({ status: 200, description: "User updated successfully" })
   @ApiResponse({ status: 404, description: "User not found" })
@@ -349,7 +350,7 @@ export class UserController {
   @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:delete")
+  @RequirePermissions(Permissions.USERS_DELETE)
   @ApiOperation({ summary: "Delete user by ID (Admin)" })
   @ApiResponse({ status: 204, description: "User deleted successfully" })
   @ApiResponse({ status: 404, description: "User not found" })
@@ -366,7 +367,7 @@ export class UserController {
   @Post(":id/force-password-reset")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Force user to reset password (Admin)" })
   @ApiResponse({ status: 200, description: "Password reset forced" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
@@ -383,7 +384,7 @@ export class UserController {
   @Post(":id/lock")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Lock user account (Admin)" })
   @ApiResponse({ status: 200, description: "User account locked" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
@@ -396,7 +397,7 @@ export class UserController {
   @Post(":id/unlock")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Unlock user account (Admin)" })
   @ApiResponse({ status: 200, description: "User account unlocked" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
@@ -413,7 +414,7 @@ export class UserController {
   @Post("invite")
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Invite a user to the workspace" })
   @ApiResponse({ status: 201, description: "Invitation sent" })
   @ApiResponse({ status: 409, description: "User or pending invite already exists" })
