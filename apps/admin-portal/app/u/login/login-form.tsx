@@ -23,9 +23,10 @@ function getPostLoginRoute(): string {
 interface LoginFormProps {
   tenantSlug?: string;
   tenantLogo?: string | null;
+  primaryColor?: string | null;
 }
 
-export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo }: LoginFormProps) {
+export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo, primaryColor }: LoginFormProps) {
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -41,7 +42,7 @@ export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo }: LoginFormProp
 
   if (isLoading) {
     return (
-      <AuthLayout>
+      <AuthLayout logoUrl={tenantLogo} primaryColor={primaryColor}>
         <div className="space-y-6 animate-pulse">
           <div className="h-8 w-48 bg-black/5 rounded-sm" />
           <div className="h-4 w-64 bg-black/5 rounded-sm" />
@@ -57,15 +58,7 @@ export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo }: LoginFormProp
   if (user) return null;
 
   return (
-    <AuthLayout>
-      {tenantLogo && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={tenantLogo}
-          alt="Workspace logo"
-          className="h-8 w-auto mb-6 rounded-md"
-        />
-      )}
+    <AuthLayout logoUrl={tenantLogo} primaryColor={primaryColor}>
       <SentryAuthFlow onSuccess={() => router.replace(getPostLoginRoute())} />
       <p
         style={{

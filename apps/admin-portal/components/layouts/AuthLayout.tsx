@@ -2,41 +2,39 @@
 
 import * as React from 'react';
 import { GlassCard } from "@repo/ui";
-import { cn } from "@repo/ui/lib/utils";
-import { Montserrat } from 'next/font/google';
-
-
 import { ShieldCheck } from 'lucide-react';
-
-const montserrat = Montserrat({ subsets: ['latin'] });
 
 interface AuthLayoutProps {
   children: React.ReactNode;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  workspaceName?: string | null;
 }
 
-export function AuthLayout({ children }: AuthLayoutProps) {
+export function AuthLayout({ children, logoUrl, primaryColor, workspaceName }: AuthLayoutProps) {
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[60fr_40fr] bg-background selection:bg-accent/30">
       {/* Left Panel: Auth Form */}
       <div className="relative flex items-center justify-center p-6 lg:p-12 overflow-hidden">
-        {/* Background Decorative Elements */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px]" />
-        
+
         <div className="w-full max-w-[400px] z-10 animate-fade-up">
           <div className="mb-12 flex flex-col items-center lg:items-start">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg font-display font-extrabold tracking-tight">
-                Scrolloop <span className="text-accent">Sentry</span>
+                {workspaceName ?? (
+                  <>Scrolloop <span className="text-accent">Sentry</span></>
+                )}
               </span>
               <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1" />
             </div>
           </div>
-          
+
           <GlassCard tier={2} className="p-8 lg:p-10">
             {children}
           </GlassCard>
-          
+
           <div className="mt-8 text-center lg:text-left">
             <p className="text-[11px] font-display font-bold uppercase tracking-[0.12em] text-muted-foreground/60">
               Scrolloop Sentry &middot; Enterprise Identity
@@ -47,14 +45,24 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
       {/* Right Panel: Editorial/Decorative */}
       <div className="hidden lg:flex flex-col justify-between p-16 bg-[var(--editorial-bg)] relative overflow-hidden">
-        {/* Radial Gradient Overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_var(--editorial-bg-end)_100%)]" />
+        <div
+          className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_var(--editorial-bg-end)_100%)]"
+          style={primaryColor ? { background: `radial-gradient(circle at center, ${primaryColor}66 0%, var(--editorial-bg-end) 100%)` } : undefined}
+        />
 
-        
         <div className="relative z-10 flex flex-col items-center justify-center flex-1">
-          <div className="w-24 h-24 rounded-full bg-accent/10 backdrop-blur-xl border border-accent/20 flex items-center justify-center animate-scale-in">
-            <ShieldCheck className="w-10 h-10 text-accent" strokeWidth={1.5} />
-          </div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="Workspace logo"
+              className="w-20 h-20 object-contain rounded-2xl animate-scale-in"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-accent/10 backdrop-blur-xl border border-accent/20 flex items-center justify-center animate-scale-in">
+              <ShieldCheck className="w-10 h-10 text-accent" strokeWidth={1.5} />
+            </div>
+          )}
         </div>
 
         <div className="relative z-10 space-y-4 max-w-sm">
@@ -70,8 +78,6 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             </p>
           </div>
         </div>
-        
-        {/* Subtle texture/noise could go here */}
       </div>
     </div>
   );
