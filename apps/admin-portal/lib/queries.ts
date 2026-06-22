@@ -29,6 +29,27 @@ function apiUrl(path: string): string {
   return `${authClient.getBaseURL()}${path}`;
 }
 
+// ─── User Workspaces ─────────────────────────────────────────
+
+export interface UserWorkspace {
+  tenantId: string;
+  slug: string;
+  name: string;
+  role: string;
+  isGuest: boolean;
+  logoUrl?: string;
+}
+
+export function useUserWorkspaces() {
+  return useQuery<UserWorkspace[]>({
+    queryKey: ['user', 'workspaces'],
+    queryFn: withErrorHandler<[], UserWorkspace[]>(
+      async () => authClient.getUserOrgs()
+    ),
+    staleTime: 5 * 60_000,
+  });
+}
+
 // ─── Dashboard ───────────────────────────────────────────────
 
 export function useDashboard() {
