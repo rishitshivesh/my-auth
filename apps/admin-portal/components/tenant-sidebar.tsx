@@ -11,6 +11,8 @@ import {
   CreditCard,
   Settings,
   Shield,
+  ShieldCheck,
+  ScrollText,
   LogOut,
 } from 'lucide-react'
 
@@ -31,9 +33,16 @@ export function TenantSidebar() {
       ],
     },
     {
+      label: 'Access Control',
+      items: [
+        { label: 'Users', href: `/t/${slug}/users`, icon: Users },
+        { label: 'Roles', href: `/t/${slug}/roles`, icon: ShieldCheck },
+        { label: 'Policies', href: `/t/${slug}/policies`, icon: ScrollText },
+      ],
+    },
+    {
       label: 'Account',
       items: [
-        { label: 'Team', href: `/t/${slug}/team`, icon: Users },
         { label: 'Billing', href: `/t/${slug}/billing`, icon: CreditCard },
         { label: 'Audit Log', href: `/t/${slug}/audit-logs`, icon: FileText },
         { label: 'Settings', href: `/t/${slug}/settings`, icon: Settings },

@@ -251,6 +251,14 @@ export class RbacController {
     return this.roleService.getRolePermissions(id, tenantId);
   }
 
+  @Get("roles/:roleId/policies")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.ROLES_READ)
+  @ApiOperation({ summary: "List policies attached to a role" })
+  async getRolePolicies(@Request() req: AuthenticatedRequest, @Param("roleId") roleId: string) {
+    return this.policyService.listPoliciesForRole(roleId, req.tenantId);
+  }
+
   // ============================================================
   // USER-ROLE ENDPOINTS
   // ============================================================

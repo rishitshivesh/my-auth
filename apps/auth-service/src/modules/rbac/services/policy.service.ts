@@ -124,6 +124,14 @@ export class PolicyService {
     logger.info({ roleId, policyId }, 'Policy detached from role');
   }
 
+  async listPoliciesForRole(roleId: string, tenantId: string): Promise<Policy[]> {
+    const results = await this.rolePolicyRepo.find({
+      where: { roleId, tenantId },
+      relations: ['policy'],
+    });
+    return results.map(rp => rp.policy).filter((p): p is Policy => Boolean(p));
+  }
+
   private validateDocument(doc: { Version: string; Statement: Array<{ Effect: string; Action: string | string[]; Resource: string | string[] }> }): void {
     if (!doc.Version || !doc.Statement || !Array.isArray(doc.Statement)) {
       throw new BadRequestException('Invalid policy document: Version and Statement[] required');

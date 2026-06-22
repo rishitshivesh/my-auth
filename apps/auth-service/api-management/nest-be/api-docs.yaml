@@ -3230,6 +3230,35 @@
         ]
       }
     },
+    "/rbac/roles/{roleId}/policies": {
+      "get": {
+        "operationId": "RbacController_getRolePolicies",
+        "parameters": [
+          {
+            "name": "roleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List policies attached to a role",
+        "tags": [
+          "RBAC"
+        ]
+      }
+    },
     "/rbac/users/{userId}/roles": {
       "get": {
         "operationId": "RbacController_getUserRoles",

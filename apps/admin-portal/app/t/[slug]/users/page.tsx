@@ -23,6 +23,7 @@ import {
   useRestoreUser,
   useDeleteTenantUser,
   useSendEmailToUser,
+  useTenantRoles,
 } from '@/lib/queries';
 import type { UserListItem } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
@@ -51,6 +52,7 @@ export default function UsersListPage() {
   const [emailTarget, setEmailTarget] = React.useState<UserListItem | null>(null);
   const [suspendReason, setSuspendReason] = React.useState('');
   const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteRoleId, setInviteRoleId] = React.useState('');
   const [deleteConfirm, setDeleteConfirm] = React.useState('');
   const [emailSubject, setEmailSubject] = React.useState('');
   const [emailBody, setEmailBody] = React.useState('');
@@ -60,6 +62,7 @@ export default function UsersListPage() {
   const restoreUser = useRestoreUser();
   const deleteUser = useDeleteTenantUser();
   const sendEmail = useSendEmailToUser();
+  const { data: roles } = useTenantRoles();
 
   const { data, isLoading } = useTenantUsers({ search: search || undefined, status });
 
@@ -209,24 +212,39 @@ export default function UsersListPage() {
       </div>
 
       {/* Invite User Dialog */}
-      <Dialog open={inviteOpen} onOpenChange={(o) => { if (!o) { setInviteOpen(false); setInviteEmail(''); } }}>
+      <Dialog open={inviteOpen} onOpenChange={(o) => { if (!o) { setInviteOpen(false); setInviteEmail(''); setInviteRoleId(''); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
             <DialogDescription>Send an invitation email to add someone to this workspace.</DialogDescription>
           </DialogHeader>
-          <SentryInput
-            type="email"
-            placeholder="user@example.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-          />
+          <div className="space-y-3">
+            <SentryInput
+              type="email"
+              placeholder="user@example.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <select
+              value={inviteRoleId}
+              onChange={(e) => setInviteRoleId(e.target.value)}
+              className="w-full h-[42px] px-4 rounded-sm border border-border bg-white text-sm font-body focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+            >
+              <option value="">No role (optional)</option>
+              {roles?.map(role => (
+                <option key={role.id} value={role.id}>{role.displayName ?? role.name}</option>
+              ))}
+            </select>
+          </div>
           <DialogFooter>
-            <SentryButton variant="ghost" onClick={() => { setInviteOpen(false); setInviteEmail(''); }}>Cancel</SentryButton>
+            <SentryButton variant="ghost" onClick={() => { setInviteOpen(false); setInviteEmail(''); setInviteRoleId(''); }}>Cancel</SentryButton>
             <SentryButton
               variant="accent"
               disabled={!inviteEmail || inviteUser.isPending}
-              onClick={() => inviteUser.mutate({ email: inviteEmail }, { onSuccess: () => { setInviteOpen(false); setInviteEmail(''); } })}
+              onClick={() => inviteUser.mutate(
+                { email: inviteEmail, roleIds: inviteRoleId ? [inviteRoleId] : undefined },
+                { onSuccess: () => { setInviteOpen(false); setInviteEmail(''); setInviteRoleId(''); } }
+              )}
             >
               {inviteUser.isPending ? 'Sending…' : 'Send Invite'}
             </SentryButton>
