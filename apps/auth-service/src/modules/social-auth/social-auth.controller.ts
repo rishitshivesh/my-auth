@@ -268,7 +268,15 @@ export class SocialAuthController {
       }
 
       if (result.type === 'mfa_enrollment_required') {
-        return res.redirect(`${safeReturnUrl}/mfa/enroll?enrollmentToken=${encodeURIComponent(result.enrollmentToken)}`);
+        const isProduction = process.env['NODE_ENV'] === 'production';
+        res.cookie('mfa_enrollment_token', result.enrollmentToken, {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: 'strict' as const,
+          path: '/mfa/enroll',
+          maxAge: 5 * 60 * 1000,
+        });
+        return res.redirect(`${safeReturnUrl}/mfa/enroll`);
       }
 
       const isProduction = process.env['NODE_ENV'] === 'production';

@@ -11,6 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
   User,
+  UserRole,
   UserSocialConnection,
   TenantSocialProvider,
   SocialLinkRequest,
@@ -26,8 +27,6 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { MfaPolicyService } from '@/modules/mfa/mfa-policy.service';
 import { MfaService } from '@/modules/mfa/mfa.service';
-import { UserRole } from '@repo/database';
-
 export interface SocialProfile {
   provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
   providerId: string;
@@ -110,7 +109,7 @@ export class SocialAuthService {
     ipAddress: string;
     userAgent: string;
   }): Promise<
-    | { type: "success"; accessToken: string; refreshToken: string; user: any }
+    | { type: "success"; accessToken: string; refreshToken: string; user: { id: string; email: string; firstName?: string; lastName?: string; displayName?: string; avatarUrl?: string; emailVerified: boolean } }
     | { type: "link_required"; email: string; provider: string; message: string }
     | { type: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
@@ -322,7 +321,7 @@ export class SocialAuthService {
     type: "success";
     accessToken: string;
     refreshToken: string;
-    user: any;
+    user: { id: string; email: string; firstName?: string; lastName?: string; displayName?: string; avatarUrl?: string; emailVerified: boolean };
   }> {
     this.logger.log("Creating new user with social connection", {
       tenantId,
