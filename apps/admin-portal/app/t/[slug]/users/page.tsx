@@ -2,25 +2,40 @@
 
 import * as React from 'react';
 import { PortalLayout } from '@/components/layouts/portal-layout';
-import { PageHeader, SentryButton, SentryInput, DataTable, StatusBadge } from "@repo/ui";
-import { useTenantUsers } from '@/lib/queries';
-import type { UserListItem } from '@/lib/types';
-import { useParams, useRouter } from 'next/navigation';
-import { Plus, Search, MoreHorizontal, Eye, Ban, Trash2, Mail, Download } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@repo/ui/components/ui/dropdown-menu';
+  PageHeader,
+  SentryButton,
+  SentryInput,
+  DataTable,
+  StatusBadge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@repo/ui';
+import { Textarea } from '@repo/ui/components/ui/textarea';
 import {
+  useTenantUsers,
   useInviteUser,
   useSuspendUser,
   useRestoreUser,
   useDeleteTenantUser,
   useSendEmailToUser,
 } from '@/lib/queries';
+import type { UserListItem } from '@/lib/types';
+import { useParams, useRouter } from 'next/navigation';
+import { Plus, Search, MoreHorizontal, Eye, Ban, Trash2, Mail, Download, RotateCcw } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@repo/ui/components/ui/dropdown-menu';
+import { authClient } from '@/lib/auth-client';
 
 export default function UsersListPage() {
   const params = useParams();
@@ -30,7 +45,6 @@ export default function UsersListPage() {
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState<'all' | 'active' | 'suspended'>('all');
 
-  // Modal state
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [suspendTarget, setSuspendTarget] = React.useState<UserListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<UserListItem | null>(null);
@@ -47,10 +61,7 @@ export default function UsersListPage() {
   const deleteUser = useDeleteTenantUser();
   const sendEmail = useSendEmailToUser();
 
-  const { data, isLoading } = useTenantUsers({
-    search: search || undefined,
-    status,
-  });
+  const { data, isLoading } = useTenantUsers({ search: search || undefined, status });
 
   const columns = [
     {
@@ -58,24 +69,20 @@ export default function UsersListPage() {
       accessorKey: (row: UserListItem) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-[10px] font-display font-bold text-accent">
-            {row.displayName?.slice(0, 2).toUpperCase() || row.email.slice(0, 2).toUpperCase()}
+            {(row.displayName ?? row.email).slice(0, 2).toUpperCase()}
           </div>
           <div className="flex flex-col">
             <span className="font-display font-semibold text-foreground leading-none mb-0.5">
-              {row.displayName || 'Unnamed User'}
+              {row.displayName ?? 'Unnamed User'}
             </span>
-            <span className="text-[11px] font-body text-muted-foreground leading-none">
-              {row.email}
-            </span>
+            <span className="text-[11px] font-body text-muted-foreground leading-none">{row.email}</span>
           </div>
         </div>
       ),
     },
     {
       header: 'Status',
-      accessorKey: (row: UserListItem) => (
-        <StatusBadge status={row.isActive ? 'active' : 'suspended'} />
-      ),
+      accessorKey: (row: UserListItem) => <StatusBadge status={row.isActive ? 'active' : 'suspended'} />,
     },
     {
       header: 'Email Verified',
@@ -89,7 +96,9 @@ export default function UsersListPage() {
       header: 'Last Active',
       accessorKey: (row: UserListItem) => (
         <span className="text-xs font-body text-muted-foreground">
-          {row.lastLoginAt ? formatDistanceToNow(new Date(row.lastLoginAt), { addSuffix: true }) : 'Never'}
+          {row.lastLoginAt
+            ? formatDistanceToNow(new Date(row.lastLoginAt), { addSuffix: true })
+            : 'Never'}
         </span>
       ),
     },
@@ -106,27 +115,27 @@ export default function UsersListPage() {
           <DropdownMenuContent align="end" className="w-[160px] bg-popover/95 backdrop-blur-md border-border shadow-xl">
             <DropdownMenuItem onClick={() => router.push(`/t/${slug}/users/${row.id}`)}>
               <Eye className="mr-2 h-3.5 w-3.5" />
-              <span>View Details</span>
+              View Details
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setEmailTarget(row)}>
               <Mail className="mr-2 h-3.5 w-3.5" />
-              <span>Send Email</span>
+              Send Email
             </DropdownMenuItem>
-            <div className="h-px bg-border my-1" />
+            <DropdownMenuSeparator />
             {row.isActive ? (
-              <DropdownMenuItem className="text-destructive" onClick={() => setSuspendTarget(row)}>
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setSuspendTarget(row)}>
                 <Ban className="mr-2 h-3.5 w-3.5" />
-                <span>Suspend</span>
+                Suspend
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem onClick={() => restoreUser.mutate(row.id)}>
-                <Ban className="mr-2 h-3.5 w-3.5" />
-                <span>Restore</span>
+                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                Restore
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(row)}>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(row)}>
               <Trash2 className="mr-2 h-3.5 w-3.5" />
-              <span>Delete</span>
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -135,12 +144,11 @@ export default function UsersListPage() {
   ];
 
   return (
-    <>
     <PortalLayout>
       <div className="space-y-8">
         <PageHeader
           title="Users"
-          subtitle={`Manage access for ${data?.pagination.total || 0} identities in this workspace`}
+          subtitle={`Manage access for ${data?.pagination.total ?? 0} identities in this workspace`}
           action={
             <SentryButton variant="accent" className="gap-2" onClick={() => setInviteOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -188,120 +196,137 @@ export default function UsersListPage() {
 
         <DataTable
           columns={columns}
-          data={data?.users || []}
+          data={data?.users ?? []}
           isLoading={isLoading}
           onRowClick={(row) => router.push(`/t/${slug}/users/${row.id}`)}
         />
 
-        {!isLoading && data?.users.length === 0 && (
+        {!isLoading && (data?.users.length ?? 0) === 0 && (
           <div className="py-20 text-center">
-            <p className="text-sm font-body text-muted-foreground">
-              No users found matching your filters.
-            </p>
+            <p className="text-sm font-body text-muted-foreground">No users found matching your filters.</p>
           </div>
         )}
       </div>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(o) => { if (!o) { setInviteOpen(false); setInviteEmail(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>Send an invitation email to add someone to this workspace.</DialogDescription>
+          </DialogHeader>
+          <SentryInput
+            type="email"
+            placeholder="user@example.com"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+          />
+          <DialogFooter>
+            <SentryButton variant="ghost" onClick={() => { setInviteOpen(false); setInviteEmail(''); }}>Cancel</SentryButton>
+            <SentryButton
+              variant="accent"
+              disabled={!inviteEmail || inviteUser.isPending}
+              onClick={() => inviteUser.mutate({ email: inviteEmail }, { onSuccess: () => { setInviteOpen(false); setInviteEmail(''); } })}
+            >
+              {inviteUser.isPending ? 'Sending…' : 'Send Invite'}
+            </SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend User Dialog */}
+      <Dialog open={!!suspendTarget} onOpenChange={(o) => { if (!o) { setSuspendTarget(null); setSuspendReason(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspend {suspendTarget?.displayName ?? suspendTarget?.email}?</DialogTitle>
+            <DialogDescription>The user will lose access immediately. You can restore them later.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Reason for suspension (required)"
+            value={suspendReason}
+            onChange={(e) => setSuspendReason(e.target.value)}
+            rows={3}
+          />
+          <DialogFooter>
+            <SentryButton variant="ghost" onClick={() => { setSuspendTarget(null); setSuspendReason(''); }}>Cancel</SentryButton>
+            <SentryButton
+              variant="destructive"
+              disabled={!suspendReason.trim() || suspendUser.isPending}
+              onClick={() => suspendUser.mutate(
+                { userId: suspendTarget!.id, reason: suspendReason },
+                { onSuccess: () => { setSuspendTarget(null); setSuspendReason(''); } }
+              )}
+            >
+              {suspendUser.isPending ? 'Suspending…' : 'Suspend User'}
+            </SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteConfirm(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.displayName ?? deleteTarget?.email}?</DialogTitle>
+            <DialogDescription>
+              This is permanent and cannot be undone. Type{' '}
+              <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{deleteTarget?.email}</code> to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <SentryInput
+            placeholder={deleteTarget?.email}
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            className="font-mono"
+          />
+          <DialogFooter>
+            <SentryButton variant="ghost" onClick={() => { setDeleteTarget(null); setDeleteConfirm(''); }}>Cancel</SentryButton>
+            <SentryButton
+              variant="destructive"
+              disabled={deleteConfirm !== deleteTarget?.email || deleteUser.isPending}
+              onClick={() => deleteUser.mutate(deleteTarget!.id, { onSuccess: () => { setDeleteTarget(null); setDeleteConfirm(''); } })}
+            >
+              {deleteUser.isPending ? 'Deleting…' : 'Delete Permanently'}
+            </SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Email Dialog */}
+      <Dialog open={!!emailTarget} onOpenChange={(o) => { if (!o) { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Email {emailTarget?.displayName ?? emailTarget?.email}</DialogTitle>
+            <DialogDescription>Send a direct email to this user.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <SentryInput
+              placeholder="Subject"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+            />
+            <Textarea
+              placeholder="Message body"
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <SentryButton variant="ghost" onClick={() => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); }}>Cancel</SentryButton>
+            <SentryButton
+              variant="accent"
+              disabled={!emailSubject.trim() || !emailBody.trim() || sendEmail.isPending}
+              onClick={() => sendEmail.mutate(
+                { userId: emailTarget!.id, subject: emailSubject, body: emailBody },
+                { onSuccess: () => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); } }
+              )}
+            >
+              {sendEmail.isPending ? 'Sending…' : 'Send Email'}
+            </SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PortalLayout>
-
-    {/* Invite Modal */}
-    {inviteOpen && (
-      <SimpleModal title="Invite User" onClose={() => { setInviteOpen(false); setInviteEmail(''); }}>
-        <input
-          value={inviteEmail}
-          onChange={e => setInviteEmail(e.target.value)}
-          placeholder="user@example.com"
-          type="email"
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const }}
-        />
-        <SentryButton
-          variant="accent"
-          disabled={!inviteEmail || inviteUser.isPending}
-          onClick={() => inviteUser.mutate({ email: inviteEmail }, { onSuccess: () => { setInviteOpen(false); setInviteEmail(''); } })}
-        >
-          {inviteUser.isPending ? 'Sending…' : 'Send Invite'}
-        </SentryButton>
-      </SimpleModal>
-    )}
-
-    {/* Suspend Modal */}
-    {suspendTarget && (
-      <SimpleModal title={`Suspend ${suspendTarget.displayName || suspendTarget.email}?`} onClose={() => { setSuspendTarget(null); setSuspendReason(''); }} danger>
-        <textarea
-          value={suspendReason}
-          onChange={e => setSuspendReason(e.target.value)}
-          placeholder="Reason for suspension (required)"
-          rows={3}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'DM Sans, sans-serif' }}
-        />
-        <SentryButton
-          variant="destructive"
-          disabled={!suspendReason.trim() || suspendUser.isPending}
-          onClick={() => suspendUser.mutate({ userId: suspendTarget.id, reason: suspendReason }, { onSuccess: () => { setSuspendTarget(null); setSuspendReason(''); } })}
-        >
-          {suspendUser.isPending ? 'Suspending…' : 'Suspend User'}
-        </SentryButton>
-      </SimpleModal>
-    )}
-
-    {/* Delete Modal */}
-    {deleteTarget && (
-      <SimpleModal title={`Delete ${deleteTarget.displayName || deleteTarget.email}?`} onClose={() => { setDeleteTarget(null); setDeleteConfirm(''); }} danger>
-        <p style={{ fontSize: '13px', color: '#605E5A', marginBottom: '8px' }}>
-          Type <code style={{ fontFamily: 'JetBrains Mono, monospace', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px' }}>{deleteTarget.email}</code> to confirm
-        </p>
-        <input
-          value={deleteConfirm}
-          onChange={e => setDeleteConfirm(e.target.value)}
-          placeholder={deleteTarget.email}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, fontFamily: 'JetBrains Mono, monospace' }}
-        />
-        <SentryButton
-          variant="destructive"
-          disabled={deleteConfirm !== deleteTarget.email || deleteUser.isPending}
-          onClick={() => deleteUser.mutate(deleteTarget.id, { onSuccess: () => { setDeleteTarget(null); setDeleteConfirm(''); } })}
-        >
-          {deleteUser.isPending ? 'Deleting…' : 'Delete Permanently'}
-        </SentryButton>
-      </SimpleModal>
-    )}
-
-    {/* Send Email Modal */}
-    {emailTarget && (
-      <SimpleModal title={`Email ${emailTarget.displayName || emailTarget.email}`} onClose={() => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); }}>
-        <input
-          value={emailSubject}
-          onChange={e => setEmailSubject(e.target.value)}
-          placeholder="Subject"
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '8px', boxSizing: 'border-box' as const }}
-        />
-        <textarea
-          value={emailBody}
-          onChange={e => setEmailBody(e.target.value)}
-          placeholder="Message body"
-          rows={4}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'DM Sans, sans-serif' }}
-        />
-        <SentryButton
-          variant="accent"
-          disabled={!emailSubject.trim() || !emailBody.trim() || sendEmail.isPending}
-          onClick={() => sendEmail.mutate({ userId: emailTarget.id, subject: emailSubject, body: emailBody }, { onSuccess: () => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); } })}
-        >
-          {sendEmail.isPending ? 'Sending…' : 'Send Email'}
-        </SentryButton>
-      </SimpleModal>
-    )}
-  </>
-  );
-}
-
-function SimpleModal({ title, onClose, danger, children }: { title: string; onClose: () => void; danger?: boolean; children: React.ReactNode }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: '20px', padding: '28px', maxWidth: '420px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', border: danger ? '1px solid rgba(192,57,43,0.2)' : '1px solid rgba(0,0,0,0.08)' }}>
-        <h3 style={{ margin: '0 0 16px', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: '16px' }}>{title}</h3>
-        {children}
-        <button onClick={onClose} style={{ marginTop: '8px', width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', background: 'transparent', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>Cancel</button>
-      </div>
-    </div>
   );
 }
