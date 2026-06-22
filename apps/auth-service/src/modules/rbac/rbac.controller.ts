@@ -350,6 +350,8 @@ export class RbacController {
 
   @Post("users/:userId/check-permission")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Check if user has permission" })
   async checkPermission(
     @Request() req: AuthenticatedRequest,
@@ -367,6 +369,8 @@ export class RbacController {
 
   @Post("users/:userId/check-role")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Check if user has role" })
   async checkRole(
     @Request() req: AuthenticatedRequest,
