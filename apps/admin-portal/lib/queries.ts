@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { withErrorHandler } from "./with-error-handler";
 import type {
@@ -970,47 +970,69 @@ export function useExportUsersCsv(filters?: { search?: string; status?: string }
 
 // ── Server-side Audit Log ─────────────────────────────────────
 
-export function useAuditLogsFiltered(filters: {
+export interface AuditLogFilters {
   eventType?: string;
-  actor?: string;
   startDate?: string;
   endDate?: string;
   limit?: number;
-  cursor?: string;
-}) {
+}
+
+function buildAuditQs(filters: AuditLogFilters & { cursor?: string }): string {
   const qs = new URLSearchParams();
   if (filters.eventType) qs.set("eventType", filters.eventType);
-  if (filters.actor) qs.set("actor", filters.actor);
   if (filters.startDate) qs.set("startDate", filters.startDate);
   if (filters.endDate) qs.set("endDate", filters.endDate);
   qs.set("limit", String(filters.limit ?? 50));
   if (filters.cursor) qs.set("cursor", filters.cursor);
+  return qs.toString();
+}
 
+export function useAuditLogsFiltered(filters: AuditLogFilters & { cursor?: string }) {
   return useQuery<{ items: ActivityEvent[]; nextCursor: string | null; total: number }>({
     queryKey: ["audit", "filtered", filters],
     queryFn: withErrorHandler<[], { items: ActivityEvent[]; nextCursor: string | null; total: number }>(
       async () => authClient.request({
-        url: apiUrl(`/dashboard/tenant-activity?${qs.toString()}`),
+        url: apiUrl(`/audit?${buildAuditQs(filters)}`),
         method: "GET",
       })
     ),
   });
 }
 
+const fetchAuditPage = withErrorHandler<
+  [AuditLogFilters & { cursor?: string }],
+  { items: ActivityEvent[]; nextCursor: string | null; total: number }
+>(
+  async (f) =>
+    authClient.request({
+      url: apiUrl(`/audit?${buildAuditQs(f)}`),
+      method: "GET",
+    }),
+);
+
+export function useAuditLogsInfinite(filters: AuditLogFilters) {
+  return useInfiniteQuery<
+    { items: ActivityEvent[]; nextCursor: string | null; total: number },
+    Error,
+    { pages: Array<{ items: ActivityEvent[]; nextCursor: string | null; total: number }> },
+    string[],
+    string | undefined
+  >({
+    queryKey: ["audit", "infinite", filters.eventType ?? "", filters.startDate ?? "", filters.endDate ?? ""],
+    queryFn: ({ pageParam }) => fetchAuditPage({ ...filters, cursor: pageParam }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    initialPageParam: undefined,
+  });
+}
+
 export function useExportAuditCsv() {
-  return useMutation<void, Error, { eventType?: string; actor?: string; startDate?: string; endDate?: string }>({
+  return useMutation<void, Error, AuditLogFilters>({
     mutationFn: async (filters) => {
-      const qs = new URLSearchParams();
-      if (filters.eventType) qs.set("eventType", filters.eventType);
-      if (filters.actor) qs.set("actor", filters.actor);
-      if (filters.startDate) qs.set("startDate", filters.startDate);
-      if (filters.endDate) qs.set("endDate", filters.endDate);
-      const start = filters.startDate ? filters.startDate.split("T")[0] : "all";
-      const end = filters.endDate ? filters.endDate.split("T")[0] : "time";
-      const url = `${authClient.getBaseURL()}/dashboard/tenant-activity/export?${qs.toString()}`;
+      const qs = buildAuditQs(filters);
+      const url = `${authClient.getBaseURL()}/audit/export?${qs}`;
       const a = document.createElement("a");
       a.href = url;
-      a.download = `audit-${start}-${end}.csv`;
+      a.download = `audit-${Date.now()}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -1,24 +1,50 @@
 'use client';
 
 import * as React from 'react';
+import { useParams } from 'next/navigation';
 import { PortalLayout } from '@/components/layouts/portal-layout';
-import { GlassCard, PageHeader, SentryButton, SentryInput, DataTable, StatusBadge, AuditTimeline } from "@repo/ui";
-
-import { useTenantActivity } from '@/lib/queries';
+import { DataTable, StatusBadge } from '@repo/ui';
+import { useAuditLogsInfinite, useExportAuditCsv } from '@/lib/queries';
 import type { ActivityEvent } from '@/lib/types';
-import { Download, Search, Filter, Shield, MapPin } from 'lucide-react';
+import { Download, Shield, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
-export default function AuditLogPage() {
-  const [search, setSearch] = React.useState('');
-  const { data: activity, isLoading } = useTenantActivity(50);
+interface AuditFilters {
+  eventType: string;
+  startDate: string;
+  endDate: string;
+}
 
-  const filtered = activity?.filter((a) =>
-    !search ||
-    a.eventType.toLowerCase().includes(search.toLowerCase()) ||
-    a.actorEmail?.toLowerCase().includes(search.toLowerCase()) ||
-    a.ipAddress.toLowerCase().includes(search.toLowerCase())
-  );
+export default function AuditLogPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [filters, setFilters] = React.useState<AuditFilters>({
+    eventType: '',
+    startDate: '',
+    endDate: '',
+  });
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAuditLogsInfinite({
+      eventType: filters.eventType || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
+      limit: 50,
+    });
+
+  const exportCsv = useExportAuditCsv();
+
+  const events: ActivityEvent[] =
+    data?.pages.flatMap((page) => page.items) ?? [];
+
+  const handleExport = () => {
+    exportCsv.mutate({
+      eventType: filters.eventType || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
+    });
+  };
 
   const columns = [
     {
@@ -43,15 +69,6 @@ export default function AuditLogPage() {
       ),
     },
     {
-      header: 'Location',
-      accessorKey: (row: ActivityEvent) => (
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <MapPin className="w-3 h-3" />
-          <span className="text-xs font-body">{row.location || 'Unknown'}</span>
-        </div>
-      ),
-    },
-    {
       header: 'IP Address',
       accessorKey: (row: ActivityEvent) => (
         <code className="text-[11px] font-mono text-muted-foreground bg-black/5 px-1.5 py-0.5 rounded-sm">
@@ -70,7 +87,15 @@ export default function AuditLogPage() {
     {
       header: 'Severity',
       accessorKey: (row: ActivityEvent) => (
-        <StatusBadge status={row.severity === 'critical' ? 'suspended' : row.severity === 'warning' ? 'pending' : 'active'}>
+        <StatusBadge
+          status={
+            row.severity === 'critical'
+              ? 'suspended'
+              : row.severity === 'warning'
+              ? 'pending'
+              : 'active'
+          }
+        >
           {row.severity}
         </StatusBadge>
       ),
@@ -78,60 +103,90 @@ export default function AuditLogPage() {
   ];
 
   return (
-    <PortalLayout>
-      <div className="space-y-10">
-        <PageHeader
-          title="Security Audit Log"
-          subtitle="A comprehensive record of all activities within your workspace"
-          action={
-            <SentryButton variant="ghost" className="gap-2 border-border">
-              <Download className="w-4 h-4" />
-              Export Logs
-            </SentryButton>
-          }
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center gap-4">
-               <div className="relative flex-1">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                 <SentryInput
-                   placeholder="Filter by event type, actor, or IP..."
-                   className="pl-9 bg-black/5 border-transparent focus:bg-white"
-                   value={search}
-                   onChange={(e) => setSearch(e.target.value)}
-                 />
-               </div>
-               <SentryButton variant="ghost" className="gap-2 h-[42px] border-border">
-                 <Filter className="w-3.5 h-3.5" />
-                 More Filters
-               </SentryButton>
-            </div>
-
-            <DataTable
-              columns={columns}
-              data={filtered || []}
-              isLoading={isLoading}
+    <PortalLayout
+      tenantSlug={slug}
+      pageTitle="Audit Log"
+      pageSubtitle="Security events and access history"
+      currentPath={`/t/${slug}/audit`}
+    >
+      <div className="space-y-4">
+        {/* Filter bar */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">
+              Event type
+            </label>
+            <input
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-transparent w-48"
+              placeholder="e.g. LOGIN_SUCCESS"
+              value={filters.eventType}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, eventType: e.target.value }))
+              }
             />
           </div>
-
-          <div className="space-y-6">
-            <h2 className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 mb-4">
-              Real-time Pulse
-            </h2>
-            <GlassCard tier={1} className="p-6">
-               <AuditTimeline
-                 events={filtered?.slice(0, 8).map(a => ({
-                   id: a.id,
-                   type: a.eventType,
-                   description: `${a.actorEmail || 'System'} accessed via ${a.ipAddress}`,
-                   timestamp: a.createdAt,
-                 })) || []}
-               />
-            </GlassCard>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">
+              From
+            </label>
+            <input
+              type="date"
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-transparent"
+              value={filters.startDate}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, startDate: e.target.value }))
+              }
+            />
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">
+              To
+            </label>
+            <input
+              type="date"
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-transparent"
+              value={filters.endDate}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, endDate: e.target.value }))
+              }
+            />
+          </div>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border hover:border-[var(--color-accent)] transition-colors"
+            onClick={handleExport}
+            disabled={exportCsv.isPending}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
         </div>
+
+        {/* Events table */}
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-8 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Loading audit events...</span>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            No audit events found for these filters.
+          </div>
+        ) : (
+          <>
+            <DataTable columns={columns} data={events} />
+            {hasNextPage && (
+              <div className="flex justify-center pt-2">
+                <button
+                  className="text-sm text-muted-foreground hover:text-foreground underline"
+                  onClick={() => void fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? 'Loading...' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </PortalLayout>
   );

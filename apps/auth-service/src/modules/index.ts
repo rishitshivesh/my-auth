@@ -12,6 +12,7 @@ import { WebhookModule } from "@/modules/webhook/webhook.module";
 import { SamlModule } from "@/modules/saml/saml.module";
 import { ScimModule } from "@/modules/scim/scim.module";
 import { LdapModule } from "@/modules/ldap/ldap.module";
+import { AuditModule } from "@/modules/audit/audit.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -29,6 +30,7 @@ import { ScheduleModule } from "@nestjs/schedule";
     SamlModule,
     ScimModule,
     LdapModule,
+    AuditModule,
     ScheduleModule.forRoot(),
   ],
 })
