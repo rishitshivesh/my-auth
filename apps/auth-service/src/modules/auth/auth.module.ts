@@ -14,6 +14,7 @@ import {
   TenantSocialProvider,
   SecurityEvent,
   UserInvite,
+  TenantMfaPolicy,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -30,6 +31,7 @@ import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { MfaPolicyService } from "@/modules/mfa/mfa-policy.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
@@ -53,6 +55,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       TenantSocialProvider,
       SecurityEvent,
       UserInvite,
+      TenantMfaPolicy,
     ]),
     DatabaseModule,
     SecurityEventModule,
@@ -76,6 +79,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     RedisService,
     BruteForceService,
     MfaService,
+    MfaPolicyService,
     WebAuthnService,
     RbacService,
     OAuthRefreshTokenService,

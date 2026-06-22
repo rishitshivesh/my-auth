@@ -6,7 +6,7 @@ import { PageHeader, SentryButton, SentryInput, DataTable, StatusBadge } from "@
 import { useTenantUsers } from '@/lib/queries';
 import type { UserListItem } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, Search, MoreHorizontal, Eye, Ban, Trash2, Mail } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Eye, Ban, Trash2, Mail, Download } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   DropdownMenu,
@@ -14,6 +14,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@repo/ui/components/ui/dropdown-menu';
+import {
+  useInviteUser,
+  useSuspendUser,
+  useRestoreUser,
+  useDeleteTenantUser,
+  useSendEmailToUser,
+} from '@/lib/queries';
 
 export default function UsersListPage() {
   const params = useParams();
@@ -22,6 +29,23 @@ export default function UsersListPage() {
 
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState<'all' | 'active' | 'suspended'>('all');
+
+  // Modal state
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [suspendTarget, setSuspendTarget] = React.useState<UserListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<UserListItem | null>(null);
+  const [emailTarget, setEmailTarget] = React.useState<UserListItem | null>(null);
+  const [suspendReason, setSuspendReason] = React.useState('');
+  const [inviteEmail, setInviteEmail] = React.useState('');
+  const [deleteConfirm, setDeleteConfirm] = React.useState('');
+  const [emailSubject, setEmailSubject] = React.useState('');
+  const [emailBody, setEmailBody] = React.useState('');
+
+  const inviteUser = useInviteUser();
+  const suspendUser = useSuspendUser();
+  const restoreUser = useRestoreUser();
+  const deleteUser = useDeleteTenantUser();
+  const sendEmail = useSendEmailToUser();
 
   const { data, isLoading } = useTenantUsers({
     search: search || undefined,
@@ -84,16 +108,23 @@ export default function UsersListPage() {
               <Eye className="mr-2 h-3.5 w-3.5" />
               <span>View Details</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setEmailTarget(row)}>
               <Mail className="mr-2 h-3.5 w-3.5" />
               <span>Send Email</span>
             </DropdownMenuItem>
             <div className="h-px bg-border my-1" />
-            <DropdownMenuItem className="text-destructive">
-              <Ban className="mr-2 h-3.5 w-3.5" />
-              <span>Suspend</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
+            {row.isActive ? (
+              <DropdownMenuItem className="text-destructive" onClick={() => setSuspendTarget(row)}>
+                <Ban className="mr-2 h-3.5 w-3.5" />
+                <span>Suspend</span>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => restoreUser.mutate(row.id)}>
+                <Ban className="mr-2 h-3.5 w-3.5" />
+                <span>Restore</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(row)}>
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               <span>Delete</span>
             </DropdownMenuItem>
@@ -104,13 +135,14 @@ export default function UsersListPage() {
   ];
 
   return (
+    <>
     <PortalLayout>
       <div className="space-y-8">
         <PageHeader
           title="Users"
           subtitle={`Manage access for ${data?.pagination.total || 0} identities in this workspace`}
           action={
-            <SentryButton variant="accent" className="gap-2">
+            <SentryButton variant="accent" className="gap-2" onClick={() => setInviteOpen(true)}>
               <Plus className="w-4 h-4" />
               Invite User
             </SentryButton>
@@ -137,7 +169,18 @@ export default function UsersListPage() {
               <option value="active">Active Only</option>
               <option value="suspended">Suspended</option>
             </select>
-            <SentryButton variant="ghost" className="h-[42px] gap-2">
+            <SentryButton
+              variant="ghost"
+              className="h-[42px] gap-2"
+              onClick={() => {
+                const url = `${authClient.getBaseURL()}/api/admin/users/export?search=${search}&status=${status}`;
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `users-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+              }}
+            >
+              <Download className="w-4 h-4" />
               Export CSV
             </SentryButton>
           </div>
@@ -159,5 +202,106 @@ export default function UsersListPage() {
         )}
       </div>
     </PortalLayout>
+
+    {/* Invite Modal */}
+    {inviteOpen && (
+      <SimpleModal title="Invite User" onClose={() => { setInviteOpen(false); setInviteEmail(''); }}>
+        <input
+          value={inviteEmail}
+          onChange={e => setInviteEmail(e.target.value)}
+          placeholder="user@example.com"
+          type="email"
+          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const }}
+        />
+        <SentryButton
+          variant="accent"
+          disabled={!inviteEmail || inviteUser.isPending}
+          onClick={() => inviteUser.mutate({ email: inviteEmail }, { onSuccess: () => { setInviteOpen(false); setInviteEmail(''); } })}
+        >
+          {inviteUser.isPending ? 'Sending…' : 'Send Invite'}
+        </SentryButton>
+      </SimpleModal>
+    )}
+
+    {/* Suspend Modal */}
+    {suspendTarget && (
+      <SimpleModal title={`Suspend ${suspendTarget.displayName || suspendTarget.email}?`} onClose={() => { setSuspendTarget(null); setSuspendReason(''); }} danger>
+        <textarea
+          value={suspendReason}
+          onChange={e => setSuspendReason(e.target.value)}
+          placeholder="Reason for suspension (required)"
+          rows={3}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'DM Sans, sans-serif' }}
+        />
+        <SentryButton
+          variant="destructive"
+          disabled={!suspendReason.trim() || suspendUser.isPending}
+          onClick={() => suspendUser.mutate({ userId: suspendTarget.id, reason: suspendReason }, { onSuccess: () => { setSuspendTarget(null); setSuspendReason(''); } })}
+        >
+          {suspendUser.isPending ? 'Suspending…' : 'Suspend User'}
+        </SentryButton>
+      </SimpleModal>
+    )}
+
+    {/* Delete Modal */}
+    {deleteTarget && (
+      <SimpleModal title={`Delete ${deleteTarget.displayName || deleteTarget.email}?`} onClose={() => { setDeleteTarget(null); setDeleteConfirm(''); }} danger>
+        <p style={{ fontSize: '13px', color: '#605E5A', marginBottom: '8px' }}>
+          Type <code style={{ fontFamily: 'JetBrains Mono, monospace', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px' }}>{deleteTarget.email}</code> to confirm
+        </p>
+        <input
+          value={deleteConfirm}
+          onChange={e => setDeleteConfirm(e.target.value)}
+          placeholder={deleteTarget.email}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, fontFamily: 'JetBrains Mono, monospace' }}
+        />
+        <SentryButton
+          variant="destructive"
+          disabled={deleteConfirm !== deleteTarget.email || deleteUser.isPending}
+          onClick={() => deleteUser.mutate(deleteTarget.id, { onSuccess: () => { setDeleteTarget(null); setDeleteConfirm(''); } })}
+        >
+          {deleteUser.isPending ? 'Deleting…' : 'Delete Permanently'}
+        </SentryButton>
+      </SimpleModal>
+    )}
+
+    {/* Send Email Modal */}
+    {emailTarget && (
+      <SimpleModal title={`Email ${emailTarget.displayName || emailTarget.email}`} onClose={() => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); }}>
+        <input
+          value={emailSubject}
+          onChange={e => setEmailSubject(e.target.value)}
+          placeholder="Subject"
+          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '8px', boxSizing: 'border-box' as const }}
+        />
+        <textarea
+          value={emailBody}
+          onChange={e => setEmailBody(e.target.value)}
+          placeholder="Message body"
+          rows={4}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: '10px', border: '1.5px solid rgba(0,0,0,0.15)', marginBottom: '16px', boxSizing: 'border-box' as const, resize: 'vertical' as const, fontFamily: 'DM Sans, sans-serif' }}
+        />
+        <SentryButton
+          variant="accent"
+          disabled={!emailSubject.trim() || !emailBody.trim() || sendEmail.isPending}
+          onClick={() => sendEmail.mutate({ userId: emailTarget.id, subject: emailSubject, body: emailBody }, { onSuccess: () => { setEmailTarget(null); setEmailSubject(''); setEmailBody(''); } })}
+        >
+          {sendEmail.isPending ? 'Sending…' : 'Send Email'}
+        </SentryButton>
+      </SimpleModal>
+    )}
+  </>
+  );
+}
+
+function SimpleModal({ title, onClose, danger, children }: { title: string; onClose: () => void; danger?: boolean; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderRadius: '20px', padding: '28px', maxWidth: '420px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', border: danger ? '1px solid rgba(192,57,43,0.2)' : '1px solid rgba(0,0,0,0.08)' }}>
+        <h3 style={{ margin: '0 0 16px', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: '16px' }}>{title}</h3>
+        {children}
+        <button onClick={onClose} style={{ marginTop: '8px', width: '100%', padding: '8px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.12)', background: 'transparent', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>Cancel</button>
+      </div>
+    </div>
   );
 }

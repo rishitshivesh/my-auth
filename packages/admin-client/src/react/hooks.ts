@@ -10,7 +10,16 @@ import type {
   UserFilters,
   AuditFilters,
   TenantDetail,
+  TenantMfaPolicy,
   PasswordPolicy,
+  CreateRoleDto,
+  UpdateRoleDto,
+  CreatePolicyDto,
+  UpdatePolicyDto,
+  CreateGroupDto,
+  CreateClientDto,
+  UpdateClientDto,
+  SimulationRequest,
 } from '../types';
 
 export function useUsers(filters?: UserFilters) {
@@ -83,6 +92,38 @@ export function useInviteUser() {
   });
 }
 
+export function useSuspendUser() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
+      client.users.suspend(userId, reason),
+    onSuccess: (_, { userId }) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+}
+
+export function useRestoreUser() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => client.users.restore(userId),
+    onSuccess: (_, userId) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+  });
+}
+
+export function useExportUsers() {
+  const client = useAdminClient();
+  return useMutation({
+    mutationFn: (filters?: UserFilters) => client.users.exportCsv(filters),
+  });
+}
+
 export function useUserSessions(userId: string, options?: { enabled?: boolean }) {
   const client = useAdminClient();
   return useQuery({
@@ -103,12 +144,85 @@ export function useRevokeSession() {
   });
 }
 
+export function useRevokeAllSessions() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => client.sessions.revokeAllForUser(userId),
+    onSuccess: (_, userId) =>
+      void qc.invalidateQueries({ queryKey: ['admin', 'sessions', userId] }),
+  });
+}
+
 export function useRoles() {
   const client = useAdminClient();
   return useQuery({
     queryKey: ['admin', 'roles'],
     queryFn: () => client.roles.list(),
     staleTime: 60_000,
+  });
+}
+
+export function useRole(id: string) {
+  const client = useAdminClient();
+  return useQuery({
+    queryKey: ['admin', 'role', id],
+    queryFn: () => client.roles.get(id),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+}
+
+export function useCreateRole() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateRoleDto) => client.roles.create(data),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'roles'] }),
+  });
+}
+
+export function useUpdateRole() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateRoleDto }) =>
+      client.roles.update(id, data),
+    onSuccess: (_, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'role', id] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'roles'] });
+    },
+  });
+}
+
+export function useDeleteRole() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => client.roles.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'roles'] }),
+  });
+}
+
+export function useAssignRole() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) =>
+      client.roles.assignToUser(userId, roleId),
+    onSuccess: (_, { userId }) =>
+      void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] }),
+  });
+}
+
+export function useRemoveRole() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) =>
+      client.roles.removeFromUser(userId, roleId),
+    onSuccess: (_, { userId }) =>
+      void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] }),
   });
 }
 
@@ -127,6 +241,76 @@ export function usePolicies() {
     queryKey: ['admin', 'policies'],
     queryFn: () => client.policies.list(),
     staleTime: 60_000,
+  });
+}
+
+export function usePolicy(id: string) {
+  const client = useAdminClient();
+  return useQuery({
+    queryKey: ['admin', 'policy', id],
+    queryFn: () => client.policies.get(id),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+}
+
+export function useCreatePolicy() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreatePolicyDto) => client.policies.create(data),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'policies'] }),
+  });
+}
+
+export function useUpdatePolicy() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdatePolicyDto }) =>
+      client.policies.update(id, data),
+    onSuccess: (_, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'policy', id] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'policies'] });
+    },
+  });
+}
+
+export function useDeletePolicy() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => client.policies.delete(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'policies'] }),
+  });
+}
+
+export function useSimulatePolicy() {
+  const client = useAdminClient();
+  return useMutation({
+    mutationFn: (req: SimulationRequest) => client.policies.simulate(req),
+  });
+}
+
+export function useAttachPolicy() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, policyId }: { roleId: string; policyId: string }) =>
+      client.policies.attachToRole(roleId, policyId),
+    onSuccess: (_, { roleId }) =>
+      void qc.invalidateQueries({ queryKey: ['admin', 'role', roleId] }),
+  });
+}
+
+export function useDetachPolicy() {
+  const client = useAdminClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, policyId }: { roleId: string; policyId: string }) =>
+      client.policies.detachFromRole(roleId, policyId),
+    onSuccess: (_, { roleId }) =>
+      void qc.invalidateQueries({ queryKey: ['admin', 'role', roleId] }),
   });
 }
 

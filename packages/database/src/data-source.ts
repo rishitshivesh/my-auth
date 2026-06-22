@@ -40,6 +40,7 @@ import { UserGroup } from "./entities/user-group.entity";
 import { GroupPolicy } from "./entities/group-policy.entity";
 import { UserPolicy } from "./entities/user-policy.entity";
 import { RolePolicy } from "./entities/role-policy.entity";
+import { TenantMfaPolicy } from "./entities/tenant-mfa-policy.entity";
 
 /**
  * TypeORM DataSource Configuration
@@ -99,6 +100,7 @@ export const dataSourceOptions: DataSourceOptions = {
     GroupPolicy,
     UserPolicy,
     RolePolicy,
+    TenantMfaPolicy,
   ],
 
   // Migrations

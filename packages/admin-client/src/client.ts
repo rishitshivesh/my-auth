@@ -1,9 +1,13 @@
 import { SentryAxiosTransport } from '@scrolloop/sentry-config/transport';
 import type {
   PaginatedResult, UserFilters, AuditFilters,
-  Role, Permission, Policy, Group, OAuthClient,
-  AuditEvent, DashboardStats, LoginActivityPoint,
-  TenantDetail, PasswordPolicy, SimulationRequest, SimulationResult,
+  Role, RoleWithPolicies, Permission, Policy, Group, OAuthClient,
+  AuditEvent, DashboardStats, LoginActivityPoint, LoginActivityData,
+  TenantDetail, TenantBranding, TenantMfaPolicy, PasswordPolicy,
+  SimulationRequest, SimulationResult,
+  MfaFactor, WorkspaceMembership,
+  CreateRoleDto, UpdateRoleDto, CreatePolicyDto, UpdatePolicyDto,
+  CreateGroupDto, CreateClientDto, UpdateClientDto,
 } from './types.js';
 import type { User, Session } from '@scrolloop/types';
 
@@ -26,14 +30,26 @@ export class SentryAdminClient {
     unlock: (id: string): Promise<void> =>
       this.transport.post(`/api/admin/users/${id}/unlock`),
 
+    suspend: (id: string, reason: string): Promise<void> =>
+      this.transport.post(`/api/admin/users/${id}/suspend`, { reason }),
+
+    restore: (id: string): Promise<void> =>
+      this.transport.post(`/api/admin/users/${id}/restore`),
+
     forcePasswordReset: (id: string): Promise<void> =>
       this.transport.post(`/api/admin/users/${id}/force-password-reset`),
+
+    sendEmail: (id: string, data: { subject: string; body: string }): Promise<void> =>
+      this.transport.post(`/api/admin/users/${id}/send-email`, data),
 
     delete: (id: string): Promise<void> =>
       this.transport.delete(`/api/admin/users/${id}`),
 
     invite: (data: { email: string; roleIds?: string[] }): Promise<void> =>
-      this.transport.post('/users/invite', data),
+      this.transport.post('/api/users/invite', data),
+
+    exportCsv: (filters?: UserFilters): Promise<Blob> =>
+      this.transport.download('/api/admin/users/export', filters as Record<string, unknown>),
   };
 
   readonly sessions = {
@@ -45,19 +61,22 @@ export class SentryAdminClient {
 
     revokeAll: (userId: string): Promise<void> =>
       this.transport.post(`/api/admin/users/${userId}/sessions/revoke-all`),
+
+    revokeAllForUser: (userId: string): Promise<void> =>
+      this.transport.post(`/api/admin/users/${userId}/sessions/revoke-all`),
   };
 
   readonly roles = {
     list: (): Promise<Role[]> =>
       this.transport.get('/api/rbac/roles'),
 
-    get: (id: string): Promise<Role> =>
+    get: (id: string): Promise<RoleWithPolicies> =>
       this.transport.get(`/api/rbac/roles/${id}`),
 
-    create: (data: { name: string; description?: string }): Promise<Role> =>
+    create: (data: CreateRoleDto): Promise<Role> =>
       this.transport.post('/api/rbac/roles', data),
 
-    update: (id: string, data: Partial<Pick<Role, 'name' | 'description'>>): Promise<Role> =>
+    update: (id: string, data: UpdateRoleDto): Promise<Role> =>
       this.transport.patch(`/api/rbac/roles/${id}`, data),
 
     delete: (id: string): Promise<void> =>
@@ -82,10 +101,10 @@ export class SentryAdminClient {
     get: (id: string): Promise<Policy> =>
       this.transport.get(`/api/rbac/policies/${id}`),
 
-    create: (data: { name: string; document: Policy['document'] }): Promise<Policy> =>
+    create: (data: CreatePolicyDto): Promise<Policy> =>
       this.transport.post('/api/rbac/policies', data),
 
-    update: (id: string, data: Partial<Policy>): Promise<Policy> =>
+    update: (id: string, data: UpdatePolicyDto): Promise<Policy> =>
       this.transport.patch(`/api/rbac/policies/${id}`, data),
 
     delete: (id: string): Promise<void> =>
@@ -108,7 +127,7 @@ export class SentryAdminClient {
     get: (id: string): Promise<Group> =>
       this.transport.get(`/api/rbac/groups/${id}`),
 
-    create: (data: { name: string; parentGroupId?: string }): Promise<Group> =>
+    create: (data: CreateGroupDto): Promise<Group> =>
       this.transport.post('/api/rbac/groups', data),
 
     delete: (id: string): Promise<void> =>
@@ -128,10 +147,10 @@ export class SentryAdminClient {
     get: (id: string): Promise<OAuthClient> =>
       this.transport.get(`/api/oauth/clients/${id}`),
 
-    create: (data: { name: string; type: OAuthClient['type'] }): Promise<OAuthClient & { clientSecret: string }> =>
+    create: (data: CreateClientDto): Promise<{ client: OAuthClient; clientSecret: string }> =>
       this.transport.post('/api/oauth/clients', data),
 
-    update: (id: string, data: Partial<OAuthClient>): Promise<OAuthClient> =>
+    update: (id: string, data: UpdateClientDto): Promise<OAuthClient> =>
       this.transport.patch(`/api/oauth/clients/${id}`, data),
 
     delete: (id: string): Promise<void> =>
@@ -139,26 +158,60 @@ export class SentryAdminClient {
 
     rotate: (id: string): Promise<{ clientSecret: string }> =>
       this.transport.post(`/api/oauth/clients/${id}/rotate`),
+
+    rotateSecret: (id: string): Promise<{ clientSecret: string }> =>
+      this.transport.post(`/api/oauth/clients/${id}/rotate`),
   };
 
   readonly audit = {
     list: (filters?: AuditFilters): Promise<PaginatedResult<AuditEvent>> =>
       this.transport.get('/api/audit', filters as Record<string, unknown>),
+
+    exportCsv: (filters?: AuditFilters): Promise<Blob> =>
+      this.transport.download('/api/audit/export', filters as Record<string, unknown>),
+  };
+
+  readonly mfa = {
+    getFactorsForUser: (userId: string): Promise<MfaFactor[]> =>
+      this.transport.get(`/api/admin/users/${userId}/mfa-factors`),
+
+    resetForUser: (userId: string): Promise<void> =>
+      this.transport.post(`/api/admin/users/${userId}/mfa-reset`),
+
+    initTotp: (): Promise<{ qrCodeDataUrl: string; manualEntryKey: string; backupCodes: string[] }> =>
+      this.transport.post('/api/mfa/totp/setup'),
+
+    verifyTotpSetup: (code: string): Promise<void> =>
+      this.transport.post('/api/mfa/totp/verify-setup', { code }),
+
+    getFactors: (): Promise<MfaFactor[]> =>
+      this.transport.get('/api/mfa/factors'),
+
+    deleteFactor: (factorId: string): Promise<void> =>
+      this.transport.delete(`/api/mfa/factors/${factorId}`),
+
+    regenerateBackupCodes: (): Promise<{ codes: string[] }> =>
+      this.transport.post('/api/mfa/backup-codes/regenerate'),
   };
 
   readonly stats = {
     getDashboard: (): Promise<DashboardStats> =>
       this.transport.get('/api/admin/stats/dashboard'),
 
-    getLoginActivity: (days: number): Promise<LoginActivityPoint[]> =>
+    getLoginActivity: (days: number): Promise<LoginActivityData> =>
       this.transport.get('/api/admin/stats/login-activity', { days }),
+  };
+
+  readonly workspaces = {
+    list: (): Promise<WorkspaceMembership[]> =>
+      this.transport.get('/api/user/workspaces'),
   };
 
   readonly tenant = {
     get: (): Promise<TenantDetail> =>
       this.transport.get('/api/tenant'),
 
-    update: (data: Partial<TenantDetail>): Promise<TenantDetail> =>
+    update: (data: Partial<TenantDetail> & { name?: string; primaryColor?: string }): Promise<TenantDetail> =>
       this.transport.patch('/api/tenant', data),
 
     getPasswordPolicy: (): Promise<PasswordPolicy> =>
@@ -167,13 +220,26 @@ export class SentryAdminClient {
     updatePasswordPolicy: (data: PasswordPolicy): Promise<PasswordPolicy> =>
       this.transport.patch('/api/tenant/password-policy', data),
 
+    getBranding: (): Promise<TenantBranding> =>
+      this.transport.get('/api/tenant/branding'),
+
+    getMfaPolicy: (): Promise<TenantMfaPolicy> =>
+      this.transport.get('/api/tenant/mfa-policy'),
+
+    updateMfaPolicy: (data: TenantMfaPolicy): Promise<TenantMfaPolicy> =>
+      this.transport.patch('/api/tenant/mfa-policy', data),
+
     uploadLogo: (file: File): Promise<{ url: string }> => {
       const form = new FormData();
       form.append('logo', file);
       return this.transport.upload('/api/tenant/logo', form);
     },
 
-    delete: (): Promise<void> =>
-      this.transport.delete('/api/tenant'),
+    delete: (confirmation: string): Promise<void> =>
+      this.transport.post('/api/tenant/delete', { confirmation }),
   };
+
+  getUserWorkspaces(): Promise<WorkspaceMembership[]> {
+    return this.transport.get('/api/user/workspaces');
+  }
 }

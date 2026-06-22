@@ -32,6 +32,7 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
+import { MfaPolicyService } from "@/modules/mfa/mfa-policy.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
@@ -73,6 +74,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
     private readonly bruteForceService: BruteForceService,
     private readonly mfaService: MfaService,
+    private readonly mfaPolicyService: MfaPolicyService,
     private readonly webauthnService: WebAuthnService,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly securityEventService: SecurityEventService,
@@ -241,13 +243,8 @@ export class AuthService {
     deviceId?: string;
   }): Promise<
     | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
-    | {
-        mfaRequired: boolean;
-        tempToken: string;
-        message: string;
-        availableMethods: string[];
-        preferredMethod: string;
-      }
+    | { mfaRequired: boolean; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string }
+    | { status: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
     const { tenantId, email, password, ip, userAgent } = data;
 
@@ -360,6 +357,23 @@ export class AuthService {
         preferredMethod: mfaStatus.preferredMethod || "totp",
         message: "MFA verification required",
       };
+    }
+
+    // Check if tenant MFA policy requires enrollment for this user
+    if (!mfaStatus.enabled) {
+      const mfaPolicy = await this.mfaPolicyService.getForTenant(tenantId);
+      const needsEnrollment =
+        mfaPolicy.enforceForAllUsers ||
+        (mfaPolicy.enforceForAdmins &&
+          (await this.userRoleRepository.find({ where: { userId: user.id, tenantId }, relations: ['role'] }))
+            .some((ur) => ['owner', 'admin'].includes(ur.role?.name?.toLowerCase() ?? '')));
+
+      if (needsEnrollment) {
+        return {
+          status: 'mfa_enrollment_required',
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId),
+        };
+      }
     }
 
     // === REFRESH TOKEN ROTATION LOGIC ===

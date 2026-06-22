@@ -47,6 +47,7 @@ import {
 import { CreatePolicyDto, UpdatePolicyDto, SimulatePolicyDto } from "./dto/policy.dto";
 import { CreateGroupDto, UpdateGroupDto } from "./dto/group.dto";
 import { JwtAuthGuard } from "@/common/guards";
+import { Permissions } from "./constants/permissions.catalog";
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -74,7 +75,7 @@ export class RbacController {
 
   @Get("permissions")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("permissions:read")
+  @RequirePermissions(Permissions.PERMISSIONS_READ)
   @ApiOperation({ summary: "List all permissions" })
   @ApiResponse({ status: 200, description: "Permissions retrieved" })
   async listPermissions(@Request() req: AuthenticatedRequest) {
@@ -84,7 +85,7 @@ export class RbacController {
 
   @Post("permissions")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("permissions:write")
+  @RequirePermissions(Permissions.PERMISSIONS_WRITE)
   @ApiOperation({ summary: "Create permission" })
   @ApiResponse({ status: 201, description: "Permission created" })
   async createPermission(
@@ -100,7 +101,7 @@ export class RbacController {
 
   @Get("permissions/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("permissions:read")
+  @RequirePermissions(Permissions.PERMISSIONS_READ)
   @ApiOperation({ summary: "Get permission by ID" })
   async getPermission(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId;
@@ -109,7 +110,7 @@ export class RbacController {
 
   @Put("permissions/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("permissions:write")
+  @RequirePermissions(Permissions.PERMISSIONS_WRITE)
   @ApiOperation({ summary: "Update permission" })
   async updatePermission(
     @Request() req: AuthenticatedRequest,
@@ -123,7 +124,7 @@ export class RbacController {
   @Delete("permissions/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("permissions:write")
+  @RequirePermissions(Permissions.PERMISSIONS_WRITE)
   @ApiOperation({ summary: "Delete permission" })
   async deletePermission(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId;
@@ -136,7 +137,7 @@ export class RbacController {
 
   @Get("roles")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:read")
+  @RequirePermissions(Permissions.ROLES_READ)
   @ApiOperation({ summary: "List all roles" })
   async listRoles(
     @Request() req: AuthenticatedRequest,
@@ -150,7 +151,7 @@ export class RbacController {
 
   @Post("roles")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Create role" })
   async createRole(@Request() req: AuthenticatedRequest, @Body() dto: CreateRoleDto) {
     const tenantId = req.tenantId;
@@ -164,7 +165,7 @@ export class RbacController {
 
   @Get("roles/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:read")
+  @RequirePermissions(Permissions.ROLES_READ)
   @ApiOperation({ summary: "Get role by ID" })
   async getRole(
     @Request() req: AuthenticatedRequest,
@@ -177,7 +178,7 @@ export class RbacController {
 
   @Put("roles/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Update role" })
   async updateRole(
     @Request() req: AuthenticatedRequest,
@@ -191,7 +192,7 @@ export class RbacController {
   @Delete("roles/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Delete role" })
   async deleteRole(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId;
@@ -204,7 +205,7 @@ export class RbacController {
 
   @Post("roles/:id/permissions")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Assign permissions to role" })
   async assignPermissionsToRole(
     @Request() req: AuthenticatedRequest,
@@ -225,7 +226,7 @@ export class RbacController {
   @Delete("roles/:id/permissions")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Remove permissions from role" })
   async removePermissionsFromRole(
     @Request() req: AuthenticatedRequest,
@@ -243,7 +244,7 @@ export class RbacController {
 
   @Get("roles/:id/permissions")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:read")
+  @RequirePermissions(Permissions.ROLES_READ)
   @ApiOperation({ summary: "Get role permissions" })
   async getRolePermissions(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId;
@@ -256,7 +257,7 @@ export class RbacController {
 
   @Get("users/:userId/roles")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Get user roles" })
   async getUserRoles(@Request() req: AuthenticatedRequest, @Param("userId") userId: string) {
     const tenantId = req.tenantId;
@@ -265,7 +266,7 @@ export class RbacController {
 
   @Post("users/:userId/roles")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Assign roles to user" })
   async assignRolesToUser(
     @Request() req: AuthenticatedRequest,
@@ -289,7 +290,7 @@ export class RbacController {
 
   @Put("users/:userId/roles")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Set user roles (replace all)" })
   async setUserRoles(
     @Request() req: AuthenticatedRequest,
@@ -311,7 +312,7 @@ export class RbacController {
   @Delete("users/:userId/roles/:roleName")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:write")
+  @RequirePermissions(Permissions.USERS_WRITE)
   @ApiOperation({ summary: "Remove role from user" })
   async removeRoleFromUser(
     @Request() req: AuthenticatedRequest,
@@ -325,7 +326,7 @@ export class RbacController {
 
   @Get("users/:userId/permissions")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("users:read")
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Get user permissions (aggregated from all roles)" })
   async getUserPermissions(
     @Request() req: AuthenticatedRequest,
@@ -443,7 +444,7 @@ export class RbacController {
 
   @Post("policies")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:write")
+  @RequirePermissions(Permissions.POLICIES_WRITE)
   @ApiOperation({ summary: "Create policy" })
   @ApiResponse({ status: 201, description: "Policy created" })
   async createPolicy(@Request() req: AuthenticatedRequest, @Body() dto: CreatePolicyDto) {
@@ -452,7 +453,7 @@ export class RbacController {
 
   @Get("policies")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:read")
+  @RequirePermissions(Permissions.POLICIES_READ)
   @ApiOperation({ summary: "List policies" })
   async listPolicies(
     @Request() req: AuthenticatedRequest,
@@ -466,7 +467,7 @@ export class RbacController {
 
   @Get("policies/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:read")
+  @RequirePermissions(Permissions.POLICIES_READ)
   @ApiOperation({ summary: "Get policy detail" })
   async getPolicy(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.policyService.getPolicy(id, req.tenantId);
@@ -474,7 +475,7 @@ export class RbacController {
 
   @Put("policies/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:write")
+  @RequirePermissions(Permissions.POLICIES_WRITE)
   @ApiOperation({ summary: "Update policy" })
   async updatePolicy(
     @Request() req: AuthenticatedRequest,
@@ -487,7 +488,7 @@ export class RbacController {
   @Delete("policies/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:write")
+  @RequirePermissions(Permissions.POLICIES_WRITE)
   @ApiOperation({ summary: "Delete policy" })
   async deletePolicy(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     await this.policyService.deletePolicy(id, req.tenantId);
@@ -496,7 +497,7 @@ export class RbacController {
   @Post("policies/simulate")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("policies:read")
+  @RequirePermissions(Permissions.POLICIES_SIMULATE)
   @ApiOperation({ summary: "Simulate policy evaluation" })
   async simulatePolicy(@Request() req: AuthenticatedRequest, @Body() dto: SimulatePolicyDto) {
     return this.policyEvaluationService.simulate({
@@ -513,7 +514,7 @@ export class RbacController {
 
   @Post("roles/:roleId/policies/:policyId")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Attach policy to role" })
   async attachPolicyToRole(
     @Request() req: AuthenticatedRequest,
@@ -527,7 +528,7 @@ export class RbacController {
   @Delete("roles/:roleId/policies/:policyId")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("roles:write")
+  @RequirePermissions(Permissions.ROLES_WRITE)
   @ApiOperation({ summary: "Detach policy from role" })
   async detachPolicyFromRole(
     @Request() req: AuthenticatedRequest,
@@ -544,7 +545,7 @@ export class RbacController {
 
   @Post("groups")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Create group" })
   @ApiResponse({ status: 201, description: "Group created" })
   async createGroup(@Request() req: AuthenticatedRequest, @Body() dto: CreateGroupDto) {
@@ -553,7 +554,7 @@ export class RbacController {
 
   @Get("groups")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:read")
+  @RequirePermissions(Permissions.GROUPS_READ)
   @ApiOperation({ summary: "List groups (tree)" })
   async listGroups(@Request() req: AuthenticatedRequest) {
     return this.groupService.listGroups(req.tenantId);
@@ -561,7 +562,7 @@ export class RbacController {
 
   @Get("groups/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:read")
+  @RequirePermissions(Permissions.GROUPS_READ)
   @ApiOperation({ summary: "Get group detail with members and policies" })
   async getGroupDetail(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     return this.groupService.getGroupDetail(id, req.tenantId);
@@ -569,7 +570,7 @@ export class RbacController {
 
   @Put("groups/:id")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Update group" })
   async updateGroup(
     @Request() req: AuthenticatedRequest,
@@ -582,7 +583,7 @@ export class RbacController {
   @Delete("groups/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Delete group" })
   async deleteGroup(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     await this.groupService.deleteGroup(id, req.tenantId);
@@ -590,7 +591,7 @@ export class RbacController {
 
   @Post("groups/:id/members/:userId")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Add user to group" })
   async addGroupMember(
     @Request() req: AuthenticatedRequest,
@@ -604,7 +605,7 @@ export class RbacController {
   @Delete("groups/:id/members/:userId")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Remove user from group" })
   async removeGroupMember(
     @Request() req: AuthenticatedRequest,
@@ -617,7 +618,7 @@ export class RbacController {
 
   @Post("groups/:id/policies/:policyId")
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Attach policy to group" })
   async attachPolicyToGroup(
     @Request() req: AuthenticatedRequest,
@@ -631,7 +632,7 @@ export class RbacController {
   @Delete("groups/:id/policies/:policyId")
   @HttpCode(HttpStatus.OK)
   @UseGuards(PermissionsGuard)
-  @RequirePermissions("groups:write")
+  @RequirePermissions(Permissions.GROUPS_WRITE)
   @ApiOperation({ summary: "Detach policy from group" })
   async detachPolicyFromGroup(
     @Request() req: AuthenticatedRequest,

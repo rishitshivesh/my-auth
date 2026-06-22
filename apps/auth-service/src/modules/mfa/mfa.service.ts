@@ -442,6 +442,13 @@ export class MfaService {
   }
 
   /**
+   * Check if user has any active MFA factor enrolled
+   */
+  async hasActiveFactor(userId: string, tenantId: string): Promise<boolean> {
+    return this.isMfaEnabled(userId, tenantId);
+  }
+
+  /**
    * Disable all MFA methods
    */
   async disableAllMfa(userId: string, tenantId: string): Promise<void> {

@@ -18,11 +18,16 @@ export class SentryAPIError extends Error {
 
 interface RetryConfig extends InternalAxiosRequestConfig {
   _retryCount?: number;
+  _retry?: boolean;
 }
 
 export class SentryAxiosTransport {
   private readonly axiosInstance: AxiosInstance;
   private readonly config: SentrySDKConfig;
+  private refreshPromise: Promise<void> | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  onSessionExpired?: () => void;
 
   constructor(config: SentrySDKConfig) {
     this.config = config;
@@ -30,7 +35,7 @@ export class SentryAxiosTransport {
     this.axiosInstance = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout,
-      withCredentials: config.withCredentials,
+      withCredentials: true, // httpOnly cookies must be sent on every request
       headers: {
         Accept: 'application/json',
         'X-Tenant-Slug': config.tenantSlug,
@@ -52,6 +57,32 @@ export class SentryAxiosTransport {
       },
       async (error: AxiosError) => {
         const cfg = error.config as RetryConfig | undefined;
+
+        // Serialized refresh lock: intercept 401s and refresh once
+        if (
+          cfg &&
+          error.response?.status === 401 &&
+          !cfg._retry &&
+          !cfg.url?.includes('/auth/refresh') &&
+          !cfg.url?.includes('/auth/login')
+        ) {
+          cfg._retry = true;
+
+          // Only one refresh in flight at a time — prevents token family revocation
+          if (!this.refreshPromise) {
+            this.refreshPromise = this.executeRefresh().finally(() => {
+              this.refreshPromise = null;
+            });
+          }
+
+          try {
+            await this.refreshPromise;
+            return this.axiosInstance(cfg);
+          } catch {
+            this.onSessionExpired?.();
+            throw new SentryAPIError('Session expired', 401);
+          }
+        }
 
         // Retry once on 5xx, never on 4xx
         if (
@@ -77,6 +108,13 @@ export class SentryAxiosTransport {
         );
       },
     );
+  }
+
+  protected async executeRefresh(): Promise<void> {
+    await this.axiosInstance.post('/api/auth/refresh', null, {
+      withCredentials: true,
+      _retry: true,
+    } as InternalAxiosRequestConfig & { _retry: boolean });
   }
 
   getAxiosInstance(): AxiosInstance { return this.axiosInstance; }
@@ -111,5 +149,40 @@ export class SentryAxiosTransport {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
+  }
+
+  async download(path: string, params?: Record<string, unknown>): Promise<Blob> {
+    const res = await this.axiosInstance.get(path, {
+      params,
+      responseType: 'blob',
+    });
+    return res.data as Blob;
+  }
+
+  scheduleProactiveRefresh(expiresAt: number): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    const msUntilRefresh = expiresAt * 1000 - Date.now() - 60_000;
+    if (msUntilRefresh <= 0) {
+      this.executeRefresh().catch(() => this.onSessionExpired?.());
+      return;
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.executeRefresh().catch(() => this.onSessionExpired?.());
+    }, msUntilRefresh);
+  }
+
+  clearRefreshTimer(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  async tryRestoreSession<T>(): Promise<T | null> {
+    try {
+      return await this.get<T>('/api/auth/session');
+    } catch {
+      return null;
+    }
   }
 }

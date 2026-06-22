@@ -1,76 +1,45 @@
-"use client";
+// Server Component — fetches tenant branding before HTML is sent to browser
+import { headers } from 'next/headers';
+import { LoginForm } from './login-form';
+import { BrandPanel } from './brand-panel';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { SentryAuthFlow } from "@/components/auth/SentryAuthFlow";
-import { AuthLayout } from "@/components/layouts/AuthLayout";
-import { useAuth } from "@scrolloop/sdk";
-import { authClient } from "@/lib/auth-client";
-
-function getPostLoginRoute(): string {
-  const claims = authClient.getTokenClaims()
-  if (!claims) return '/u/login'
-  const platformSlug = process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? 'sentry'
-  const isPlatformTenant = claims.tenantSlug === platformSlug
-  const isInternal = Array.isArray(claims.groups) &&
-    (claims.groups as string[]).includes(`${platformSlug}-internal`)
-  if (isPlatformTenant && isInternal) return `/t/${platformSlug}/dashboard`
-  const slug = (claims.tenantSlug as string) ?? ''
-  return slug ? `/t/${slug}/dashboard` : '/u/login'
+interface TenantBranding {
+  primaryColor?: string;
+  logoUrl?: string;
+  fontFamily?: string;
 }
 
-export default function LoginPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
-
-  useEffect(() => {
-    if (!isLoading && user) {
-      if (!user.emailVerified) {
-        router.replace("/u/verify-email");
-      } else {
-        router.replace(getPostLoginRoute());
-      }
-    }
-  }, [user, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <AuthLayout>
-        <div className="space-y-6 animate-pulse">
-          <div className="h-8 w-48 bg-black/5 rounded-sm" />
-          <div className="h-4 w-64 bg-black/5 rounded-sm" />
-          <div className="space-y-4 pt-4">
-            <div className="h-10 bg-black/5 rounded-sm" />
-            <div className="h-10 bg-black/5 rounded-sm" />
-          </div>
-        </div>
-      </AuthLayout>
+async function getTenantBranding(slug: string): Promise<TenantBranding | null> {
+  try {
+    const res = await fetch(
+      `${process.env.AUTH_SERVICE_URL}/tenants/${slug}/branding/public`,
+      { next: { revalidate: 300 } },
     );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: TenantBranding };
+    return json.data ?? null;
+  } catch {
+    return null;
   }
+}
 
-  if (user) return null; // redirect in progress
+function extractTenantSlug(hostname: string): string | null {
+  const match = hostname.match(/^([^.]+)\.(sentry\.scrolloop\.com|localhost)/);
+  return match?.[1] ?? null;
+}
+
+export default async function LoginPage() {
+  const headersList = await headers();
+  const hostname = headersList.get('host') ?? '';
+  const slug = extractTenantSlug(hostname);
+  const branding = slug ? await getTenantBranding(slug) : null;
 
   return (
-    <AuthLayout>
-      <SentryAuthFlow onSuccess={() => router.replace(getPostLoginRoute())} />
-      <p
-        style={{
-          marginTop: "20px",
-          textAlign: "center",
-          fontSize: "13px",
-          fontFamily: "DM Sans, sans-serif",
-          color: "#605E5A",
-        }}
-      >
-        New here?{" "}
-        <a
-          href="/onboarding"
-          style={{ color: "#2ABF6C", textDecoration: "none", fontWeight: 500 }}
-        >
-          Create a workspace →
-        </a>
-      </p>
-    </AuthLayout>
+    <main style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '3fr 2fr' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <LoginForm tenantSlug={slug ?? undefined} tenantLogo={branding?.logoUrl} />
+      </div>
+      <BrandPanel primaryColor={branding?.primaryColor} />
+    </main>
   );
 }
-

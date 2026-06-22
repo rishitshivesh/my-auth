@@ -48,6 +48,9 @@ export * from "./src/entities/role-policy.entity";
 // Invites
 export * from "./src/entities/user-invite.entity";
 
+// MFA Policy
+export * from "./src/entities/tenant-mfa-policy.entity";
+
 // Sprint 4 — Webhooks
 export * from "./src/entities/webhook-endpoint.entity";
 export * from "./src/entities/webhook-delivery.entity";

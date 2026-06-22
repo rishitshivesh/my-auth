@@ -93,16 +93,19 @@ export interface AuditEvent {
 
 export interface DashboardStats {
   totalUsers: number;
+  activeUsers30d: number;
   activeSessions: number;
   apiCalls30d: number;
   mfaAdoptionPercent: number;
-  userGrowthPercent?: number;
+  userGrowthPercent: number;
 }
 
 export interface LoginActivityPoint {
   date: string;
   count: number;
 }
+
+export type LoginActivityData = LoginActivityPoint[];
 
 export interface TenantDetail {
   id: string;
@@ -136,14 +139,110 @@ export interface PasswordPolicy {
 }
 
 export interface SimulationRequest {
-  principal: { userId?: string; roleIds?: string[] };
+  userId?: string;
+  principal?: { userId?: string; roleIds?: string[] };
   action: string;
   resource: string;
   context?: Record<string, unknown>;
 }
 
+export interface TraceEntry {
+  policyId: string;
+  policyName: string;
+  statementSid?: string;
+  effect: 'Allow' | 'Deny';
+  matched: boolean;
+  reason: string;
+}
+
 export interface SimulationResult {
+  allowed: boolean;
   decision: 'Allow' | 'Deny';
   reason: string;
+  trace: TraceEntry[];
   matchedPolicies: string[];
+  policiesEvaluated: number;
+}
+
+export interface RoleWithPolicies extends Role {
+  policies: Policy[];
+}
+
+export interface MfaFactor {
+  id: string;
+  type: 'totp' | 'webauthn' | 'email';
+  name?: string;
+  isActive: boolean;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+export interface TenantBranding {
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  slug: string;
+}
+
+export interface TenantMfaPolicy {
+  id?: string;
+  enforceForAllUsers: boolean;
+  enforceForAdmins: boolean;
+  gracePeriodDays: number;
+  exemptRoleSlugs: string[];
+}
+
+export interface CreateRoleDto {
+  name: string;
+  description?: string;
+  cloneFromRoleId?: string;
+}
+
+export interface UpdateRoleDto {
+  name?: string;
+  description?: string;
+}
+
+export interface CreatePolicyDto {
+  name: string;
+  description?: string;
+  document: PolicyDocument;
+}
+
+export interface UpdatePolicyDto {
+  name?: string;
+  description?: string;
+  document?: PolicyDocument;
+}
+
+export interface CreateGroupDto {
+  name: string;
+  parentGroupId?: string;
+}
+
+export interface CreateClientDto {
+  name: string;
+  type: OAuthClient['type'];
+  redirectUris?: string[];
+  postLogoutRedirectUris?: string[];
+  allowedWebOrigins?: string[];
+  accessTokenLifetime?: number;
+  refreshTokenLifetime?: number;
+}
+
+export interface UpdateClientDto {
+  name?: string;
+  redirectUris?: string[];
+  postLogoutRedirectUris?: string[];
+  allowedWebOrigins?: string[];
+  accessTokenLifetime?: number;
+  refreshTokenLifetime?: number;
+}
+
+export interface WorkspaceMembership {
+  tenantId: string;
+  tenantSlug: string;
+  roleSlug: string;
+  joinedAt: string;
+  status: 'active' | 'suspended' | 'revoked';
 }

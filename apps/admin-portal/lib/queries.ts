@@ -815,3 +815,179 @@ export function useSyncLdap() {
     },
   });
 }
+
+// ── Admin User Actions ────────────────────────────────────────
+
+export function useInviteUser() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { email: string; roleIds?: string[] }>({
+    mutationFn: withErrorHandler<[{ email: string; roleIds?: string[] }], void>(
+      async (body) => authClient.request({ url: apiUrl("/users/invite"), method: "POST", body }),
+      { successMessage: "Invitation sent", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "users"] }),
+  });
+}
+
+export function useSuspendUser() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { userId: string; reason: string }>({
+    mutationFn: withErrorHandler<[{ userId: string; reason: string }], void>(
+      async ({ userId, reason }) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}/suspend`),
+        method: "POST",
+        body: { reason },
+      }),
+      { successMessage: "User suspended", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "users"] }),
+  });
+}
+
+export function useRestoreUser() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (userId) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}/restore`),
+        method: "POST",
+      }),
+      { successMessage: "User restored", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "users"] }),
+  });
+}
+
+export function useDeleteTenantUser() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (userId) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}`),
+        method: "DELETE",
+      }),
+      { successMessage: "User deleted", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "users"] }),
+  });
+}
+
+export function useForcePasswordReset() {
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (userId) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}/force-password-reset`),
+        method: "POST",
+      }),
+      { successMessage: "Password reset email sent", showSuccessToast: true, showErrorToast: true }
+    ),
+  });
+}
+
+export function useSendEmailToUser() {
+  return useMutation<void, Error, { userId: string; subject: string; body: string }>({
+    mutationFn: withErrorHandler<[{ userId: string; subject: string; body: string }], void>(
+      async ({ userId, subject, body: emailBody }) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}/send-email`),
+        method: "POST",
+        body: { subject, body: emailBody },
+      }),
+      { successMessage: "Email sent", showSuccessToast: true, showErrorToast: true }
+    ),
+  });
+}
+
+export function useRevokeAllUserSessions() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (userId) => authClient.request({
+        url: apiUrl(`/admin/users/${userId}/sessions/revoke-all`),
+        method: "POST",
+      }),
+      { successMessage: "All sessions revoked", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, userId) => qc.invalidateQueries({ queryKey: ["tenant", "users", userId] }),
+  });
+}
+
+export function useResetUserMfa() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (userId) => authClient.request({
+        url: apiUrl(`/mfa/reset-user/${userId}`),
+        method: "POST",
+      }),
+      { successMessage: "MFA reset for user", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, userId) => qc.invalidateQueries({ queryKey: ["tenant", "users", userId] }),
+  });
+}
+
+export function useExportUsersCsv(filters?: { search?: string; status?: string }) {
+  return useMutation<void, Error, void>({
+    mutationFn: async () => {
+      const qs = new URLSearchParams();
+      if (filters?.search) qs.set("search", filters.search);
+      if (filters?.status && filters.status !== "all") qs.set("status", filters.status);
+      const url = `${authClient.getBaseURL()}/admin/users/export?${qs.toString()}`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `users-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+  });
+}
+
+// ── Server-side Audit Log ─────────────────────────────────────
+
+export function useAuditLogsFiltered(filters: {
+  eventType?: string;
+  actor?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (filters.eventType) qs.set("eventType", filters.eventType);
+  if (filters.actor) qs.set("actor", filters.actor);
+  if (filters.startDate) qs.set("startDate", filters.startDate);
+  if (filters.endDate) qs.set("endDate", filters.endDate);
+  qs.set("limit", String(filters.limit ?? 50));
+  if (filters.cursor) qs.set("cursor", filters.cursor);
+
+  return useQuery<{ items: ActivityEvent[]; nextCursor: string | null; total: number }>({
+    queryKey: ["audit", "filtered", filters],
+    queryFn: withErrorHandler<[], { items: ActivityEvent[]; nextCursor: string | null; total: number }>(
+      async () => authClient.request({
+        url: apiUrl(`/dashboard/tenant-activity?${qs.toString()}`),
+        method: "GET",
+      })
+    ),
+  });
+}
+
+export function useExportAuditCsv() {
+  return useMutation<void, Error, { eventType?: string; actor?: string; startDate?: string; endDate?: string }>({
+    mutationFn: async (filters) => {
+      const qs = new URLSearchParams();
+      if (filters.eventType) qs.set("eventType", filters.eventType);
+      if (filters.actor) qs.set("actor", filters.actor);
+      if (filters.startDate) qs.set("startDate", filters.startDate);
+      if (filters.endDate) qs.set("endDate", filters.endDate);
+      const start = filters.startDate ? filters.startDate.split("T")[0] : "all";
+      const end = filters.endDate ? filters.endDate.split("T")[0] : "time";
+      const url = `${authClient.getBaseURL()}/dashboard/tenant-activity/export?${qs.toString()}`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-${start}-${end}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+  });
+}

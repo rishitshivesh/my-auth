@@ -48,10 +48,16 @@ export class PolicyEvaluationService {
     const deniedBy: string[] = [];
     const allowedBy: string[] = [];
 
+    const substitutionVars: Record<string, string> = {
+      'sentry:UserId': userId,
+      'sentry:TenantId': tenantId,
+    };
+
     for (const policy of policies) {
       for (const statement of policy.document.Statement) {
         if (!this.matchesAction(statement.Action, action)) continue;
-        if (!this.matchesResource(statement.Resource, resource)) continue;
+        const substitutedResource = this.substituteResourceVars(statement.Resource, substitutionVars);
+        if (!this.matchesResource(substitutedResource, resource)) continue;
         if (!this.evaluateConditions(statement.Condition, context)) continue;
 
         if (statement.Effect === 'Deny') {
@@ -82,10 +88,16 @@ export class PolicyEvaluationService {
     const policies = await this.collectPolicies(request.userId, request.tenantId);
     const trace: TraceEntry[] = [];
 
+    const substitutionVars: Record<string, string> = {
+      'sentry:UserId': request.userId,
+      'sentry:TenantId': request.tenantId,
+    };
+
     for (const policy of policies) {
       for (const statement of policy.document.Statement) {
         const actionMatch = this.matchesAction(statement.Action, request.action);
-        const resourceMatch = this.matchesResource(statement.Resource, request.resource);
+        const substitutedResource = this.substituteResourceVars(statement.Resource, substitutionVars);
+        const resourceMatch = this.matchesResource(substitutedResource, request.resource);
         const conditionMatch = this.evaluateConditions(statement.Condition, request.context);
 
         trace.push({
@@ -112,6 +124,15 @@ export class PolicyEvaluationService {
   private matchesResource(pattern: string | string[], resource: string): boolean {
     const patterns = Array.isArray(pattern) ? pattern : [pattern];
     return patterns.some(p => p === '*' || this.wildcardMatch(p, resource));
+  }
+
+  private substituteResourceVars(
+    pattern: string | string[],
+    vars: Record<string, string>,
+  ): string | string[] {
+    const substitute = (p: string): string =>
+      p.replace(/\$\{([^}]+)\}/g, (_, key: string) => vars[key] ?? `\${${key}}`);
+    return Array.isArray(pattern) ? pattern.map(substitute) : substitute(pattern);
   }
 
   wildcardMatch(pattern: string, value: string): boolean {

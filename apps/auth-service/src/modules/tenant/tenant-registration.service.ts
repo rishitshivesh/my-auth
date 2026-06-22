@@ -13,6 +13,8 @@ import {
   UserRole,
   OAuthRefreshToken,
   KeyPair,
+  Policy,
+  RolePolicy,
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { TenantService } from "./tenant.service";
@@ -21,6 +23,7 @@ import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { RedisService } from "@/common/service/redis.service";
 import { logger } from "@/common/logger";
+import { SystemRoles } from "@/modules/rbac/constants/system-roles";
 
 export class RegisterTenantDto {
   workspaceName!: string;
@@ -55,6 +58,10 @@ export class TenantRegistrationService {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(UserRole)
     private readonly userRoleRepository: Repository<UserRole>,
+    @InjectRepository(Policy)
+    private readonly policyRepository: Repository<Policy>,
+    @InjectRepository(RolePolicy)
+    private readonly rolePolicyRepository: Repository<RolePolicy>,
     private readonly tenantService: TenantService,
     private readonly sessionService: SessionService,
     private readonly jwksService: JwksService,
@@ -147,24 +154,43 @@ export class TenantRegistrationService {
       }),
     );
 
-    // Bootstrap default roles for this tenant
-    const defaultRoles = [
-      { name: "owner", description: "Workspace owner — full access", isSystem: true },
-      { name: "admin", description: "Workspace admin", isSystem: true },
-      { name: "member", description: "Workspace member", isSystem: false },
-    ];
-
+    // Bootstrap system roles with IAM policy documents for this tenant
+    const systemRoleDefinitions = Object.values(SystemRoles);
     const createdRoles: Role[] = [];
-    for (const r of defaultRoles) {
+
+    for (const def of systemRoleDefinitions) {
       const role = await this.roleRepository.save(
         this.roleRepository.create({
           tenantId: tenant.id,
-          name: r.name,
-          description: r.description,
-          isSystem: r.isSystem,
+          name: def.slug,
+          displayName: def.name,
+          description: def.description,
+          isSystem: def.isSystem,
+          priority: def.priority,
+          scope: 'tenant',
         } as Partial<Role>),
       );
       createdRoles.push(role);
+
+      // Create and attach the IAM policy document for this role
+      const policy = await this.policyRepository.save(
+        this.policyRepository.create({
+          tenantId: tenant.id,
+          name: `${def.name} Policy`,
+          description: `System policy for ${def.name} role`,
+          document: def.policy,
+          isSystem: true,
+          type: 'managed',
+        } as Partial<Policy>),
+      );
+
+      await this.rolePolicyRepository.save(
+        this.rolePolicyRepository.create({
+          tenantId: tenant.id,
+          roleId: role.id,
+          policyId: policy.id,
+        } as Partial<RolePolicy>),
+      );
     }
 
     // Assign owner role to the first admin

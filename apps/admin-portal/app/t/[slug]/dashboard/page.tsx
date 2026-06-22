@@ -11,6 +11,7 @@ import {
 } from '@/lib/queries';
 import type { TrendPoint } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Users,
   Activity,
@@ -224,25 +225,27 @@ export default function DashboardPage() {
   );
 }
 
-function QuickActionCard({ icon: Icon, title, desc, href }: { icon: LucideIcon; title: string; desc: string; href: string }) {
-  return (
-    <button className="group text-left focus:outline-none">
-      <GlassCard tier={1} className="p-5 flex items-start gap-4 group-hover:border-accent/30 group-hover:bg-accent/[0.02] transition-all">
-        <div className="p-2.5 rounded-sm bg-black/5 group-hover:bg-accent/10 transition-colors">
-          <Icon className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
-        </div>
-        <div className="space-y-0.5">
-          <h4 className="text-sm font-display font-semibold group-hover:text-accent transition-colors">
-            {title}
-          </h4>
-          <p className="text-[11px] font-body text-muted-foreground leading-snug">
-            {desc}
-          </p>
-        </div>
-        <ArrowUpRight className="w-3 h-3 text-muted-foreground/20 ml-auto group-hover:text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-      </GlassCard>
-    </button>
+function QuickActionCard({ icon: Icon, title, desc, href, onClick }: { icon: LucideIcon; title: string; desc: string; href?: string; onClick?: () => void }) {
+  const inner = (
+    <GlassCard tier={1} className="p-5 flex items-start gap-4 group-hover:border-accent/30 group-hover:bg-accent/[0.02] transition-all">
+      <div className="p-2.5 rounded-sm bg-black/5 group-hover:bg-accent/10 transition-colors">
+        <Icon className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+      </div>
+      <div className="space-y-0.5">
+        <h4 className="text-sm font-display font-semibold group-hover:text-accent transition-colors">
+          {title}
+        </h4>
+        <p className="text-[11px] font-body text-muted-foreground leading-snug">
+          {desc}
+        </p>
+      </div>
+      <ArrowUpRight className="w-3 h-3 text-muted-foreground/20 ml-auto group-hover:text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+    </GlassCard>
   );
+  if (href) {
+    return <Link href={href} className="group text-left focus:outline-none block">{inner}</Link>;
+  }
+  return <button onClick={onClick} className="group text-left focus:outline-none w-full">{inner}</button>;
 }
 
 function generatePath(points: TrendPoint[], w: number, h: number, lineOnly = false) {
