@@ -25,11 +25,15 @@ export class MfaPolicyService {
       }
       return policy;
     } catch (err: unknown) {
-      // Table may not exist yet (pending migration). Return permissive default
-      // so login is never hard-blocked by this service.
+      // Only swallow undefined_table (42P01) — migration not yet run.
+      // Any other error (connection failure, timeout, etc.) must rethrow so
+      // the caller does NOT silently bypass MFA enforcement.
+      const pgCode = (err as { code?: string })?.code;
+      if (pgCode !== '42P01') throw err;
+
       this.logger.warn(
-        { tenantId, error: err instanceof Error ? err.message : String(err) },
-        'tenant_mfa_policy unavailable — returning permissive default',
+        { tenantId },
+        'tenant_mfa_policy table missing (migration pending) — returning permissive default',
       );
       return Object.assign(new TenantMfaPolicy(), {
         tenantId,
