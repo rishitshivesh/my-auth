@@ -62,6 +62,7 @@ describe('TenantService.create (M-006)', () => {
   });
 
   it('T-001b: response is safe error message, not internal error detail', async () => {
+    expect.assertions(3);
     const savedTenant = { id: 'tenant-1', slug: 'acme', active: true } as Tenant;
     tenantRepo.create.mockReturnValue(savedTenant);
     tenantRepo.save.mockResolvedValue(savedTenant);

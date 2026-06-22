@@ -66,7 +66,7 @@ export class TenantRegistrationController {
     @Headers("user-agent") userAgent: string,
   ): Promise<TenantRegistrationResult> {
     // Idempotency: if this key was already submitted within 10 minutes, return cached result
-    const idempotencyKey = `tenant-reg:idem:${dto.idempotencyKey}`;
+    const idempotencyKey = `tenant-reg:idem:${dto.slug}:${dto.idempotencyKey}`;
     const cached = await this.redisService.get<TenantRegistrationResult>('', '', idempotencyKey).catch(() => null);
     if (cached) {
       return cached;
