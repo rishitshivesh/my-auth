@@ -25,7 +25,7 @@ interface LoginFormProps {
   tenantLogo?: string | null;
 }
 
-export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo: _tenantLogo }: LoginFormProps) {
+export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo }: LoginFormProps) {
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -58,6 +58,14 @@ export function LoginForm({ tenantSlug: _tenantSlug, tenantLogo: _tenantLogo }: 
 
   return (
     <AuthLayout>
+      {tenantLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={tenantLogo}
+          alt="Workspace logo"
+          className="h-8 w-auto mb-6 rounded-md"
+        />
+      )}
       <SentryAuthFlow onSuccess={() => router.replace(getPostLoginRoute())} />
       <p
         style={{
