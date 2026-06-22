@@ -4,23 +4,23 @@ import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, Index } from 
 @Index(['tenantId'], { unique: true })
 export class TenantMfaPolicy {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ type: 'uuid' })
-  tenantId: string;
+  tenantId!: string;
 
   @Column({ default: false })
-  enforceForAllUsers: boolean;
+  enforceForAllUsers!: boolean;
 
   @Column({ default: false })
-  enforceForAdmins: boolean;
+  enforceForAdmins!: boolean;
 
   @Column({ type: 'int', default: 0 })
-  gracePeriodDays: number;
+  gracePeriodDays!: number;
 
   @Column({ type: 'simple-array', default: '' })
-  exemptRoleSlugs: string[];
+  exemptRoleSlugs!: string[];
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

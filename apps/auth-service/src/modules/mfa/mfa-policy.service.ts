@@ -28,7 +28,10 @@ export class MfaPolicyService {
       // Only swallow undefined_table (42P01) — migration not yet run.
       // Any other error (connection failure, timeout, etc.) must rethrow so
       // the caller does NOT silently bypass MFA enforcement.
-      const pgCode = (err as { code?: string })?.code;
+      // TypeORM copies driverError properties onto QueryFailedError via Object.assign,
+      // but also keeps them on .driverError — check both to be safe across versions.
+      const asAny = err as Record<string, unknown>;
+      const pgCode = (asAny?.code as string) ?? (asAny?.driverError as Record<string, unknown>)?.code as string;
       if (pgCode !== '42P01') throw err;
 
       this.logger.warn(
