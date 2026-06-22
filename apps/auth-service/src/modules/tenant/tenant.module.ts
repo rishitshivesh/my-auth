@@ -12,6 +12,8 @@ import {
   UserRole,
   OAuthRefreshToken,
   KeyPair,
+  Policy,
+  RolePolicy,
 } from "@repo/database";
 import { TenantService } from "./tenant.service";
 import { TenantController } from "./tenant.controller";
@@ -42,6 +44,8 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
       OAuthRefreshToken,
       KeyPair,
       SessionRepository,
+      Policy,
+      RolePolicy,
     ]),
     CacheModule.register({
       ttl: 300000,
