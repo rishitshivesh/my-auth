@@ -24,6 +24,9 @@ import { v4 as uuidv4 } from "uuid";
 import { SessionService } from "@/common/service/session.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
+import { MfaPolicyService } from '@/modules/mfa/mfa-policy.service';
+import { MfaService } from '@/modules/mfa/mfa.service';
+import { UserRole } from '@repo/database';
 
 export interface SocialProfile {
   provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
@@ -73,6 +76,10 @@ export class SocialAuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly jwksService: JwksService,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepository: Repository<UserRole>,
+    private readonly mfaPolicyService: MfaPolicyService,
+    private readonly mfaService: MfaService,
   ) {}
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
@@ -104,12 +111,8 @@ export class SocialAuthService {
     userAgent: string;
   }): Promise<
     | { type: "success"; accessToken: string; refreshToken: string; user: any }
-    | {
-        type: "link_required";
-        email: string;
-        provider: string;
-        message: string;
-      }
+    | { type: "link_required"; email: string; provider: string; message: string }
+    | { type: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
     const { tenantId, profile, ipAddress, userAgent } = params;
 
@@ -184,12 +187,10 @@ export class SocialAuthService {
     profile: SocialProfile,
     ipAddress: string,
     userAgent: string,
-  ): Promise<{
-    type: "success";
-    accessToken: string;
-    refreshToken: string;
-    user: any;
-  }> {
+  ): Promise<
+    | { type: 'success'; accessToken: string; refreshToken: string; user: { id: string; email: string; firstName?: string; lastName?: string; displayName?: string; avatarUrl?: string; emailVerified: boolean } }
+    | { type: 'mfa_enrollment_required'; enrollmentToken: string }
+  > {
     const user = connection.user;
 
     this.logger.log("Logging in user with social connection", {
@@ -215,6 +216,24 @@ export class SocialAuthService {
       displayName: profile.displayName,
       avatarUrl: profile.avatarUrl,
     });
+
+    // MFA enforcement: check before issuing session
+    const socialMfaStatus = await this.mfaService.getMfaStatus(user.id, connection.tenantId);
+    if (!socialMfaStatus.enabled) {
+      const mfaPolicy = await this.mfaPolicyService.getForTenant(connection.tenantId);
+      const needsEnrollment =
+        mfaPolicy.enforceForAllUsers ||
+        (mfaPolicy.enforceForAdmins &&
+          (await this.userRoleRepository.find({ where: { userId: user.id, tenantId: connection.tenantId }, relations: ['role'] }))
+            .some((ur) => ['owner', 'admin'].includes(ur.role?.name?.toLowerCase() ?? '')));
+
+      if (needsEnrollment) {
+        return {
+          type: 'mfa_enrollment_required' as const,
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, connection.tenantId),
+        };
+      }
+    }
 
     // Create session
     const session = await this.sessionService.createSession({

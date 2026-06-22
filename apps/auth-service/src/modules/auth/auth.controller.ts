@@ -679,8 +679,12 @@ export class AuthController {
       userAgent,
     });
 
-    this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return { user: result.user, tenantSlug: result.tenantSlug };
+    if ('status' in result) {
+      return { status: result.status, enrollmentToken: (result as { status: string; enrollmentToken: string }).enrollmentToken };
+    }
+    const successResult = result as { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } };
+    this.setAuthCookies(res, successResult.accessToken, successResult.refreshToken);
+    return { user: successResult.user, tenantSlug: successResult.tenantSlug };
   }
 
   /**
@@ -715,15 +719,19 @@ export class AuthController {
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const { accessToken, refreshToken, tenantSlug } = await this.authService.verifyMagicLink(
+    const result = await this.authService.verifyMagicLink(
       tenantId,
       dto.token,
       ip,
       userAgent || "unknown",
     );
 
-    this.setAuthCookies(res, accessToken, refreshToken);
-    return { tenantSlug };
+    if ('status' in result) {
+      return { status: result.status, enrollmentToken: (result as { status: string; enrollmentToken: string }).enrollmentToken };
+    }
+    const magicLinkSuccess = result as { accessToken: string; refreshToken: string; tenantSlug: string };
+    this.setAuthCookies(res, magicLinkSuccess.accessToken, magicLinkSuccess.refreshToken);
+    return { tenantSlug: magicLinkSuccess.tenantSlug };
   }
 
   /**

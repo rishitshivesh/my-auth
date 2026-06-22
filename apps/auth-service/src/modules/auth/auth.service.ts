@@ -573,7 +573,10 @@ export class AuthService {
     rawToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
+  ): Promise<
+    | { accessToken: string; refreshToken: string; tenantSlug: string }
+    | { status: 'mfa_enrollment_required'; enrollmentToken: string }
+  > {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     const user = await this.userRepository
@@ -593,6 +596,24 @@ export class AuthService {
       { id: user.id, tenantId },
       { magicLinkToken: undefined, magicLinkExpiresAt: undefined, emailVerified: true },
     );
+
+    // MFA enrollment enforcement: check policy AFTER credential verification but BEFORE session
+    const magicLinkMfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
+    if (!magicLinkMfaStatus.enabled) {
+      const mfaPolicy = await this.mfaPolicyService.getForTenant(tenantId);
+      const needsEnrollment =
+        mfaPolicy.enforceForAllUsers ||
+        (mfaPolicy.enforceForAdmins &&
+          (await this.userRoleRepository.find({ where: { userId: user.id, tenantId }, relations: ['role'] }))
+            .some((ur) => ['owner', 'admin'].includes(ur.role?.name?.toLowerCase() ?? '')));
+
+      if (needsEnrollment) {
+        return {
+          status: 'mfa_enrollment_required' as const,
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId),
+        };
+      }
+    }
 
     const session = await this.sessionService.createSession({
       userId: user.id,
@@ -1155,7 +1176,10 @@ export class AuthService {
     ip: string;
     userAgent: string;
     deviceId?: string;
-  }): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }> {
+  }): Promise<
+    | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
+    | { status: 'mfa_enrollment_required'; enrollmentToken: string }
+  > {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
 
     // Find user
@@ -1196,6 +1220,24 @@ export class AuthService {
     // Check if account is active
     if (!user.isActive) {
       throw new UnauthorizedException("Account is disabled");
+    }
+
+    // MFA enforcement: check before issuing session
+    const passkeyMfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
+    if (!passkeyMfaStatus.enabled) {
+      const mfaPolicy = await this.mfaPolicyService.getForTenant(tenantId);
+      const needsEnrollment =
+        mfaPolicy.enforceForAllUsers ||
+        (mfaPolicy.enforceForAdmins &&
+          (await this.userRoleRepository.find({ where: { userId: user.id, tenantId }, relations: ['role'] }))
+            .some((ur) => ['owner', 'admin'].includes(ur.role?.name?.toLowerCase() ?? '')));
+
+      if (needsEnrollment) {
+        return {
+          status: 'mfa_enrollment_required' as const,
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId),
+        };
+      }
     }
 
     // Create session using SessionService (consistent with password login)

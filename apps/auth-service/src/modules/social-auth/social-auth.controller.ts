@@ -267,6 +267,10 @@ export class SocialAuthController {
         );
       }
 
+      if (result.type === 'mfa_enrollment_required') {
+        return res.redirect(`${safeReturnUrl}/mfa/enroll?enrollmentToken=${encodeURIComponent(result.enrollmentToken)}`);
+      }
+
       const isProduction = process.env['NODE_ENV'] === 'production';
       const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
       const base = { httpOnly: true, secure: isProduction, sameSite: 'strict' as const, path: '/', ...(cookieDomain ? { domain: cookieDomain } : {}) };
