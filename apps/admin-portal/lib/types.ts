@@ -91,7 +91,7 @@ export interface ActivityEvent {
   ipAddress: string;
   location?: string;
   createdAt: string;
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "medium" | "warning" | "high" | "critical";
   resourceType?: string;
   resourceId?: string;
 }

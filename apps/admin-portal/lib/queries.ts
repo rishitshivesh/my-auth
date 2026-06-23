@@ -1025,17 +1025,44 @@ export function useAuditLogsInfinite(filters: AuditLogFilters) {
   });
 }
 
-export function useExportAuditCsv() {
+export function useExportAuditCsv(tenantSlug?: string) {
   return useMutation<void, Error, AuditLogFilters>({
     mutationFn: async (filters) => {
       const qs = buildAuditQs(filters);
       const url = `${authClient.getBaseURL()}/audit/export?${qs}`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `audit-${Date.now()}.csv`;
+
+      // Use fetch (not bare <a href>) so we can inject auth headers — a bare
+      // navigation cannot send X-Tenant-Slug, which breaks local dev where
+      // tenant resolution falls back to the header instead of subdomain.
+      const accessToken = await authClient.getAccessToken();
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      if (tenantSlug) {
+        headers['X-Tenant-Slug'] = tenantSlug;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `audit-${tenantSlug ?? 'export'}-${dateStr}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
     },
   });
 }

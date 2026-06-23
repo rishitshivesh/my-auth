@@ -663,7 +663,7 @@ export class AuthController {
   })
   async finishWebAuthnLogin(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
     @Body() dto: { email: string; response: Record<string, unknown>; sessionNonce: string },
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -680,10 +680,17 @@ export class AuthController {
     });
 
     if ('status' in result) {
-      return { status: result.status, enrollmentToken: result.enrollmentToken };
+      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
+        httpOnly: true,
+        secure: process.env['NODE_ENV'] === 'production',
+        sameSite: 'strict',
+        path: '/mfa/enroll',
+        maxAge: 5 * 60 * 1000,
+      });
+      return res.json({ status: result.status });
     }
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return { user: result.user, tenantSlug: result.tenantSlug };
+    return res.json({ user: result.user, tenantSlug: result.tenantSlug });
   }
 
   /**
@@ -712,7 +719,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Authentication successful" })
   async verifyMagicLink(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
     @Body() dto: VerifyMagicLinkDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -726,10 +733,17 @@ export class AuthController {
     );
 
     if ('status' in result) {
-      return { status: result.status, enrollmentToken: result.enrollmentToken };
+      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
+        httpOnly: true,
+        secure: process.env['NODE_ENV'] === 'production',
+        sameSite: 'strict',
+        path: '/mfa/enroll',
+        maxAge: 5 * 60 * 1000,
+      });
+      return res.json({ status: result.status });
     }
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return { tenantSlug: result.tenantSlug };
+    return res.json({ tenantSlug: result.tenantSlug });
   }
 
   /**

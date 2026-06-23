@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useParams } from 'next/navigation';
 import { PortalLayout } from '@/components/layouts/portal-layout';
-import { DataTable, StatusBadge } from '@repo/ui';
+import { DataTable } from '@repo/ui';
 import { useAuditLogsInfinite, useExportAuditCsv } from '@/lib/queries';
 import type { ActivityEvent } from '@/lib/types';
 import { Download, Shield, Loader2 } from 'lucide-react';
@@ -33,7 +33,7 @@ export default function AuditLogPage() {
       limit: 50,
     });
 
-  const exportCsv = useExportAuditCsv();
+  const exportCsv = useExportAuditCsv(slug);
 
   const events: ActivityEvent[] =
     data?.pages.flatMap((page) => page.items) ?? [];
@@ -86,19 +86,58 @@ export default function AuditLogPage() {
     },
     {
       header: 'Severity',
-      accessorKey: (row: ActivityEvent) => (
-        <StatusBadge
-          status={
-            row.severity === 'critical'
-              ? 'suspended'
-              : row.severity === 'warning'
-              ? 'pending'
-              : 'active'
-          }
-        >
-          {row.severity}
-        </StatusBadge>
-      ),
+      accessorKey: (row: ActivityEvent) => {
+        const severityStyles: Record<
+          ActivityEvent['severity'],
+          { bg: string; text: string; border: string }
+        > = {
+          critical: {
+            bg: 'rgba(192,57,43,0.08)',
+            text: 'var(--color-danger, #C0392B)',
+            border: 'rgba(192,57,43,0.22)',
+          },
+          high: {
+            bg: 'rgba(196,131,10,0.12)',
+            text: '#A0690A',
+            border: 'rgba(196,131,10,0.30)',
+          },
+          warning: {
+            bg: 'rgba(196,131,10,0.08)',
+            text: 'var(--color-warning, #C4830A)',
+            border: 'rgba(196,131,10,0.22)',
+          },
+          medium: {
+            bg: 'rgba(37,99,235,0.08)',
+            text: 'var(--color-info, #2563EB)',
+            border: 'rgba(37,99,235,0.22)',
+          },
+          info: {
+            bg: 'rgba(42,191,108,0.1)',
+            text: 'var(--color-accent-dark, #1D8F50)',
+            border: 'rgba(42,191,108,0.22)',
+          },
+        };
+        const s = severityStyles[row.severity] ?? severityStyles.info;
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              borderRadius: '2px',
+              border: `1px solid ${s.border}`,
+              padding: '1px 6px',
+              fontSize: '11px',
+              fontWeight: 600,
+              background: s.bg,
+              color: s.text,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {row.severity}
+          </span>
+        );
+      },
     },
   ];
 

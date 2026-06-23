@@ -40,72 +40,178 @@ const makeStubs = () => ({
   sessionRepository: {},
 });
 
-describe('MFA enrollment enforcement (T-008)', () => {
-  // NOTE: These are unit tests verifying the enforcement branching logic.
-  // Full integration tests require a running Postgres instance and are in test/jest-e2e.json.
+/**
+ * Replicates the enforcement block logic shared across
+ * verifyMagicLink, finishWebAuthnLogin, and loginWithSocialConnection:
+ *
+ *   const mfaStatus = await mfaService.getMfaStatus(userId, tenantId);
+ *   if (!mfaStatus.enabled) {
+ *     const policy = await mfaPolicyService.getForTenant(tenantId);
+ *     const roles = await userRoleRepo.find(...);
+ *     const isAdminOrOwner = roles.some(ur => ['owner','admin'].includes(ur.role.name.toLowerCase()));
+ *     const needsEnrollment = policy.enforceForAllUsers || (policy.enforceForAdmins && isAdminOrOwner);
+ *     if (needsEnrollment) {
+ *       const enrollmentToken = await mfaPolicyService.issueEnrollmentToken(userId, tenantId);
+ *       return { status: 'mfa_enrollment_required', enrollmentToken };
+ *     }
+ *   }
+ */
+async function runEnforcementBlock(
+  mfaService: Partial<MfaService>,
+  mfaPolicyService: Partial<MfaPolicyService>,
+  userRoleRepo: { find: jest.Mock },
+  userId: string,
+  tenantId: string,
+): Promise<{ status: 'mfa_enrollment_required'; enrollmentToken: string } | null> {
+  const mfaStatus = await mfaService.getMfaStatus!(userId, tenantId);
+  if (!mfaStatus.enabled) {
+    const policy = await mfaPolicyService.getForTenant!(tenantId);
+    const roles: Array<{ role: { name: string } }> = await userRoleRepo.find({
+      where: { userId },
+      relations: ['role'],
+    });
+    const isAdminOrOwner = roles.some((ur) =>
+      ['owner', 'admin'].includes(ur.role.name.toLowerCase()),
+    );
+    const needsEnrollment =
+      policy.enforceForAllUsers || (policy.enforceForAdmins && isAdminOrOwner);
+    if (needsEnrollment) {
+      const enrollmentToken = await mfaPolicyService.issueEnrollmentToken!(userId, tenantId);
+      return { status: 'mfa_enrollment_required', enrollmentToken };
+    }
+  }
+  return null;
+}
 
+describe('MFA enrollment enforcement (T-008)', () => {
   describe('verifyMagicLink — enrollment enforcement', () => {
     it('T-008a: enforceForAllUsers=true + no MFA → returns mfa_enrollment_required', async () => {
       const stubs = makeStubs();
 
-      const user = { id: 'user-1', tenantId: 'tenant-1', email: 'test@acme.com', isActive: true, magicLinkToken: 'hashed', magicLinkExpiresAt: new Date(Date.now() + 60000) };
-
-      // Magic link token lookup
-      stubs.userRepo.createQueryBuilder().getOne.mockResolvedValueOnce(user);
-      stubs.userRepo.update.mockResolvedValue(undefined);
-
-      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({ enabled: false, methods: [] });
+      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({
+        enabled: false,
+        methods: [],
+      });
       (stubs.mfaPolicyService.getForTenant as jest.Mock).mockResolvedValue({
         enforceForAllUsers: true,
         enforceForAdmins: false,
       } as Partial<TenantMfaPolicy>);
       stubs.userRoleRepo.find.mockResolvedValue([]);
 
-      // We can't easily instantiate AuthService without all deps — assert the mock shape
-      // instead. Full wiring is done in e2e tests.
-      // This test documents the expected contract:
-      expect((stubs.mfaPolicyService.getForTenant as jest.Mock)).toBeDefined();
-      expect((stubs.mfaService.getMfaStatus as jest.Mock)).toBeDefined();
+      const result = await runEnforcementBlock(
+        stubs.mfaService,
+        stubs.mfaPolicyService,
+        stubs.userRoleRepo,
+        'user-1',
+        'tenant-1',
+      );
 
-      // Verify enforcement check logic in isolation:
-      const mfaStatus = await stubs.mfaService.getMfaStatus!('user-1', 'tenant-1');
-      const policy = await stubs.mfaPolicyService.getForTenant!('tenant-1');
-
-      const needsEnrollment = policy.enforceForAllUsers || (policy.enforceForAdmins && false);
-      expect(needsEnrollment).toBe(true);
-
-      const token = await stubs.mfaPolicyService.issueEnrollmentToken!('user-1', 'tenant-1');
-      expect(token).toBe('enroll-token-abc');
+      expect(result).toEqual({
+        status: 'mfa_enrollment_required',
+        enrollmentToken: 'enroll-token-abc',
+      });
+      expect(stubs.mfaService.getMfaStatus).toHaveBeenCalledWith('user-1', 'tenant-1');
+      expect(stubs.mfaPolicyService.getForTenant).toHaveBeenCalledWith('tenant-1');
+      expect(stubs.mfaPolicyService.issueEnrollmentToken).toHaveBeenCalledWith('user-1', 'tenant-1');
     });
 
-    it('T-008d: enforceForAdmins=true + member role → no enforcement', async () => {
+    it('T-008d: MFA already enabled → skips enforcement entirely', async () => {
       const stubs = makeStubs();
-      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({ enabled: false, methods: [] });
-      (stubs.mfaPolicyService.getForTenant as jest.Mock).mockResolvedValue({
-        enforceForAllUsers: false,
-        enforceForAdmins: true,
-      } as Partial<TenantMfaPolicy>);
-      // Member role — not owner or admin
-      stubs.userRoleRepo.find.mockResolvedValue([{ role: { name: 'member' } }]);
 
-      const policy = await stubs.mfaPolicyService.getForTenant!('tenant-1');
-      const roles: Array<{ role: { name: string } }> = await stubs.userRoleRepo.find();
-      const isAdminOrOwner = roles.some((ur) => ['owner', 'admin'].includes(ur.role.name.toLowerCase()));
+      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({
+        enabled: true,
+        methods: ['totp'],
+      });
 
-      const needsEnrollment = policy.enforceForAllUsers || (policy.enforceForAdmins && isAdminOrOwner);
-      expect(needsEnrollment).toBe(false);
+      const result = await runEnforcementBlock(
+        stubs.mfaService,
+        stubs.mfaPolicyService,
+        stubs.userRoleRepo,
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(result).toBeNull();
+      // Policy and role lookups must NOT fire when MFA is already enabled
+      expect(stubs.mfaPolicyService.getForTenant).not.toHaveBeenCalled();
+      expect(stubs.mfaPolicyService.issueEnrollmentToken).not.toHaveBeenCalled();
     });
 
-    it('T-008e: policy off entirely → no enforcement', async () => {
+    it('T-008e: policy off entirely → no enforcement even without MFA', async () => {
       const stubs = makeStubs();
+
+      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({
+        enabled: false,
+        methods: [],
+      });
       (stubs.mfaPolicyService.getForTenant as jest.Mock).mockResolvedValue({
         enforceForAllUsers: false,
         enforceForAdmins: false,
       } as Partial<TenantMfaPolicy>);
+      stubs.userRoleRepo.find.mockResolvedValue([]);
 
-      const policy = await stubs.mfaPolicyService.getForTenant!('tenant-1');
-      const needsEnrollment = policy.enforceForAllUsers || policy.enforceForAdmins;
-      expect(needsEnrollment).toBe(false);
+      const result = await runEnforcementBlock(
+        stubs.mfaService,
+        stubs.mfaPolicyService,
+        stubs.userRoleRepo,
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(result).toBeNull();
+      expect(stubs.mfaPolicyService.issueEnrollmentToken).not.toHaveBeenCalled();
+    });
+
+    it('T-008b: enforceForAdmins=true + admin role + no MFA → returns mfa_enrollment_required', async () => {
+      const stubs = makeStubs();
+
+      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({
+        enabled: false,
+        methods: [],
+      });
+      (stubs.mfaPolicyService.getForTenant as jest.Mock).mockResolvedValue({
+        enforceForAllUsers: false,
+        enforceForAdmins: true,
+      } as Partial<TenantMfaPolicy>);
+      stubs.userRoleRepo.find.mockResolvedValue([{ role: { name: 'admin' } }]);
+
+      const result = await runEnforcementBlock(
+        stubs.mfaService,
+        stubs.mfaPolicyService,
+        stubs.userRoleRepo,
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(result).toEqual({
+        status: 'mfa_enrollment_required',
+        enrollmentToken: 'enroll-token-abc',
+      });
+    });
+
+    it('T-008c: enforceForAdmins=true + member role + no MFA → no enforcement', async () => {
+      const stubs = makeStubs();
+
+      (stubs.mfaService.getMfaStatus as jest.Mock).mockResolvedValue({
+        enabled: false,
+        methods: [],
+      });
+      (stubs.mfaPolicyService.getForTenant as jest.Mock).mockResolvedValue({
+        enforceForAllUsers: false,
+        enforceForAdmins: true,
+      } as Partial<TenantMfaPolicy>);
+      stubs.userRoleRepo.find.mockResolvedValue([{ role: { name: 'member' } }]);
+
+      const result = await runEnforcementBlock(
+        stubs.mfaService,
+        stubs.mfaPolicyService,
+        stubs.userRoleRepo,
+        'user-1',
+        'tenant-1',
+      );
+
+      expect(result).toBeNull();
+      expect(stubs.mfaPolicyService.issueEnrollmentToken).not.toHaveBeenCalled();
     });
   });
 });
