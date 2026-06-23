@@ -4,6 +4,7 @@ export class Sprint4Tables1900000000000 implements MigrationInterface {
   name = "Sprint4Tables1900000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     // ── Webhook endpoints ─────────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "webhook_endpoints" (
@@ -120,6 +121,7 @@ export class Sprint4Tables1900000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(`DROP TABLE IF EXISTS "ldap_connections"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "scim_tokens"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "saml_service_providers"`);

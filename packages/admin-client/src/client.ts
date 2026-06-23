@@ -157,10 +157,10 @@ export class SentryAdminClient {
       this.transport.delete(`/api/oauth/clients/${id}`),
 
     rotate: (id: string): Promise<{ clientSecret: string }> =>
-      this.transport.post(`/api/oauth/clients/${id}/rotate`),
+      this.transport.post(`/api/oauth/clients/${id}/rotate-secret`),
 
     rotateSecret: (id: string): Promise<{ clientSecret: string }> =>
-      this.transport.post(`/api/oauth/clients/${id}/rotate`),
+      this.transport.post(`/api/oauth/clients/${id}/rotate-secret`),
   };
 
   readonly audit = {

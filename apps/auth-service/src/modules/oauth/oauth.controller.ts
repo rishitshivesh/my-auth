@@ -850,8 +850,7 @@ export class OAuthController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   @ApiResponse({ status: 404, description: "Client not found" })
   async deleteClient(@Param("clientId") clientId: string) {
-    // TODO: Implement deleteClient in service
-    return;
+    await this.clientService.deleteClient(clientId);
   }
 
   /**

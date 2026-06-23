@@ -17,6 +17,9 @@ export class InitialMigration1735289000000 implements MigrationInterface {
   name = "InitialMigration1735289000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Ensure we start in public schema
+    await queryRunner.query(`SET search_path TO public, extensions`);
+
     // Enable UUID extension
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
@@ -57,6 +60,12 @@ export class InitialMigration1735289000000 implements MigrationInterface {
     await queryRunner.query(
       `COMMENT ON TABLE "tenants" IS 'Multi-tenant organizations'`,
     );
+
+    // =======================================================================
+    // SWITCH TO TEMPLATE SCHEMA FOR TENANT TABLES
+    // =======================================================================
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS "template"`);
+    await queryRunner.query(`SET search_path TO template, public, extensions`);
 
     // =======================================================================
     // USERS TABLE
@@ -376,11 +385,11 @@ export class InitialMigration1735289000000 implements MigrationInterface {
     //     ('audit', 'read', 'Read audit logs')
     // `);
 
-    console.log("✅ Initial migration completed successfully");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Drop tables in reverse order (respecting foreign keys)
+    // Drop tenant tables in template schema first
+    await queryRunner.query(`SET search_path TO template, public, extensions`);
     await queryRunner.query(`DROP TABLE IF EXISTS "role_permissions" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "roles" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "permissions" CASCADE`);
@@ -388,8 +397,10 @@ export class InitialMigration1735289000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "sessions" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "mfa_settings" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "users" CASCADE`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "tenants" CASCADE`);
 
-    console.log("✅ Migration reverted successfully");
+    // Drop platform tables and schema in public
+    await queryRunner.query(`SET search_path TO public, extensions`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "tenants" CASCADE`);
+    await queryRunner.query(`DROP SCHEMA IF EXISTS "template" CASCADE`);
   }
 }

@@ -15,9 +15,11 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "typecheck": "tsc --noEmit",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
@@ -28,7 +30,7 @@
     "db:drop": "dotenv -e .env -- typeorm-ts-node-commonjs schema:drop -d ../../packages/database/src/data-source.ts",
     "db:seed": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/run-seeds.ts",
     "db:seed:demo": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/demo.seed.ts",
-    "db:reset": "npm run db:drop && npm run db:migrate && npm run db:seed",
+    "db:reset": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/db-reset.ts",
     "setup": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/cli/setup.ts"
   },
   "dependencies": {

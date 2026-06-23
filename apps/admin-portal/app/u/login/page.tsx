@@ -1,12 +1,10 @@
 // Server Component — fetches tenant branding before HTML is sent to browser
 import { headers } from 'next/headers';
 import { LoginForm } from './login-form';
-import { BrandPanel } from './brand-panel';
 
 interface TenantBranding {
   primaryColor?: string;
   logoUrl?: string;
-  fontFamily?: string;
 }
 
 async function getTenantBranding(slug: string): Promise<TenantBranding | null> {
@@ -35,11 +33,10 @@ export default async function LoginPage() {
   const branding = slug ? await getTenantBranding(slug) : null;
 
   return (
-    <main style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '3fr 2fr' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-        <LoginForm tenantSlug={slug ?? undefined} tenantLogo={branding?.logoUrl} />
-      </div>
-      <BrandPanel primaryColor={branding?.primaryColor} />
-    </main>
+    <LoginForm
+      tenantSlug={slug ?? undefined}
+      tenantLogo={branding?.logoUrl}
+      primaryColor={branding?.primaryColor}
+    />
   );
 }

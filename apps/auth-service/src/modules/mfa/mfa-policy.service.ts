@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantMfaPolicy } from '@repo/database';
@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MfaPolicyService {
+  private readonly logger = new Logger(MfaPolicyService.name);
+
   constructor(
     @InjectRepository(TenantMfaPolicy)
     private readonly policyRepo: Repository<TenantMfaPolicy>,
@@ -15,12 +17,35 @@ export class MfaPolicyService {
   ) {}
 
   async getForTenant(tenantId: string): Promise<TenantMfaPolicy> {
-    let policy = await this.policyRepo.findOne({ where: { tenantId } });
-    if (!policy) {
-      policy = this.policyRepo.create({ tenantId });
-      await this.policyRepo.save(policy);
+    try {
+      let policy = await this.policyRepo.findOne({ where: { tenantId } });
+      if (!policy) {
+        policy = this.policyRepo.create({ tenantId });
+        await this.policyRepo.save(policy);
+      }
+      return policy;
+    } catch (err: unknown) {
+      // Only swallow undefined_table (42P01) — migration not yet run.
+      // Any other error (connection failure, timeout, etc.) must rethrow so
+      // the caller does NOT silently bypass MFA enforcement.
+      // TypeORM copies driverError properties onto QueryFailedError via Object.assign,
+      // but also keeps them on .driverError — check both to be safe across versions.
+      const asAny = err as Record<string, unknown>;
+      const pgCode = (asAny?.code as string) ?? (asAny?.driverError as Record<string, unknown>)?.code as string;
+      if (pgCode !== '42P01') throw err;
+
+      this.logger.warn(
+        { tenantId },
+        'tenant_mfa_policy table missing (migration pending) — returning permissive default',
+      );
+      return Object.assign(new TenantMfaPolicy(), {
+        tenantId,
+        enforceForAllUsers: false,
+        enforceForAdmins: false,
+        gracePeriodDays: 0,
+        exemptRoleSlugs: [],
+      });
     }
-    return policy;
   }
 
   async updateForTenant(tenantId: string, data: Partial<TenantMfaPolicy>): Promise<TenantMfaPolicy> {

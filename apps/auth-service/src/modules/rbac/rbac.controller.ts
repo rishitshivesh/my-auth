@@ -251,6 +251,14 @@ export class RbacController {
     return this.roleService.getRolePermissions(id, tenantId);
   }
 
+  @Get("roles/:roleId/policies")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.ROLES_READ)
+  @ApiOperation({ summary: "List policies attached to a role" })
+  async getRolePolicies(@Request() req: AuthenticatedRequest, @Param("roleId") roleId: string) {
+    return this.policyService.listPoliciesForRole(roleId, req.tenantId);
+  }
+
   // ============================================================
   // USER-ROLE ENDPOINTS
   // ============================================================
@@ -342,6 +350,8 @@ export class RbacController {
 
   @Post("users/:userId/check-permission")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Check if user has permission" })
   async checkPermission(
     @Request() req: AuthenticatedRequest,
@@ -359,6 +369,8 @@ export class RbacController {
 
   @Post("users/:userId/check-role")
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
   @ApiOperation({ summary: "Check if user has role" })
   async checkRole(
     @Request() req: AuthenticatedRequest,

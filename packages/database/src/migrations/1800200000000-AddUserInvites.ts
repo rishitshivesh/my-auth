@@ -4,6 +4,7 @@ export class AddUserInvites1800200000000 implements MigrationInterface {
   name = 'AddUserInvites1800200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "user_invites" (
         "id"          uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -31,6 +32,7 @@ export class AddUserInvites1800200000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(`DROP TABLE IF EXISTS "user_invites"`);
   }
 }

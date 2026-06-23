@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SlugInput } from '@/components/slug-input'
 import { useCreateTenant } from '@/lib/admin-queries'
+import { useDashboard } from '@/lib/queries'
 import { withAdmin } from '@/lib/with-admin'
 import { AdminSidebar } from '@/components/admin-sidebar'
 
@@ -33,6 +34,9 @@ const PLANS: { id: Plan; name: string; price: string; limits: string[] }[] = [
 
 function NewTenantPage() {
   const router = useRouter()
+  const { data: dashboard } = useDashboard()
+  const currentUser = dashboard?.user
+
   const [step, setStep] = useState<1 | 2>(1)
 
   // Step 1 fields
@@ -42,7 +46,9 @@ function NewTenantPage() {
   const [plan, setPlan] = useState<Plan>('free')
 
   // Step 2 fields
+  const [useMyAccount, setUseMyAccount] = useState(true)
   const [ownerEmail, setOwnerEmail] = useState('')
+  const [migrateProfile, setMigrateProfile] = useState(true)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -50,13 +56,48 @@ function NewTenantPage() {
 
   const step1Valid = name.trim().length > 0 && slug.length >= 4 && slugAvailable && plan
 
+  const adminPortalOrigin =
+    typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.host}`
+      : ''
+
+  function getNewTenantUrl(tenantSlug: string) {
+    // Redirect to the new tenant workspace
+    // Pattern: {slug}.sentry.scrolloop.com or localhost:3000/t/{slug}
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `/t/${tenantSlug}`
+      }
+      // Production: subdomain-based routing
+      const parts = hostname.split('.')
+      // Replace the first subdomain with the new slug
+      parts[0] = tenantSlug
+      return `${window.location.protocol}//${parts.join('.')}`
+    }
+    return `/t/${tenantSlug}`
+  }
+
   function handleCreate() {
     setError(null)
     createTenant(
-      { name: name.trim(), slug, plan, ownerEmail: ownerEmail || undefined },
+      {
+        name: name.trim(),
+        slug,
+        plan,
+        ownerEmail: useMyAccount ? undefined : (ownerEmail || undefined),
+        useCurrentUserAsAdmin: useMyAccount,
+        migrateProfile: useMyAccount ? migrateProfile : undefined,
+      },
       {
         onSuccess: (tenant) => {
-          router.push(`/tenants/${tenant.id}?created=1`)
+          if (useMyAccount) {
+            // Switch context to the new tenant workspace
+            const newUrl = getNewTenantUrl(tenant.slug ?? slug)
+            window.location.href = newUrl
+          } else {
+            router.push(`/tenants/${tenant.id}?created=1`)
+          }
         },
         onError: (err) => {
           setError(err.message)
@@ -169,22 +210,63 @@ function NewTenantPage() {
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Owner Account</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">The first admin user for this tenant.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Who will be the first admin of this tenant?</p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">Owner Email</label>
-                    <input
-                      type="email"
-                      value={ownerEmail}
-                      onChange={(e) => setOwnerEmail(e.target.value)}
-                      placeholder="admin@company.com"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      An invitation will be sent to this email address.
-                    </p>
+                  {/* Use my account toggle */}
+                  <div
+                    onClick={() => setUseMyAccount(v => !v)}
+                    className={`flex items-start gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all select-none ${useMyAccount ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'}`}
+                  >
+                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${useMyAccount ? 'border-primary bg-primary' : 'border-muted-foreground/40'}`}>
+                      {useMyAccount && <span className="text-white text-[10px]">✓</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">Use my account as admin</p>
+                      {currentUser ? (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Your credentials (<span className="font-medium text-foreground">{currentUser.email}</span>) will be copied to this tenant. Same password, instant access.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Your current credentials will be copied to this tenant. Same password, instant access.
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Migrate profile option (only when using own account) */}
+                  {useMyAccount && (
+                    <div
+                      onClick={() => setMigrateProfile(v => !v)}
+                      className={`flex items-center gap-3 rounded-lg border p-3.5 cursor-pointer transition-all select-none ${migrateProfile ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-muted-foreground/30'}`}
+                    >
+                      <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${migrateProfile ? 'border-primary bg-primary' : 'border-muted-foreground/40'}`}>
+                        {migrateProfile && <span className="text-white text-[9px]">✓</span>}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Copy my profile</p>
+                        <p className="text-xs text-muted-foreground">Name and avatar will also be copied to the new tenant.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Invite a different owner */}
+                  {!useMyAccount && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Owner Email</label>
+                      <input
+                        type="email"
+                        value={ownerEmail}
+                        onChange={(e) => setOwnerEmail(e.target.value)}
+                        placeholder="admin@company.com"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        An invitation will be sent to this email address.
+                      </p>
+                    </div>
+                  )}
 
                   {error && (
                     <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -199,8 +281,15 @@ function NewTenantPage() {
                       <p>Name: <span className="text-foreground">{name}</span></p>
                       <p>Slug: <span className="text-foreground">{slug}</span></p>
                       <p>Plan: <span className="text-foreground capitalize">{plan}</span></p>
+                      <p>Admin: <span className="text-foreground">{useMyAccount ? (currentUser?.email ?? 'you') : (ownerEmail || 'invite via email')}</span></p>
                     </div>
                   </div>
+
+                  {useMyAccount && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-primary">
+                      After creation you will be switched into the <strong>{slug}</strong> workspace automatically.
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-2">
                     <button

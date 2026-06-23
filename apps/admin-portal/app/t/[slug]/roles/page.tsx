@@ -14,16 +14,31 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter
+  DialogFooter,
+  Checkbox,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@repo/ui";
 import { cn } from "@repo/ui/lib/utils";
+import { Label } from "@repo/ui/components/ui/label";
 
 import {
   useTenantRoles,
   useCreateRole,
   useUpdateRole,
-  useDeleteRole
+  useDeleteRole,
+  usePermissions,
+  useAssignPermissionsToRole,
+  useRemovePermissionsFromRole,
+  useRolePolicies,
+  usePolicies,
+  useAttachPolicyToRole,
+  useDetachPolicyFromRole,
 } from '@/lib/queries';
+import type { Permission, Policy } from '@/lib/types';
 import {
   Shield,
   Plus,
@@ -31,7 +46,10 @@ import {
   ChevronRight,
   Lock,
   AlertTriangle,
-  Info
+  Info,
+  Settings2,
+  FileKey,
+  Unlink2,
 } from 'lucide-react';
 
 export default function RolesPage() {
@@ -39,22 +57,33 @@ export default function RolesPage() {
   const [selectedRoleId, setSelectedRoleId] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  // Create Role Dialog State
+  // Create Role Dialog
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [createName, setCreateName] = React.useState('');
   const [createDescription, setCreateDescription] = React.useState('');
 
-  // Edit Role Dialog State
+  // Edit Role Dialog
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [editName, setEditName] = React.useState('');
   const [editDescription, setEditDescription] = React.useState('');
 
-  // Delete Confirmation State
+  // Delete Dialog
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
+
+  // Assign Permissions Dialog
+  const [isPermissionsOpen, setIsPermissionsOpen] = React.useState(false);
+  const [selectedPermissions, setSelectedPermissions] = React.useState<Set<string>>(new Set());
+
+  // Attach Policy Dialog
+  const [isPoliciesAttachOpen, setIsPoliciesAttachOpen] = React.useState(false);
+  const [attachPolicyId, setAttachPolicyId] = React.useState('');
 
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
   const deleteRole = useDeleteRole();
+  const { data: allPermissions, isLoading: permissionsLoading } = usePermissions();
+  const assignPermissions = useAssignPermissionsToRole();
+  const removePermissions = useRemovePermissionsFromRole();
 
   const filteredRoles = roles?.filter(role =>
     role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -63,13 +92,17 @@ export default function RolesPage() {
 
   const selectedRole = roles?.find(r => r.id === selectedRoleId) || filteredRoles?.[0] || roles?.[0];
 
+  const { data: rolePolicies, isLoading: rolePoliciesLoading } = useRolePolicies(selectedRole?.id ?? '');
+  const { data: policiesData } = usePolicies();
+  const attachPolicy = useAttachPolicyToRole();
+  const detachPolicy = useDetachPolicyFromRole();
+
   React.useEffect(() => {
     if (roles && !selectedRoleId && roles.length > 0) {
       setSelectedRoleId(roles[0]?.id ?? null);
     }
   }, [roles, selectedRoleId]);
 
-  // Sync edit form fields when editing role changes or edit modal opens
   React.useEffect(() => {
     if (selectedRole) {
       setEditName(selectedRole.name);
@@ -77,22 +110,40 @@ export default function RolesPage() {
     }
   }, [selectedRole, isEditOpen]);
 
+  // Initialise permission checkboxes when dialog opens
+  React.useEffect(() => {
+    if (isPermissionsOpen && selectedRole) {
+      const current = new Set(
+        (selectedRole.rolePermissions ?? [])
+          .map(rp => rp.permission?.name)
+          .filter((n): n is string => Boolean(n))
+      );
+      setSelectedPermissions(current);
+    }
+  }, [isPermissionsOpen, selectedRole]);
+
+  // Group permissions by resource
+  const permissionsByResource = React.useMemo(() => {
+    if (!allPermissions) return {} as Record<string, Permission[]>;
+    return allPermissions.reduce((acc, perm) => {
+      const group = acc[perm.resource] ?? [];
+      group.push(perm);
+      acc[perm.resource] = group;
+      return acc;
+    }, {} as Record<string, Permission[]>);
+  }, [allPermissions]);
+
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createName) return;
     try {
-      const newRole = await createRole.mutateAsync({
-        name: createName,
-        description: createDescription,
-      });
+      const newRole = await createRole.mutateAsync({ name: createName, description: createDescription });
       setIsCreateOpen(false);
       setCreateName('');
       setCreateDescription('');
-      if (newRole) {
-        setSelectedRoleId(newRole.id);
-      }
-    } catch (err: unknown) {
-      // Handled by withErrorHandler
+      if (newRole) setSelectedRoleId(newRole.id);
+    } catch {
+      // handled by withErrorHandler
     }
   };
 
@@ -100,14 +151,10 @@ export default function RolesPage() {
     e.preventDefault();
     if (!selectedRole) return;
     try {
-      await updateRole.mutateAsync({
-        id: selectedRole.id,
-        name: editName,
-        description: editDescription,
-      });
+      await updateRole.mutateAsync({ id: selectedRole.id, name: editName, description: editDescription });
       setIsEditOpen(false);
-    } catch (err: unknown) {
-      // Handled by withErrorHandler
+    } catch {
+      // handled by withErrorHandler
     }
   };
 
@@ -117,9 +164,57 @@ export default function RolesPage() {
       await deleteRole.mutateAsync(selectedRole.id);
       setIsDeleteOpen(false);
       setSelectedRoleId(null);
-    } catch (err: unknown) {
-      // Handled by withErrorHandler
+    } catch {
+      // handled by withErrorHandler
     }
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedRole) return;
+    const original = new Set(
+      (selectedRole.rolePermissions ?? [])
+        .map(rp => rp.permission?.name)
+        .filter((n): n is string => Boolean(n))
+    );
+    const toAdd = [...selectedPermissions].filter(n => !original.has(n));
+    const toRemove = [...original].filter(n => !selectedPermissions.has(n));
+    try {
+      if (toAdd.length > 0) {
+        await assignPermissions.mutateAsync({ roleId: selectedRole.id, permissionNames: toAdd });
+      }
+      if (toRemove.length > 0) {
+        await removePermissions.mutateAsync({ roleId: selectedRole.id, permissionNames: toRemove });
+      }
+      setIsPermissionsOpen(false);
+    } catch {
+      // handled by withErrorHandler
+    }
+  };
+
+  const handleAttachPolicy = async () => {
+    if (!selectedRole || !attachPolicyId) return;
+    try {
+      await attachPolicy.mutateAsync({ roleId: selectedRole.id, policyId: attachPolicyId });
+      setIsPoliciesAttachOpen(false);
+      setAttachPolicyId('');
+    } catch {
+      // handled by withErrorHandler
+    }
+  };
+
+  const handleDetachPolicy = async (policy: Policy) => {
+    if (!selectedRole) return;
+    try {
+      await detachPolicy.mutateAsync({ roleId: selectedRole.id, policyId: policy.id });
+    } catch {
+      // handled by withErrorHandler
+    }
+  };
+
+  const togglePermission = (name: string, checked: boolean) => {
+    const next = new Set(selectedPermissions);
+    if (checked) next.add(name); else next.delete(name);
+    setSelectedPermissions(next);
   };
 
   const dialogStyle = {
@@ -128,6 +223,11 @@ export default function RolesPage() {
     WebkitBackdropFilter: 'blur(28px)',
     borderColor: 'rgba(255, 255, 255, 0.60)',
   };
+
+  // Policies not yet attached to this role (for the attach dropdown)
+  const attachablePolicies = (policiesData?.data ?? []).filter(
+    p => !(rolePolicies ?? []).some(rp => rp.id === p.id)
+  );
 
   return (
     <PortalLayout>
@@ -155,7 +255,7 @@ export default function RolesPage() {
                 className="pl-9 bg-black/5 border-transparent focus:bg-white"
               />
             </div>
-            
+
             <GlassCard tier={1} className="flex-1 overflow-y-auto p-2 space-y-1">
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
@@ -168,8 +268,8 @@ export default function RolesPage() {
                     onClick={() => setSelectedRoleId(role.id)}
                     className={cn(
                       'w-full flex items-center justify-between p-3 rounded-sm transition-all text-left group',
-                      selectedRole?.id === role.id 
-                        ? 'bg-accent/10 border border-accent/20' 
+                      selectedRole?.id === role.id
+                        ? 'bg-accent/10 border border-accent/20'
                         : 'border border-transparent hover:bg-black/5'
                     )}
                   >
@@ -219,19 +319,31 @@ export default function RolesPage() {
                     {selectedRole.isSystem ? (
                       <StatusBadge status="system">System Protected</StatusBadge>
                     ) : (
-                      <SentryButton
-                        variant="ghost"
-                        size="sm"
-                        className="h-8"
-                        onClick={() => setIsEditOpen(true)}
-                      >
-                        Edit Details
-                      </SentryButton>
+                      <>
+                        <SentryButton
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          onClick={() => setIsPermissionsOpen(true)}
+                        >
+                          <Settings2 className="w-3.5 h-3.5" />
+                          Permissions
+                        </SentryButton>
+                        <SentryButton
+                          variant="ghost"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => setIsEditOpen(true)}
+                        >
+                          Edit Details
+                        </SentryButton>
+                      </>
                     )}
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto pr-2 space-y-8 scrollbar-hide">
+                  {/* Granted Permissions */}
                   <section className="space-y-4">
                     <h3 className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 border-b border-border/50 pb-2">
                       Granted Permissions
@@ -248,7 +360,62 @@ export default function RolesPage() {
                     ) : (
                       <div className="flex items-start gap-2.5 p-3 rounded-sm bg-black/5 text-muted-foreground text-xs font-body">
                         <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                        <p>No explicit permissions assigned to this role. Users with this role will inherit base tenant access permissions.</p>
+                        <p>No explicit permissions assigned. Users with this role inherit base tenant access.</p>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Attached Policies */}
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                      <h3 className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60">
+                        Attached Policies
+                      </h3>
+                      {!selectedRole.isSystem && (
+                        <SentryButton
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-[10px] gap-1"
+                          onClick={() => setIsPoliciesAttachOpen(true)}
+                        >
+                          <Plus className="w-3 h-3" />
+                          Attach
+                        </SentryButton>
+                      )}
+                    </div>
+
+                    {rolePoliciesLoading ? (
+                      <SentrySkeleton className="h-10 w-full" />
+                    ) : rolePolicies && rolePolicies.length > 0 ? (
+                      <div className="space-y-2">
+                        {rolePolicies.map((policy) => (
+                          <div key={policy.id} className="flex items-center justify-between p-3 border border-border rounded-sm bg-black/5">
+                            <div className="flex items-center gap-2.5">
+                              <FileKey className="w-3.5 h-3.5 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-body font-medium">{policy.name}</p>
+                                <p className="text-[10px] text-muted-foreground capitalize">{policy.type}</p>
+                              </div>
+                            </div>
+                            {!selectedRole.isSystem && (
+                              <SentryButton
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDetachPolicy(policy)}
+                                isLoading={detachPolicy.isPending && detachPolicy.variables?.policyId === policy.id}
+                                title="Detach policy"
+                              >
+                                <Unlink2 className="w-3.5 h-3.5" />
+                              </SentryButton>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2.5 p-3 rounded-sm bg-black/5 text-muted-foreground text-xs font-body">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        <p>No IAM policies attached. Attach a managed policy to grant additional access.</p>
                       </div>
                     )}
                   </section>
@@ -284,7 +451,6 @@ export default function RolesPage() {
               Define a new workspace role. Permissions can be mapped after creation.
             </DialogDescription>
           </DialogHeader>
-
           <form onSubmit={handleCreateRole} className="space-y-6 py-2">
             <SentryInput
               label="Role Name"
@@ -293,29 +459,15 @@ export default function RolesPage() {
               onChange={(e) => setCreateName(e.target.value)}
               required
             />
-
             <SentryInput
               label="Description"
               placeholder="e.g. Manages subscription payments and billing history"
               value={createDescription}
               onChange={(e) => setCreateDescription(e.target.value)}
             />
-
             <DialogFooter className="pt-4 border-t border-border/50 gap-2">
-              <SentryButton
-                type="button"
-                variant="ghost"
-                onClick={() => setIsCreateOpen(false)}
-              >
-                Cancel
-              </SentryButton>
-              <SentryButton
-                type="submit"
-                variant="accent"
-                isLoading={createRole.isPending}
-              >
-                Create Role
-              </SentryButton>
+              <SentryButton type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</SentryButton>
+              <SentryButton type="submit" variant="accent" isLoading={createRole.isPending}>Create Role</SentryButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -330,7 +482,6 @@ export default function RolesPage() {
               Update the name and description of this custom role.
             </DialogDescription>
           </DialogHeader>
-
           <form onSubmit={handleUpdateRole} className="space-y-6 py-2">
             <SentryInput
               label="Role Name"
@@ -339,29 +490,15 @@ export default function RolesPage() {
               onChange={(e) => setEditName(e.target.value)}
               required
             />
-
             <SentryInput
               label="Description"
               placeholder="e.g. Manages subscription payments and billing history"
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
             />
-
             <DialogFooter className="pt-4 border-t border-border/50 gap-2">
-              <SentryButton
-                type="button"
-                variant="ghost"
-                onClick={() => setIsEditOpen(false)}
-              >
-                Cancel
-              </SentryButton>
-              <SentryButton
-                type="submit"
-                variant="accent"
-                isLoading={updateRole.isPending}
-              >
-                Save Changes
-              </SentryButton>
+              <SentryButton type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</SentryButton>
+              <SentryButton type="submit" variant="accent" isLoading={updateRole.isPending}>Save Changes</SentryButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -379,22 +516,120 @@ export default function RolesPage() {
               This action is permanent. Any users or policies assigned to <span className="font-semibold text-neutral-800">"{selectedRole?.name}"</span> will lose the associated permissions immediately.
             </DialogDescription>
           </DialogHeader>
+          <DialogFooter className="pt-4 border-t border-border/50 gap-2">
+            <SentryButton type="button" variant="ghost" onClick={() => setIsDeleteOpen(false)}>Cancel</SentryButton>
+            <SentryButton type="button" variant="destructive" onClick={handleDeleteRole} isLoading={deleteRole.isPending}>Confirm Delete</SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ASSIGN PERMISSIONS DIALOG */}
+      <Dialog open={isPermissionsOpen} onOpenChange={setIsPermissionsOpen}>
+        <DialogContent className="text-neutral-900 border max-w-2xl" style={dialogStyle}>
+          <DialogHeader>
+            <DialogTitle className="font-display font-semibold text-lg">Manage Permissions</DialogTitle>
+            <DialogDescription className="font-body text-sm text-neutral-600">
+              Select the permissions granted to the <span className="font-semibold text-neutral-800">{selectedRole?.name}</span> role.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 max-h-[60vh] overflow-y-auto space-y-6">
+            {permissionsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => <SentrySkeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : Object.entries(permissionsByResource).length === 0 ? (
+              <p className="text-sm font-body text-muted-foreground text-center py-4">No permissions found.</p>
+            ) : (
+              Object.entries(permissionsByResource).map(([resource, perms]) => (
+                <div key={resource}>
+                  <p className="text-[10px] font-display font-bold uppercase tracking-[0.1em] text-muted-foreground/60 mb-3">
+                    {resource}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {perms.map((perm) => (
+                      <label
+                        key={perm.id}
+                        className="flex items-start gap-3 p-3 rounded-sm border border-border bg-black/[0.02] hover:bg-black/5 cursor-pointer transition-colors"
+                      >
+                        <Checkbox
+                          id={`perm-${perm.id}`}
+                          checked={selectedPermissions.has(perm.name)}
+                          onCheckedChange={(checked) => togglePermission(perm.name, !!checked)}
+                          className="mt-0.5"
+                        />
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-body font-medium leading-none">{perm.name}</p>
+                          {perm.description && (
+                            <p className="text-[11px] font-body text-muted-foreground">{perm.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
 
           <DialogFooter className="pt-4 border-t border-border/50 gap-2">
+            <SentryButton type="button" variant="ghost" onClick={() => setIsPermissionsOpen(false)}>Cancel</SentryButton>
             <SentryButton
               type="button"
-              variant="ghost"
-              onClick={() => setIsDeleteOpen(false)}
+              variant="accent"
+              onClick={handleSavePermissions}
+              isLoading={assignPermissions.isPending || removePermissions.isPending}
             >
-              Cancel
+              Save Permissions
             </SentryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ATTACH POLICY DIALOG */}
+      <Dialog open={isPoliciesAttachOpen} onOpenChange={(o) => { if (!o) { setIsPoliciesAttachOpen(false); setAttachPolicyId(''); } }}>
+        <DialogContent className="text-neutral-900 border" style={dialogStyle}>
+          <DialogHeader>
+            <DialogTitle className="font-display font-semibold text-lg">Attach Policy</DialogTitle>
+            <DialogDescription className="font-body text-sm text-neutral-600">
+              Attach an IAM-style managed policy to <span className="font-semibold text-neutral-800">{selectedRole?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            {attachablePolicies.length === 0 ? (
+              <p className="text-sm font-body text-muted-foreground text-center py-4">
+                All available policies are already attached.
+              </p>
+            ) : (
+              <Select value={attachPolicyId} onValueChange={setAttachPolicyId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a policy..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {attachablePolicies.map((policy) => (
+                    <SelectItem key={policy.id} value={policy.id}>
+                      <div className="flex flex-col">
+                        <span>{policy.name}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{policy.type}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-border/50 gap-2">
+            <SentryButton type="button" variant="ghost" onClick={() => { setIsPoliciesAttachOpen(false); setAttachPolicyId(''); }}>Cancel</SentryButton>
             <SentryButton
               type="button"
-              variant="destructive"
-              onClick={handleDeleteRole}
-              isLoading={deleteRole.isPending}
+              variant="accent"
+              disabled={!attachPolicyId || attachablePolicies.length === 0}
+              onClick={handleAttachPolicy}
+              isLoading={attachPolicy.isPending}
             >
-              Confirm Delete
+              Attach Policy
             </SentryButton>
           </DialogFooter>
         </DialogContent>
@@ -402,4 +637,3 @@ export default function RolesPage() {
     </PortalLayout>
   );
 }
-

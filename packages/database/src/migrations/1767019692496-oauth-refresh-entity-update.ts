@@ -4,6 +4,7 @@ export class Sh1767019692496 implements MigrationInterface {
     name = 'Sh1767019692496'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ADD "session_id" uuid`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83"`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ALTER COLUMN "client_id" DROP NOT NULL`);
@@ -12,6 +13,7 @@ export class Sh1767019692496 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_153ccd844f940084b8f51018b1e"`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" DROP CONSTRAINT "FK_fb5c17c6a502c4e8bfe643edd83"`);
         await queryRunner.query(`ALTER TABLE "oauth_refresh_tokens" ALTER COLUMN "client_id" SET NOT NULL`);

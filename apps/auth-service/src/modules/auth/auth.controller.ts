@@ -156,12 +156,15 @@ export class AuthController {
       userAgent: userAgent || "unknown",
     });
 
-    if ('mfaRequired' in response) {
+    if (!('accessToken' in response)) {
       return response;
     }
 
     this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    return { user: response.user, tenantSlug: response.tenantSlug };
+    // Return access token in body so SDK clients can cache it in state.
+    // Bearer token auth requires the SDK to hold the token in memory;
+    // the httpOnly cookie provides fallback for server-side cookie auth.
+    return { user: response.user, tenantSlug: response.tenantSlug, accessToken: response.accessToken };
   }
 
   /**
@@ -283,7 +286,9 @@ export class AuthController {
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
     this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    return {};
+    // Return the access token in the body so SDK clients can cache it in memory.
+    // The httpOnly cookie is the authoritative token; this is a convenience copy.
+    return { accessToken: response.accessToken };
   }
 
   /**
@@ -658,7 +663,7 @@ export class AuthController {
   })
   async finishWebAuthnLogin(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
     @Body() dto: { email: string; response: Record<string, unknown>; sessionNonce: string },
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
@@ -674,8 +679,18 @@ export class AuthController {
       userAgent,
     });
 
+    if ('status' in result) {
+      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
+        httpOnly: true,
+        secure: process.env['NODE_ENV'] === 'production',
+        sameSite: 'strict',
+        path: '/mfa/enroll',
+        maxAge: 5 * 60 * 1000,
+      });
+      return res.json({ status: result.status });
+    }
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return { user: result.user, tenantSlug: result.tenantSlug };
+    return res.json({ user: result.user, tenantSlug: result.tenantSlug });
   }
 
   /**
@@ -704,21 +719,31 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "Authentication successful" })
   async verifyMagicLink(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
     @Body() dto: VerifyMagicLinkDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const { accessToken, refreshToken, tenantSlug } = await this.authService.verifyMagicLink(
+    const result = await this.authService.verifyMagicLink(
       tenantId,
       dto.token,
       ip,
       userAgent || "unknown",
     );
 
-    this.setAuthCookies(res, accessToken, refreshToken);
-    return { tenantSlug };
+    if ('status' in result) {
+      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
+        httpOnly: true,
+        secure: process.env['NODE_ENV'] === 'production',
+        sameSite: 'strict',
+        path: '/mfa/enroll',
+        maxAge: 5 * 60 * 1000,
+      });
+      return res.json({ status: result.status });
+    }
+    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    return res.json({ tenantSlug: result.tenantSlug });
   }
 
   /**

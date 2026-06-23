@@ -91,7 +91,7 @@ export interface ActivityEvent {
   ipAddress: string;
   location?: string;
   createdAt: string;
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "medium" | "warning" | "high" | "critical";
   resourceType?: string;
   resourceId?: string;
 }
@@ -288,4 +288,59 @@ export interface LdapConnection {
   lastSyncUsersCreated?: number;
   lastSyncUsersUpdated?: number;
   createdAt: string;
+}
+
+// ── RBAC: Permissions & Policies ────────────────────────────────────────────
+
+export interface Permission {
+  id: string;
+  tenantId: string;
+  name: string;
+  resource: string;
+  action: string;
+  description?: string;
+  scope: string;
+  isSystem: boolean;
+}
+
+export interface PolicyStatement {
+  Sid?: string;
+  Effect: 'Allow' | 'Deny';
+  Action: string | string[];
+  Resource: string | string[];
+  Condition?: Record<string, unknown>;
+}
+
+export interface PolicyDocument {
+  Version: string;
+  Statement: PolicyStatement[];
+}
+
+export interface Policy {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  document: PolicyDocument;
+  isSystem: boolean;
+  type: 'inline' | 'managed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserRoleAssignment {
+  id: string;
+  userId: string;
+  roleId: string;
+  role: Role;
+  assignedAt: string;
+  expiresAt?: string;
+  reason?: string;
+  isGuest: boolean;
+}
+
+export interface SimulateResult {
+  allowed: boolean;
+  reason: 'explicit_allow' | 'explicit_deny' | 'implicit_deny';
+  matchedPolicy?: string;
 }

@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Request,
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
@@ -63,6 +64,7 @@ export class AdminController {
   @Post("tenants")
   @ApiOperation({ summary: "Create a new tenant" })
   async createTenant(
+    @Request() req: { user?: { sub?: string } },
     @Body()
     body: {
       name: string;
@@ -70,9 +72,14 @@ export class AdminController {
       plan?: string;
       ownerEmail?: string;
       environment?: string;
+      useCurrentUserAsAdmin?: boolean;
+      migrateProfile?: boolean;
     },
   ) {
-    return this.adminService.createTenant(body);
+    return this.adminService.createTenant({
+      ...body,
+      currentUserId: body.useCurrentUserAsAdmin ? req.user?.sub : undefined,
+    });
   }
 
   @Patch("tenants/:id")

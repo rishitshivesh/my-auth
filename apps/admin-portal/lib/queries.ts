@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { withErrorHandler } from "./with-error-handler";
 import type {
@@ -23,6 +23,11 @@ import type {
   SamlServiceProvider,
   ScimToken,
   LdapConnection,
+  Permission,
+  Policy,
+  PolicyDocument,
+  UserRoleAssignment,
+  SimulateResult,
 } from "./types";
 
 function apiUrl(path: string): string {
@@ -416,7 +421,7 @@ export function useRotateClientSecret() {
   return useMutation<{ clientSecret: string }, Error, string>({
     mutationFn: withErrorHandler<[string], { clientSecret: string }>(
       async (id) => authClient.request({
-        url: apiUrl(`/oauth/clients/${id}/rotate`),
+        url: apiUrl(`/oauth/clients/${id}/rotate-secret`),
         method: "POST",
       }),
       { successMessage: "Client secret rotated successfully", showSuccessToast: true }
@@ -965,50 +970,371 @@ export function useExportUsersCsv(filters?: { search?: string; status?: string }
 
 // ── Server-side Audit Log ─────────────────────────────────────
 
-export function useAuditLogsFiltered(filters: {
+export interface AuditLogFilters {
   eventType?: string;
-  actor?: string;
   startDate?: string;
   endDate?: string;
   limit?: number;
-  cursor?: string;
-}) {
+}
+
+function buildAuditQs(filters: AuditLogFilters & { cursor?: string }): string {
   const qs = new URLSearchParams();
   if (filters.eventType) qs.set("eventType", filters.eventType);
-  if (filters.actor) qs.set("actor", filters.actor);
   if (filters.startDate) qs.set("startDate", filters.startDate);
   if (filters.endDate) qs.set("endDate", filters.endDate);
   qs.set("limit", String(filters.limit ?? 50));
   if (filters.cursor) qs.set("cursor", filters.cursor);
+  return qs.toString();
+}
 
+export function useAuditLogsFiltered(filters: AuditLogFilters & { cursor?: string }) {
   return useQuery<{ items: ActivityEvent[]; nextCursor: string | null; total: number }>({
     queryKey: ["audit", "filtered", filters],
     queryFn: withErrorHandler<[], { items: ActivityEvent[]; nextCursor: string | null; total: number }>(
       async () => authClient.request({
-        url: apiUrl(`/dashboard/tenant-activity?${qs.toString()}`),
+        url: apiUrl(`/audit?${buildAuditQs(filters)}`),
         method: "GET",
       })
     ),
   });
 }
 
-export function useExportAuditCsv() {
-  return useMutation<void, Error, { eventType?: string; actor?: string; startDate?: string; endDate?: string }>({
+const fetchAuditPage = withErrorHandler<
+  [AuditLogFilters & { cursor?: string }],
+  { items: ActivityEvent[]; nextCursor: string | null; total: number }
+>(
+  async (f) =>
+    authClient.request({
+      url: apiUrl(`/audit?${buildAuditQs(f)}`),
+      method: "GET",
+    }),
+);
+
+export function useAuditLogsInfinite(filters: AuditLogFilters) {
+  return useInfiniteQuery<
+    { items: ActivityEvent[]; nextCursor: string | null; total: number },
+    Error,
+    { pages: Array<{ items: ActivityEvent[]; nextCursor: string | null; total: number }> },
+    string[],
+    string | undefined
+  >({
+    queryKey: ["audit", "infinite", filters.eventType ?? "", filters.startDate ?? "", filters.endDate ?? ""],
+    queryFn: ({ pageParam }) => fetchAuditPage({ ...filters, cursor: pageParam }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    initialPageParam: undefined,
+  });
+}
+
+export function useExportAuditCsv(tenantSlug?: string) {
+  return useMutation<void, Error, AuditLogFilters>({
     mutationFn: async (filters) => {
-      const qs = new URLSearchParams();
-      if (filters.eventType) qs.set("eventType", filters.eventType);
-      if (filters.actor) qs.set("actor", filters.actor);
-      if (filters.startDate) qs.set("startDate", filters.startDate);
-      if (filters.endDate) qs.set("endDate", filters.endDate);
-      const start = filters.startDate ? filters.startDate.split("T")[0] : "all";
-      const end = filters.endDate ? filters.endDate.split("T")[0] : "time";
-      const url = `${authClient.getBaseURL()}/dashboard/tenant-activity/export?${qs.toString()}`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `audit-${start}-${end}.csv`;
+      const qs = buildAuditQs(filters);
+      const url = `${authClient.getBaseURL()}/audit/export?${qs}`;
+
+      // Use fetch (not bare <a href>) so we can inject auth headers — a bare
+      // navigation cannot send X-Tenant-Slug, which breaks local dev where
+      // tenant resolution falls back to the header instead of subdomain.
+      const accessToken = await authClient.getAccessToken();
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      if (tenantSlug) {
+        headers['X-Tenant-Slug'] = tenantSlug;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `audit-${tenantSlug ?? 'export'}-${dateStr}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
     },
+  });
+}
+
+// ── RBAC: Permissions ────────────────────────────────────────────
+
+export function usePermissions() {
+  return useQuery<Permission[]>({
+    queryKey: ['rbac', 'permissions'],
+    queryFn: withErrorHandler<[], Permission[]>(
+      async () => authClient.request({ url: apiUrl('/rbac/permissions'), method: 'GET' })
+    ),
+  });
+}
+
+export function useAssignPermissionsToRole() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string }, Error, { roleId: string; permissionNames: string[] }>({
+    mutationFn: withErrorHandler<[{ roleId: string; permissionNames: string[] }], { message: string }>(
+      async ({ roleId, permissionNames }) => authClient.request({
+        url: apiUrl(`/rbac/roles/${roleId}/permissions`),
+        method: 'POST',
+        body: { permissionNames },
+      }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenant', 'roles'] }),
+  });
+}
+
+export function useRemovePermissionsFromRole() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string }, Error, { roleId: string; permissionNames: string[] }>({
+    mutationFn: withErrorHandler<[{ roleId: string; permissionNames: string[] }], { message: string }>(
+      async ({ roleId, permissionNames }) => authClient.request({
+        url: apiUrl(`/rbac/roles/${roleId}/permissions`),
+        method: 'DELETE',
+        body: { permissionNames },
+      }),
+      { showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenant', 'roles'] }),
+  });
+}
+
+export function useRolePolicies(roleId: string) {
+  return useQuery<Policy[]>({
+    queryKey: ['rbac', 'roles', roleId, 'policies'],
+    queryFn: withErrorHandler<[], Policy[]>(
+      async () => authClient.request({ url: apiUrl(`/rbac/roles/${roleId}/policies`), method: 'GET' })
+    ),
+    enabled: !!roleId,
+  });
+}
+
+// ── RBAC: User Roles ────────────────────────────────────────────
+
+export function useUserRoles(userId: string) {
+  return useQuery<UserRoleAssignment[]>({
+    queryKey: ['rbac', 'users', userId, 'roles'],
+    queryFn: withErrorHandler<[], UserRoleAssignment[]>(
+      async () => authClient.request({ url: apiUrl(`/rbac/users/${userId}/roles`), method: 'GET' })
+    ),
+    enabled: !!userId,
+  });
+}
+
+export function useAssignRolesToUser() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string }, Error, { userId: string; roleNames: string[]; expiresAt?: string; reason?: string }>({
+    mutationFn: withErrorHandler<[{ userId: string; roleNames: string[]; expiresAt?: string; reason?: string }], { message: string }>(
+      async ({ userId, ...body }) => authClient.request({
+        url: apiUrl(`/rbac/users/${userId}/roles`),
+        method: 'POST',
+        body,
+      }),
+      { successMessage: 'Role assigned', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, { userId }) => qc.invalidateQueries({ queryKey: ['rbac', 'users', userId, 'roles'] }),
+  });
+}
+
+export function useRevokeRoleFromUser() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string }, Error, { userId: string; roleName: string }>({
+    mutationFn: withErrorHandler<[{ userId: string; roleName: string }], { message: string }>(
+      async ({ userId, roleName }) => authClient.request({
+        url: apiUrl(`/rbac/users/${userId}/roles/${roleName}`),
+        method: 'DELETE',
+      }),
+      { successMessage: 'Role revoked', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, { userId }) => qc.invalidateQueries({ queryKey: ['rbac', 'users', userId, 'roles'] }),
+  });
+}
+
+export function useUserEffectivePermissions(userId: string) {
+  return useQuery<Permission[]>({
+    queryKey: ['rbac', 'users', userId, 'permissions'],
+    queryFn: withErrorHandler<[], Permission[]>(
+      async () => authClient.request({ url: apiUrl(`/rbac/users/${userId}/permissions`), method: 'GET' })
+    ),
+    enabled: !!userId,
+  });
+}
+
+// ── RBAC: Policies ────────────────────────────────────────────
+
+export function usePolicies() {
+  return useQuery<{ data: Policy[]; total: number }>({
+    queryKey: ['rbac', 'policies'],
+    queryFn: withErrorHandler<[], { data: Policy[]; total: number }>(
+      async () => authClient.request({ url: apiUrl('/rbac/policies?limit=100'), method: 'GET' })
+    ),
+  });
+}
+
+export function useCreatePolicy() {
+  const qc = useQueryClient();
+  return useMutation<Policy, Error, { name: string; description?: string; document: PolicyDocument; type?: 'inline' | 'managed' }>({
+    mutationFn: withErrorHandler<[{ name: string; description?: string; document: PolicyDocument; type?: 'inline' | 'managed' }], Policy>(
+      async (body) => authClient.request({
+        url: apiUrl('/rbac/policies'),
+        method: 'POST',
+        body,
+      }),
+      { successMessage: 'Policy created', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rbac', 'policies'] }),
+  });
+}
+
+export function useUpdatePolicy() {
+  const qc = useQueryClient();
+  return useMutation<Policy, Error, { id: string; description?: string; document?: PolicyDocument }>({
+    mutationFn: withErrorHandler<[{ id: string; description?: string; document?: PolicyDocument }], Policy>(
+      async ({ id, ...body }) => authClient.request({
+        url: apiUrl(`/rbac/policies/${id}`),
+        method: 'PUT',
+        body,
+      }),
+      { successMessage: 'Policy updated', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rbac', 'policies'] }),
+  });
+}
+
+export function useDeletePolicy() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: withErrorHandler<[string], void>(
+      async (id) => authClient.request({
+        url: apiUrl(`/rbac/policies/${id}`),
+        method: 'DELETE',
+      }),
+      { successMessage: 'Policy deleted', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rbac', 'policies'] }),
+  });
+}
+
+export function useAttachPolicyToRole() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { roleId: string; policyId: string }>({
+    mutationFn: withErrorHandler<[{ roleId: string; policyId: string }], void>(
+      async ({ roleId, policyId }) => authClient.request({
+        url: apiUrl(`/rbac/roles/${roleId}/policies/${policyId}`),
+        method: 'POST',
+      }),
+      { successMessage: 'Policy attached', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, { roleId }) => qc.invalidateQueries({ queryKey: ['rbac', 'roles', roleId, 'policies'] }),
+  });
+}
+
+export function useDetachPolicyFromRole() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { roleId: string; policyId: string }>({
+    mutationFn: withErrorHandler<[{ roleId: string; policyId: string }], void>(
+      async ({ roleId, policyId }) => authClient.request({
+        url: apiUrl(`/rbac/roles/${roleId}/policies/${policyId}`),
+        method: 'DELETE',
+      }),
+      { successMessage: 'Policy detached', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, { roleId }) => qc.invalidateQueries({ queryKey: ['rbac', 'roles', roleId, 'policies'] }),
+  });
+}
+
+export function useSimulatePolicy() {
+  return useMutation<SimulateResult, Error, { userId: string; action: string; resource: string; ipAddress?: string; mfaVerified?: boolean }>({
+    mutationFn: withErrorHandler<[{ userId: string; action: string; resource: string; ipAddress?: string; mfaVerified?: boolean }], SimulateResult>(
+      async (body) => authClient.request({
+        url: apiUrl('/rbac/policies/simulate'),
+        method: 'POST',
+        body,
+      }),
+      { showErrorToast: true }
+    ),
+  });
+}
+
+// ── Admin: Per-User Sessions & Audit ────────────────────────────
+
+export interface AdminUserSession {
+  id: string;
+  deviceInfo: { browser?: string; os?: string; device?: string; type?: string };
+  location?: { city?: string; country?: string; timezone?: string };
+  ipAddress?: string;
+  lastActivityAt: Date;
+  createdAt: Date;
+  current: boolean;
+}
+
+export interface AdminSecurityEvent {
+  id: string;
+  eventType: string;
+  severity: string;
+  ipAddress?: string;
+  location?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export function useAdminUserSessions(userId: string, options?: { enabled?: boolean }) {
+  return useQuery<AdminUserSession[]>({
+    queryKey: ["admin", "users", userId, "sessions"],
+    queryFn: withErrorHandler<[], AdminUserSession[]>(
+      async () => authClient.request({
+        url: apiUrl(`/users/${userId}/sessions`),
+        method: "GET",
+      })
+    ),
+    select: (raw: unknown) => {
+      const arr = Array.isArray(raw) ? raw : [];
+      return (arr as Array<Record<string, unknown>>).map((s) => ({
+        id: s['id'] as string,
+        deviceInfo: (s['deviceInfo'] ?? {}) as AdminUserSession['deviceInfo'],
+        location: s['location'] as AdminUserSession['location'],
+        ipAddress: s['ipAddress'] as string | undefined,
+        lastActivityAt: new Date(((s['lastActivity'] ?? s['lastActivityAt']) as string)),
+        createdAt: new Date(s['createdAt'] as string),
+        current: Boolean(s['isCurrent'] ?? s['current']),
+      }));
+    },
+    enabled: !!userId && (options?.enabled ?? true),
+  });
+}
+
+export function useAdminRevokeUserSession() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { userId: string; sessionId: string }>({
+    mutationFn: withErrorHandler<[{ userId: string; sessionId: string }], void>(
+      async ({ userId, sessionId }) => authClient.request({
+        url: apiUrl(`/users/${userId}/sessions/${sessionId}`),
+        method: "DELETE",
+      }),
+      { successMessage: "Session revoked", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: (_, { userId }) => qc.invalidateQueries({ queryKey: ["admin", "users", userId, "sessions"] }),
+  });
+}
+
+export function useAdminUserAudit(userId: string, options?: { limit?: number; enabled?: boolean }) {
+  return useQuery<AdminSecurityEvent[]>({
+    queryKey: ["admin", "users", userId, "security-events"],
+    queryFn: withErrorHandler<[], AdminSecurityEvent[]>(
+      async () => authClient.request({
+        url: apiUrl(`/users/${userId}/security-events?limit=${options?.limit ?? 50}`),
+        method: "GET",
+      })
+    ),
+    enabled: !!userId && (options?.enabled ?? true),
   });
 }

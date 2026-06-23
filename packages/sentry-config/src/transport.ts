@@ -162,13 +162,24 @@ export class SentryAxiosTransport {
   scheduleProactiveRefresh(expiresAt: number): void {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     const msUntilRefresh = expiresAt * 1000 - Date.now() - 60_000;
+
+    const doRefresh = () => {
+      // Use the same serialized lock as the 401 interceptor.
+      // Without this, a proactive refresh racing a 401 interceptor refresh
+      // causes two parallel token exchanges → token family revocation → auth loop.
+      if (!this.refreshPromise) {
+        this.refreshPromise = this.executeRefresh().finally(() => {
+          this.refreshPromise = null;
+        });
+      }
+      this.refreshPromise.catch(() => this.onSessionExpired?.());
+    };
+
     if (msUntilRefresh <= 0) {
-      this.executeRefresh().catch(() => this.onSessionExpired?.());
+      doRefresh();
       return;
     }
-    this.refreshTimer = setTimeout(() => {
-      this.executeRefresh().catch(() => this.onSessionExpired?.());
-    }, msUntilRefresh);
+    this.refreshTimer = setTimeout(doRefresh, msUntilRefresh);
   }
 
   clearRefreshTimer(): void {

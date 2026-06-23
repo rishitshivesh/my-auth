@@ -223,3 +223,66 @@ Every session must append an entry at its start and update it at completion.
 - Leaked credential (plaintext Supabase connection string in list-users.js)
 **Outcome:** completed
 **Action required:** Rotate Supabase database password (plaintext connection string was in deleted list-users.js)
+
+## Session: 2026-06-22 — Claude Sonnet 4.6 (Sprint 4 — Close the Gaps)
+**Prompt:** Implement docs/sprints/sprint-4.md — 6 parallel tracks, close all P0 backlog items
+**Files touched:** See `docs/logs/sprint-4.md` for complete file list
+**Work done:**
+- Track 1: permissions.catalog.ts (single source of truth); system-roles.ts (Owner/Admin/Member IAM policies); @RequirePermissions on all controllers (webhook, ldap, scim, saml, user, oauth, dashboard); resource variable substitution in policy engine; gitignore cleanup
+- Track 2: Serialized refresh lock (one refresh in flight, concurrent 401s queue); proactive token refresh 60s before expiry; RefreshTokenRepository migration (no more raw SQL in OAuthRefreshTokenService); GET /api/user/workspaces endpoint; tenant registration inserts into user_tenant_memberships; React Query never retries 401/403
+- Track 3: 4-step MFA enroll wizard (CodeInput + factor-select + totp-setup + backup-codes + success) all shadcn; /u/mfa redirects to /u/login; TenantMfaPolicy entity + MfaPolicyService + enforcement check in auth.service.ts; MFA policy UI section in settings (RadioGroup)
+- Track 4: User detail danger zone wired (Suspend/Restore/ForceReset/ResetMFA/Delete) with shadcn AlertDialog/Dialog; permissions trace tab added; audit page server-side filters (Select, debounced Input, date range, filter pills, cursor pagination, CSV export)
+- Track 5: useUserWorkspaces hook; TenantSwitcher verified wired; tenantLogo prop rendered on login form; SSR branding Server Component; /onboarding/create-tenant redirect; user_tenant_memberships migration
+- Track 6: MFA policy endpoints in tenant controller (GET/PUT); StatsService + StatsController (dashboard, login-activity); verify-schema-isolation.ts script; TenantMfaPolicy exported from database package
+- Mid-sprint correction: replaced hand-rolled SimpleModal with shadcn Dialog; rule enforced across all track prompts
+**Outcome:** completed
+**Full log:** docs/logs/sprint-4.md
+
+## Session: 2026-06-22 — Gemini 3.5 Flash (Medium)
+**Prompt:** Verify if the webauthn credential created was stored in the public schema and if that is correct.
+**Files touched:** docs/agent-sessions.md
+**Work done:**
+- Researched WebAuthn credentials storage schema location.
+**Outcome:** completed
+
+## Session: 2026-06-22 — Gemini (Antigravity)
+**Prompt:** Fix schema isolation issue: prevent tenant-specific database tables (like WebAuthn credentials, etc.) from being created in the public schema. Ensure that they are only created in tenant schemas. Update migrations to use the template schema. Reset and verify database.
+**Files touched:** TBD
+**Work done:**
+- Resuming session to execute the schema isolation fix.
+**Outcome:** completed
+
+## Session: 2026-06-22 — Gemini (Antigravity)
+**Prompt:** and ensure on db:reset, a list of all schemas that are being reset, public and fk_tenants are shown and confirmed.
+**Files touched:** packages/database/src/data-source.ts, apps/auth-service/src/modules/tenant/tenant-registration.service.ts, apps/auth-service/src/modules/admin/admin.service.ts, apps/auth-service/src/database/db-reset.ts, docs/agent-sessions.md
+**Work done:**
+- Removed `schema: "public"` from `AppDataSource` configuration to prevent TypeORM prefixing all queries with `"public"`.
+- Wrapped database writes inside self-service tenant registration with `TenantContextService` to scope queries to the new tenant's schema.
+- Configured platform routes startup check (`isInitialized` / `createFirstAdmin`) to execute inside the platform tenant schema using a dedicated query runner and graceful error handling.
+- Enhanced `db-reset.ts` to output warning lists of all target schemas (`public`, `template`, and `fk_*`) and prompt user for confirmation, with a Supabase-safe fallback if drop schema is restricted.
+- Successfully verified layout and schema separation.
+**Outcome:** completed
+
+## Session: 2026-06-23 — Gemini (Antigravity)
+**Prompt:** Fix database seeding/reset error constraint "fk_security_events_tenant_id" already exists, and fix login update query "relation users does not exist" error due to connection pool search path reset.
+**Files touched:** apps/auth-service/src/core/tenant/tenant-schema.service.ts, apps/auth-service/src/database/seeders/tenants.seed.ts, apps/auth-service/src/core/database/tenant-context.service.ts, apps/auth-service/src/core/database/database.module.ts, docs/agent-sessions.md
+**Work done:**
+- Fixed duplicate foreign key constraint rows by qualifying the join in `fkQuery` with `AND ccu.constraint_schema = tc.table_schema`.
+- Added an idempotency check that queries existing constraints in the target tenant schema and skips adding them if they are already present.
+- Exported the global `tenantStorage` `AsyncLocalStorage` instance from `tenant-context.service.ts` so it can be imported inside the database configuration factory.
+- Moved the `getRepository` Proxy interceptor in `database.module.ts` from `onModuleInit` to a custom `dataSourceFactory` handler inside `TypeOrmModule.forRootAsync`. This resolves NestJS DI timing issues and ensures all injected repositories are proxied at bootstrap time, preventing connection pool search_path leaks.
+- Deleted the temporary `check_fkeys.js` and `check_tables.js` diagnostic scripts.
+- Verified compilation and layout checks successfully.
+**Outcome:** completed
+
+## Session: 2026-06-23 — Gemini (Antigravity)
+**Prompt:** Fix database connection pool transaction abort errors, CorsRefreshService global queries, and frontend layout hydration warning.
+**Files touched:** apps/admin-portal/app/layout.tsx, apps/auth-service/src/common/midllewares/tenant-schema.middleware.ts, apps/auth-service/src/core/cors-refresh.service.ts, docs/agent-sessions.md
+**Work done:**
+- Added suppressHydrationWarning to body tag in RootLayout.
+- Implemented a once-only guard for cleanup() in TenantSchemaMiddleware and called it directly on middleware failure, preventing aborted transactions from polluting the database connection pool.
+- Updated CorsRefreshService to dynamically scan all tenant schemas fk_* for client origins rather than querying a non-existent global oauth_clients table in the public schema.
+**Outcome:** completed
+
+
+

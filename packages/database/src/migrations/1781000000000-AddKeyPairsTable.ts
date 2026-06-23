@@ -4,6 +4,7 @@ export class AddKeyPairsTable1781000000000 implements MigrationInterface {
   name = "AddKeyPairsTable1781000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO public, extensions`);
     await queryRunner.query(`
       CREATE TABLE "key_pairs" (
         "id"                    UUID          NOT NULL DEFAULT gen_random_uuid(),
@@ -32,6 +33,7 @@ export class AddKeyPairsTable1781000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO public, extensions`);
     await queryRunner.query(`DROP TABLE IF EXISTS "key_pairs";`);
   }
 }

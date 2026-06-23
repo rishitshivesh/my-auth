@@ -6,6 +6,18 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { Observable } from "rxjs";
 
+interface AuthenticatedUser {
+  userId: string;
+  // These fields come from JWT payload claims and may be absent on malformed tokens.
+  // The guard validates their presence before allowing the request through.
+  tenantId: string | undefined;
+  tenantSlug: string | undefined;
+  email: string | undefined;
+  roles: string[];
+  groups: string[];
+  isSuperAdmin: boolean;
+}
+
 /**
  * JWT Authentication Guard
  *
@@ -13,15 +25,16 @@ import { Observable } from "rxjs";
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
-  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+  handleRequest<TUser = any>(err: unknown, user: unknown, info: unknown, context: ExecutionContext, status?: unknown): TUser {
     if (err || !user) {
       throw err || new UnauthorizedException("Invalid or expired token");
     }
 
     const req = context.switchToHttp().getRequest();
+    const authedUser = user as AuthenticatedUser;
 
     // 1️⃣ Tenant binding
-    const tokenTenant = user.tenantId;
+    const tokenTenant = authedUser.tenantId;
     const requestTenant = req.tenant?.id;
 
     if (!tokenTenant || !requestTenant) {
@@ -32,8 +45,6 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       throw new UnauthorizedException("Cross-tenant token");
     }
 
-    console.log({ user }, 'User in Jwt Auth Guard')
-
-    return user;
+    return authedUser as unknown as TUser;
   }
 }

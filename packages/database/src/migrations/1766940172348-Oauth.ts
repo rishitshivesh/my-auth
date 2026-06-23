@@ -4,6 +4,7 @@ export class Oauth1766940172348 implements MigrationInterface {
     name = 'Oauth1766940172348'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
         await queryRunner.query(`CREATE TABLE "oauth_authorization_codes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "tenant_id" uuid NOT NULL, "client_id" uuid NOT NULL, "user_id" uuid NOT NULL, "code_hash" character varying(255) NOT NULL, "code_challenge" character varying(255), "code_challenge_method" character varying(10), "redirect_uri" character varying(500) NOT NULL, "scope" text, "state" character varying(500), "nonce" character varying(255), "used_at" TIMESTAMP WITH TIME ZONE, "expires_at" TIMESTAMP WITH TIME ZONE NOT NULL, "ip_address" inet, "user_agent" text, CONSTRAINT "UQ_25c7c7a7cdc5a6eb88200c472ca" UNIQUE ("code_hash"), CONSTRAINT "PK_441350d3fce3606534fbb2c1197" PRIMARY KEY ("id")); COMMENT ON COLUMN "oauth_authorization_codes"."code_hash" IS 'SHA-256 hash of authorization code'; COMMENT ON COLUMN "oauth_authorization_codes"."code_challenge" IS 'PKCE code challenge'; COMMENT ON COLUMN "oauth_authorization_codes"."code_challenge_method" IS 'PKCE challenge method: S256 or plain'; COMMENT ON COLUMN "oauth_authorization_codes"."redirect_uri" IS 'Redirect URI used in authorization request'; COMMENT ON COLUMN "oauth_authorization_codes"."scope" IS 'Requested scopes (space-separated)'; COMMENT ON COLUMN "oauth_authorization_codes"."state" IS 'OAuth2 state parameter for CSRF protection'; COMMENT ON COLUMN "oauth_authorization_codes"."nonce" IS 'OIDC nonce parameter for replay protection'; COMMENT ON COLUMN "oauth_authorization_codes"."used_at" IS 'When this code was exchanged for tokens'; COMMENT ON COLUMN "oauth_authorization_codes"."expires_at" IS 'When this code expires (typically 10 minutes)'; COMMENT ON COLUMN "oauth_authorization_codes"."ip_address" IS 'IP address of authorization request'; COMMENT ON COLUMN "oauth_authorization_codes"."user_agent" IS 'User agent of authorization request'`);
         await queryRunner.query(`CREATE INDEX "IDX_932dd5cf0b72ed912513ca67cf" ON "oauth_authorization_codes" ("expires_at") `);
         await queryRunner.query(`CREATE INDEX "IDX_1b5d11edec13074db58972ed81" ON "oauth_authorization_codes" ("user_id") `);
@@ -62,6 +63,7 @@ export class Oauth1766940172348 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`SET search_path TO template, public, extensions;`);
         await queryRunner.query(`ALTER TABLE "oauth_clients" DROP CONSTRAINT "FK_74abff294e8ab96ed7e41c058c9"`);
         await queryRunner.query(`ALTER TABLE "oauth_consents" DROP CONSTRAINT "FK_6b1ce29d22e910f696a5713b2a6"`);
         await queryRunner.query(`ALTER TABLE "oauth_consents" DROP CONSTRAINT "FK_6ff84892918cd6fce5b535063fe"`);
@@ -78,44 +80,44 @@ export class Oauth1766940172348 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "oauth_authorization_codes" DROP CONSTRAINT "FK_1b5d11edec13074db58972ed81e"`);
         await queryRunner.query(`ALTER TABLE "oauth_authorization_codes" DROP CONSTRAINT "FK_85e243eecb2ac4428721a02da4e"`);
         await queryRunner.query(`ALTER TABLE "oauth_authorization_codes" DROP CONSTRAINT "FK_b7b0f12c45c2376f2d8e726abf0"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_96f49bea5a6d6e6d40d900d718"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_74abff294e8ab96ed7e41c058c"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_c5c4af500cc8bfc05500fff7f9"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_5e74824c4181cbea0805c8f873"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_4f489acb509241af187f2d60cc"`);
+        await queryRunner.query(`DROP INDEX "IDX_96f49bea5a6d6e6d40d900d718"`);
+        await queryRunner.query(`DROP INDEX "IDX_74abff294e8ab96ed7e41c058c"`);
+        await queryRunner.query(`DROP INDEX "IDX_c5c4af500cc8bfc05500fff7f9"`);
+        await queryRunner.query(`DROP INDEX "IDX_5e74824c4181cbea0805c8f873"`);
+        await queryRunner.query(`DROP INDEX "IDX_4f489acb509241af187f2d60cc"`);
         await queryRunner.query(`DROP TABLE "oauth_clients"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_58a6370b8f175f8cd835f37903"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_86f20c5aacfaa14d860b6a4ce7"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6ff84892918cd6fce5b535063f"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6b1ce29d22e910f696a5713b2a"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_2a07bb8ea69ea3c68b9a850785"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_ceaf54a7cd9c0c596de0646336"`);
+        await queryRunner.query(`DROP INDEX "IDX_58a6370b8f175f8cd835f37903"`);
+        await queryRunner.query(`DROP INDEX "IDX_86f20c5aacfaa14d860b6a4ce7"`);
+        await queryRunner.query(`DROP INDEX "IDX_6ff84892918cd6fce5b535063f"`);
+        await queryRunner.query(`DROP INDEX "IDX_6b1ce29d22e910f696a5713b2a"`);
+        await queryRunner.query(`DROP INDEX "IDX_2a07bb8ea69ea3c68b9a850785"`);
+        await queryRunner.query(`DROP INDEX "IDX_ceaf54a7cd9c0c596de0646336"`);
         await queryRunner.query(`DROP TABLE "oauth_consents"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6d005803abd4c08562280c44d3"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_5de7b850ff54c783dbf64ec16c"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_e670f36d6278d3f45fce07dbc2"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_fb5c17c6a502c4e8bfe643edd8"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_a7f0966fdf948cf9045ab88d47"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_f88e2e36d2bd85e52a09452396"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_b754af84df65485777e79aab81"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_596ea59c3b0b60f25368207a65"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_77d6f7ec73f826cb2fda0164da"`);
+        await queryRunner.query(`DROP INDEX "IDX_6d005803abd4c08562280c44d3"`);
+        await queryRunner.query(`DROP INDEX "IDX_5de7b850ff54c783dbf64ec16c"`);
+        await queryRunner.query(`DROP INDEX "IDX_e670f36d6278d3f45fce07dbc2"`);
+        await queryRunner.query(`DROP INDEX "IDX_fb5c17c6a502c4e8bfe643edd8"`);
+        await queryRunner.query(`DROP INDEX "IDX_a7f0966fdf948cf9045ab88d47"`);
+        await queryRunner.query(`DROP INDEX "IDX_f88e2e36d2bd85e52a09452396"`);
+        await queryRunner.query(`DROP INDEX "IDX_b754af84df65485777e79aab81"`);
+        await queryRunner.query(`DROP INDEX "IDX_596ea59c3b0b60f25368207a65"`);
+        await queryRunner.query(`DROP INDEX "IDX_77d6f7ec73f826cb2fda0164da"`);
         await queryRunner.query(`DROP TABLE "oauth_refresh_tokens"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d0e547a90dcf664c520cddf53f"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_10d46be2817d1fcd6ece4095ab"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_d6f0aa7f931d7e6d62c530c56b"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_2219941593702bb35b2422f980"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_2a145d311b29be597ff9612311"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_881050b1dc49811e474914c1a4"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_44ec42c816eb02e5eb2789607c"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_17c732dd692a4fe7cb6de7010f"`);
+        await queryRunner.query(`DROP INDEX "IDX_d0e547a90dcf664c520cddf53f"`);
+        await queryRunner.query(`DROP INDEX "IDX_10d46be2817d1fcd6ece4095ab"`);
+        await queryRunner.query(`DROP INDEX "IDX_d6f0aa7f931d7e6d62c530c56b"`);
+        await queryRunner.query(`DROP INDEX "IDX_2219941593702bb35b2422f980"`);
+        await queryRunner.query(`DROP INDEX "IDX_2a145d311b29be597ff9612311"`);
+        await queryRunner.query(`DROP INDEX "IDX_881050b1dc49811e474914c1a4"`);
+        await queryRunner.query(`DROP INDEX "IDX_44ec42c816eb02e5eb2789607c"`);
+        await queryRunner.query(`DROP INDEX "IDX_17c732dd692a4fe7cb6de7010f"`);
         await queryRunner.query(`DROP TABLE "oauth_access_tokens"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_6f85cc44bcce8f335f236eb0bd"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_b7b0f12c45c2376f2d8e726abf"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_25c7c7a7cdc5a6eb88200c472c"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_85e243eecb2ac4428721a02da4"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_1b5d11edec13074db58972ed81"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_932dd5cf0b72ed912513ca67cf"`);
+        await queryRunner.query(`DROP INDEX "IDX_6f85cc44bcce8f335f236eb0bd"`);
+        await queryRunner.query(`DROP INDEX "IDX_b7b0f12c45c2376f2d8e726abf"`);
+        await queryRunner.query(`DROP INDEX "IDX_25c7c7a7cdc5a6eb88200c472c"`);
+        await queryRunner.query(`DROP INDEX "IDX_85e243eecb2ac4428721a02da4"`);
+        await queryRunner.query(`DROP INDEX "IDX_1b5d11edec13074db58972ed81"`);
+        await queryRunner.query(`DROP INDEX "IDX_932dd5cf0b72ed912513ca67cf"`);
         await queryRunner.query(`DROP TABLE "oauth_authorization_codes"`);
     }
 

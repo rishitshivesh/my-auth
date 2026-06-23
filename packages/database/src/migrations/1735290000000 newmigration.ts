@@ -13,6 +13,7 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  */
 export class CompleteMultiTenant1735400000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     console.log("🚀 Starting Complete Multi-Tenant Migration...");
 
     // ============================================
@@ -398,6 +399,7 @@ export class CompleteMultiTenant1735400000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     console.log("⏪ Reverting Complete Multi-Tenant Migration...");
 
     // Revert in reverse order

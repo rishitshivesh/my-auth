@@ -4,6 +4,7 @@ export class AddIAMPolicyTables1781500000000 implements MigrationInterface {
   name = "AddIAMPolicyTables1781500000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     // Policies table
     await queryRunner.query(`
       CREATE TABLE "policies" (
@@ -123,6 +124,7 @@ export class AddIAMPolicyTables1781500000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN IF EXISTS "permission_boundary_policy_id";`);
     await queryRunner.query(`DROP TABLE IF EXISTS "role_policies";`);
     await queryRunner.query(`DROP TABLE IF EXISTS "user_policies";`);

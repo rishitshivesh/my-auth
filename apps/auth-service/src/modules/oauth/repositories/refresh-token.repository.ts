@@ -41,7 +41,7 @@ export class RefreshTokenRepository extends TenantAwareRepository<OAuthRefreshTo
   findFamily(familyId: string, tenantId: string): Promise<OAuthRefreshToken[]> {
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     return this.find({
-      where: { familyId, tenantId } as Parameters<typeof this.find>[0]['where'],
+      where: { familyId, tenantId } as NonNullable<Parameters<typeof this.find>[0]>['where'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -89,7 +89,7 @@ export class RefreshTokenRepository extends TenantAwareRepository<OAuthRefreshTo
   findActiveForSession(sessionId: string, tenantId: string): Promise<OAuthRefreshToken[]> {
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     return this.find({
-      where: { sessionId, tenantId, revokedAt: IsNull() } as Parameters<typeof this.find>[0]['where'],
+      where: { sessionId, tenantId, revokedAt: IsNull() } as NonNullable<Parameters<typeof this.find>[0]>['where'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -97,7 +97,7 @@ export class RefreshTokenRepository extends TenantAwareRepository<OAuthRefreshTo
   findActiveForUser(userId: string, tenantId: string): Promise<OAuthRefreshToken[]> {
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     return this.find({
-      where: { userId, tenantId, revokedAt: IsNull() } as Parameters<typeof this.find>[0]['where'],
+      where: { userId, tenantId, revokedAt: IsNull() } as NonNullable<Parameters<typeof this.find>[0]>['where'],
       order: { createdAt: 'DESC' },
     });
   }

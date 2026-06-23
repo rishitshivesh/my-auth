@@ -9,6 +9,7 @@ import {
   SocialLinkRequest,
   Session,
   OAuthRefreshToken,
+  UserRole,
 } from "@repo/database";
 import { SocialAuthController } from "./social-auth.controller";
 import { SocialAuthService } from "./social-auth.service";
@@ -21,6 +22,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
 import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
+import { MfaModule } from "@/modules/mfa/mfa.module";
 
 @Module({
   imports: [
@@ -31,9 +33,11 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       SocialLinkRequest,
       Session,
       OAuthRefreshToken,
+      UserRole,
     ]),
     SecurityEventModule,
     OAuthModule,
+    MfaModule,
     JwtModule.register({}),
   ],
   controllers: [SocialAuthController],

@@ -25,13 +25,27 @@ export class TenantSchemaMiddleware implements NestMiddleware {
     const schemaName = this.tenantSchemaService.getSchemaName(slug);
     const qr = this.dataSource.createQueryRunner();
 
+    let cleanedUp = false;
     const cleanup = async () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      res.removeListener('finish', cleanup);
+      res.removeListener('close', cleanup);
+      try {
+        await qr.query('ROLLBACK');
+      } catch {
+        // ignore rollback errors
+      }
       try {
         await qr.query('SET search_path TO public');
       } catch {
         // ignore cleanup errors
       }
-      await qr.release();
+      try {
+        await qr.release();
+      } catch {
+        // ignore release errors
+      }
     };
 
     res.on('finish', cleanup);
@@ -51,9 +65,7 @@ export class TenantSchemaMiddleware implements NestMiddleware {
       this.tenantContext.run({ queryRunner: qr, schemaName }, () => next());
     } catch (error) {
       this.logger.error({ slug, error }, 'Failed to set tenant search_path');
-      await qr.release();
-      res.removeListener('finish', cleanup);
-      res.removeListener('close', cleanup);
+      await cleanup();
       res.status(503).json({ statusCode: 503, message: 'Tenant schema unavailable' });
     }
   }

@@ -13,15 +13,18 @@ import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import {
   TenantRegistrationService,
   RegisterTenantDto,
+  type TenantRegistrationResult,
 } from "./tenant-registration.service";
 import { Public } from "@/common/decorators/public.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
+import { RedisService } from "@/common/service/redis.service";
 
 @ApiTags("Tenant Registration")
 @Controller()
 export class TenantRegistrationController {
   constructor(
     private readonly tenantRegistrationService: TenantRegistrationService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -58,14 +61,26 @@ export class TenantRegistrationController {
   @ApiResponse({ status: 409, description: "Slug already taken" })
   @ApiResponse({ status: 400, description: "Validation error" })
   async registerTenant(
-    @Body() body: RegisterTenantDto,
+    @Body() dto: RegisterTenantDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
-  ) {
-    return this.tenantRegistrationService.registerTenant(
-      body,
+  ): Promise<TenantRegistrationResult> {
+    // Idempotency: if this key was already submitted within 10 minutes, return cached result
+    const idempotencyKey = `tenant-reg:idem:${dto.slug}:${dto.idempotencyKey}`;
+    const cached = await this.redisService.get<TenantRegistrationResult>('', '', idempotencyKey).catch(() => null);
+    if (cached) {
+      return cached;
+    }
+
+    const result = await this.tenantRegistrationService.registerTenant(
+      dto,
       ip ?? "0.0.0.0",
       userAgent ?? "unknown",
     );
+
+    // Cache the result for 10 minutes so duplicate submissions return the same result
+    await this.redisService.set('', '', idempotencyKey, result, 600).catch(() => {});
+
+    return result;
   }
 }

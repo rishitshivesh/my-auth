@@ -13,6 +13,7 @@ export class AddSessionSecurityFields1780000000000 implements MigrationInterface
   name = "AddSessionSecurityFields1780000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS template; SET search_path TO template, public, extensions;`);
     // New columns
     await queryRunner.query(`
       ALTER TABLE "sessions"
@@ -29,6 +30,7 @@ export class AddSessionSecurityFields1780000000000 implements MigrationInterface
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`SET search_path TO template, public, extensions;`);
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_sessions_expires_at_revoked_at"`,
     );

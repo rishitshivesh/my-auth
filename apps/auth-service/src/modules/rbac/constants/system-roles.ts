@@ -77,4 +77,4 @@ export const SystemRoles = {
       ],
     },
   },
-} as const;
+};

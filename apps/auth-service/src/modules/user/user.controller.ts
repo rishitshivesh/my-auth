@@ -25,6 +25,7 @@ import {
 import { PermissionsGuard } from "../rbac/guards/permissions.guard";
 import { UserService, ListUsersOptions } from "./user.service";
 import { OrgMembership } from "./user.repository";
+import { SessionManagementService } from "@/modules/session/session-management.service";
 import {
   UpdateUserDto,
   ChangePasswordDto,
@@ -51,7 +52,10 @@ interface AuthenticatedRequest {
 @Controller("users")
 @Protected()
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly sessionManagementService: SessionManagementService,
+  ) {}
 
   // ============================================================
   // CURRENT USER ENDPOINTS (Own Profile)
@@ -424,5 +428,59 @@ export class UserController {
   ) {
     const tenantId = req.tenantId!;
     return this.userService.inviteUser(tenantId, req.user.sub, dto);
+  }
+
+  /**
+   * List active sessions for a specific user (Admin only)
+   * Requires: users:read permission
+   */
+  @Get(":id/sessions")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
+  @ApiOperation({ summary: "List active sessions for a user (Admin)" })
+  @ApiResponse({ status: 200, description: "Sessions retrieved" })
+  async getUserSessions(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    const tenantId = req.tenantId!;
+    return this.sessionManagementService.getActiveSessions(id, tenantId);
+  }
+
+  /**
+   * Revoke a specific session for a user (Admin only)
+   * Requires: users:write permission
+   */
+  @Delete(":id/sessions/:sessionId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_WRITE)
+  @ApiOperation({ summary: "Revoke a session for a user (Admin)" })
+  @ApiResponse({ status: 204, description: "Session revoked" })
+  async revokeUserSession(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Param("sessionId") sessionId: string,
+  ) {
+    const tenantId = req.tenantId!;
+    await this.sessionManagementService.revokeSession(sessionId, id, tenantId, "admin_revoked");
+  }
+
+  /**
+   * Get security events for a specific user (Admin only)
+   * Requires: users:read permission
+   */
+  @Get(":id/security-events")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
+  @ApiOperation({ summary: "Get security event history for a user (Admin)" })
+  @ApiResponse({ status: 200, description: "Security events retrieved" })
+  async getUserSecurityEvents(
+    @Request() req: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Query("limit") limit: string = "50",
+  ) {
+    const tenantId = req.tenantId!;
+    return this.userService.getSecurityEvents(tenantId, id, parseInt(limit, 10));
   }
 }
