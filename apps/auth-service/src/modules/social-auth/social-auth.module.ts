@@ -23,6 +23,7 @@ import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
+import { DatabaseModule } from "@/core/database/database.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MfaModule } from "@/modules/mfa/mfa.module";
     SecurityEventModule,
     OAuthModule,
     MfaModule,
+    DatabaseModule,
     JwtModule.register({}),
   ],
   controllers: [SocialAuthController],

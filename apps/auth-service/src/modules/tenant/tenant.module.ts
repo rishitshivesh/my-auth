@@ -43,7 +43,6 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
       UserRole,
       OAuthRefreshToken,
       KeyPair,
-      SessionRepository,
       Policy,
       RolePolicy,
     ]),

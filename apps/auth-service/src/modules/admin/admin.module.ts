@@ -19,6 +19,7 @@ import { GuardsModule } from "@/common/guards/guards.module";
 import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { DatabaseModule } from "@/core/database/database.module";
 
 import { TenantModule } from "@/modules/tenant/tenant.module";
 
@@ -37,6 +38,7 @@ import { TenantModule } from "@/modules/tenant/tenant.module";
     JwtModule.register({}),
     GuardsModule,
     TenantModule,
+    DatabaseModule,
   ],
   controllers: [AdminController, SuperadminSetupController],
   providers: [
