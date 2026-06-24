@@ -8,7 +8,7 @@
  */
 import { DataSource } from 'typeorm';
 import { Role, Policy, RolePolicy, Tenant } from '@repo/database';
-import { SystemRoles } from '../../../src/modules/rbac/constants/system-roles';
+import { SystemRoles } from '@/modules/rbac/constants/system-roles';
 import { logger } from '@/common/logger';
 
 export async function seedSystemRoles(dataSource: DataSource): Promise<void> {

@@ -13,6 +13,9 @@ import { IsArray, IsOptional, IsString } from "class-validator";
 import { type Request } from "express";
 import { TenantService } from "./tenant.service";
 import { JwtAuthGuard } from "@/common/guards";
+import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
+import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
+import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 
 // DTO for creating tenant
 export class CreateTenantDto {
@@ -50,14 +53,18 @@ export class TenantController {
    * Get current tenant info
    */
   @Get("current")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   async getCurrent(@Req() req: Request) {
     return req.tenant;
   }
 
   /**
-   * Create new tenant (platform admin only - add RBAC later)
+   * Create new tenant (platform admin only)
    */
   @Post()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async create(@Body() dto: CreateTenantDto) {
     return this.tenantService.create(dto);
   }
@@ -66,6 +73,8 @@ export class TenantController {
    * Set custom domain for tenant
    */
   @Patch(":id/custom-domain")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async setCustomDomain(
     @Param("id") id: string,
     @Body() dto: SetCustomDomainDto,
@@ -74,9 +83,11 @@ export class TenantController {
   }
 
   /**
-   * Verify custom domain (would be called after DNS verification)
+   * Verify custom domain (called after DNS verification)
    */
   @Post(":id/verify-domain")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async verifyDomain(@Param("id") id: string) {
     return this.tenantService.verifyCustomDomain(id);
   }

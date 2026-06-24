@@ -73,6 +73,8 @@ export class DashboardController {
   }
 
   @Get("tenant-settings")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   @ApiOperation({ summary: "Get tenant login method settings" })
   async getTenantSettings(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
@@ -114,12 +116,16 @@ export class DashboardController {
   }
 
   @Get("tenant-metrics")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   @ApiOperation({ summary: "Get aggregate metrics for this tenant" })
   async getTenantMetrics(@Request() req: AuthenticatedRequest) {
     return this.dashboardService.getTenantMetrics(req.tenantId!);
   }
 
   @Get("tenant-activity")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.AUDIT_READ)
   @ApiOperation({ summary: "Get recent security events for this tenant" })
   async getTenantActivity(
     @Request() req: AuthenticatedRequest,
@@ -130,6 +136,8 @@ export class DashboardController {
   }
 
   @Get("api-call-trend")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   @ApiOperation({ summary: "Get daily API call counts for this tenant" })
   async getApiCallTrend(
     @Request() req: AuthenticatedRequest,
@@ -141,6 +149,8 @@ export class DashboardController {
   }
 
   @Get("auth-breakdown")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   @ApiOperation({ summary: "Get authentication method breakdown for this tenant" })
   async getAuthBreakdown(@Request() req: AuthenticatedRequest) {
     return this.dashboardService.getAuthMethodBreakdown(req.tenantId!);
