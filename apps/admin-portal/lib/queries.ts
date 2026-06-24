@@ -650,6 +650,36 @@ export function useUploadLogo() {
   });
 }
 
+// ─── Tenant MFA Policy ───────────────────────────────────────
+
+export interface TenantMfaPolicy {
+  id?: string;
+  enforceForAllUsers: boolean;
+  enforceForAdmins: boolean;
+  gracePeriodDays: number;
+  exemptRoleSlugs: string[];
+}
+
+export function useTenantMfaPolicy() {
+  return useQuery<TenantMfaPolicy>({
+    queryKey: ['tenant', 'mfa-policy'],
+    queryFn: withErrorHandler<[], TenantMfaPolicy>(
+      async () => authClient.request({ url: apiUrl('/tenant/mfa-policy'), method: 'GET' })
+    ),
+  });
+}
+
+export function useUpdateTenantMfaPolicy() {
+  const qc = useQueryClient();
+  return useMutation<TenantMfaPolicy, Error, TenantMfaPolicy>({
+    mutationFn: withErrorHandler<[TenantMfaPolicy], TenantMfaPolicy>(
+      async (body) => authClient.request({ url: apiUrl('/tenant/mfa-policy'), method: 'PATCH', body }),
+      { successMessage: 'MFA policy updated', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenant', 'mfa-policy'] }),
+  });
+}
+
 // ── Sprint 4: Webhooks ────────────────────────────────────────
 
 export function useWebhooks() {
