@@ -20,6 +20,7 @@ import type {
   AuthEvent,
   AuthEventListener,
   LoginIntentResponse,
+  PasskeyChallengeResponse,
 } from "./types";
 import { AuthError as AuthErrorClass } from "./types";
 import { createFetchTransport } from "./transport";
@@ -312,7 +313,7 @@ export class SentryClient {
    * Returns the raw server response which includes both WebAuthn options and
    * the opaque `sessionNonce` required by `finishPasskeyLogin`.
    */
-  async startPasskeyLogin(email: string): Promise<unknown> {
+  async startPasskeyLogin(email: string): Promise<PasskeyChallengeResponse> {
     const response = await this.request({
       url: `${this.config.baseURL}/auth/webauthn/login/start`,
       method: "POST",
@@ -323,7 +324,7 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    return response.data?.data || response.data;
+    return (response.data?.data || response.data) as PasskeyChallengeResponse;
   }
 
   /**

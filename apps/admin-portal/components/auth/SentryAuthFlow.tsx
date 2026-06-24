@@ -126,8 +126,10 @@ function PasskeySection({ email, onSuccess }: { email: string; onSuccess?: () =>
     try {
       const serverData = await startPasskeyLogin(email);
       const { sessionNonce, ...optionsJSON } = serverData;
-      const { startAuthentication } = await import('@simplewebauthn/browser');
-      const assertion = await startAuthentication({ optionsJSON });
+      const simplewebauthn = await import('@simplewebauthn/browser' as string) as {
+        startAuthentication: (opts: { optionsJSON: Record<string, unknown> }) => Promise<unknown>;
+      };
+      const assertion = await simplewebauthn.startAuthentication({ optionsJSON });
       await finishPasskeyLogin(email, assertion, sessionNonce);
       setStatus('success');
       onSuccess?.();

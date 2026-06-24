@@ -8,7 +8,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { SentryClient } from "../core/client";
-import type { User, LoginCredentials, LoginResponse, AuthEvent, LoginIntentResponse } from "../core/types";
+import type { User, LoginCredentials, LoginResponse, AuthEvent, LoginIntentResponse, PasskeyChallengeResponse } from "../core/types";
 
 // ============================================================
 // CONTEXT
@@ -38,7 +38,7 @@ interface AuthContextValue {
   claimSocialSession: (ct: string) => Promise<void>;
   sendMagicLink: (email: string) => Promise<void>;
   verifyMagicLink: (token: string) => Promise<void>;
-  startPasskeyLogin: (email: string) => Promise<unknown>;
+  startPasskeyLogin: (email: string) => Promise<PasskeyChallengeResponse>;
   finishPasskeyLogin: (email: string, assertion: unknown, sessionNonce: string) => Promise<void>;
   authenticateWithPasskey: (email: string) => Promise<void>;
 
@@ -271,7 +271,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const startPasskeyLogin = async (email: string): Promise<unknown> => {
+  const startPasskeyLogin = async (email: string): Promise<PasskeyChallengeResponse> => {
     try {
       setError(null);
       return await client.startPasskeyLogin(email);

@@ -133,12 +133,17 @@ export interface LoginIntentResponse {
     mfa: boolean;
     social: string[];
   };
-  preferredMethod: string[];
+  preferredMethod: "password" | "magicLink" | "passkey";
   branding: {
     logo: string;
     primaryColor: string;
     companyName: string;
   };
+}
+
+export interface PasskeyChallengeResponse {
+  sessionNonce: string;
+  [key: string]: unknown;
 }
 
 export interface MfaChallenge {
