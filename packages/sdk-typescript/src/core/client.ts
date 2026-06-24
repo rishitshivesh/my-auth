@@ -13,8 +13,10 @@ import type {
   AuthState,
   LoginCredentials,
   LoginResponse,
+  MfaChallenge,
   User,
   AuthError,
+  AuthErrorCode,
   AuthEvent,
   AuthEventListener,
   LoginIntentResponse,
@@ -80,19 +82,26 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    const data = response.data?.data;
+    const data = response.data?.data as LoginResponse & {
+      mfaRequired?: boolean;
+      tempToken?: string;
+      availableMethods?: MfaChallenge['methods'];
+      preferredMethod?: string;
+    };
 
     // Handle MFA challenge
     if (data.mfaRequired) {
       this.log("MFA required");
+      // Server returns a partial response when MFA is required (no token).
+      // We cast through unknown since the MFA challenge shape is a subset of LoginResponse.
       return {
         mfaRequired: true,
         mfaChallenge: {
-          tempToken: data.tempToken,
-          methods: data.availableMethods || [],
+          tempToken: data.tempToken ?? '',
+          methods: data.availableMethods ?? [],
           preferredMethod: data.preferredMethod,
         },
-      } as any;
+      } as unknown as LoginResponse;
     }
 
     // Set access token
@@ -303,7 +312,7 @@ export class SentryClient {
    * Returns the raw server response which includes both WebAuthn options and
    * the opaque `sessionNonce` required by `finishPasskeyLogin`.
    */
-  async startPasskeyLogin(email: string): Promise<any> {
+  async startPasskeyLogin(email: string): Promise<unknown> {
     const response = await this.request({
       url: `${this.config.baseURL}/auth/webauthn/login/start`,
       method: "POST",
@@ -325,7 +334,7 @@ export class SentryClient {
    */
   async finishPasskeyLogin(
     email: string,
-    assertion: any,
+    assertion: unknown,
     sessionNonce: string,
   ): Promise<void> {
     const response = await this.request({
@@ -333,7 +342,7 @@ export class SentryClient {
       method: "POST",
       body: { email, response: assertion, sessionNonce },
       credentials: "include",
-    } as any);
+    });
 
     if (!response.ok) {
       throw this.createError(response);
@@ -372,24 +381,30 @@ export class SentryClient {
     }
 
     // Step 1: Get options + nonce from server
-    const serverData = await this.startPasskeyLogin(email);
+    const serverData = await this.startPasskeyLogin(email) as Record<string, unknown>;
     const { sessionNonce, ...optionsJSON } = serverData;
+    if (typeof sessionNonce !== 'string') {
+      throw new AuthErrorClass('UNKNOWN_ERROR', 'Missing sessionNonce in WebAuthn response');
+    }
 
     // Step 2: Invoke the browser's native WebAuthn API
-    let assertion: any;
+    let assertion: unknown;
     try {
-      const { startAuthentication } = await import(
-        "@simplewebauthn/browser" as any
-      );
-      assertion = await startAuthentication({ optionsJSON });
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
+      // @simplewebauthn/browser has its own opaque types; we import dynamically
+      // to keep this package browser-optional for SSR builds.
+      const simplewebauthn = await import('@simplewebauthn/browser' as string) as {
+        startAuthentication: (opts: { optionsJSON: unknown }) => Promise<unknown>;
+      };
+      assertion = await simplewebauthn.startAuthentication({ optionsJSON });
+    } catch (err: unknown) {
+      const e = err as { name?: string } | null;
+      if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
         throw new AuthErrorClass(
           "PASSKEY_AUTH_CANCELLED",
           "Passkey authentication was cancelled",
         );
       }
-      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
+      if (e?.name === "NotSupportedError" || e?.name === "SecurityError") {
         throw new AuthErrorClass(
           "PASSKEY_NOT_SUPPORTED",
           "This browser or device does not support passkeys",
@@ -416,7 +431,7 @@ export class SentryClient {
    * Throws `AuthError` with code `PASSKEY_REGISTRATION_CANCELLED` if the
    * user dismisses the prompt or if the browser API is unavailable.
    */
-  async startPasskeyRegistration(): Promise<any> {
+  async startPasskeyRegistration(): Promise<unknown> {
     if (typeof window === "undefined") {
       throw new AuthErrorClass(
         "PASSKEY_NOT_SUPPORTED",
@@ -434,18 +449,19 @@ export class SentryClient {
 
     // Step 2: Invoke the browser's native WebAuthn API
     try {
-      const { startRegistration } = await import(
-        "@simplewebauthn/browser" as any
-      );
-      return await startRegistration({ optionsJSON });
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
+      const simplewebauthn = await import('@simplewebauthn/browser' as string) as {
+        startRegistration: (opts: { optionsJSON: unknown }) => Promise<unknown>;
+      };
+      return await simplewebauthn.startRegistration({ optionsJSON });
+    } catch (err: unknown) {
+      const e = err as { name?: string } | null;
+      if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
         throw new AuthErrorClass(
           "PASSKEY_REGISTRATION_CANCELLED",
           "Passkey registration was cancelled",
         );
       }
-      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
+      if (e?.name === "NotSupportedError" || e?.name === "SecurityError") {
         throw new AuthErrorClass(
           "PASSKEY_REGISTRATION_CANCELLED",
           "This browser or device does not support passkeys",
@@ -457,7 +473,7 @@ export class SentryClient {
 
   /** Finish WebAuthn passkey registration — verifies and stores the credential */
   async finishPasskeyRegistration(
-    registrationResponse: any,
+    registrationResponse: unknown,
     deviceName?: string,
   ): Promise<{ credentialId: string }> {
     const response = await this.request({
@@ -670,7 +686,7 @@ export class SentryClient {
    * Parse the JWT payload from the current access token.
    * Returns null if no token is present.
    */
-  getTokenClaims(): Record<string, any> | null {
+  getTokenClaims(): Record<string, unknown> | null {
     if (!this.state.accessToken) return null;
     try {
       const payload = JSON.parse(
@@ -688,29 +704,31 @@ export class SentryClient {
   }
 
   getUserTenantId(): string | null {
-    return this.getTokenClaims()?.tenantId ?? null;
+    const v = this.getTokenClaims()?.['tenantId'];
+    return typeof v === 'string' ? v : null;
   }
 
   getUserTenantSlug(): string | null {
-    return this.getTokenClaims()?.tenantSlug ?? null;
+    const v = this.getTokenClaims()?.['tenantSlug'];
+    return typeof v === 'string' ? v : null;
   }
 
   isInGroup(groupName: string): boolean {
-    const groups: string[] | undefined = this.getTokenClaims()?.groups;
-    return Array.isArray(groups) && groups.includes(groupName);
+    const groups = this.getTokenClaims()?.['groups'];
+    return Array.isArray(groups) && (groups as string[]).includes(groupName);
   }
 
   isSentryInternal(): boolean {
     const sentryTenantId =
       typeof process !== "undefined"
-        ? (process.env as any)?.NEXT_PUBLIC_SENTRY_TENANT_ID ||
-          process.env.SENTRY_TENANT_ID
+        ? process.env['NEXT_PUBLIC_SENTRY_TENANT_ID'] ||
+          process.env['SENTRY_TENANT_ID']
         : undefined;
     const claims = this.getTokenClaims();
     if (!claims) return false;
     const tenantMatches = sentryTenantId
-      ? claims.tenantId === sentryTenantId
-      : claims.tenantSlug === "sentry";
+      ? claims['tenantId'] === sentryTenantId
+      : claims['tenantSlug'] === "sentry";
     return tenantMatches && this.isInGroup("sentry-internal");
   }
 
@@ -844,7 +862,7 @@ export class SentryClient {
    */
   private async refreshWithRetry(): Promise<void> {
     let attempt = 0;
-    let lastError: any;
+    let lastError: unknown;
 
     while (attempt < this.config.maxRefreshRetries) {
       try {
@@ -997,8 +1015,8 @@ export class SentryClient {
     this.listeners.forEach((listener) => {
       try {
         listener(event);
-      } catch (error) {
-        console.error("Error in auth event listener:", error);
+      } catch {
+        // Swallow listener errors — a broken subscriber must not crash the SDK
       }
     });
   }
@@ -1027,7 +1045,7 @@ export class SentryClient {
   /**
    * Map HTTP status to error code
    */
-  private statusToErrorCode(status: number): any {
+  private statusToErrorCode(status: number): AuthErrorCode {
     switch (status) {
       case 401:
         return "UNAUTHORIZED";

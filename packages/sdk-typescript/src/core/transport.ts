@@ -21,7 +21,7 @@ export function createFetchTransport(): Transport {
       });
 
       // Parse response body
-      let data: any;
+      let data: unknown;
       const contentType = response.headers.get('content-type');
 
       if (contentType?.includes('application/json')) {
