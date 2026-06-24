@@ -212,6 +212,18 @@ export class TenantService {
   }
 
   /**
+   * Update tenant display name
+   */
+  async updateName(tenantId: string, name: string): Promise<{ id: string; name: string }> {
+    const tenant = await this.getTenantById(tenantId);
+    if (!tenant) throw new Error('Tenant not found');
+    await this.tenantRepository.update({ id: tenantId }, { name });
+    // Bust slug cache so the updated name is reflected in future reads
+    await this.cacheManager.del(`tenant:slug:${tenant.slug}`).catch(() => undefined);
+    return { id: tenantId, name };
+  }
+
+  /**
    * Update tenant branding
    */
   async updateBranding(
