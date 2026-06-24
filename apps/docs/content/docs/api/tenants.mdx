@@ -22,9 +22,21 @@ Content-Type: application/json
   "slug": "acme",
   "adminName": "Ada Lovelace",
   "adminEmail": "admin@acme.com",
-  "adminPassword": "StrongPass123!"
+  "adminPassword": "StrongPass123!",
+  "idempotencyKey": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+**Body fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `workspaceName` | string | ✓ | Display name for the workspace |
+| `slug` | string | ✓ | URL-safe workspace identifier (4–63 chars, lowercase alphanumeric + hyphens) |
+| `adminName` | string | ✓ | Full name of the initial owner account |
+| `adminEmail` | string | ✓ | Email address of the initial owner account |
+| `adminPassword` | string | ✓ | Password for the initial owner (must satisfy the default password policy) |
+| `idempotencyKey` | string | ✓ | Client-generated UUID. If the same key is submitted twice within 10 minutes, the second request returns the original result without creating a duplicate workspace. Generate with `crypto.randomUUID()`. |
 
 **Response `201`:**
 
@@ -41,7 +53,7 @@ Content-Type: application/json
 }
 ```
 
-**Errors:** `409` slug taken · `400` invalid slug (reserved word, too short, invalid chars) · `429` rate limited (3/hour/IP)
+**Errors:** `409` slug taken · `400` invalid slug (reserved word, too short, invalid chars) · `429` rate limited (3/hour/IP) · `500` provisioning failed (schema or role seeding error — safe to retry with the same `idempotencyKey`)
 
 Slug rules: 4–63 characters, lowercase letters/numbers/hyphens only, no reserved words (`sentry`, `www`, `api`, `admin`, etc.)
 

@@ -1,0 +1,79 @@
+---
+title: Audit API
+description: Query audit events and export audit logs with server-side filtering.
+---
+
+# Audit API
+
+The audit log records every security-relevant action taken within a tenant workspace.
+All endpoints require the `AUDIT_READ` or `AUDIT_EXPORT` permission.
+
+---
+
+## GET /audit
+
+List audit events with server-side filtering and cursor-based pagination.
+
+**Headers:** `Authorization: Bearer <token>` · `x-tenant-id: <slug>`
+
+**Required permission:** `audit:read`
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `userId` | string | Filter by the actor who performed the action |
+| `eventType` | string | Filter by event type (e.g. `user.login`, `role.assigned`) |
+| `startDate` | ISO 8601 | Return events on or after this timestamp |
+| `endDate` | ISO 8601 | Return events on or before this timestamp |
+| `cursor` | string | Pagination cursor from the previous response |
+| `limit` | number | Events per page (1–200, default 50) |
+
+**Response `200`:**
+
+```json
+{
+  "events": [
+    {
+      "id": "uuid",
+      "eventType": "user.login",
+      "actorId": "user-uuid",
+      "actorEmail": "admin@acme.com",
+      "targetId": "user-uuid",
+      "targetType": "user",
+      "ipAddress": "1.2.3.4",
+      "userAgent": "Mozilla/5.0 ...",
+      "metadata": {},
+      "createdAt": "2024-06-01T12:00:00.000Z"
+    }
+  ],
+  "nextCursor": "cursor-opaque-string",
+  "total": 142
+}
+```
+
+`nextCursor` is `null` when there are no more pages.
+
+---
+
+## GET /audit/export
+
+Download audit events as a CSV file.
+
+**Headers:** `Authorization: Bearer <token>` · `x-tenant-id: <slug>`
+
+**Required permission:** `audit:export`
+
+**Query parameters:** Same as `GET /audit` (all optional).
+
+**Response `200`:**
+
+- `Content-Type: text/csv`
+- `Content-Disposition: attachment; filename="audit-{timestamp}.csv"`
+
+CSV columns: `id`, `eventType`, `actorId`, `actorEmail`, `targetId`, `targetType`,
+`ipAddress`, `userAgent`, `createdAt`.
+
+All values are sanitized to prevent CSV formula injection (cells beginning with `=`, `+`, `-`, or `@` are prefixed with a tab character).
+
+**Errors:** `403` insufficient permission · `401` unauthenticated

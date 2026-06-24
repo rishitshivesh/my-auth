@@ -183,6 +183,41 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Build platform-level (non-tenant-scoped) key.
+   * Format: sentry:platform:{identifier}
+   */
+  private buildPlatformKey(identifier: string): string {
+    return `${this.keyPrefix}platform:${identifier}`;
+  }
+
+  /** Set a platform-level value (not tenant-scoped). */
+  async setPlatform(
+    identifier: string,
+    value: unknown,
+    ttl?: number,
+  ): Promise<void> {
+    const key = this.buildPlatformKey(identifier);
+    const serialized = JSON.stringify(value);
+    if (ttl) {
+      await this.client.setex(key, ttl, serialized);
+    } else {
+      await this.client.set(key, serialized);
+    }
+  }
+
+  /** Get a platform-level value (not tenant-scoped). */
+  async getPlatform<T>(identifier: string): Promise<T | null> {
+    const key = this.buildPlatformKey(identifier);
+    const value = await this.client.get(key);
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return value as unknown as T;
+    }
+  }
+
+  /**
    * Read multiple daily api_call counters for a tenant.
    * Returns counts in the same order as the provided dates array.
    */

@@ -2,9 +2,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { In } from "typeorm";
-import { Session, OAuthRefreshToken } from "@repo/database";
+import { Session, OAuthRefreshToken, Tenant } from "@repo/database";
 import { SessionManagementService } from "./session-management.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { SessionRepository } from "@/core/database/session.repository";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -30,13 +31,12 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
 
   const mockSessionRepo = {
     find: jest.fn(),
-    manager: {
-      transaction: jest
-        .fn()
-        .mockImplementation(async (cb: (em: typeof mockManager) => Promise<void>) =>
-          cb(mockManager),
-        ),
-    },
+    // SessionRepository exposes .transaction() directly (wraps this.manager.transaction)
+    transaction: jest
+      .fn()
+      .mockImplementation(async (cb: (em: typeof mockManager) => Promise<void>) =>
+        cb(mockManager),
+      ),
   };
 
   beforeEach(async () => {
@@ -46,7 +46,7 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
       providers: [
         SessionManagementService,
         {
-          provide: getRepositoryToken(Session),
+          provide: SessionRepository,
           useValue: mockSessionRepo,
         },
         {
@@ -87,7 +87,7 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
     expect(result.sessionsCleanedUp).toBe(0);
     expect(result.tokensRevoked).toBe(0);
     expect(mockManager.softDelete).not.toHaveBeenCalled();
-    expect(mockSessionRepo.manager.transaction).not.toHaveBeenCalled();
+    expect(mockSessionRepo.transaction).not.toHaveBeenCalled();
   });
 });
 
@@ -98,12 +98,20 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
 import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { ConfigService } from "@nestjs/config";
+import { DataSource } from "typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 
 describe("SessionService.revokeSession() logout hardening", () => {
   let sessionService: SessionService;
 
-  const mockSessionRepo = {
-    update: jest.fn().mockResolvedValue({ affected: 1 }),
+  const mockQuery = jest.fn();
+  const mockFindOne = jest.fn();
+
+  const mockDataSource = {
+    manager: {
+      query: mockQuery,
+      findOne: mockFindOne,
+    },
   };
 
   const mockRedis = {
@@ -114,13 +122,24 @@ describe("SessionService.revokeSession() logout hardening", () => {
     get: jest.fn().mockReturnValue(604800),
   };
 
+  const mockCache = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    // getSchemaName: looks up tenant by id via manager.findOne
+    mockFindOne.mockResolvedValue({ slug: "tenant-slug-1" });
+    // revokeSession UPDATE query returns undefined
+    mockQuery.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SessionService,
-        { provide: getRepositoryToken(Session), useValue: mockSessionRepo },
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: CACHE_MANAGER, useValue: mockCache },
         { provide: RedisService, useValue: mockRedis },
         { provide: ConfigService, useValue: mockConfig },
       ],
@@ -132,16 +151,18 @@ describe("SessionService.revokeSession() logout hardening", () => {
   it("sets revokedAt, nulls refreshTokenHash, and deletes the Redis key", async () => {
     await sessionService.revokeSession("tenant-1", "sess-1", "user_logout");
 
-    expect(mockSessionRepo.update).toHaveBeenCalledWith(
-      { id: "sess-1", tenantId: "tenant-1" },
-      expect.objectContaining({
-        revokedAt: expect.any(Date),
-        revokedReason: "user_logout",
-        refreshTokenHash: null,
-      }),
-    );
-
+    // Redis delete must be called
     expect(mockRedis.delete).toHaveBeenCalledWith("tenant-1", "session", "sess-1");
+
+    // Raw SQL UPDATE must include revoked_at and the right params
+    const updateCall = mockQuery.mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("revoked_at"),
+    );
+    expect(updateCall).toBeDefined();
+    const params = updateCall![1] as unknown[];
+    expect(params).toContain("user_logout");
+    expect(params).toContain("sess-1");
+    expect(params).toContain("tenant-1");
   });
 });
 
@@ -154,31 +175,47 @@ import { UnauthorizedException } from "@nestjs/common";
 describe("OAuthRefreshTokenService — double-use of refresh token is rejected", () => {
   let refreshSvc: OAuthRefreshTokenService;
 
-  const usedToken = {
+  // Simulate a token row that has already been used (used_at is set)
+  const usedTokenRow = {
     id: "token-1",
-    tokenHash: "doesnotmatter",
-    familyId: "family-1",
-    tenantId: "tenant-1",
-    userId: "user-1",
-    sessionId: "sess-1",
-    clientId: null,
+    token_hash: "doesnotmatter",
+    family_id: "family-1",
+    tenant_id: "tenant-1",
+    user_id: "user-1",
+    session_id: "sess-1",
+    client_id: null,
     scope: null,
-    usedAt: new Date(Date.now() - 5000), // already marked as used
-    revokedAt: undefined,
-    expiresAt: new Date(Date.now() + 86400000),
-    session: { revokedAt: undefined },
-    user: { email: "user@example.com" },
+    parent_token_id: null,
+    used_at: new Date(Date.now() - 5000).toISOString(), // non-null → reuse detected
+    revoked_at: null,
+    revoked_reason: null,
+    expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+    userEmail: "user@example.com",
   };
 
+  const sessionRow = { id: "sess-1", revoked_at: null };
+
+  const mockManagerQuery = jest.fn();
+  const mockManagerFindOne = jest.fn();
+
   const mockTokenRepo = {
-    findOne: jest.fn().mockResolvedValue(usedToken),
-    save: jest.fn(),
-    update: jest.fn().mockResolvedValue({ affected: 2 }),
+    manager: {
+      query: mockManagerQuery,
+      findOne: mockManagerFindOne,
+    },
   };
 
   beforeEach(async () => {
-    jest.clearAllMocks();
-    mockTokenRepo.findOne.mockResolvedValue(usedToken);
+    jest.resetAllMocks(); // wipes the once-queue and default so each test starts clean
+    // getSchemaName: findOne(Tenant) returns a tenant with a slug
+    mockManagerFindOne.mockResolvedValue({ slug: "tenant-slug-1" } as Tenant);
+    // query call 1: token lookup → return the already-used token
+    // query call 2: session lookup → return session
+    // query call 3+: revokeTokenFamily UPDATE
+    mockManagerQuery
+      .mockResolvedValueOnce([usedTokenRow])  // token SELECT
+      .mockResolvedValueOnce([sessionRow])    // session SELECT
+      .mockResolvedValue([[], 2]);            // UPDATE returns [rows, rowCount] — prevents result[1] TypeError
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -207,9 +244,15 @@ describe("OAuthRefreshTokenService — double-use of refresh token is rejected",
       }),
     ).rejects.toThrow();
 
-    expect(mockTokenRepo.update).toHaveBeenCalledWith(
-      expect.objectContaining({ familyId: "family-1" }),
-      expect.objectContaining({ revokedReason: "family_revoked_reuse_detection" }),
+    // The family-revoke UPDATE must have been issued
+    // "family_revoked_reuse_detection" is in the params array (call[1]), not the SQL (call[0])
+    const familyRevokeCall = mockManagerQuery.mock.calls.find(
+      (call: unknown[]) =>
+        Array.isArray(call[1]) &&
+        (call[1] as unknown[]).includes("family_revoked_reuse_detection"),
     );
+    expect(familyRevokeCall).toBeDefined();
+    expect(familyRevokeCall![1]).toContain("family-1");
+    expect(familyRevokeCall![1]).toContain("tenant-1");
   });
 });

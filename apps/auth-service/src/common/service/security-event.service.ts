@@ -88,7 +88,10 @@ export class SecurityEventService {
       return {};
     }
 
-    const SENSITIVE = /password|secret|token|hash|key|credential|private/i;
+    // Match only when the sensitive word is the LAST component of the key name
+    // (suffix or exact match, case-insensitive). This preserves keys like
+    // "tokenExpiry" or "hashAlgorithm" that are not themselves sensitive values.
+    const SENSITIVE = /(?:password|secret|tokens?|hash|keys?|credentials?|private)$/i;
     const result: Record<string, unknown> = {};
 
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {

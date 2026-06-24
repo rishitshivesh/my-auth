@@ -67,7 +67,7 @@ export class TenantRegistrationController {
   ): Promise<TenantRegistrationResult> {
     // Idempotency: if this key was already submitted within 10 minutes, return cached result
     const idempotencyKey = `tenant-reg:idem:${dto.slug}:${dto.idempotencyKey}`;
-    const cached = await this.redisService.get<TenantRegistrationResult>('', '', idempotencyKey).catch(() => null);
+    const cached = await this.redisService.getPlatform<TenantRegistrationResult>(idempotencyKey).catch(() => null);
     if (cached) {
       return cached;
     }
@@ -79,7 +79,7 @@ export class TenantRegistrationController {
     );
 
     // Cache the result for 10 minutes so duplicate submissions return the same result
-    await this.redisService.set('', '', idempotencyKey, result, 600).catch(() => {});
+    await this.redisService.setPlatform(idempotencyKey, result, 600).catch(() => {});
 
     return result;
   }
