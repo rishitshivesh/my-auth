@@ -277,6 +277,56 @@ describe('PolicyEvaluationService', () => {
     });
   });
 
+  describe('resource variable substitution', () => {
+    it('resource variable ${sentry:UserId} substituted correctly', async () => {
+      const svc = Object.create(PolicyEvaluationService.prototype);
+      // Policy allows access only to the user's own resource
+      const policies = [
+        {
+          name: 'SelfAccessPolicy',
+          document: {
+            Version: '2024-01-01',
+            Statement: [
+              {
+                Sid: 'AllowSelfRead',
+                Effect: 'Allow' as const,
+                Action: 'users:read',
+                // Resource uses ${sentry:UserId} variable — should be substituted with the actual userId
+                Resource: 'sentry:tenant:t1:user:${sentry:UserId}',
+              },
+            ],
+          },
+        },
+      ];
+      svc.collectPolicies = async () => policies;
+      svc.checkPermissionBoundary = async () => null;
+
+      const context = { ipAddress: '10.0.0.1', mfaVerified: true };
+
+      // Accessing own resource — should be allowed (${sentry:UserId} → 'alice')
+      const allowed = await svc.evaluate({
+        userId: 'alice',
+        tenantId: 't1',
+        action: 'users:read',
+        resource: 'sentry:tenant:t1:user:alice',
+        context,
+      });
+      expect(allowed.allowed).toBe(true);
+      expect(allowed.reason).toBe('explicit_allow');
+
+      // Accessing another user's resource — should be denied (substituted resource won't match 'bob')
+      const denied = await svc.evaluate({
+        userId: 'alice',
+        tenantId: 't1',
+        action: 'users:read',
+        resource: 'sentry:tenant:t1:user:bob',
+        context,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.reason).toBe('implicit_deny');
+    });
+  });
+
   describe('simulate', () => {
     it('should return trace of all evaluated statements', async () => {
       const svc = Object.create(PolicyEvaluationService.prototype);

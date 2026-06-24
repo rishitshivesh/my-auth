@@ -19,6 +19,7 @@ import {
   PayloadTooLargeException,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantBrandingService } from './tenant-branding.service';
@@ -30,6 +31,9 @@ import {
 } from './dto/tenant-branding.dto';
 import { SecurityEventService } from '@/common/service/security-event.service';
 import { SecurityEventType } from '@repo/database';
+import { PermissionsGuard } from '@/modules/rbac/guards/permissions.guard';
+import { RequirePermissions } from '@/modules/rbac/decorators/rbac.decorator';
+import { Permissions } from '@/modules/rbac/constants/permissions.catalog';
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -53,6 +57,8 @@ export class TenantBrandingController {
 
   /** GET /tenants/current/branding */
   @Get()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_READ)
   async getBranding(@Req() req: AuthenticatedRequest): Promise<BrandingResponse> {
     const tenantId: string = req.tenantId!;
     return this.brandingService.getBranding(tenantId);
@@ -60,6 +66,8 @@ export class TenantBrandingController {
 
   /** PUT /tenants/current/branding */
   @Put()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async updateBranding(
     @Req() req: AuthenticatedRequest,
     @Body() dto: TenantBrandingDto,
@@ -92,6 +100,8 @@ export class TenantBrandingController {
 
   /** POST /tenants/current/branding/logo */
   @Post('logo')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   @UseInterceptors(
     FileInterceptor('logo', {
       limits: { fileSize: LOGO_MAX_BYTES },
