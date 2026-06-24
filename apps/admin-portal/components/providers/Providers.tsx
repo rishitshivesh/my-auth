@@ -6,6 +6,7 @@ import { SentryProvider } from '@scrolloop/sdk';
 import { AdminProvider } from '@scrolloop/admin-client';
 import { ThemeProvider } from '@repo/ui';
 import { authClient } from '@/lib/auth-client';
+import { SentryAPIError } from '@scrolloop/sentry-config';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -14,9 +15,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30_000,
-            retry: 1,
+            retry: (failureCount, error) => {
+              // Never retry 401/403 — these are auth failures, not transient errors.
+              // Retrying would trigger multiple refresh attempts and could
+              // revoke the token family via reuse detection.
+              if (
+                error instanceof SentryAPIError &&
+                (error.isUnauthorized || error.isForbidden)
+              ) {
+                return false;
+              }
+              return failureCount < 1;
+            },
             refetchOnWindowFocus: false,
           },
+          mutations: { retry: false },
         },
       }),
   );

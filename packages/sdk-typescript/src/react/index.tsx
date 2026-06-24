@@ -8,7 +8,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { SentryClient } from "../core/client";
-import type { User, LoginCredentials, LoginResponse, AuthEvent } from "../core/types";
+import type { User, LoginCredentials, LoginResponse, AuthEvent, LoginIntentResponse } from "../core/types";
 
 // ============================================================
 // CONTEXT
@@ -23,7 +23,7 @@ interface AuthContextValue {
 
   // Actions
   login: (credentials: LoginCredentials) => Promise<LoginResponse>;
-  loginIntent: (params: { email: string }) => Promise<any>;
+  loginIntent: (params: { email: string }) => Promise<LoginIntentResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -38,18 +38,18 @@ interface AuthContextValue {
   claimSocialSession: (ct: string) => Promise<void>;
   sendMagicLink: (email: string) => Promise<void>;
   verifyMagicLink: (token: string) => Promise<void>;
-  startPasskeyLogin: (email: string) => Promise<any>;
-  finishPasskeyLogin: (email: string, assertion: any, sessionNonce: string) => Promise<void>;
+  startPasskeyLogin: (email: string) => Promise<unknown>;
+  finishPasskeyLogin: (email: string, assertion: unknown, sessionNonce: string) => Promise<void>;
   authenticateWithPasskey: (email: string) => Promise<void>;
 
   // Passkey management
-  startPasskeyRegistration: () => Promise<any>;
-  finishPasskeyRegistration: (response: any, deviceName?: string) => Promise<{ credentialId: string }>;
-  listPasskeys: () => Promise<any[]>;
+  startPasskeyRegistration: () => Promise<unknown>;
+  finishPasskeyRegistration: (response: unknown, deviceName?: string) => Promise<{ credentialId: string }>;
+  listPasskeys: () => Promise<unknown[]>;
   deletePasskey: (credentialId: string) => Promise<void>;
 
   // Social account linking
-  getSocialConnections: () => Promise<any[]>;
+  getSocialConnections: () => Promise<unknown[]>;
   unlinkSocialAccount: (provider: string) => Promise<void>;
   initiateSocialLinking: (provider: string) => Promise<void>;
 
@@ -57,7 +57,7 @@ interface AuthContextValue {
   client: SentryClient;
 }
 
-const AuthContext = createContext<AuthContextValue>(undefined as any);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 // ============================================================
 // PROVIDER
@@ -271,7 +271,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const startPasskeyLogin = async (email: string): Promise<any> => {
+  const startPasskeyLogin = async (email: string): Promise<unknown> => {
     try {
       setError(null);
       return await client.startPasskeyLogin(email);
@@ -281,7 +281,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const finishPasskeyLogin = async (email: string, assertion: any, sessionNonce: string): Promise<void> => {
+  const finishPasskeyLogin = async (email: string, assertion: unknown, sessionNonce: string): Promise<void> => {
     try {
       setError(null);
       setIsLoading(true);
@@ -311,7 +311,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const startPasskeyRegistration = async (): Promise<any> => {
+  const startPasskeyRegistration = async (): Promise<unknown> => {
     try {
       setError(null);
       return await client.startPasskeyRegistration();
@@ -322,7 +322,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
   };
 
   const finishPasskeyRegistration = async (
-    registrationResponse: any,
+    registrationResponse: unknown,
     deviceName?: string,
   ): Promise<{ credentialId: string }> => {
     try {
@@ -334,7 +334,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const listPasskeys = async (): Promise<any[]> => {
+  const listPasskeys = async (): Promise<unknown[]> => {
     try {
       setError(null);
       return await client.listPasskeys();
@@ -354,7 +354,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const getSocialConnections = async (): Promise<any[]> => {
+  const getSocialConnections = async (): Promise<unknown[]> => {
     try {
       setError(null);
       return await client.getSocialConnections();
@@ -431,7 +431,7 @@ export function useAuth(): AuthContextValue {
     throw new Error("useAuth must be used within SentryProvider");
   }
 
-  return context as AuthContextValue;
+  return context;
 }
 
 /**
