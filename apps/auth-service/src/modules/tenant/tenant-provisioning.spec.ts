@@ -16,6 +16,8 @@ const mockTenantRepo = () => ({
 const mockSchemaService = () => ({
   createSchema: jest.fn(),
   getSchemaName: jest.fn().mockReturnValue('fk_test'),
+  isVerifiedAndReady: jest.fn().mockResolvedValue(true),
+  markVerified: jest.fn(),
 });
 
 const mockCacheManager = () => ({
@@ -45,7 +47,6 @@ describe('TenantService.create (M-006)', () => {
     service = module.get<TenantService>(TenantService);
   });
 
-  // T-001: schema creation failure must rollback tenant row
   it('T-001: rolls back tenant row when schema creation fails', async () => {
     const savedTenant = { id: 'tenant-1', slug: 'acme', active: true } as Tenant;
     tenantRepo.create.mockReturnValue(savedTenant);
@@ -57,12 +58,10 @@ describe('TenantService.create (M-006)', () => {
       service.create({ slug: 'acme', name: 'Acme Corp' }),
     ).rejects.toThrow(InternalServerErrorException);
 
-    // Tenant row must be deleted
     expect(tenantRepo.delete).toHaveBeenCalledWith('tenant-1');
   });
 
   it('T-001b: response is safe error message, not internal error detail', async () => {
-    expect.assertions(3);
     const savedTenant = { id: 'tenant-1', slug: 'acme', active: true } as Tenant;
     tenantRepo.create.mockReturnValue(savedTenant);
     tenantRepo.save.mockResolvedValue(savedTenant);
@@ -77,5 +76,17 @@ describe('TenantService.create (M-006)', () => {
       expect(body.message).toBe('Workspace provisioning failed. Please try again.');
       expect(body.message).not.toContain('disk full');
     }
+  });
+
+  it('T-001c: successful schema creation does not delete tenant', async () => {
+    const savedTenant = { id: 'tenant-2', slug: 'beta', active: true } as Tenant;
+    tenantRepo.create.mockReturnValue(savedTenant);
+    tenantRepo.save.mockResolvedValue(savedTenant);
+    schemaService.createSchema.mockResolvedValue(undefined);
+
+    const result = await service.create({ slug: 'beta', name: 'Beta Corp' });
+
+    expect(result).toBe(savedTenant);
+    expect(tenantRepo.delete).not.toHaveBeenCalled();
   });
 });
