@@ -1,8 +1,8 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, LessThan, In } from "typeorm";
+import { IsNull, LessThan, In } from "typeorm";
 import { Session, OAuthRefreshToken } from "@repo/database";
 import { SessionRepository } from "@/core/database/session.repository";
+import { RefreshTokenRepository } from "@/modules/oauth/repositories/refresh-token.repository";
 import * as geoip from "geoip-lite";
 import { UAParser } from "ua-parser-js";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
@@ -46,8 +46,7 @@ export class SessionManagementService {
 
   constructor(
     private readonly sessionRepository: SessionRepository,
-    @InjectRepository(OAuthRefreshToken)
-    private readonly refreshTokenRepository: Repository<OAuthRefreshToken>,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
   ) {}
 
