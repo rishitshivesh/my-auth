@@ -6,6 +6,8 @@ import { GlassCard, PageHeader, SentryButton, SentryInput, SentrySkeleton } from
 import {
   useTenantSettings,
   useUpdateTenantSettings,
+  useUpdateTenantName,
+  useCurrentTenant,
   useUpdateSocialProvider,
   useBranding,
   useUpdateBranding,
@@ -32,7 +34,14 @@ export default function SettingsPage() {
 
   const { data: settings, isLoading: settingsLoading } = useTenantSettings();
   const { mutate: updateSettings, isPending: settingsSaving } = useUpdateTenantSettings();
+  const { mutate: updateTenantName, isPending: nameSaving } = useUpdateTenantName();
+  const { data: currentTenant } = useCurrentTenant();
   const { mutate: updateSocialProvider, isPending: socialSaving } = useUpdateSocialProvider();
+
+  const [workspaceName, setWorkspaceName] = React.useState('');
+  React.useEffect(() => {
+    if (currentTenant?.name) setWorkspaceName(currentTenant.name);
+  }, [currentTenant]);
 
   const { data: branding, isLoading: brandingLoading } = useBranding();
   const { mutate: updateBranding, isPending: brandingSaving } = useUpdateBranding();
@@ -128,6 +137,26 @@ export default function SettingsPage() {
           {activeTab === 'general' && (
             <div className="space-y-6">
               <GlassCard tier={1} className="p-8 space-y-6">
+                <div className="flex items-end justify-between gap-4">
+                  <SentryInput
+                    label="Workspace Name"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    placeholder="Acme Corp"
+                    className="flex-1"
+                  />
+                  <SentryButton
+                    variant="accent"
+                    size="sm"
+                    isLoading={nameSaving}
+                    disabled={!workspaceName.trim() || workspaceName.trim() === currentTenant?.name}
+                    onClick={() => updateTenantName(workspaceName.trim())}
+                    className="shrink-0 mb-0.5"
+                  >
+                    <Save className="w-3.5 h-3.5 mr-2" />
+                    Save
+                  </SentryButton>
+                </div>
                 <SentryInput
                   label="Workspace Slug"
                   value={slug}

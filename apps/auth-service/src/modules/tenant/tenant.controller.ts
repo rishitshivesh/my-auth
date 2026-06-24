@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Req,
+  ForbiddenException,
 } from "@nestjs/common";
 import { IsArray, IsOptional, IsString } from "class-validator";
 import { type Request } from "express";
@@ -37,6 +38,11 @@ export class UpdateTenantDto {
   allowedOrigins?: string[];
 }
 
+export class UpdateTenantNameDto {
+  @IsString()
+  name!: string;
+}
+
 export class SetCustomDomainDto {
   domain!: string;
 }
@@ -52,6 +58,24 @@ export class TenantController {
   @Get("current")
   async getCurrent(@Req() req: Request) {
     return req.tenant;
+  }
+
+  /**
+   * Update current tenant display name
+   * PATCH /tenants/current/name
+   */
+  @Patch("current/name")
+  async updateCurrentName(
+    @Req() req: Request,
+    @Body() dto: UpdateTenantNameDto,
+  ) {
+    const tenantId = req.tenantId;
+    if (!tenantId) throw new ForbiddenException("No tenant context");
+    const trimmed = dto.name?.trim();
+    if (!trimmed || trimmed.length < 1) {
+      throw new ForbiddenException("Name cannot be empty");
+    }
+    return this.tenantService.updateName(tenantId, trimmed);
   }
 
   /**
