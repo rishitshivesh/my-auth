@@ -24,6 +24,7 @@ import {
   useDeleteTenantUser,
   useSendEmailToUser,
   useTenantRoles,
+  useExportUsersCsv,
 } from '@/lib/queries';
 import type { UserListItem } from '@/lib/types';
 import { useParams, useRouter } from 'next/navigation';
@@ -36,7 +37,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@repo/ui/components/ui/dropdown-menu';
-import { authClient } from '@/lib/auth-client';
 
 export default function UsersListPage() {
   const params = useParams();
@@ -63,6 +63,7 @@ export default function UsersListPage() {
   const deleteUser = useDeleteTenantUser();
   const sendEmail = useSendEmailToUser();
   const { data: roles } = useTenantRoles();
+  const exportCsv = useExportUsersCsv({ search: search || undefined, status: status !== 'all' ? status : undefined });
 
   const { data, isLoading } = useTenantUsers({ search: search || undefined, status });
 
@@ -183,16 +184,11 @@ export default function UsersListPage() {
             <SentryButton
               variant="ghost"
               className="h-[42px] gap-2"
-              onClick={() => {
-                const url = `${authClient.getBaseURL()}/api/admin/users/export?search=${search}&status=${status}`;
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `users-${new Date().toISOString().split('T')[0]}.csv`;
-                a.click();
-              }}
+              onClick={() => exportCsv.mutate()}
+              disabled={exportCsv.isPending}
             >
               <Download className="w-4 h-4" />
-              Export CSV
+              {exportCsv.isPending ? 'Exporting…' : 'Export CSV'}
             </SentryButton>
           </div>
         </div>
