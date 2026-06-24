@@ -6,6 +6,7 @@ import { Session, OAuthRefreshToken, Tenant } from "@repo/database";
 import { SessionManagementService } from "./session-management.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { SessionRepository } from "@/core/database/session.repository";
+import { RefreshTokenRepository } from "@/modules/oauth/repositories/refresh-token.repository";
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -50,7 +51,7 @@ describe("SessionManagementService.cleanupExpiredSessions()", () => {
           useValue: mockSessionRepo,
         },
         {
-          provide: getRepositoryToken(OAuthRefreshToken),
+          provide: RefreshTokenRepository,
           useValue: { find: jest.fn() },
         },
         {
@@ -142,6 +143,7 @@ describe("SessionService.revokeSession() logout hardening", () => {
         { provide: CACHE_MANAGER, useValue: mockCache },
         { provide: RedisService, useValue: mockRedis },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: SessionRepository, useValue: { findActiveByUserId: jest.fn().mockResolvedValue([]), findBySessionId: jest.fn() } },
       ],
     }).compile();
 

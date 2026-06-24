@@ -9,6 +9,7 @@ import { TenantBrandingDto } from './dto/tenant-branding.dto';
 import { JwtAuthGuard } from '@/common/guards';
 import { TenantBindingGuard } from '@/common/guards/tenant-binding.guard';
 import { SessionGuard } from '@/common/guards/session.guard';
+import { PermissionsGuard } from '@/modules/rbac/guards/permissions.guard';
 
 const PASS_GUARD = { canActivate: () => true };
 
@@ -111,6 +112,7 @@ describe('TenantBrandingController – logo upload guards', () => {
       .overrideGuard(JwtAuthGuard).useValue(PASS_GUARD)
       .overrideGuard(TenantBindingGuard).useValue(PASS_GUARD)
       .overrideGuard(SessionGuard).useValue(PASS_GUARD)
+      .overrideGuard(PermissionsGuard).useValue(PASS_GUARD)
       .compile();
 
     controller = module.get(TenantBrandingController);
@@ -197,6 +199,7 @@ describe('TenantBrandingController – save round-trip', () => {
       .overrideGuard(JwtAuthGuard).useValue(PASS_GUARD)
       .overrideGuard(TenantBindingGuard).useValue(PASS_GUARD)
       .overrideGuard(SessionGuard).useValue(PASS_GUARD)
+      .overrideGuard(PermissionsGuard).useValue(PASS_GUARD)
       .compile();
 
     controller = module.get(TenantBrandingController);
