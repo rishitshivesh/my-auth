@@ -65,6 +65,8 @@ export class TenantController {
    * PATCH /tenants/current/name
    */
   @Patch("current/name")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async updateCurrentName(
     @Req() req: Request,
     @Body() dto: UpdateTenantNameDto,
