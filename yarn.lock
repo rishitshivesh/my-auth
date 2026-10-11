@@ -3246,20 +3246,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@nestjs/sequelize@npm:^11.0.1":
-  version: 11.0.1
-  resolution: "@nestjs/sequelize@npm:11.0.1"
-  peerDependencies:
-    "@nestjs/common": ^10.0.0 || ^11.0.0
-    "@nestjs/core": ^10.0.0 || ^11.0.0
-    reflect-metadata: ^0.1.13 || ^0.2.0
-    rxjs: ^7.2.0
-    sequelize: ^6.3.5
-    sequelize-typescript: ^2.0.0
-  checksum: 10c0/df0a529649b8a7eccc6c5fb36e3ee4ad964d8b20d12995ede00ff36b2644b9a2ededbf7257911e1361e19da43cfebd49a0744f35e928f058817e380226385d76
-  languageName: node
-  linkType: hard
-
 "@nestjs/swagger@npm:^11.2.0":
   version: 11.2.3
   resolution: "@nestjs/swagger@npm:11.2.3"
@@ -8788,7 +8774,6 @@ __metadata:
     "@nestjs/passport": "npm:^11.0.5"
     "@nestjs/platform-express": "npm:^11.0.1"
     "@nestjs/schematics": "npm:^11.0.0"
-    "@nestjs/sequelize": "npm:^11.0.1"
     "@nestjs/swagger": "npm:^11.2.0"
     "@nestjs/testing": "npm:^11.0.1"
     "@nestjs/typeorm": "npm:^11.0.0"

@@ -63,3 +63,6 @@ Thumbs.db
 # ── Deployment tooling ──────────────────────────────────────────
 .vercel/
 venv/
+
+# ── Local service data ──────────────────────────────────────────
+dump.rdb

@@ -1,0 +1,52 @@
+# Local backing services for Scrolloop Sentry development.
+#
+#   docker compose up -d        start Postgres 16, Redis 7 and Mailpit
+#   docker compose down -v      stop and wipe all data
+#
+# Matches the defaults in apps/auth-service/.env.example.
+# Mailpit catches all outgoing email: SMTP on :1025, web UI on http://localhost:8025
+
+name: scrolloop-sentry
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: scrolloop_sentry
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d scrolloop_sentry"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.20
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  postgres-data:
+  redis-data:

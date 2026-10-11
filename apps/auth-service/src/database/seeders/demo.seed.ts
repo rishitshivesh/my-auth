@@ -8,7 +8,7 @@
 import { DataSource, Repository } from "typeorm";
 import { Tenant, Role, Permission } from "@repo/database";
 import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
-import { dataSourceOptions } from "@repo/database";
+import { buildDataSourceOptions } from "@repo/database";
 
 const DEMO_TENANTS = [
   {
@@ -122,14 +122,8 @@ export async function seedDemo(existingDataSource?: DataSource): Promise<void> {
   if (existingDataSource) {
     dataSource = existingDataSource;
   } else {
-    const pgBase = dataSourceOptions as PostgresConnectionOptions;
-    const dbUrl = process.env["DB_URL"] ?? process.env["DATABASE_URL"];
     dataSource = new DataSource({
-      ...pgBase,
-      ...(dbUrl ? { url: dbUrl, host: undefined, port: undefined, username: undefined, password: undefined, database: undefined } : {}),
-      // Inherit SSL config from dataSourceOptions (configured via env/TypeORM options).
-      // To use a custom CA cert instead of disabling verification, set PGSSLROOTCERT.
-      ssl: pgBase.ssl ?? false,
+      ...buildDataSourceOptions(),
       migrationsRun: false,
     } as PostgresConnectionOptions);
     await dataSource.initialize();

@@ -1,5 +1,5 @@
 import { DataSource, Repository, EntityManager, QueryRunner } from "typeorm";
-import { Tenant, Role, Permission, User, UserRole, RolePermission, dataSourceOptions } from "@repo/database";
+import { Tenant, Role, Permission, User, UserRole, RolePermission, buildDataSourceOptions } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
 
@@ -21,13 +21,8 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
   if (existingDataSource) {
     dataSource = existingDataSource;
   } else {
-    const pgBase = dataSourceOptions as PostgresConnectionOptions;
-    const dbUrl = process.env["DB_URL"] ?? process.env["DATABASE_URL"];
-    const useSSL = process.env["DB_SSL"] === "true" || process.env["DATABASE_SSL"] === "true";
     dataSource = new DataSource({
-      ...pgBase,
-      ...(dbUrl ? { url: dbUrl, host: undefined, port: undefined, username: undefined, password: undefined, database: undefined } : {}),
-      ssl: useSSL ? (pgBase.ssl ?? false) : (pgBase.ssl ?? false),
+      ...buildDataSourceOptions(),
       migrationsRun: false,
     } as PostgresConnectionOptions);
     await dataSource.initialize();
