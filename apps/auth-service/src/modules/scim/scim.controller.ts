@@ -27,13 +27,11 @@ interface AuthenticatedRequest {
 }
 import { ScimTokenService } from "./scim-token.service";
 import { ScimAuthGuard } from "./scim.guard";
-import {
-  ScimUser,
-  ScimGroup,
-  ScimPatchRequest,
-  SCIM_SCHEMA_LIST,
-} from "./scim.types";
+import { SCIM_SCHEMA_LIST } from "./scim.types";
 import { IsString, IsOptional, IsInt, Min, Max, IsNumber } from "class-validator";
+import { ScimUserDto } from "./dto/scim-user.dto";
+import { ScimGroupDto } from "./dto/scim-group.dto";
+import { ScimPatchRequestDto } from "./dto/scim-patch-request.dto";
 
 class CreateScimTokenDto {
   @IsString() name!: string;
@@ -110,10 +108,10 @@ export class ScimController {
   @HttpCode(HttpStatus.CREATED)
   createUser(
     @Request() req: ExpressRequest & { scimTenantId: string },
-    @Body() body: object,
+    @Body() body: ScimUserDto,
   ) {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    return this.scimService.createUser(req.scimTenantId, body as ScimUser, baseUrl);
+    return this.scimService.createUser(req.scimTenantId, body, baseUrl);
   }
 
   @UseGuards(ScimAuthGuard)
@@ -122,10 +120,10 @@ export class ScimController {
   replaceUser(
     @Request() req: ExpressRequest & { scimTenantId: string },
     @Param("id") id: string,
-    @Body() body: object,
+    @Body() body: ScimUserDto,
   ) {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    return this.scimService.replaceUser(req.scimTenantId, id, body as ScimUser, baseUrl);
+    return this.scimService.replaceUser(req.scimTenantId, id, body, baseUrl);
   }
 
   @UseGuards(ScimAuthGuard)
@@ -134,10 +132,10 @@ export class ScimController {
   patchUser(
     @Request() req: ExpressRequest & { scimTenantId: string },
     @Param("id") id: string,
-    @Body() body: object,
+    @Body() body: ScimPatchRequestDto,
   ) {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    return this.scimService.patchUser(req.scimTenantId, id, (body as ScimPatchRequest).Operations, baseUrl);
+    return this.scimService.patchUser(req.scimTenantId, id, body.Operations, baseUrl);
   }
 
   @UseGuards(ScimAuthGuard)
@@ -186,10 +184,10 @@ export class ScimController {
   @HttpCode(HttpStatus.CREATED)
   createGroup(
     @Request() req: ExpressRequest & { scimTenantId: string },
-    @Body() body: object,
+    @Body() body: ScimGroupDto,
   ) {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    return this.scimService.createGroup(req.scimTenantId, body as ScimGroup, baseUrl);
+    return this.scimService.createGroup(req.scimTenantId, body, baseUrl);
   }
 
   @UseGuards(ScimAuthGuard)
@@ -198,10 +196,10 @@ export class ScimController {
   patchGroup(
     @Request() req: ExpressRequest & { scimTenantId: string },
     @Param("id") id: string,
-    @Body() body: object,
+    @Body() body: ScimPatchRequestDto,
   ) {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    return this.scimService.patchGroup(req.scimTenantId, id, (body as ScimPatchRequest).Operations, baseUrl);
+    return this.scimService.patchGroup(req.scimTenantId, id, body.Operations, baseUrl);
   }
 
   @UseGuards(ScimAuthGuard)

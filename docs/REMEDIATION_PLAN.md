@@ -26,6 +26,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | P0-2 Background jobs run per tenant (`TenantJobRunner`) |
 | ✅ | P0-6 Email OTP moved to Redis |
 | ✅ | P0-7 PKCE is S256-only and mandatory for public clients |
+| ✅ | P0-5 Request bodies validated via class-validator DTOs |
 
 ## P0 — correctness & security
 
@@ -48,11 +49,12 @@ design. For (a): re-introduce `KEY_ACTIVE_TTL_DAYS` / `KEY_ROTATION_GRACE_DAYS`.
 *AC:* rotation test — tokens signed before rotation still verify during grace; JWKS lists
 active + retired keys.
 
-**P0-5 🔜 Request bodies that bypass validation.** About 15 `@Body()` parameters are typed as
-inline objects, `object`, interfaces or bare `string` (admin tenant status/featureFlags, social
-provider toggle, WebAuthn register/finish, social claim `{ ct }`, `{ email }` ×2, five
-`string` bodies). Convert each to a `class-validator` DTO.
-*AC:* `grep` finds no `@Body()` whose type is not a DTO class; invalid payloads return 400.
+**P0-5 ✅ Request bodies that bypass validation.** Fixed: all ~15 inline-typed `@Body()`
+parameters (admin tenant status/featureFlags, SCIM user/group/patch, WebAuthn register/finish,
+social claim `{ ct }`, dashboard settings) converted to `class-validator` DTOs across
+`admin`, `scim`, `auth`, `mfa`, `social-auth` and `dashboard`. WebAuthn `response` blobs stay
+`@IsObject()` since `@simplewebauthn/server` does its own structural verification. Tests:
+per-DTO `*.dto.spec.ts` files.
 
 **P0-6 ✅ Email OTP stored in process memory.** Fixed: codes live in Redis per tenant + user
 (hash only, 10-minute TTL, 5-attempt budget, single use, constant-time compare). Tests:

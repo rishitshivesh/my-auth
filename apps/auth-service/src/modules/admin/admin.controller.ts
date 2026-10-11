@@ -14,6 +14,10 @@ import {
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { AdminService } from "./admin.service";
+import { CreateTenantDto } from "./dto/create-tenant.dto";
+import { UpdateTenantDto } from "./dto/update-tenant.dto";
+import { AddTeamMemberDto } from "./dto/add-team-member.dto";
+import { UpdatePlatformSettingsDto } from "./dto/update-platform-settings.dto";
 
 @ApiTags("Admin - Platform")
 @Controller("admin")
@@ -65,16 +69,7 @@ export class AdminController {
   @ApiOperation({ summary: "Create a new tenant" })
   async createTenant(
     @Request() req: { user?: { sub?: string } },
-    @Body()
-    body: {
-      name: string;
-      slug: string;
-      plan?: string;
-      ownerEmail?: string;
-      environment?: string;
-      useCurrentUserAsAdmin?: boolean;
-      migrateProfile?: boolean;
-    },
+    @Body() body: CreateTenantDto,
   ) {
     return this.adminService.createTenant({
       ...body,
@@ -86,7 +81,7 @@ export class AdminController {
   @ApiOperation({ summary: "Update tenant (status, name, plan)" })
   async updateTenant(
     @Param("id") id: string,
-    @Body() body: { status?: string; name?: string; plan?: string },
+    @Body() body: UpdateTenantDto,
   ) {
     return this.adminService.updateTenant(id, body);
   }
@@ -117,7 +112,7 @@ export class AdminController {
 
   @Post("team")
   @ApiOperation({ summary: "Add a user to the sentry-internal team" })
-  async addTeamMember(@Body() body: { email: string }) {
+  async addTeamMember(@Body() body: AddTeamMemberDto) {
     return this.adminService.addTeamMember(body.email);
   }
 
@@ -138,16 +133,7 @@ export class AdminController {
 
   @Patch("settings")
   @ApiOperation({ summary: "Update platform settings" })
-  async updateSettings(
-    @Body()
-    body: {
-      platformName?: string;
-      smtpHost?: string;
-      supportEmail?: string;
-      allowPublicSignup?: boolean;
-      maintenanceMode?: boolean;
-    },
-  ) {
+  async updateSettings(@Body() body: UpdatePlatformSettingsDto) {
     return this.adminService.updatePlatformSettings(body);
   }
 }

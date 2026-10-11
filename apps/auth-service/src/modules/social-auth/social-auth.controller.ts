@@ -28,6 +28,7 @@ import {
   setMfaEnrollmentCookie,
   setRefreshTokenCookie,
 } from "@/common/http/auth-cookies";
+import { ClaimSessionDto } from "./dto/claim-session.dto";
 
 interface SocialCallbackRequest {
   tenantId?: string;
@@ -309,7 +310,7 @@ export class SocialAuthController {
   @ApiResponse({ status: 200, description: "Session claimed, accessToken set as httpOnly cookie" })
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
   async claimSession(
-    @Body() body: { ct: string },
+    @Body() body: ClaimSessionDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     try {

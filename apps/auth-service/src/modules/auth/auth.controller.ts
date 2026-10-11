@@ -37,6 +37,7 @@ import {
   GetProvidersResponseDto,
   AcceptInviteDto,
 } from "./auth.dto";
+import { StartWebAuthnLoginDto, FinishWebAuthnLoginDto } from "./dto/webauthn-login.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
 import { type Request, type Response } from "express";
@@ -585,7 +586,7 @@ export class AuthController {
   })
   async startWebAuthnLogin(
     @Req() req: Request,
-    @Body() dto: { email: string },
+    @Body() dto: StartWebAuthnLoginDto,
   ) {
     const tenantId = req.tenantId!;
 
@@ -641,7 +642,7 @@ export class AuthController {
   async finishWebAuthnLogin(
     @Req() req: Request,
     @Res() res: Response,
-    @Body() dto: { email: string; response: Record<string, unknown>; sessionNonce: string },
+    @Body() dto: FinishWebAuthnLoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
