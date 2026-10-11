@@ -2,15 +2,20 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  InternalServerErrorException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
-import { SamlServiceProvider, KeyPair, User } from "@repo/database";
+import * as samlify from "samlify";
+import { X509CertificateGenerator } from "@peculiar/x509";
+import { SamlServiceProvider, KeyPair, User, Tenant } from "@repo/database";
 import { RegisterSPDto, UpdateSPDto } from "./saml.dto";
 import { logger } from "@/common/logger";
+import { TenantService } from "@/modules/tenant/tenant.service";
+import { TenantJobRunner } from "@/core/database/tenant-job-runner.service";
+import { RedisService } from "@/common/service/redis.service";
 
 function xmlEsc(s: string): string {
   return String(s)
@@ -27,14 +32,60 @@ function validateSlug(slug: string): void {
   }
 }
 
+const POST_BINDING = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST";
+
+/**
+ * SSO requests always carry an authenticated user — handlePostSSO stashes an
+ * unauthenticated request here and redirects to login; the hosted login page
+ * calls back into GET /saml/sso/continue/:nonce once a session exists.
+ *
+ * Keyed by nonce alone (not per-tenant) because the request arrives before we
+ * can resolve a tenant context for the Redis key namespace; the nonce's
+ * 256 bits of randomness plus a short TTL are the security boundary, and
+ * `tenantSlug` inside the stashed value still drives every downstream check.
+ */
+interface PendingSamlRequest {
+  tenantSlug: string;
+  samlRequest: string;
+  relayState: string;
+}
+
+const PENDING_SSO_TENANT_KEY = "global";
+const PENDING_SSO_TTL_SECONDS = 10 * 60;
+
+export interface SamlPostBinding {
+  postUrl: string;
+  samlResponse: string;
+  relayState: string;
+}
+
+/** samlify doesn't re-export FlowResult publicly; derive it structurally. */
+type SamlFlowResult = Awaited<ReturnType<samlify.IdentityProviderInstance["parseLoginRequest"]>>;
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const body = pem.replace(/-----BEGIN [^-]+-----/, "").replace(/-----END [^-]+-----/, "").replace(/\s+/g, "");
+  const buf = Buffer.from(body, "base64");
+  // Buffer#buffer is the underlying (possibly pooled, larger) ArrayBuffer —
+  // slice to the actual byte range or WebCrypto reads garbage past the end.
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
 @Injectable()
 export class SamlService {
+  /** In-memory cache: KeyPair.id → self-signed cert PEM wrapping that key. */
+  private readonly signingCertCache = new Map<string, string>();
+
   constructor(
     @InjectRepository(SamlServiceProvider)
     private spRepo: Repository<SamlServiceProvider>,
     @InjectRepository(KeyPair)
     private keyPairRepo: Repository<KeyPair>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
     private config: ConfigService,
+    private tenantService: TenantService,
+    private tenantJobRunner: TenantJobRunner,
+    private redis: RedisService,
   ) {}
 
   private get issuerBaseUrl(): string {
@@ -53,7 +104,39 @@ export class SamlService {
     return decipher.update(encrypted).toString("utf8") + decipher.final("utf8");
   }
 
-  private async getActiveKeyPair(): Promise<{ publicKeyPem: string; privateKeyPem: string }> {
+  /**
+   * SAML needs a real X.509 certificate for `<ds:X509Certificate>` and for
+   * samlify's own signing pipeline (which parses the configured cert via
+   * Node's `crypto.X509Certificate` to extract the key) — the `KeyPair` row
+   * only stores a bare SPKI public key for JWT/JWKS purposes. Wrap it in a
+   * self-signed certificate derived from the same key material, generated
+   * once per active key and cached in memory (never persisted).
+   */
+  private async signSelfSignedCert(publicKeyPem: string, privateKeyPem: string): Promise<string> {
+    const webcrypto = crypto.webcrypto as unknown as Crypto;
+    const alg = { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+
+    const [publicKey, privateKey] = await Promise.all([
+      webcrypto.subtle.importKey("spki", pemToArrayBuffer(publicKeyPem), alg, true, ["verify"]),
+      webcrypto.subtle.importKey("pkcs8", pemToArrayBuffer(privateKeyPem), alg, true, ["sign"]),
+    ]);
+
+    const cert = await X509CertificateGenerator.createSelfSigned(
+      {
+        serialNumber: "01",
+        name: "CN=sentry-saml-idp",
+        notBefore: new Date(),
+        notAfter: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+        signingAlgorithm: alg,
+        keys: { publicKey, privateKey },
+      },
+      webcrypto,
+    );
+
+    return cert.toString("pem");
+  }
+
+  private async getActiveKeyPair(): Promise<{ publicKeyPem: string; privateKeyPem: string; signingCertPem: string }> {
     const keyPair = await this.keyPairRepo.findOne({
       where: { status: "active" },
       order: { createdAt: "DESC" },
@@ -62,19 +145,26 @@ export class SamlService {
     if (!keyPair) throw new BadRequestException("No active signing key found");
 
     const privateKeyPem = this.decryptPrivateKey(keyPair);
-    return { publicKeyPem: keyPair.publicKeyPem, privateKeyPem };
+
+    let signingCertPem = this.signingCertCache.get(keyPair.id);
+    if (!signingCertPem) {
+      signingCertPem = await this.signSelfSignedCert(keyPair.publicKeyPem, privateKeyPem);
+      this.signingCertCache.set(keyPair.id, signingCertPem);
+    }
+
+    return { publicKeyPem: keyPair.publicKeyPem, privateKeyPem, signingCertPem };
   }
 
   async getIdpMetadata(tenantSlug: string): Promise<string> {
     validateSlug(tenantSlug);
-    const { publicKeyPem } = await this.getActiveKeyPair();
+    const { signingCertPem } = await this.getActiveKeyPair();
     const entityId = xmlEsc(`${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`);
-    const ssoUrl = xmlEsc(`${this.issuerBaseUrl}/saml/sso`);
-    const sloUrl = xmlEsc(`${this.issuerBaseUrl}/saml/slo`);
+    const ssoUrl = xmlEsc(`${this.issuerBaseUrl}/saml/sso/${tenantSlug}`);
+    const sloUrl = xmlEsc(`${this.issuerBaseUrl}/saml/slo/${tenantSlug}`);
 
-    const certBody = publicKeyPem
-      .replace(/-----BEGIN PUBLIC KEY-----/, "")
-      .replace(/-----END PUBLIC KEY-----/, "")
+    const certBody = signingCertPem
+      .replace(/-----BEGIN CERTIFICATE-----/, "")
+      .replace(/-----END CERTIFICATE-----/, "")
       .replace(/\s+/g, "");
 
     return `<?xml version="1.0"?>
@@ -148,23 +238,153 @@ export class SamlService {
     return sp;
   }
 
-  // SPRINT_N: implement full XML signing + assertion generation with xmldsig
-  // This stub returns the data needed; the controller renders the POST-binding form.
-  async createSamlResponse(
-    spId: string,
+  /** Resolve `:tenantSlug` to a real tenant — SSO is reached at a shared
+   * hostname, so this stands in for the header/subdomain resolution the
+   * rest of the app relies on. */
+  async resolveTenant(tenantSlug: string): Promise<Tenant> {
+    validateSlug(tenantSlug);
+    const tenant = await this.tenantService.findBySlug(tenantSlug);
+    if (!tenant || !tenant.active) {
+      throw new NotFoundException("Tenant not found");
+    }
+    return tenant;
+  }
+
+  /** Confirm the authenticated user's own session belongs to this tenant —
+   * defence against a user signed into tenant A completing SSO for tenant
+   * B's registered service providers. */
+  assertSessionTenant(sessionTenantId: string | undefined, tenantId: string): void {
+    if (sessionTenantId !== tenantId) {
+      throw new UnauthorizedException("Session does not belong to this tenant");
+    }
+  }
+
+  async stashPendingRequest(
+    tenantSlug: string,
+    samlRequest: string,
+    relayState: string,
+  ): Promise<string> {
+    const nonce = crypto.randomBytes(32).toString("hex");
+    const pending: PendingSamlRequest = { tenantSlug, samlRequest, relayState };
+    await this.redis.set(PENDING_SSO_TENANT_KEY, "saml-sso-pending", nonce, pending, PENDING_SSO_TTL_SECONDS);
+    return nonce;
+  }
+
+  /** One-time read: the stashed request is deleted whether or not it's found. */
+  async popPendingRequest(nonce: string): Promise<PendingSamlRequest | null> {
+    const pending = await this.redis.get<PendingSamlRequest>(
+      PENDING_SSO_TENANT_KEY,
+      "saml-sso-pending",
+      nonce,
+    );
+    await this.redis.delete(PENDING_SSO_TENANT_KEY, "saml-sso-pending", nonce);
+    return pending;
+  }
+
+  private buildIdp(tenantSlug: string, signingCertPem: string, privateKeyPem: string): samlify.IdentityProviderInstance {
+    return samlify.IdentityProvider({
+      entityID: `${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`,
+      privateKey: privateKeyPem,
+      signingCert: signingCertPem,
+      wantAuthnRequestsSigned: false,
+      singleSignOnService: [
+        { Binding: POST_BINDING, Location: `${this.issuerBaseUrl}/saml/sso/${tenantSlug}` },
+      ],
+      singleLogoutService: [
+        { Binding: POST_BINDING, Location: `${this.issuerBaseUrl}/saml/slo/${tenantSlug}` },
+      ],
+      generateID: () => `_${crypto.randomBytes(16).toString("hex")}`,
+    });
+  }
+
+  private buildSp(sp: SamlServiceProvider): samlify.ServiceProviderInstance {
+    return samlify.ServiceProvider({
+      entityID: sp.entityId,
+      assertionConsumerService: [
+        { Binding: POST_BINDING, Location: sp.acsUrl, isDefault: true },
+      ],
+      wantAssertionsSigned: sp.signAssertions,
+      ...(sp.certificate ? { signingCert: sp.certificate } : {}),
+    });
+  }
+
+  /**
+   * Parse and validate an inbound AuthnRequest (POST binding).
+   *
+   * The SP that sent it is unknown until we read its `<Issuer>`, so this
+   * does a cheap unauthenticated peek at the decoded XML first (just enough
+   * to find the issuer), looks up a matching *active* `SamlServiceProvider`
+   * row scoped to this tenant, then re-parses through samlify with that
+   * trusted SP config for the real validation (issuer/signature/schema).
+   * Unknown issuer, inactive SP, or a malformed/expired request all reject
+   * here with 400 before any assertion is ever built.
+   */
+  async parseAuthnRequest(
     tenantId: string,
     tenantSlug: string,
-    user: User,
-    relayState?: string,
-  ): Promise<{ postUrl: string; samlResponse: string; relayState: string }> {
-    const sp = await this.findSP(tenantId, spId);
-    if (!sp.active) throw new BadRequestException("Service provider is inactive");
+    samlRequestB64: string,
+  ): Promise<{ sp: SamlServiceProvider; requestInfo: SamlFlowResult }> {
+    let decodedXml: string;
+    try {
+      decodedXml = Buffer.from(samlRequestB64, "base64").toString("utf8");
+    } catch {
+      throw new BadRequestException("Malformed SAMLRequest");
+    }
+
+    const peek = samlify.Extractor.extract(decodedXml, samlify.Extractor.loginRequestFields);
+    const issuer = Array.isArray(peek.issuer) ? peek.issuer[0] : peek.issuer;
+    if (!issuer) {
+      throw new BadRequestException("AuthnRequest is missing an Issuer");
+    }
+
+    const sp = await this.spRepo.findOne({ where: { tenantId, entityId: issuer, active: true } });
+    if (!sp) {
+      throw new BadRequestException("Unknown or inactive service provider");
+    }
+
+    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair();
+    const idp = this.buildIdp(tenantSlug, signingCertPem, privateKeyPem);
+    const samlifySp = this.buildSp(sp);
+
+    try {
+      const requestInfo = await idp.parseLoginRequest(samlifySp, "post", {
+        body: { SAMLRequest: samlRequestB64 },
+      });
+      return { sp, requestInfo };
+    } catch (error: unknown) {
+      logger.warn({ err: error, tenantId, issuer }, "Rejected invalid SAML AuthnRequest");
+      throw new BadRequestException("Invalid or tampered AuthnRequest");
+    }
+  }
+
+  /**
+   * Build and sign the SAML Response for an already-validated AuthnRequest.
+   * Runs the user lookup inside the tenant's own schema (TenantJobRunner),
+   * since SSO is reached at a shared hostname with no per-request tenant
+   * context already established by the usual middleware.
+   */
+  async buildSignedResponse(
+    tenantSlug: string,
+    sp: SamlServiceProvider,
+    requestInfo: SamlFlowResult,
+    userId: string,
+    relayState: string,
+  ): Promise<SamlPostBinding> {
+    const user = await this.tenantJobRunner.runInTenant(tenantSlug, () =>
+      this.userRepo.findOne({ where: { id: userId } }),
+    );
+    if (!user) throw new NotFoundException("User not found");
+
+    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair();
+    const idp = this.buildIdp(tenantSlug, signingCertPem, privateKeyPem);
+    const samlifySp = this.buildSp(sp);
 
     const issuer = `${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`;
     const now = new Date();
     const notOnOrAfter = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
     const assertionId = `_${crypto.randomBytes(16).toString("hex")}`;
     const responseId = `_${crypto.randomBytes(16).toString("hex")}`;
+    const inResponseTo = (requestInfo.extract.request as { id?: string } | undefined)?.id ?? "";
 
     const attributes = Object.entries(sp.attributeMapping)
       .map(([samlAttr, userField]) => {
@@ -181,7 +401,7 @@ export class SamlService {
   <saml:Subject>
     <saml:NameID Format="${xmlEsc(sp.nameIdFormat)}">${xmlEsc(user.email)}</saml:NameID>
     <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-      <saml:SubjectConfirmationData NotOnOrAfter="${xmlEsc(notOnOrAfter)}" Recipient="${xmlEsc(sp.acsUrl)}"/>
+      <saml:SubjectConfirmationData NotOnOrAfter="${xmlEsc(notOnOrAfter)}" Recipient="${xmlEsc(sp.acsUrl)}" InResponseTo="${xmlEsc(inResponseTo)}"/>
     </saml:SubjectConfirmation>
   </saml:Subject>
   <saml:Conditions NotBefore="${xmlEsc(now.toISOString())}" NotOnOrAfter="${xmlEsc(notOnOrAfter)}">
@@ -195,16 +415,33 @@ export class SamlService {
     const response = `<?xml version="1.0"?>
 <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
     ID="${xmlEsc(responseId)}" Version="2.0" IssueInstant="${xmlEsc(now.toISOString())}"
-    Destination="${xmlEsc(sp.acsUrl)}">
+    Destination="${xmlEsc(sp.acsUrl)}" InResponseTo="${xmlEsc(inResponseTo)}">
   <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">${xmlEsc(issuer)}</saml:Issuer>
   <samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>
   ${assertion}
 </samlp:Response>`;
 
+    // The customTagReplacement callback supplies the unsigned XML; samlify
+    // still runs its own XML-DSig signing pipeline afterward (assertion
+    // and/or message signature, per the SP's wantAssertionsSigned setting) —
+    // using a custom template only replaces the unsigned-template step, not
+    // the cryptographic signing itself.
+    const context = await idp.createLoginResponse(
+      samlifySp,
+      // FlowResult (returned by parseLoginRequest) and RequestInfo (expected
+      // here) are structurally the same `{ extract, ... }` shape; RequestInfo
+      // just adds an index signature samlify's own FlowResult doesn't declare.
+      requestInfo as unknown as { extract: SamlFlowResult["extract"] },
+      "post",
+      { email: user.email },
+      { relayState, customTagReplacement: () => ({ context: response, id: responseId }) },
+    );
+
+    const postBinding = context as unknown as { context: string; entityEndpoint: string; relayState?: string };
     return {
-      postUrl: sp.acsUrl,
-      samlResponse: Buffer.from(response).toString("base64"),
-      relayState: relayState ?? "",
+      postUrl: postBinding.entityEndpoint,
+      samlResponse: postBinding.context,
+      relayState: postBinding.relayState ?? relayState,
     };
   }
 }

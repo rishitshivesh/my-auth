@@ -172,8 +172,26 @@ export class TenantResolverMiddleware implements NestMiddleware {
     return reserved.has(label.toLowerCase());
   }
 
+  /**
+   * Unauthenticated SAML endpoints reached by third-party SPs at a shared
+   * platform hostname — the tenant is disambiguated by the :tenantSlug path
+   * segment, not by subdomain/header, so host-based resolution legitimately
+   * finds nothing here. The SAML module resolves and schema-scopes the
+   * tenant itself. Matched precisely (not a bare "/saml" prefix) so the
+   * authenticated /saml/sps* SP-management routes keep normal tenant
+   * resolution and still get `req.tenantId` set.
+   */
+  private readonly publicSamlRoutes = [
+    /^\/saml\/metadata\/[^/]+$/,
+    /^\/saml\/sso\/continue\/[^/]+$/,
+    /^\/saml\/sso\/[^/]+$/,
+  ];
+
   private isPublicEndpoint(path: string): boolean {
     const publicPaths = ["/health", "/metrics", "/.well-known", "/favicon.ico"];
-    return publicPaths.some((p) => path.startsWith(p));
+    return (
+      publicPaths.some((p) => path.startsWith(p)) ||
+      this.publicSamlRoutes.some((r) => r.test(path))
+    );
   }
 }

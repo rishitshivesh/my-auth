@@ -28,6 +28,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | P0-7 PKCE is S256-only and mandatory for public clients |
 | ✅ | P0-5 Request bodies validated via class-validator DTOs |
 | ✅ | P0-8 ADR-0003 accepted; access tokens removed from all response bodies |
+| ✅ | P0-3 SAML SSO wired and assertions signed (XML-DSig via samlify) |
 
 ## P0 — correctness & security
 
@@ -37,11 +38,20 @@ cluster-wide advisory lock; hourly token and 15-minute session cleanups use it. 
 (expired sessions in `fk_sentry` purged) and by `tenant-job-runner.service.spec`. Any new
 background job must use `TenantJobRunner`.
 
-**P0-3 🔜 SAML assertions unsigned; `/saml/sso` not wired** (`saml.service.ts`,
-`saml.controller.ts` — `SPRINT_N` markers). Implement XML-DSig with `xml-crypto` using the
-tenant signing key; validate AuthnRequest issuer/ACS against the registered SP; wire session
-lookup. *AC:* assertion validates in a reference SP (e.g. samltest / `saml2-js` test harness);
-tampered assertion rejected.
+**P0-3 ✅ SAML assertions unsigned; `/saml/sso` not wired.** Fixed: full SP-initiated SSO wired
+via `samlify` (XML-DSig; already a listed-but-unused dependency). `/saml/sso/:tenantSlug` and
+`/saml/metadata/:tenantSlug` resolve the tenant from the path (reached at a shared hostname, not
+subdomain/header) and schema-scope the eventual user lookup via `TenantJobRunner`. The AuthnRequest
+issuer is peeked cheaply, then re-validated against the matching *active* `SamlServiceProvider`
+row before any assertion is built; unauthenticated requests are stashed in Redis (one-time nonce,
+10-min TTL) and resumed via `GET /saml/sso/continue/:nonce` after login. The authenticated
+session's own tenant is checked against the resolved SSO tenant before signing
+(`assertSessionTenant`). Since `KeyPair` only stores a bare public key (no real X.509 cert, needed
+by both `<ds:X509Certificate>` and samlify's signing pipeline), a self-signed cert wrapping the
+same key is generated on the fly (`@peculiar/x509` + WebCrypto) and cached in memory, never
+persisted. *AC met:* `saml.service.spec.ts` signs a response, validates it with a reference SP
+(`samlify.ServiceProvider.parseLoginResponse`), then tampers one byte and confirms that SP rejects
+it.
 
 **P0-4 🔜 Per-tenant signing keys are not real.** `getCurrentSigningKey(tenantId)` falls back to
 the platform key and provisioning never creates tenant keys. Write an ADR choosing either
