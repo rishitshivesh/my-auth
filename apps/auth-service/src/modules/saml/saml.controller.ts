@@ -91,6 +91,7 @@ export class SamlController {
       samlRequest,
     );
     const binding = await this.samlService.buildSignedResponse(
+      tenant.id,
       tenantSlug,
       sp,
       requestInfo,
@@ -141,6 +142,7 @@ export class SamlController {
       pending.samlRequest,
     );
     const binding = await this.samlService.buildSignedResponse(
+      tenant.id,
       pending.tenantSlug,
       sp,
       requestInfo,

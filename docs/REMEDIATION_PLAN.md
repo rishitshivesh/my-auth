@@ -53,12 +53,17 @@ same key is generated on the fly (`@peculiar/x509` + WebCrypto) and cached in me
 persisted. *AC met:* `saml.service.spec.ts` signs a response, validates it with a reference SP
 (`samlify.ServiceProvider.parseLoginResponse`), then tampers one byte and confirms that SP rejects
 it.
-Post-commit review follow-ups: (1) the SSO continuation nonce is now bound to the initiating
-browser via a short-lived cookie (`saml_sso_nonce`), closing a login-CSRF path where a leaked
-nonce could be completed from a different browser — fixed. (2) cross-tenant signing-key reuse
-(every tenant shares the platform key) is a known, explicitly-documented limitation tracked under
-P0-4, not fixed here. Two further findings from that review were not delivered with enough detail
-to act on (notification body was truncated) — flagged to the user; re-run if needed.
+Post-commit review follow-ups, all fixed: (1) the SSO continuation nonce is now bound to the
+initiating browser via a short-lived cookie (`saml_sso_nonce`), closing a login-CSRF path where a
+leaked nonce could be completed from a different browser. (2) `getActiveKeyPair()` queried
+`status: "active"` with no tenant filter — harmless before P0-4 (only one active key ever
+existed), but once P0-4 provisioned a dedicated active key per tenant this picked whichever
+tenant's key was created most recently *globally*, so a SAML assertion for tenant A could be
+signed with tenant B's key. Now tenant-scoped, with the same platform-key fallback
+`JwksService.getCurrentSigningKey` already uses. (Two of this review's findings were initially
+lost to a tooling issue — the notification body was truncated before the detail arrived — but
+were recovered from the security-guidance plugin's own state file at
+`~/.claude/security/security_warnings_state_*.json` and fixed from there.)
 
 **P0-4 ✅ Per-tenant signing keys are not real.** Fixed: ADR-0004 accepted option (a) — generate
 at provisioning, scheduled rotation with a grace period. `JwksService.ensureTenantKeyExists`

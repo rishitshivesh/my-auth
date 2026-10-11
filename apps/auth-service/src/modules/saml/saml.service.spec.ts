@@ -138,11 +138,66 @@ describe("SamlService — assertion signing", () => {
     });
   });
 
+  describe("getActiveKeyPair tenant scoping (cross-tenant key confusion fix)", () => {
+    it("signs with this tenant's own key, not another tenant's more-recently-created one", async () => {
+      const otherTenantId = "tenant-2";
+      const { publicKey: otherPub, privateKey: otherPriv } = crypto.generateKeyPairSync("rsa", {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      });
+      const otherEnc = encryptPrivateKey(otherPriv);
+      const otherTenantKeyRow = {
+        id: "kp-2",
+        kid: "other-tenant-kid",
+        tenantId: otherTenantId,
+        algorithm: "RS256",
+        use: "sig",
+        publicKeyPem: otherPub,
+        encryptedPrivateKey: otherEnc.encryptedPrivateKey,
+        iv: otherEnc.iv,
+        authTag: otherEnc.authTag,
+        status: "active",
+        // Created AFTER this tenant's own key — an unscoped
+        // `order: { createdAt: "DESC" }` query would wrongly pick this one.
+        createdAt: new Date(Date.now() + 1000),
+      } as unknown as KeyPair;
+
+      keyPairRepo.findOne.mockImplementation(
+        (opts: { where: { tenantId?: unknown } }) => {
+          const where = opts.where;
+          if ("tenantId" in where && where.tenantId === otherTenantId) {
+            return Promise.resolve(otherTenantKeyRow);
+          }
+          if ("tenantId" in where && where.tenantId === tenantId) {
+            return Promise.resolve(keyPairRow);
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      const requestInfo = { samlContent: "", extract: { request: { id: "_req1" } } } as never;
+      const binding = await service.buildSignedResponse(tenantId, tenantSlug, sp, requestInfo, user.id, "");
+
+      const decoded = Buffer.from(binding.samlResponse, "base64").toString("utf8");
+      const embeddedCertMatch = decoded.match(/<ds:X509Certificate>([^<]+)<\/ds:X509Certificate>/);
+      const embeddedPublicKeyPem = new crypto.X509Certificate(
+        `-----BEGIN CERTIFICATE-----\n${embeddedCertMatch![1]}\n-----END CERTIFICATE-----`,
+      )
+        .publicKey.export({ type: "spki", format: "pem" })
+        .toString();
+
+      // Signed with THIS tenant's key, not tenant-2's.
+      expect(embeddedPublicKeyPem.trim()).toBe(publicKeyPem.trim());
+      expect(embeddedPublicKeyPem.trim()).not.toBe(otherPub.trim());
+    });
+  });
+
   describe("buildSignedResponse", () => {
     it("produces a signed assertion a reference SP accepts, and rejects a tampered copy", async () => {
       const requestInfo = { samlContent: "", extract: { request: { id: "_req1" } } } as never;
 
-      const binding = await service.buildSignedResponse(tenantSlug, sp, requestInfo, user.id, "relay-123");
+      const binding = await service.buildSignedResponse(tenantId, tenantSlug, sp, requestInfo, user.id, "relay-123");
 
       expect(binding.postUrl).toBe(sp.acsUrl);
       expect(binding.relayState).toBe("relay-123");

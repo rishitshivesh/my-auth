@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, IsNull } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import * as samlify from "samlify";
@@ -147,11 +147,26 @@ export class SamlService {
    * query's scope without also addressing key provisioning/rotation per
    * tenant — that's P0-4's job, not a one-line fix here.
    */
-  private async getActiveKeyPair(): Promise<{ publicKeyPem: string; privateKeyPem: string; signingCertPem: string }> {
-    const keyPair = await this.keyPairRepo.findOne({
-      where: { status: "active" },
+  /**
+   * Scoped to `tenantId` — unscoped would pick whichever row across ALL
+   * tenants was created most recently, since P0-4 made `status: "active"`
+   * no longer unique platform-wide (every tenant now has its own active
+   * key). Falls back to the platform key (tenantId IS NULL) only when this
+   * tenant hasn't been provisioned a dedicated key yet, matching
+   * JwksService.getCurrentSigningKey's same fallback semantics.
+   */
+  private async getActiveKeyPair(tenantId: string): Promise<{ publicKeyPem: string; privateKeyPem: string; signingCertPem: string }> {
+    let keyPair = await this.keyPairRepo.findOne({
+      where: { tenantId, status: "active" },
       order: { createdAt: "DESC" },
     });
+
+    if (!keyPair) {
+      keyPair = await this.keyPairRepo.findOne({
+        where: { tenantId: IsNull(), status: "active" },
+        order: { createdAt: "DESC" },
+      });
+    }
 
     if (!keyPair) throw new BadRequestException("No active signing key found");
 
@@ -168,7 +183,8 @@ export class SamlService {
 
   async getIdpMetadata(tenantSlug: string): Promise<string> {
     validateSlug(tenantSlug);
-    const { signingCertPem } = await this.getActiveKeyPair();
+    const tenant = await this.resolveTenant(tenantSlug);
+    const { signingCertPem } = await this.getActiveKeyPair(tenant.id);
     const entityId = xmlEsc(`${this.issuerBaseUrl}/saml/metadata/${tenantSlug}`);
     const ssoUrl = xmlEsc(`${this.issuerBaseUrl}/saml/sso/${tenantSlug}`);
     const sloUrl = xmlEsc(`${this.issuerBaseUrl}/saml/slo/${tenantSlug}`);
@@ -353,7 +369,7 @@ export class SamlService {
       throw new BadRequestException("Unknown or inactive service provider");
     }
 
-    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair();
+    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair(tenantId);
     const idp = this.buildIdp(tenantSlug, signingCertPem, privateKeyPem);
     const samlifySp = this.buildSp(sp);
 
@@ -375,6 +391,7 @@ export class SamlService {
    * context already established by the usual middleware.
    */
   async buildSignedResponse(
+    tenantId: string,
     tenantSlug: string,
     sp: SamlServiceProvider,
     requestInfo: SamlFlowResult,
@@ -386,7 +403,7 @@ export class SamlService {
     );
     if (!user) throw new NotFoundException("User not found");
 
-    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair();
+    const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair(tenantId);
     const idp = this.buildIdp(tenantSlug, signingCertPem, privateKeyPem);
     const samlifySp = this.buildSp(sp);
 
