@@ -30,6 +30,7 @@ import * as os from "os";
 import * as path from "path";
 import { logger } from "@/common/logger";
 import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
+import type { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 
 export interface PlatformMetricsDto {
   totalTenants: number;
@@ -74,12 +75,6 @@ export interface TeamMemberDto {
   addedAt?: Date;
 }
 
-export interface CreateFirstAdminDto {
-  platformName?: string;
-  name: string;
-  email: string;
-  password: string;
-}
 
 export interface FirstAdminResultDto {
   accessToken: string;

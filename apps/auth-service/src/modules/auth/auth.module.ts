@@ -30,13 +30,10 @@ import { JwtAuthGuard } from "@/common/guards";
 import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
-import { MfaService } from "@/modules/mfa/mfa.service";
-import { MfaPolicyService } from "@/modules/mfa/mfa-policy.service";
-import { WebAuthnService } from "@/modules/mfa/webauthn.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
-import { ScheduleModule } from "@nestjs/schedule";
+import { MfaModule } from "@/modules/mfa/mfa.module";
 import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 import { SessionModule } from "@/modules/session/session.module";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
@@ -64,27 +61,18 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     GuardsModule,
     SessionModule,
     OAuthModule,
-    ScheduleModule.forRoot(),
+    MfaModule,
     PassportModule.register(JwtStrategy),
     JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
-    SecurityEventService,
     PasswordService,
     JwtStrategy,
-    JwtAuthGuard,
-    SessionService,
-    RedisService,
     BruteForceService,
-    MfaService,
-    MfaPolicyService,
-    WebAuthnService,
-    RbacService,
-    OAuthRefreshTokenService,
     TokenCleanupService,
   ],
-  exports: [AuthService, OAuthRefreshTokenService],
+  exports: [AuthService],
 })
 export class AuthModule {}

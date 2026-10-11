@@ -43,13 +43,10 @@ import { MfaModule } from "@/modules/mfa/mfa.module";
   controllers: [SocialAuthController],
   providers: [
     SocialAuthService,
-    SecurityEventService,
     GoogleStrategy,
     GitHubStrategy,
     MicrosoftStrategy,
     TokenEncryptionService,
-    SessionService,
-    OAuthRefreshTokenService,
   ],
   exports: [SocialAuthService],
 })

@@ -2,7 +2,6 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
-import { CacheModule } from "@nestjs/cache-manager";
 import {
   Session,
   Tenant,
@@ -29,8 +28,6 @@ import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { GuardsModule } from "@/common/guards/guards.module";
-import { SessionRepository } from "@/core/database/session.repository";
-import { TenantContextService } from "@/core/database/tenant-context.service";
 
 @Module({
   imports: [
@@ -43,14 +40,9 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
       UserRole,
       OAuthRefreshToken,
       KeyPair,
-      SessionRepository,
       Policy,
       RolePolicy,
     ]),
-    CacheModule.register({
-      ttl: 300000,
-      max: 1000,
-    }),
     JwtModule.register({}),
     SecurityEventModule,
     GuardsModule,
@@ -61,12 +53,6 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
     FileStorageService,
     TenantSchemaService,
     TenantRegistrationService,
-    RedisService,
-    SessionService,
-    JwksService,
-    OAuthRefreshTokenService,
-    SessionRepository,
-    TenantContextService,
   ],
   controllers: [
     TenantController,
@@ -74,6 +60,6 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
     PublicBrandingController,
     TenantRegistrationController,
   ],
-  exports: [TenantService, TenantBrandingService, TenantSchemaService, TenantContextService, SessionRepository],
+  exports: [TenantService, TenantBrandingService, TenantSchemaService],
 })
 export class TenantModule {}

@@ -5,13 +5,12 @@ import { StatsModule } from "./stats/stats.module";
 import { DatabaseModule } from "@/core/database/database.module";
 import { CombinedModules } from "@/modules";
 import { ApiCallInterceptor } from "@/common/interceptors/api-call.interceptor";
-import { RedisService } from "@/common/service/redis.service";
+import { SharedServicesModule } from "@/core/shared/shared-services.module";
 import { RateLimitGuard } from "@/common/guards/rate-limit.guard";
 
 @Module({
-  imports: [GlobalModule, StatsModule, DatabaseModule, CombinedModules],
+  imports: [GlobalModule, SharedServicesModule, StatsModule, DatabaseModule, CombinedModules],
   providers: [
-    RedisService,
     {
       provide: APP_INTERCEPTOR,
       useClass: ApiCallInterceptor,

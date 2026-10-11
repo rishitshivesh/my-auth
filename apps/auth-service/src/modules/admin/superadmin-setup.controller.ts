@@ -12,7 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { type Response } from "express";
 import { AdminService } from "./admin.service";
-import type { CreateFirstAdminDto } from "./admin.service";
+import { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { Public } from "@/common/decorators/public.decorator";
 

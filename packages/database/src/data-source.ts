@@ -43,98 +43,124 @@ import { RolePolicy } from "./entities/role-policy.entity";
 import { TenantMfaPolicy } from "./entities/tenant-mfa-policy.entity";
 
 /**
- * TypeORM DataSource Configuration
+ * Database connection configuration — single source of truth.
  *
- * This file is used by TypeORM CLI for migrations
- * and can also be imported by the NestJS application
+ * Used by:
+ *   - the NestJS runtime (`DatabaseModule` calls `buildDataSourceOptions()`
+ *     inside its factory, after ConfigModule has loaded `.env`), and
+ *   - the TypeORM CLI (migrations) via the `AppDataSource` export below.
+ *
+ * Connection resolution (first match wins):
+ *   1. DB_URL                       (canonical)
+ *   2. DATABASE_URL                 (accepted alias)
+ *   3. DATABASE_HOST / DATABASE_PORT / DATABASE_USER / DATABASE_PASSWORD / DATABASE_NAME
+ *
+ * TLS:
+ *   DB_SSL=true                     enable TLS
+ *   DB_SSL_CA=<PEM or base64 PEM>   verify the server against this CA (recommended)
+ *   DB_SSL_REJECT_UNAUTHORIZED=true verify against the system CA bundle
+ *   Without either of the last two, TLS is encrypted but the server certificate
+ *   is NOT verified (legacy behaviour, kept for managed providers such as
+ *   Supabase poolers). Production deployments should set DB_SSL_CA.
  */
+export type DatabaseEnv = Record<string, string | undefined>;
 
-const useSSL = process.env.DB_SSL === "true";
-const dbUrl = process.env.DB_URL ?? process.env.DATABASE_URL;
+const truthy = (value: string | undefined): boolean =>
+  /^(1|true|yes|on)$/i.test(value ?? "");
 
-const connectionConfig = dbUrl
-  ? { url: dbUrl }
-  : {
-      host: process.env.DATABASE_HOST || "localhost",
-      port: parseInt(process.env.DATABASE_PORT || "5432", 10),
-      username: process.env.DATABASE_USER || "postgres",
-      password: process.env.DATABASE_PASSWORD || "",
-      database: process.env.DATABASE_NAME || "postgres",
-    };
+function resolveSsl(env: DatabaseEnv): false | { rejectUnauthorized: boolean; ca?: string } {
+  if (!truthy(env.DB_SSL) && !truthy(env.DATABASE_SSL)) return false;
 
-export const dataSourceOptions: DataSourceOptions = {
-  type: "postgres",
-  ...connectionConfig,
+  const rawCa = env.DB_SSL_CA?.trim();
+  if (rawCa) {
+    const ca = rawCa.includes("BEGIN CERTIFICATE")
+      ? rawCa
+      : Buffer.from(rawCa, "base64").toString("utf8");
+    return { rejectUnauthorized: true, ca };
+  }
 
-  // Entities - explicit import for reliability
-  entities: [
-    Tenant,
-    Session,
-    MfaSettings,
-    WebAuthnCredential,
-    SecurityEvent,
-    Role,
-    Permission,
-    OAuthClient,
-    OAuthAuthorizationCode,
-    OAuthAccessToken,
-    OAuthRefreshToken,
-    OAuthConsent,
-    RolePermission,
-    SocialLinkRequest,
-    TenantSocialProvider,
-    UserSocialConnection,
-    UserRole,
-    User,
-    TenantBranding,
-    KeyPair,
-    UserInvite,
-    WebhookEndpoint,
-    WebhookDelivery,
-    SamlServiceProvider,
-    ScimToken,
-    LdapConnection,
-    Policy,
-    Group,
-    UserGroup,
-    GroupPolicy,
-    UserPolicy,
-    RolePolicy,
-    TenantMfaPolicy,
-  ],
+  return { rejectUnauthorized: truthy(env.DB_SSL_REJECT_UNAUTHORIZED) };
+}
 
-  // Migrations
-  migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
+function resolveConnection(env: DatabaseEnv): { url: string } | {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+} {
+  const url = env.DB_URL || env.DATABASE_URL;
+  if (url) return { url };
+  return {
+    host: env.DATABASE_HOST || "localhost",
+    port: parseInt(env.DATABASE_PORT || "5432", 10),
+    username: env.DATABASE_USER || "postgres",
+    password: env.DATABASE_PASSWORD || "",
+    database: env.DATABASE_NAME || "postgres",
+  };
+}
 
-  // Migration settings
-  migrationsTableName: "migrations",
-  migrationsRun: false, // Don't auto-run migrations
+export const ENTITIES = [
+  Tenant,
+  Session,
+  MfaSettings,
+  WebAuthnCredential,
+  SecurityEvent,
+  Role,
+  Permission,
+  OAuthClient,
+  OAuthAuthorizationCode,
+  OAuthAccessToken,
+  OAuthRefreshToken,
+  OAuthConsent,
+  RolePermission,
+  SocialLinkRequest,
+  TenantSocialProvider,
+  UserSocialConnection,
+  UserRole,
+  User,
+  TenantBranding,
+  KeyPair,
+  UserInvite,
+  WebhookEndpoint,
+  WebhookDelivery,
+  SamlServiceProvider,
+  ScimToken,
+  LdapConnection,
+  Policy,
+  Group,
+  UserGroup,
+  GroupPolicy,
+  UserPolicy,
+  RolePolicy,
+  TenantMfaPolicy,
+];
 
-  // Logging
-  logging: process.env.DATABASE_LOGGING === "true",
-  logger: "advanced-console",
+export function buildDataSourceOptions(env: DatabaseEnv = process.env): DataSourceOptions {
+  return {
+    type: "postgres",
+    ...resolveConnection(env),
+    entities: ENTITIES,
+    migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
+    migrationsTableName: "migrations",
+    migrationsRun: false,
+    logging: truthy(env.DB_LOGGING) || truthy(env.DATABASE_LOGGING),
+    logger: "advanced-console",
+    extra: {
+      max: parseInt(env.DATABASE_POOL_MAX || "20", 10),
+      min: parseInt(env.DATABASE_POOL_MIN || "2", 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    },
+    ssl: resolveSsl(env),
+    // No `schema` — tables resolve through the per-request search_path set by
+    // TenantSchemaMiddleware (tenant schemas) or default to `public`.
+    synchronize: false,
+  } as DataSourceOptions;
+}
 
-  // Connection pool
-  extra: {
-    max: parseInt(process.env.DATABASE_POOL_MAX || "20", 10),
-    min: parseInt(process.env.DATABASE_POOL_MIN || "2", 10),
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-  },
-
-  // SSL (for production or cloud databases like Supabase)
-  ssl: useSSL
-    ? {
-        rejectUnauthorized: false, // Supabase requires this
-      }
-    : false,
-
-  // Schema (omitted to let PostgreSQL resolve tables via active search_path)
-  // schema: process.env.DATABASE_SCHEMA || "public",
-
-  // Synchronize (NEVER use in production!)
-  synchronize: false,
-};
+/** Options resolved from the current process environment (CLI / scripts). */
+export const dataSourceOptions: DataSourceOptions = buildDataSourceOptions();
 
 // Create and export DataSource
 export const AppDataSource = new DataSource(dataSourceOptions);
