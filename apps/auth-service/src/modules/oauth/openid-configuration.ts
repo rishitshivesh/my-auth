@@ -49,7 +49,7 @@ export function buildOpenIdConfiguration(
       "client_secret_post",
       "none",
     ],
-    code_challenge_methods_supported: ["S256", "plain"],
+    code_challenge_methods_supported: ["S256"],
     claims_supported: [
       "sub",
       "email",

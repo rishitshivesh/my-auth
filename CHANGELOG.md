@@ -6,6 +6,8 @@
 - `POST /auth/reset-password` requires `email` in addition to `otp` and `password`.
   `@scrolloop/sdk`: `resetPassword(email, otp, password)`.
 - `TOKEN_ENCRYPTION_KEY` is required when `NODE_ENV=production`.
+- OAuth PKCE: only `code_challenge_method=S256` is accepted and it must be sent explicitly;
+  public clients must always use PKCE. Authorization codes issued with `plain` are rejected.
 - Removed `GET /api/health-check`, `GET /` and `GET /api-docs.yaml`. Use `GET /health`,
   `GET /health/ready` and Swagger at `/api-docs` (non-production).
 

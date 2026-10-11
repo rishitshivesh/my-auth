@@ -113,7 +113,7 @@ export class OAuthController {
   @ApiQuery({
     name: "code_challenge_method",
     required: false,
-    enum: ["S256", "plain"],
+    enum: ["S256"],
   })
   @ApiResponse({
     status: 302,
@@ -158,9 +158,15 @@ export class OAuthController {
       requestedScopes,
     );
 
-    // Check PKCE requirement
-    if (client.requirePkce && !query.code_challenge) {
+    // PKCE: always required for public clients, and for confidential clients
+    // that opted in. Only S256 is accepted; an absent method would mean
+    // "plain" under RFC 7636, so it must be explicit.
+    const pkceRequired = client.requirePkce || client.clientType === "public";
+    if (pkceRequired && !query.code_challenge) {
       throw new BadRequestException("code_challenge required for this client");
+    }
+    if (query.code_challenge && query.code_challenge_method !== "S256") {
+      throw new BadRequestException("code_challenge_method must be S256");
     }
 
     // Check if consent is required

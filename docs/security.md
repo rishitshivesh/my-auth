@@ -25,6 +25,7 @@ gaps. Open gaps reference [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Vulnerabil
 | Input validation | Global `ValidationPipe` (whitelist, transform) on class DTOs | `app.module.ts` | — (gaps: P0-5) |
 | Transport/headers | Helmet; strict CORS allow-list; `TRUST_PROXY` for correct client IPs | `app.module.ts` | — |
 | Audit trail | Security events for auth, MFA, admin and email actions; metadata sanitised (secrets stripped recursively); CSV export with formula-injection protection | `SecurityEventService`, `audit` | `security-event.service.spec` |
+| OAuth PKCE | S256 only, explicit method, mandatory for public clients, constant-time verify | `oauth` | `oauth-token.pkce.spec` |
 | Webhooks | HMAC-SHA256 signatures; SSRF protection (DNS fail-closed, IPv4-mapped IPv6, no redirects) | `webhook` | — |
 | Secrets | All secrets from env; validated at boot; never logged | `env.validation.ts` | boot |
 | Supply chain | `yarn install --immutable` in CI; lockfile committed | CI | CI |
@@ -37,7 +38,6 @@ gaps. Open gaps reference [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Vulnerabil
 | Per-tenant signing keys not provisioned | Weaker tenant blast-radius isolation | P0-4 |
 | Some request bodies are not class DTOs | Unvalidated input reaches services | P0-5 |
 | Email OTP codes held in process memory | Fails across replicas/restarts | P0-6 |
-| PKCE `plain` accepted | Weaker public-client protection | P0-7 |
 | Access token also returned in response body | Token exposure to page scripts | P0-8 / ADR-0003 |
 | Per-request pinned DB connection | Pool exhaustion → availability | P1-9 |
 | Audit log mutable; no retention / GDPR erasure endpoints | Compliance evidence | P1-13 |

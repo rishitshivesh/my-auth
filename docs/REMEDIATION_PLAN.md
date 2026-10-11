@@ -24,6 +24,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | CI: typecheck, unit tests, boot + e2e smoke |
 | ✅ | P0-1 Docs consolidation (this file, README, AGENTS.md, architecture, security, ADRs) |
 | ✅ | P0-2 Background jobs run per tenant (`TenantJobRunner`) |
+| ✅ | P0-7 PKCE is S256-only and mandatory for public clients |
 
 ## P0 — correctness & security
 
@@ -56,8 +57,10 @@ provider toggle, WebAuthn register/finish, social claim `{ ct }`, `{ code }`, `{
 Breaks with >1 replica or a restart. Move to Redis with TTL and an attempt budget (same pattern
 as password reset). *AC:* unit test; works across two service instances.
 
-**P0-7 🔜 PKCE `plain` accepted and advertised.** Enforce `S256` only; require PKCE for public
-clients; remove `plain` from discovery. *AC:* `plain` → `invalid_request`.
+**P0-7 ✅ PKCE `plain` accepted and advertised.** Fixed: authorize accepts only
+`code_challenge_method=S256` (explicit, since RFC 7636 defaults to plain), validates challenge
+format, and always requires PKCE for public clients; token exchange compares in constant time and
+rejects legacy `plain` codes; discovery advertises `["S256"]`. Tests: `oauth-token.pkce.spec`.
 
 **P0-8 🔜 Access token returned in response bodies** despite the cookie-only rule. Decide
 ADR-0003, then implement. *AC:* first-party portal works with no token in any response body.
