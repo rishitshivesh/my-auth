@@ -43,10 +43,6 @@ import { SessionModule } from "@/modules/session/session.module";
   providers: [
     UserRepository,
     UserService,
-    SecurityEventService,
-    RbacService,
-    RoleService,
-    PermissionService,
   ],
   exports: [UserService],
 })

@@ -1,15 +1,29 @@
 import { Module, ValidationPipe } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+import { NestFactory, Reflector } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppApiModule } from "./modules/app-module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { logger } from '@/common/logger';
 import { ResponseInterceptor } from '@/common/interceptors/response.interceptors';
-import { saveApiDoc } from "./services/utility/utility.service";
 import { CorsRefreshService } from "./cors-refresh.service";
 import { AdminService } from "@/modules/admin/admin.service";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
+
+/**
+ * TRUST_PROXY accepts the same values as Express' "trust proxy" setting:
+ * a hop count ("1"), "true", or a comma-separated list of subnets/keywords
+ * ("loopback, 10.0.0.0/8"). Unset → Express default (trust nothing).
+ */
+function resolveTrustProxy(raw: string | undefined): boolean | number | string | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const value = raw.trim();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  return value;
+}
 
 function parseCorsOrigins(): string[] {
   const raw = process.env.CORS_ORIGINS || "";
@@ -24,7 +38,21 @@ function parseCorsOrigins(): string[] {
 })
 export class AppModule {
   static async startApp(): Promise<void> {
-    const app = await NestFactory.create(AppApiModule, { bufferLogs: true });
+    const app = await NestFactory.create<NestExpressApplication>(AppApiModule, {
+      bufferLogs: true,
+    });
+
+    // Behind a load balancer / ingress, request.ip is the proxy's address
+    // unless Express is told how many hops to trust. Without this every
+    // client shares one IP-keyed rate-limit bucket. See TRUST_PROXY in
+    // .env.example.
+    const trustProxy = resolveTrustProxy(process.env["TRUST_PROXY"]);
+    if (trustProxy !== undefined) {
+      app.set("trust proxy", trustProxy);
+    }
+
+    // Close DB pools / Redis connections cleanly on SIGTERM (rolling deploys).
+    app.enableShutdownHooks();
 
     const isProduction = process.env.NODE_ENV === "production";
     const staticOrigins = parseCorsOrigins();
@@ -102,25 +130,35 @@ export class AppModule {
     // Swagger — disabled in production
     if (!isProduction) {
       const config = new DocumentBuilder()
-        .setTitle("identity-server")
-        .setDescription("API for Identity Server")
-        .setVersion("1.0")
-        .setExternalDoc("Sample", "https://id.sample.com")
+        .setTitle("Scrolloop Sentry Auth Service")
+        .setDescription(
+          "Multi-tenant authentication, authorization and identity APIs. " +
+            "Tenant-scoped routes require X-Tenant-Slug (or a tenant subdomain).",
+        )
+        .setVersion(process.env["npm_package_version"] ?? "0.0.0")
         .addBearerAuth()
+        .addCookieAuth("accessToken")
         .build();
 
       const documentForGeneralApis = SwaggerModule.createDocument(app, config);
       SwaggerModule.setup("api-docs", app, documentForGeneralApis);
-      saveApiDoc("api-docs", documentForGeneralApis, "nest-be");
     }
 
-    app.useGlobalInterceptors(new ResponseInterceptor());
+    app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
     app.use(
       session({
+        // Used only for the short-lived OAuth/social-login handshake state.
+        name: "sentry.sid",
         secret: process.env.SESSION_SECRET!,
         resave: false,
         saveUninitialized: false,
+        cookie: {
+          httpOnly: true,
+          secure: isProduction,
+          sameSite: "lax",
+          maxAge: 10 * 60 * 1000,
+        },
       }),
     );
 

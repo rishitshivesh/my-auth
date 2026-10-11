@@ -1,3 +1,4 @@
+import { WellKnownController } from "./well-known.controller";
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
@@ -19,6 +20,7 @@ import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
 import { JwksService } from "./services/jwks.service";
+import { KeyRotationService } from "./services/key-rotation.service";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 
@@ -39,15 +41,14 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
     JwtModule.register({}), // Config provided in service
     RbacModule,
   ],
-  controllers: [OAuthController],
+  controllers: [OAuthController, WellKnownController],
   providers: [
     OAuthClientService,
     OAuthTokenService,
     OAuthConsentService,
-    JwksService,
     PasswordService,
-    RbacService,
+    KeyRotationService,
   ],
-  exports: [OAuthClientService, OAuthTokenService, OAuthConsentService, JwksService],
+  exports: [OAuthClientService, OAuthTokenService, OAuthConsentService],
 })
 export class OAuthModule {}

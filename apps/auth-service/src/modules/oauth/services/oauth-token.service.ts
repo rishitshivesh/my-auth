@@ -29,7 +29,7 @@ export interface CreateAuthorizationCodeDto {
   state?: string;
   nonce?: string;
   codeChallenge?: string;
-  codeChallengeMethod?: "S256" | "plain";
+  codeChallengeMethod?: "S256";
   ipAddress?: string;
   userAgent?: string;
 }
@@ -201,22 +201,23 @@ export class OAuthTokenService {
   async validatePKCE(
     codeVerifier: string,
     codeChallenge: string,
-    method: "S256" | "plain",
+    method: string,
   ): Promise<boolean> {
-    let computedChallenge: string;
-
-    if (method === "S256") {
-      computedChallenge = crypto
-        .createHash("sha256")
-        .update(codeVerifier)
-        .digest("base64url");
-    } else if (method === "plain") {
-      computedChallenge = codeVerifier;
-    } else {
-      throw new BadRequestException("Invalid code_challenge_method");
+    // Only S256. Codes issued with "plain" before this change are rejected.
+    if (method !== "S256") {
+      throw new BadRequestException("Unsupported code_challenge_method");
+    }
+    if (!/^[A-Za-z0-9\-._~]{43,128}$/.test(codeVerifier)) {
+      return false;
     }
 
-    return computedChallenge === codeChallenge;
+    const computed = Buffer.from(
+      crypto.createHash("sha256").update(codeVerifier).digest("base64url"),
+    );
+    const expected = Buffer.from(codeChallenge);
+    return (
+      computed.length === expected.length && crypto.timingSafeEqual(computed, expected)
+    );
   }
 
   // ============================================================

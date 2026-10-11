@@ -12,9 +12,10 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { type Response } from "express";
 import { AdminService } from "./admin.service";
-import type { CreateFirstAdminDto } from "./admin.service";
+import { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { Public } from "@/common/decorators/public.decorator";
+import { setAuthCookies, ACCESS_TOKEN_TTL_SECONDS } from "@/common/http/auth-cookies";
 
 /**
  * Public endpoints for first-run platform initialization.
@@ -96,7 +97,7 @@ export class SuperadminSetupController {
     description:
       "One-shot endpoint for first-run setup. Returns 409 if already initialized.",
   })
-  @ApiResponse({ status: 201, description: "Superadmin created, access token returned" })
+  @ApiResponse({ status: 201, description: "Superadmin created, tokens set as httpOnly cookies" })
   @ApiResponse({ status: 409, description: "Platform already initialized" })
   async createFirstAdmin(
     @Body() body: CreateFirstAdminDto,
@@ -112,24 +113,9 @@ export class SuperadminSetupController {
       userAgent ?? "unknown",
     );
 
-    const isProduction = process.env["NODE_ENV"] === "production";
-    const cookieBase = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax" as const,
-      path: "/",
-    };
-
     // Tokens go into httpOnly cookies — never in the response body
-    res.cookie("accessToken", result.accessToken, {
-      ...cookieBase,
-      maxAge: 15 * 60 * 1000, // 15 min
-    });
-    res.cookie("refreshToken", result.refreshToken, {
-      ...cookieBase,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
 
-    return { user: result.user };
+    return { user: result.user, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
   }
 }

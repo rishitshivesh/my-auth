@@ -25,7 +25,9 @@ import {
   MfaStatusDto,
   MfaEnabledResponseDto,
   BackupCodesResponseDto,
+  VerifyEmailOtpDto,
 } from "./dto/mfa.dto";
+import { FinishWebAuthnRegistrationDto } from "./dto/finish-webauthn-registration.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
@@ -37,17 +39,6 @@ interface AuthenticatedRequest {
   ip?: string;
   route?: { path: string };
   params?: Record<string, string>;
-}
-
-interface WebAuthnRegistrationResponse {
-  id: string;
-  rawId: string;
-  response: {
-    attestationObject: string;
-    clientDataJSON: string;
-  };
-  type: string;
-  clientExtensionResults?: Record<string, unknown>;
 }
 
 @ApiTags("MFA")
@@ -289,7 +280,7 @@ export class MfaController {
     summary: "Verify email OTP code",
     description: "Verify the 6-digit code received via email",
   })
-  async verifyEmailOtp(@Request() req: AuthenticatedRequest, @Body() dto: { code: string }) {
+  async verifyEmailOtp(@Request() req: AuthenticatedRequest, @Body() dto: VerifyEmailOtpDto) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
@@ -333,7 +324,7 @@ export class MfaController {
   @ApiOperation({ summary: "Finish WebAuthn credential registration" })
   async finishWebAuthnRegistration(
     @Request() req: AuthenticatedRequest,
-    @Body() body: { response: WebAuthnRegistrationResponse; deviceName?: string },
+    @Body() body: FinishWebAuthnRegistrationDto,
   ) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;

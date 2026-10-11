@@ -11,6 +11,8 @@ import { DashboardService } from "./dashboard.service";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { UpdateTenantSettingsDto } from "./dto/update-tenant-settings.dto";
+import { UpdateSocialProviderDto } from "./dto/update-social-provider.dto";
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -99,7 +101,7 @@ export class DashboardController {
   @ApiOperation({ summary: "Update tenant feature flags for login methods" })
   async updateTenantSettings(
     @Request() req: AuthenticatedRequest,
-    @Body() body: { featureFlags: Record<string, boolean> },
+    @Body() body: UpdateTenantSettingsDto,
   ) {
     const tenantId = req.tenantId!;
     const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
@@ -153,7 +155,7 @@ export class DashboardController {
   async updateSocialProvider(
     @Request() req: AuthenticatedRequest,
     @Param("provider") provider: string,
-    @Body() body: { enabled: boolean; clientId?: string; clientSecret?: string },
+    @Body() body: UpdateSocialProviderDto,
   ) {
     const tenantId = req.tenantId!;
 

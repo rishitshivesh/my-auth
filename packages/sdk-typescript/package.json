@@ -45,10 +45,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "type-check": "tsc --noEmit",
     "test": "vitest --passWithNoTests",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "auth",

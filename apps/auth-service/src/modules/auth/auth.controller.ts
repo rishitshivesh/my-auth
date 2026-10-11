@@ -37,12 +37,19 @@ import {
   GetProvidersResponseDto,
   AcceptInviteDto,
 } from "./auth.dto";
+import { StartWebAuthnLoginDto, FinishWebAuthnLoginDto } from "./dto/webauthn-login.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
 import { type Request, type Response } from "express";
 import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
+import {
+  clearAuthCookies,
+  setAuthCookies,
+  setMfaEnrollmentCookie,
+  ACCESS_TOKEN_TTL_SECONDS,
+} from "@/common/http/auth-cookies";
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string; tenantId?: string };
@@ -68,40 +75,6 @@ interface AuthenticatedRequest {
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  /**
-   * Set both access and refresh tokens as httpOnly cookies.
-   * Tokens are NEVER returned in the response body — cookie-only per project rules.
-   *
-   * accessToken maxAge = 15 min (matches RS256 JWT TTL)
-   * refreshToken maxAge = 30 days (matches DB refresh token TTL)
-   *
-   * Set COOKIE_DOMAIN=.sentry.scrolloop.com in production so cookies are shared
-   * across tenant subdomains (acme.sentry.scrolloop.com, beta.sentry.scrolloop.com).
-   * Leave unset in development — defaults to exact hostname, works for localhost.
-   */
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
-    const isProduction = process.env['NODE_ENV'] === 'production';
-    const domain = process.env['COOKIE_DOMAIN'] || undefined;
-
-    const base = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'strict' as const,
-      path: '/',
-      ...(domain ? { domain } : {}),
-    };
-
-    res.cookie('accessToken', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
-  }
-
-  private clearAuthCookies(res: Response): void {
-    const domain = process.env['COOKIE_DOMAIN'] || undefined;
-    const base = { httpOnly: true, path: '/', ...(domain ? { domain } : {}) };
-    res.clearCookie('accessToken', base);
-    res.clearCookie('refreshToken', base);
-  }
 
   /**
    * Register a new user
@@ -160,11 +133,15 @@ export class AuthController {
       return response;
     }
 
-    this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    // Return access token in body so SDK clients can cache it in state.
-    // Bearer token auth requires the SDK to hold the token in memory;
-    // the httpOnly cookie provides fallback for server-side cookie auth.
-    return { user: response.user, tenantSlug: response.tenantSlug, accessToken: response.accessToken };
+    setAuthCookies(res, response.accessToken, response.refreshToken);
+    // Tokens are httpOnly cookies only (ADR-0003) — the body carries no
+    // credential, just non-secret session metadata for the client to use.
+    return {
+      user: response.user,
+      tenantSlug: response.tenantSlug,
+      session: response.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    };
   }
 
   /**
@@ -186,7 +163,7 @@ export class AuthController {
     const sessionId = req.user.sessionId ?? '';
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
 
-    this.clearAuthCookies(res);
+    clearAuthCookies(res);
 
     return { message: "Logged out successfully" };
   }
@@ -221,6 +198,7 @@ export class AuthController {
    * Reset password with token
    */
   @Post("reset-password")
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reset password using token" })
   @ApiResponse({ status: 200, description: "Password reset successful" })
@@ -228,13 +206,16 @@ export class AuthController {
   async resetPassword(
     @Req() req: Request,
     @Body() resetPasswordDto: ResetPasswordDto,
+    @Ip() ip: string,
   ) {
     const tenantId = req.tenantId!;
 
     await this.authService.resetPassword(
       tenantId,
+      resetPasswordDto.email,
       resetPasswordDto.otp,
       resetPasswordDto.password,
+      ip,
     );
     return { message: "Password reset successfully" };
   }
@@ -243,6 +224,7 @@ export class AuthController {
    * Verify email address
    */
   @Post("verify-email")
+  @RateLimit({ max: 20, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Verify email address" })
   @ApiResponse({ status: 200, description: "Email verified successfully" })
@@ -257,6 +239,7 @@ export class AuthController {
    * Resend verification email
    */
   @Post("resend-verification")
+  @RateLimit({ max: 3, windowMs: 3600000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resend email verification" })
   @ApiResponse({ status: 200, description: "Verification email sent" })
@@ -271,6 +254,7 @@ export class AuthController {
    */
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
+  @RateLimit({ max: 30, windowMs: 60000, keyBy: "ip" })
   @ApiOperation({ summary: "Refresh access token" })
   @ApiResponse({ status: 200, description: "Token refreshed successfully" })
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
@@ -285,10 +269,13 @@ export class AuthController {
 
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
-    this.setAuthCookies(res, response.accessToken, response.refreshToken);
-    // Return the access token in the body so SDK clients can cache it in memory.
-    // The httpOnly cookie is the authoritative token; this is a convenience copy.
-    return { accessToken: response.accessToken };
+    setAuthCookies(res, response.accessToken, response.refreshToken);
+    // Tokens are httpOnly cookies only (ADR-0003) — no credential in the body.
+    return {
+      tenantSlug: response.tenantSlug,
+      session: response.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    };
   }
 
   /**
@@ -455,13 +442,13 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "MFA verified successfully, tokens issued",
+    description: "MFA verified successfully, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
         message: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
       },
     },
   })
@@ -487,8 +474,13 @@ export class AuthController {
         userAgent,
       );
 
-      this.setAuthCookies(res, result.accessToken, result.refreshToken);
-      return { message: result.message, tenantSlug: result.tenantSlug };
+      setAuthCookies(res, result.accessToken, result.refreshToken);
+      return {
+        message: result.message,
+        tenantSlug: result.tenantSlug,
+        session: result.session,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      };
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
@@ -529,13 +521,13 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "Backup code verified, tokens issued",
+    description: "Backup code verified, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
         message: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
         warning: {
           type: "string",
           description: "Warning about remaining backup codes",
@@ -564,8 +556,14 @@ export class AuthController {
         ip,
         userAgent,
       );
-      this.setAuthCookies(res, result.accessToken, result.refreshToken);
-      return { message: result.message, tenantSlug: result.tenantSlug, warning: result.warning };
+      setAuthCookies(res, result.accessToken, result.refreshToken);
+      return {
+        message: result.message,
+        tenantSlug: result.tenantSlug,
+        session: result.session,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+        warning: result.warning,
+      };
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
@@ -608,7 +606,7 @@ export class AuthController {
   })
   async startWebAuthnLogin(
     @Req() req: Request,
-    @Body() dto: { email: string },
+    @Body() dto: StartWebAuthnLoginDto,
   ) {
     const tenantId = req.tenantId!;
 
@@ -639,12 +637,12 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "Authentication successful",
+    description: "Authentication successful, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
         user: {
           type: "object",
           properties: {
@@ -664,7 +662,7 @@ export class AuthController {
   async finishWebAuthnLogin(
     @Req() req: Request,
     @Res() res: Response,
-    @Body() dto: { email: string; response: Record<string, unknown>; sessionNonce: string },
+    @Body() dto: FinishWebAuthnLoginDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -680,17 +678,16 @@ export class AuthController {
     });
 
     if ('status' in result) {
-      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
-        httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
-        sameSite: 'strict',
-        path: '/mfa/enroll',
-        maxAge: 5 * 60 * 1000,
-      });
+      setMfaEnrollmentCookie(res, result.enrollmentToken);
       return res.json({ status: result.status });
     }
-    this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return res.json({ user: result.user, tenantSlug: result.tenantSlug });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    return res.json({
+      user: result.user,
+      tenantSlug: result.tenantSlug,
+      session: result.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    });
   }
 
   /**
@@ -733,17 +730,15 @@ export class AuthController {
     );
 
     if ('status' in result) {
-      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
-        httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
-        sameSite: 'strict',
-        path: '/mfa/enroll',
-        maxAge: 5 * 60 * 1000,
-      });
+      setMfaEnrollmentCookie(res, result.enrollmentToken);
       return res.json({ status: result.status });
     }
-    this.setAuthCookies(res, result.accessToken, result.refreshToken);
-    return res.json({ tenantSlug: result.tenantSlug });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    return res.json({
+      tenantSlug: result.tenantSlug,
+      session: result.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    });
   }
 
   /**

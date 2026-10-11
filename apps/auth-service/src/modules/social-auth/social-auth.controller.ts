@@ -23,6 +23,13 @@ import type { StringValue } from "ms";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
+import {
+  setAccessTokenCookie,
+  setMfaEnrollmentCookie,
+  setRefreshTokenCookie,
+  ACCESS_TOKEN_TTL_SECONDS,
+} from "@/common/http/auth-cookies";
+import { ClaimSessionDto } from "./dto/claim-session.dto";
 
 interface SocialCallbackRequest {
   tenantId?: string;
@@ -268,22 +275,12 @@ export class SocialAuthController {
       }
 
       if (result.type === 'mfa_enrollment_required') {
-        const isProduction = process.env['NODE_ENV'] === 'production';
-        res.cookie('mfa_enrollment_token', result.enrollmentToken, {
-          httpOnly: true,
-          secure: isProduction,
-          sameSite: 'strict' as const,
-          path: '/mfa/enroll',
-          maxAge: 5 * 60 * 1000,
-        });
+        setMfaEnrollmentCookie(res, result.enrollmentToken);
         return res.redirect(`${safeReturnUrl}/mfa/enroll`);
       }
 
-      const isProduction = process.env['NODE_ENV'] === 'production';
-      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
-      const base = { httpOnly: true, secure: isProduction, sameSite: 'strict' as const, path: '/', ...(cookieDomain ? { domain: cookieDomain } : {}) };
       // Refresh token: set now (we have it)
-      res.cookie("refreshToken", result.refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      setRefreshTokenCookie(res, result.refreshToken);
 
       // Create short-lived completion token (60s, one-time use by the portal)
       const completionToken = await this.signToken(
@@ -306,7 +303,8 @@ export class SocialAuthController {
    * Claim social session using completion token
    *
    * POST /auth/social/claim-session { ct: completionToken }
-   * Returns { accessToken } — refresh token is already in httpOnly cookie
+   * Sets the access token as an httpOnly cookie; refresh token is already
+   * cookied from the OAuth callback. Returns { tenantSlug, expiresIn } only.
    */
   @Post("claim-session")
   @HttpCode(HttpStatus.OK)
@@ -314,7 +312,7 @@ export class SocialAuthController {
   @ApiResponse({ status: 200, description: "Session claimed, accessToken set as httpOnly cookie" })
   @ApiResponse({ status: 401, description: "Invalid or expired completion token" })
   async claimSession(
-    @Body() body: { ct: string },
+    @Body() body: ClaimSessionDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     try {
@@ -328,18 +326,12 @@ export class SocialAuthController {
         throw new Error("Invalid token type");
       }
 
-      const isProduction = process.env['NODE_ENV'] === 'production';
-      const cookieDomain = process.env['COOKIE_DOMAIN'] || undefined;
-      res.cookie('accessToken', payload['accessToken'] as string, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: 'strict',
-        path: '/',
-        maxAge: 15 * 60 * 1000,
-        ...(cookieDomain ? { domain: cookieDomain } : {}),
-      });
+      setAccessTokenCookie(res, payload['accessToken'] as string);
 
-      return { tenantSlug: (payload['tenantSlug'] as string) ?? '' };
+      return {
+        tenantSlug: (payload['tenantSlug'] as string) ?? '',
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      };
     } catch {
       throw new UnauthorizedException("Invalid or expired completion token");
     }

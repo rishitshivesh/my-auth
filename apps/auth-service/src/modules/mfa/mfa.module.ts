@@ -53,12 +53,9 @@ import { SecurityEventService } from "@/common/service/security-event.service";
   providers: [
     MfaService,
     MfaPolicyService,
-    SecurityEventService,
     EmailOtpService,
-    EmailService,
     WebAuthnService,
-    RedisService,
   ],
-  exports: [MfaService, MfaPolicyService],
+  exports: [MfaService, MfaPolicyService, WebAuthnService],
 })
 export class MfaModule {}

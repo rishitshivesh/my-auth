@@ -158,6 +158,7 @@ export class TenantRegistrationService {
         name: dto.workspaceName,
         environment: "production",
       });
+      await this.jwksService.ensureTenantKeyExists(tenant.id);
 
       // Begin an explicit transaction for all tenant data so that a mid-flight
       // failure leaves no partial users / roles / policies committed.
@@ -335,6 +336,15 @@ export class TenantRegistrationService {
       await this.dataSource.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
     } catch (err) {
       logger.error({ err, schemaName }, "Failed to drop schema during registration rollback");
+    }
+    try {
+      // ensureTenantKeyExists() may have already provisioned a signing key
+      // before the failure — without this, the encrypted private key for a
+      // tenant that no longer exists would persist indefinitely (key_pairs
+      // has no FK/cascade to tenants).
+      await this.jwksService.deleteTenantKeys(tenantId);
+    } catch (err) {
+      logger.error({ err, tenantId }, "Failed to delete tenant signing key during registration rollback");
     }
     try {
       await this.tenantRepository.delete({ id: tenantId });

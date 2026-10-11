@@ -30,6 +30,6 @@ import { DatabaseModule } from "@/core/database/database.module";
     MfaModule,
   ],
   controllers: [DashboardController],
-  providers: [DashboardService, RedisService],
+  providers: [DashboardService],
 })
 export class DashboardModule {}

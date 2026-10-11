@@ -584,7 +584,7 @@ export class OpenIDConfigurationDto {
 
   @ApiProperty({
     description: "Supported code challenge methods",
-    example: ["S256", "plain"],
+    example: ["S256"],
     isArray: true,
   })
   code_challenge_methods_supported!: string[];

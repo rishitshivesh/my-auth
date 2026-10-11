@@ -1,54 +1,69 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# Dependencies
-node_modules
+# ── Dependencies ────────────────────────────────────────────────
+node_modules/
 .pnp
 .pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
-# Local env files
+# ── Environment (never commit real secrets) ─────────────────────
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
-# Testing
-coverage
-
-# Turbo
-.turbo
-
-# Vercel
-.vercel
-
-# Build Outputs
-.next/
+# ── Build output ────────────────────────────────────────────────
+dist/
+build/
 out/
-build
-dist
-
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Misc
-.DS_Store
-*.pem
-
-
-*v0*
-
-venv
-# Build artifacts
+.next/
+.turbo/
 *.tsbuildinfo
-packages/*/dist/
+next-env.d.ts
 packages/*/*.js
 packages/*/*.js.map
 packages/*/*.d.ts
 packages/*/*.d.ts.map
+!packages/eslint-config/*.js
+!packages/ui/*.js
 
-# Generated analysis artifacts
+# ── Generated at runtime ────────────────────────────────────────
+apps/auth-service/api-management/
+apps/auth-service/uploads/
 graphify-out/
-apps/auth-service/build_output.txt
+
+# ── Test & coverage ─────────────────────────────────────────────
+coverage/
+*.lcov
+
+# ── Logs & debug ────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+app-logs*.txt
+
+# ── Ad-hoc code dumps (never commit) ────────────────────────────
+consolidated-code*.txt
+
+# ── Keys & certificates ─────────────────────────────────────────
+*.pem
+*.key
+*.p12
+
+# ── Editors & OS ────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# ── Deployment tooling ──────────────────────────────────────────
+.vercel/
+venv/
+
+# ── Local service data ──────────────────────────────────────────
+dump.rdb
+apps/docs/.source/

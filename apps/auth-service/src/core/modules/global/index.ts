@@ -1,6 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
 import { BullModule } from "@nestjs/bullmq";
 import { HealthCheckModule } from "../health-check/health-check.module";
 import { validationSchema } from "@/config/env.validation";
@@ -9,16 +8,21 @@ import * as redisStore from "cache-manager-redis-store";
 import { TenantResolverMiddleware } from "@/common/midllewares/tenant-resolver.middleware";
 import { TenantSchemaMiddleware } from "@/common/midllewares/tenant-schema.middleware";
 import { TenantModule } from "@/modules/tenant/tenant.module";
-import { TenantContextService } from "@/core/database/tenant-context.service";
+import { DatabaseModule } from "@/core/database/database.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // Root .env first so it sets all shared vars; local .env overrides when present.
-      envFilePath: ["../../.env", ".env"],
+      // Nest gives precedence to the FIRST file that defines a variable, so
+      // the app-local .env wins over the monorepo-root .env.
+      envFilePath: [".env", "../../.env"],
       validationSchema,
     }),
+
+    // Single TypeORM root connection (global). Must be registered before any
+    // module that injects repositories.
+    DatabaseModule,
 
     HealthCheckModule,
     TenantModule,
@@ -50,30 +54,7 @@ import { TenantContextService } from "@/core/database/tenant-context.service";
         },
       }),
     }),
-
-    // Database
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: "postgres",
-        host: configService.get("DATABASE_HOST"),
-        port: configService.get("DATABASE_PORT"),
-        username: configService.get("DATABASE_USER"),
-        password: configService.get("DATABASE_PASSWORD"),
-        database: configService.get("DATABASE_NAME"),
-        autoLoadEntities: true,
-        synchronize: false,
-        logging: configService.get("DATABASE_LOGGING") === "true",
-        ssl:
-          configService.get("DB_SSL") === "true"
-            ? { rejectUnauthorized: false }
-            : false,
-      }),
-    }),
   ],
-  providers: [TenantContextService],
-  exports: [TenantContextService],
 })
 export class GlobalModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
@@ -81,6 +62,7 @@ export class GlobalModule implements NestModule {
     // Both middleware layers share these exclusions so they stay in sync.
     const platformRoutes = [
       { path: "health", method: RequestMethod.GET },
+      { path: "health/(.*)", method: RequestMethod.GET },
       { path: ".well-known/(.*)", method: RequestMethod.GET },
       // Superadmin / first-run setup — operates on the public schema, no tenant
       { path: "superadmin/(.*)", method: RequestMethod.ALL },

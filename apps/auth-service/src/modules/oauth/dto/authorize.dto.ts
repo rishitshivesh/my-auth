@@ -68,18 +68,23 @@ export class AuthorizeRequestDto {
     example: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
   })
   @IsString()
+  @Matches(/^[A-Za-z0-9\-._~]{43,128}$/, {
+    message: "code_challenge must be a base64url S256 challenge (43-128 chars)",
+  })
   @IsOptional()
   code_challenge?: string;
 
   @ApiPropertyOptional({
-    description: "PKCE code challenge method",
-    enum: ["S256", "plain"],
+    description:
+      "PKCE code challenge method. Only S256 is supported (OAuth 2.0 Security BCP / OAuth 2.1). " +
+      "Required whenever code_challenge is sent, because RFC 7636 defaults an absent method to plain.",
+    enum: ["S256"],
     example: "S256",
   })
   @IsString()
-  @IsIn(["S256", "plain"])
+  @IsIn(["S256"], { message: "code_challenge_method must be S256" })
   @IsOptional()
-  code_challenge_method?: "S256" | "plain";
+  code_challenge_method?: "S256";
 }
 
 /**

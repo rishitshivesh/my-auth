@@ -71,7 +71,6 @@ import { RedisService } from "@/common/service/redis.service";
     PermissionService,
     PolicyEvaluationService,
     RbacCacheService,
-    RedisService,
     RolePermission,
   ],
   exports: [

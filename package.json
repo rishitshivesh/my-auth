@@ -5,12 +5,13 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
     "test:coverage": "turbo run test:coverage",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "verify": "turbo run typecheck test"
   },
   "devDependencies": {
     "@types/cache-manager": "^5.0.0",
@@ -26,7 +27,7 @@
     "typescript": "5.9.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.11"
   },
   "packageManager": "yarn@4.11.0",
   "workspaces": [

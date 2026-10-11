@@ -9,9 +9,9 @@ export { SentryClient } from './client';
 export { createFetchTransport } from './transport';
 export {
   createAuthState,
-  setAccessToken,
-  clearAccessToken,
-  isTokenExpired,
+  markAuthenticated,
+  clearAuthentication,
+  isSessionExpiringSoon,
 } from './state';
 
 export type {
@@ -26,6 +26,7 @@ export type {
   SignupCredentials,
   LoginResponse,
   MfaChallenge,
+  SessionClaims,
   AuthEvent,
   AuthEventListener,
   AuthErrorCode,

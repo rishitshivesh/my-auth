@@ -6,6 +6,16 @@ import { SecurityEventService } from '@/common/service/security-event.service';
 import { ValidationPipe } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { TenantBrandingDto } from './dto/tenant-branding.dto';
+import { JwtAuthGuard } from '@/common/guards';
+import { TenantBindingGuard } from '@/common/guards/tenant-binding.guard';
+import { SessionGuard } from '@/common/guards/session.guard';
+import { PermissionsGuard } from '@/modules/rbac/guards/permissions.guard';
+
+/**
+ * Guards are exercised by their own specs and the e2e smoke suite; here they
+ * are replaced so the controller can be unit-tested in isolation.
+ */
+const allowAll = { canActivate: () => true };
 
 // ── DTO validation ─────────────────────────────────────────────
 
@@ -102,7 +112,12 @@ describe('TenantBrandingController – logo upload guards', () => {
         { provide: TenantBrandingService, useValue: mockBrandingService },
         { provide: SecurityEventService, useValue: mockSecurityEvents },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue(allowAll)
+      .overrideGuard(TenantBindingGuard).useValue(allowAll)
+      .overrideGuard(SessionGuard).useValue(allowAll)
+      .overrideGuard(PermissionsGuard).useValue(allowAll)
+      .compile();
 
     controller = module.get(TenantBrandingController);
   });
@@ -184,7 +199,12 @@ describe('TenantBrandingController – save round-trip', () => {
         { provide: TenantBrandingService, useValue: mockBrandingService },
         { provide: SecurityEventService, useValue: mockSecurityEvents },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue(allowAll)
+      .overrideGuard(TenantBindingGuard).useValue(allowAll)
+      .overrideGuard(SessionGuard).useValue(allowAll)
+      .overrideGuard(PermissionsGuard).useValue(allowAll)
+      .compile();
 
     controller = module.get(TenantBrandingController);
   });

@@ -1,6 +1,6 @@
 import { DataSource } from "typeorm";
 import type { PostgresConnectionOptions } from "typeorm/driver/postgres/PostgresConnectionOptions";
-import { dataSourceOptions } from "@repo/database";
+import { buildDataSourceOptions } from "@repo/database";
 import { seed } from "./seeders/tenants.seed";
 import { seedOAuth } from "./seeders/oauth.seed";
 import * as readline from "readline";
@@ -20,18 +20,10 @@ async function askQuestion(query: string): Promise<string> {
 }
 
 async function runReset(): Promise<void> {
-  const dbUrl = process.env.DB_URL ?? process.env.DATABASE_URL;
-  const useSSL = process.env.DB_SSL === "true" || process.env.DATABASE_SSL === "true";
-  const pgBase = dataSourceOptions as PostgresConnectionOptions;
-
-  const connectionOverride: Partial<PostgresConnectionOptions> = dbUrl
-    ? { url: dbUrl, host: undefined, port: undefined, username: undefined, password: undefined, database: undefined }
-    : {};
-
+  // Connection, TLS and pool settings come from the shared builder in
+  // @repo/database (DB_URL | DATABASE_URL | DATABASE_*, DB_SSL, DB_SSL_CA ...).
   const dataSource = new DataSource({
-    ...pgBase,
-    ...connectionOverride,
-    ssl: useSSL ? { rejectUnauthorized: false } : (pgBase.ssl ?? false),
+    ...buildDataSourceOptions(),
     migrationsRun: false,
   } as PostgresConnectionOptions);
 

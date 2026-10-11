@@ -8,15 +8,13 @@ import { useAuth } from '@scrolloop/sdk';
 import { authClient } from '@/lib/auth-client';
 
 function getPostLoginRoute(): string {
-  const claims = authClient.getTokenClaims();
-  if (!claims) return '/u/login';
+  const session = authClient.getSessionClaims();
+  if (!session) return '/u/login';
   const platformSlug = process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? 'sentry';
-  const isPlatformTenant = claims.tenantSlug === platformSlug;
-  const isInternal =
-    Array.isArray(claims.groups) &&
-    (claims.groups as string[]).includes(`${platformSlug}-internal`);
+  const isPlatformTenant = session.tenantSlug === platformSlug;
+  const isInternal = session.groups.includes(`${platformSlug}-internal`);
   if (isPlatformTenant && isInternal) return `/t/${platformSlug}/dashboard`;
-  const slug = (claims.tenantSlug as string) ?? '';
+  const slug = session.tenantSlug ?? '';
   return slug ? `/t/${slug}/dashboard` : '/u/login';
 }
 

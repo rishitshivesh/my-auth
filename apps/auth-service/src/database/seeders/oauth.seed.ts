@@ -1,4 +1,4 @@
-import { DataSource } from "typeorm";
+import { DataSource, DataSourceOptions } from "typeorm";
 import {
   Tenant,
   OAuthClient,
@@ -6,6 +6,7 @@ import {
   Permission,
   User,
   UserRole,
+  buildDataSourceOptions,
 } from "@repo/database";
 import * as crypto from "crypto";
 import { PasswordService } from "@repo/security";
@@ -138,11 +139,23 @@ export async function seedOAuth(dataSource: DataSource): Promise<void> {
   // ------------------------------------------------------------------
   const thirdPartyClientId = "example_client";
 
-  const existingThirdParty = await clientRepo.findOne({
-    where: { tenantId, clientId: thirdPartyClientId },
-  });
+  // Demo client only — confidential client with PKCE disabled pointing at
+  // example.com. Never seeded unless explicitly requested.
+  const seedExampleClients = /^(1|true|yes|on)$/i.test(
+    process.env.SEED_EXAMPLE_CLIENTS ?? "",
+  );
 
-  if (!existingThirdParty) {
+  const existingThirdParty = seedExampleClients
+    ? await clientRepo.findOne({
+        where: { tenantId, clientId: thirdPartyClientId },
+      })
+    : null;
+
+  if (!seedExampleClients) {
+    console.log(
+      "  ⏭️  Skipping example third-party client (set SEED_EXAMPLE_CLIENTS=true to seed it)",
+    );
+  } else if (!existingThirdParty) {
     const thirdPartySecret = crypto.randomBytes(32).toString("hex");
     const thirdPartySecretHash = await PasswordService.hash(thirdPartySecret);
 
@@ -193,14 +206,10 @@ export async function seedOAuth(dataSource: DataSource): Promise<void> {
 // ============================================================
 async function run(): Promise<void> {
   const dataSource = new DataSource({
-    type: "postgres",
-    url: process.env.DATABASE_URL,
+    ...buildDataSourceOptions(),
     entities: [Tenant, OAuthClient, Role, Permission, User, UserRole],
-    ssl:
-      process.env.DATABASE_SSL === "true"
-        ? { rejectUnauthorized: false }
-        : false,
-  });
+    migrations: [],
+  } as DataSourceOptions);
 
   await dataSource.initialize();
   console.log("🔌 Connected to database");

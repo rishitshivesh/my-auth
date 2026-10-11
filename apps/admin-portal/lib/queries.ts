@@ -1031,14 +1031,12 @@ export function useExportAuditCsv(tenantSlug?: string) {
       const qs = buildAuditQs(filters);
       const url = `${authClient.getBaseURL()}/audit/export?${qs}`;
 
-      // Use fetch (not bare <a href>) so we can inject auth headers — a bare
-      // navigation cannot send X-Tenant-Slug, which breaks local dev where
-      // tenant resolution falls back to the header instead of subdomain.
-      const accessToken = await authClient.getAccessToken();
+      // Use fetch (not bare <a href>) so we can send X-Tenant-Slug — a bare
+      // navigation cannot send it, which breaks local dev where tenant
+      // resolution falls back to the header instead of subdomain.
+      // `credentials: 'include'` below sends the httpOnly auth cookie;
+      // no Authorization header is needed (see ADR-0003).
       const headers: Record<string, string> = {};
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
       if (tenantSlug) {
         headers['X-Tenant-Slug'] = tenantSlug;
       }

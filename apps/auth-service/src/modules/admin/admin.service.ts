@@ -30,6 +30,7 @@ import * as os from "os";
 import * as path from "path";
 import { logger } from "@/common/logger";
 import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
+import type { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 
 export interface PlatformMetricsDto {
   totalTenants: number;
@@ -74,12 +75,6 @@ export interface TeamMemberDto {
   addedAt?: Date;
 }
 
-export interface CreateFirstAdminDto {
-  platformName?: string;
-  name: string;
-  email: string;
-  password: string;
-}
 
 export interface FirstAdminResultDto {
   accessToken: string;
@@ -388,6 +383,7 @@ export class AdminService implements OnModuleInit {
     if (dto.plan) (tenant as unknown as Record<string, unknown>).plan = dto.plan;
 
     const saved = await this.tenantRepository.save(tenant);
+    await this.jwksService.ensureTenantKeyExists(saved.id);
 
     if (dto.currentUserId) {
       await this.provisionAdminUser(saved.id, dto.slug, dto.currentUserId);

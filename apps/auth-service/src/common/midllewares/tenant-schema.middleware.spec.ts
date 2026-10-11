@@ -43,7 +43,8 @@ describe('TenantSchemaMiddleware', () => {
 
     mockTenantSchemaService = {
       getSchemaName: jest.fn((slug: string) => `fk_${slug}`),
-      schemaExists: jest.fn().mockResolvedValue(true),
+      isVerifiedAndReady: jest.fn().mockResolvedValue(true),
+      markVerified: jest.fn(),
       createSchema: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<TenantSchemaService>;
 
@@ -89,7 +90,7 @@ describe('TenantSchemaMiddleware', () => {
   });
 
   it('auto-heals missing schema', async () => {
-    mockTenantSchemaService.schemaExists.mockResolvedValue(false);
+    mockTenantSchemaService.isVerifiedAndReady.mockResolvedValue(false);
     const qr = makeQueryRunner();
     mockDataSource.createQueryRunner.mockReturnValue(qr);
 
@@ -100,6 +101,7 @@ describe('TenantSchemaMiddleware', () => {
     await middleware.use(req, res, next);
 
     expect(mockTenantSchemaService.createSchema).toHaveBeenCalledWith('newco');
+    expect(mockTenantSchemaService.markVerified).toHaveBeenCalledWith('newco');
     expect(qr.query).toHaveBeenCalledWith(`SET search_path TO "fk_newco", public`);
     expect(next).toHaveBeenCalledTimes(1);
   });

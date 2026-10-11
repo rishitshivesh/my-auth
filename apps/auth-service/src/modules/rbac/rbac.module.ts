@@ -43,27 +43,12 @@ import { RedisService } from "@/common/service/redis.service";
   ],
   controllers: [RbacController],
   providers: [
-    RbacService,
-    RoleService,
-    PermissionService,
     PolicyService,
     GroupService,
-    PolicyEvaluationService,
-    RbacCacheService,
-    RedisService,
-    PermissionsGuard,
-    RolesGuard,
   ],
-  exports: [
-    RbacService,
-    RoleService,
-    PermissionService,
-    PolicyService,
-    GroupService,
-    PolicyEvaluationService,
-    RbacCacheService,
-    PermissionsGuard,
-    RolesGuard,
-  ],
+  // RbacService, RoleService, PermissionService, PolicyEvaluationService,
+  // RbacCacheService and the RBAC guards are owned by the global GuardsModule
+  // so that a single RbacCacheService instance backs every permission check.
+  exports: [PolicyService, GroupService],
 })
 export class RbacModule {}

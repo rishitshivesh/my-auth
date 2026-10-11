@@ -45,13 +45,21 @@ export interface TransportResponse {
 /**
  * Internal state of the auth session
  * Lives in memory, never persisted
+ *
+ * The SDK never holds the access token itself — it lives only in an httpOnly
+ * cookie the browser cannot read (see docs/adr/0003-access-token-delivery.md).
+ * `authenticated` reflects "did the last login/refresh/getCurrentUser call
+ * succeed", not token possession.
  */
 export interface AuthState {
-  /** Current access token (JWT) */
-  accessToken?: string;
+  /** Whether the client believes it currently has a live session */
+  authenticated: boolean;
 
-  /** Access token expiration timestamp (ms) */
-  accessTokenExp?: number;
+  /** When the current access token is expected to expire (ms epoch), if known */
+  expiresAt?: number;
+
+  /** Non-secret session claims from the last successful login/refresh */
+  session?: SessionClaims;
 
   /** Whether a refresh is currently in progress */
   isRefreshing: boolean;
@@ -93,7 +101,7 @@ export interface SentryConfig {
   maxRefreshRetries?: number;
 
   /** Event listeners */
-  onTokenRefreshed?: (accessToken: string) => void;
+  onTokenRefreshed?: () => void;
   onLogout?: () => void;
   onError?: (error: AuthError) => void;
 }
@@ -115,9 +123,20 @@ export interface SignupCredentials {
   phone?: string;
 }
 
+/**
+ * Non-secret session metadata returned by every endpoint that establishes or
+ * refreshes a session — never the access token itself (ADR-0003).
+ */
+export interface SessionClaims {
+  tenantId: string;
+  tenantSlug: string;
+  groups: string[];
+}
+
 export interface LoginResponse {
-  accessToken: string;
   expiresIn: number;
+  tenantSlug: string;
+  session?: SessionClaims;
   user: User;
   mfaRequired?: boolean;
   mfaChallenge?: MfaChallenge;
@@ -191,7 +210,7 @@ export type AuthErrorCode =
 // ============================================================
 
 export type AuthEvent =
-  | { type: "token_refreshed"; accessToken: string }
+  | { type: "token_refreshed" }
   | { type: "logout" }
   | { type: "error"; error: AuthError }
   | { type: "session_expired" };

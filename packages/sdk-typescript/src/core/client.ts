@@ -3,6 +3,13 @@
  *
  * The session runtime - owns tokens, knows when to refresh
  * Works in any environment (browser, Node, Next.js)
+ *
+ * The access token itself never lives here (see docs/adr/0003-access-token-delivery.md):
+ * it is set by the server as an httpOnly cookie and sent automatically via
+ * `credentials: "include"`. This client tracks only whether a session is
+ * believed to be live (`state.authenticated`), when it is expected to expire
+ * (for proactive refresh), and the non-secret session claims the server
+ * returns alongside the cookie.
  */
 
 import type {
@@ -18,14 +25,14 @@ import type {
   AuthEvent,
   AuthEventListener,
   LoginIntentResponse,
+  SessionClaims,
 } from "./types";
 import { AuthError as AuthErrorClass } from "./types";
 import { createFetchTransport } from "./transport";
 import {
   createAuthState,
-  setAccessToken,
-  clearAccessToken,
-  isTokenExpired,
+  markAuthenticated,
+  clearAuthentication,
   queueRequest,
   flushPendingRequests,
   rejectPendingRequests,
@@ -95,13 +102,7 @@ export class SentryClient {
       } as any;
     }
 
-    // Set access token
-    if (data.accessToken) {
-      setAccessToken(this.state, data.accessToken);
-      this.emit({ type: "token_refreshed", accessToken: data.accessToken });
-      this.config.onTokenRefreshed(data.accessToken);
-    }
-
+    this.onSessionEstablished(data.expiresIn, data.session);
     this.log("Login successful", { email: data.user?.email });
 
     return data;
@@ -143,9 +144,10 @@ export class SentryClient {
   }
 
   /**
-   * Reset password with OTP
+   * Reset password with the code emailed by forgotPassword().
+   * The code is bound to `email`; it is rejected for any other account.
    */
-  async resetPassword(otp: string, password: string): Promise<void> {
+  async resetPassword(email: string, otp: string, password: string): Promise<void> {
     this.log("Reset password with OTP");
     const response = await this.transport({
       url: `${this.config.baseURL}/auth/reset-password`,
@@ -154,7 +156,7 @@ export class SentryClient {
         "Content-Type": "application/json",
         "X-Tenant-Slug": this.config.tenant,
       },
-      body: { otp, password },
+      body: { email, otp, password },
     });
 
     if (!response.ok) {
@@ -182,20 +184,8 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    const accessToken =
-      response.data?.data?.data?.accessToken ||
-      response.data?.data?.accessToken ||
-      response.data?.accessToken;
-    if (!accessToken) {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "No access token in MFA verify response",
-      );
-    }
-
-    setAccessToken(this.state, accessToken);
-    this.emit({ type: "token_refreshed", accessToken });
-    this.config.onTokenRefreshed(accessToken);
+    const data = response.data?.data;
+    this.onSessionEstablished(data?.expiresIn, data?.session);
   }
 
   /**
@@ -230,18 +220,24 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    const accessToken =
-      response.data?.data?.accessToken || response.data?.accessToken;
-    if (!accessToken) {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "No access token in claim-session response",
-      );
-    }
+    const data = response.data?.data;
+    this.onSessionEstablished(data?.expiresIn, data?.session);
 
-    setAccessToken(this.state, accessToken);
-    this.emit({ type: "token_refreshed", accessToken });
-    this.config.onTokenRefreshed(accessToken);
+    // The claim-session completion token carries no tenant/group claims (it
+    // only wraps the access token itself), so `data.session` is always
+    // absent here. Backfill it with one refresh call — the refresh-token
+    // cookie is already set from the OAuth callback step, so this succeeds
+    // silently and brings `getSessionClaims()`/`getUserTenantSlug()` in line
+    // with every other login path. Best-effort: a failure here just leaves
+    // session claims unset until the next natural refresh, it does not
+    // affect the session this method just established.
+    if (!data?.session) {
+      try {
+        await this.refreshOnce();
+      } catch {
+        this.log("Could not backfill session claims after social login");
+      }
+    }
   }
 
   /**
@@ -282,20 +278,8 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    const accessToken =
-      response.data?.data?.data?.accessToken ||
-      response.data?.data?.accessToken ||
-      response.data?.accessToken;
-    if (!accessToken) {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "No access token in magic-link verify response",
-      );
-    }
-
-    setAccessToken(this.state, accessToken);
-    this.emit({ type: "token_refreshed", accessToken });
-    this.config.onTokenRefreshed(accessToken);
+    const data = response.data?.data;
+    this.onSessionEstablished(data?.expiresIn, data?.session);
   }
 
   /**
@@ -339,18 +323,8 @@ export class SentryClient {
       throw this.createError(response);
     }
 
-    const accessToken =
-      response.data?.data?.accessToken || response.data?.accessToken;
-    if (!accessToken) {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "No access token in passkey login response",
-      );
-    }
-
-    setAccessToken(this.state, accessToken);
-    this.emit({ type: "token_refreshed", accessToken });
-    this.config.onTokenRefreshed(accessToken);
+    const data = response.data?.data;
+    this.onSessionEstablished(data?.expiresIn, data?.session);
   }
 
   /**
@@ -398,7 +372,7 @@ export class SentryClient {
       throw err;
     }
 
-    // Step 3: Verify with server (establishes session, sets access token)
+    // Step 3: Verify with server (establishes session, sets auth cookies)
     await this.finishPasskeyLogin(email, assertion, sessionNonce);
   }
 
@@ -582,7 +556,7 @@ export class SentryClient {
   }
 
   /**
-   * ⭐ NEW: Try to restore session from refresh cookie
+   * Try to restore session from refresh cookie on page load
    */
   private async tryRestoreSession(): Promise<void> {
     try {
@@ -600,7 +574,7 @@ export class SentryClient {
   }
 
   /**
-   * ⭐ NEW: Wait for initialization to complete
+   * Wait for initialization (session restore attempt) to complete
    */
   async waitForInit(): Promise<void> {
     if (this.initPromise) {
@@ -641,7 +615,7 @@ export class SentryClient {
    * Get current user
    */
   async getCurrentUser(): Promise<User> {
-    await this.waitForInit(); // ← Add this line
+    await this.waitForInit();
     this.log("Get current user");
 
     const response = await this.request({
@@ -657,78 +631,27 @@ export class SentryClient {
   }
 
   /**
-   * Check if user is authenticated
+   * Check if the client believes it currently has a live session.
+   *
+   * This reflects the outcome of the last login/refresh/session-restore
+   * call, not possession of a credential — the SDK never holds the access
+   * token itself (ADR-0003). A false positive (session actually expired
+   * server-side) is caught by the 401→refresh→retry path on the next request.
    */
   isAuthenticated(): boolean {
-    return (
-      !!this.state.accessToken &&
-      !isTokenExpired(this.state, this.config.refreshMargin)
-    );
+    return this.state.authenticated;
   }
 
   /**
-   * Parse the JWT payload from the current access token.
-   * Returns null if no token is present.
+   * Non-secret session claims (tenantId, tenantSlug, groups) from the last
+   * successful login/refresh. Returns null before any session is established.
    */
-  getTokenClaims(): Record<string, any> | null {
-    if (!this.state.accessToken) return null;
-    try {
-      const payload = JSON.parse(
-        atob(
-          this.state.accessToken
-            .split(".")[1]!
-            .replace(/-/g, "+")
-            .replace(/_/g, "/"),
-        ),
-      );
-      return payload;
-    } catch {
-      return null;
-    }
-  }
-
-  getUserTenantId(): string | null {
-    return this.getTokenClaims()?.tenantId ?? null;
+  getSessionClaims(): SessionClaims | null {
+    return this.state.session ?? null;
   }
 
   getUserTenantSlug(): string | null {
-    return this.getTokenClaims()?.tenantSlug ?? null;
-  }
-
-  isInGroup(groupName: string): boolean {
-    const groups: string[] | undefined = this.getTokenClaims()?.groups;
-    return Array.isArray(groups) && groups.includes(groupName);
-  }
-
-  isSentryInternal(): boolean {
-    const sentryTenantId =
-      typeof process !== "undefined"
-        ? (process.env as any)?.NEXT_PUBLIC_SENTRY_TENANT_ID ||
-          process.env.SENTRY_TENANT_ID
-        : undefined;
-    const claims = this.getTokenClaims();
-    if (!claims) return false;
-    const tenantMatches = sentryTenantId
-      ? claims.tenantId === sentryTenantId
-      : claims.tenantSlug === "sentry";
-    return tenantMatches && this.isInGroup("sentry-internal");
-  }
-
-  /**
-   * Get current access token, silently refreshing if expired.
-   *
-   * Serialized: concurrent calls while a refresh is in-flight all await the
-   * same this.state.refreshPromise rather than issuing duplicate requests.
-   */
-  async getAccessToken(): Promise<string | undefined> {
-    if (isTokenExpired(this.state, this.config.refreshMargin)) {
-      try {
-        await this.refresh();
-      } catch {
-        return undefined;
-      }
-    }
-    return this.state.accessToken;
+    return this.state.session?.tenantSlug ?? null;
   }
 
   // ============================================================
@@ -746,22 +669,17 @@ export class SentryClient {
       return this.queueRequestDuringRefresh(req);
     }
 
-    // Add auth headers
-    const requestWithAuth = this.addAuthHeaders(req);
+    const response = await this.transport(this.withTenantHeaders(req));
 
-    // Make request
-    const response = await this.transport(requestWithAuth);
-
-    // If 401 and we have a token, try to refresh
-    if (response.status === 401 && this.state.accessToken) {
+    // On 401, always try one silent refresh + retry — we have no local
+    // token-possession flag to gate this on, and the attempt is cheap.
+    if (response.status === 401) {
       this.log("Got 401, attempting refresh", req.url);
 
       try {
         await this.refresh();
 
-        // Retry original request with new token
-        const retryRequest = this.addAuthHeaders(req);
-        const retryResponse = await this.transport(retryRequest);
+        const retryResponse = await this.transport(this.withTenantHeaders(req));
 
         if (retryResponse.status === 401) {
           // Still 401 after refresh - session is dead
@@ -786,24 +704,18 @@ export class SentryClient {
   }
 
   /**
-   * Add authorization and tenant headers to request
+   * Add tenant header and cookie credentials to a request.
+   * No Authorization header is ever set — the httpOnly cookie is the only
+   * credential this client sends (ADR-0003).
    */
-  private addAuthHeaders(req: TransportRequest): TransportRequest {
-    const headers = {
-      "Content-Type": "application/json",
-      "X-Tenant-Slug": this.config.tenant,
-      Authorization: "", // Placeholder
-      ...req.headers,
-    };
-
-    // Add access token if available
-    if (this.state.accessToken) {
-      headers["Authorization"] = `Bearer ${this.state.accessToken}`;
-    }
-
+  private withTenantHeaders(req: TransportRequest): TransportRequest {
     return {
       ...req,
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Tenant-Slug": this.config.tenant,
+        ...req.headers,
+      },
       credentials: "include", // Always send cookies
     };
   }
@@ -813,7 +725,7 @@ export class SentryClient {
   // ============================================================
 
   /**
-   * Refresh access token using refresh token cookie
+   * Refresh the session using the refresh token cookie.
    * Concurrency-safe - only one refresh at a time
    */
   private async refresh(): Promise<void> {
@@ -876,8 +788,10 @@ export class SentryClient {
   }
 
   /**
-   * Single refresh attempt
-   * NO refresh token is passed - httpOnly cookie handles it
+   * Single refresh attempt.
+   * No refresh token is passed - the httpOnly cookie handles it, and the
+   * server sets a new access-token cookie; the body carries only
+   * non-secret session metadata.
    */
   private async refreshOnce(): Promise<void> {
     const response = await this.transport({
@@ -898,18 +812,19 @@ export class SentryClient {
       );
     }
 
-    // Update access token
-    const newToken = response.data?.data?.accessToken;
-    if (!newToken) {
-      throw new AuthErrorClass(
-        "REFRESH_FAILED",
-        "No access token in refresh response",
-      );
-    }
+    const data = response.data?.data;
+    this.onSessionEstablished(data?.expiresIn, data?.session);
+  }
 
-    setAccessToken(this.state, newToken);
-    this.emit({ type: "token_refreshed", accessToken: newToken });
-    this.config.onTokenRefreshed(newToken);
+  /**
+   * Record a successful login/refresh/verify: mark the session live, cache
+   * the non-secret claims the server returned, and notify listeners. Never
+   * receives or stores the access token itself.
+   */
+  private onSessionEstablished(expiresIn?: number, session?: SessionClaims): void {
+    markAuthenticated(this.state, expiresIn, session);
+    this.emit({ type: "token_refreshed" });
+    this.config.onTokenRefreshed();
   }
 
   // ============================================================
@@ -960,7 +875,7 @@ export class SentryClient {
   private clearSession(): void {
     this.log("Clearing session");
 
-    clearAccessToken(this.state);
+    clearAuthentication(this.state);
     rejectPendingRequests(
       this.state,
       new AuthErrorClass("SESSION_EXPIRED", "Session expired"),

@@ -41,10 +41,6 @@ import { TenantModule } from "@/modules/tenant/tenant.module";
   controllers: [AdminController, SuperadminSetupController],
   providers: [
     AdminService,
-    RedisService,
-    SessionService,
-    JwksService,
-    OAuthRefreshTokenService,
   ],
 })
 export class AdminModule {}

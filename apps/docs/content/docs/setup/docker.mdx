@@ -1,92 +1,36 @@
 ---
-title: Docker Deployment
-description: Deploy Scrolloop Sentry with Docker Compose or Kubernetes.
+title: Deployment
+description: Local infrastructure with Docker Compose and production requirements.
 ---
 
-# Docker Deployment
+# Deployment
 
-## Local development (Docker Compose)
+## Local infrastructure
 
-The repo ships a `docker-compose.yml` that starts the infrastructure dependencies:
+`docker-compose.yml` at the repository root starts only the backing services:
 
-```bash
-docker-compose up -d
-```
-
-| Service | Port | Notes |
-|---------|------|-------|
-| PostgreSQL 16 | `5432` | Database |
-| Redis 7 | `6379` | Sessions, rate limiting, JWKS cache |
-| Mailhog | `1025` (SMTP), `8025` (UI) | Email catcher for local dev |
-
-The auth-service and admin-portal are run with `yarn dev`, not in Docker, for hot reload.
-
-## Production (full stack in Docker)
-
-Build images from the repo root:
+| Service | Image | Ports |
+|---|---|---|
+| Postgres | `postgres:16-alpine` | 5432 |
+| Redis | `redis:7-alpine` | 6379 |
+| Mailpit | `axllent/mailpit` | 1025 (SMTP), 8025 (UI) |
 
 ```bash
-docker build -f apps/auth-service/Dockerfile -t sentry-auth .
-docker build -f apps/admin-portal/Dockerfile -t sentry-portal .
+docker compose up -d       # start
+docker compose down -v     # stop and wipe data
 ```
 
-Example `docker-compose.prod.yml`:
+## Production checklist
 
-```yaml
-version: '3.9'
-services:
-  auth-service:
-    image: sentry-auth:latest
-    ports: ['4000:4000']
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/scrolloop_sentry
-      REDIS_URL: redis://:password@redis:6379
-      NODE_ENV: production
-      # ... rest of env vars
-    depends_on: [db, redis]
+Container images and a Helm chart are on the roadmap. Until then, run the auth-service with
+`yarn build && yarn start:prod` behind a TLS-terminating proxy, and ensure:
 
-  admin-portal:
-    image: sentry-portal:latest
-    ports: ['3000:3000']
-    environment:
-      NEXT_PUBLIC_AUTH_SERVICE_URL: https://api.yourdomain.com
-      NEXT_PUBLIC_ROOT_DOMAIN: sentry.yourdomain.com
-
-  db:
-    image: postgres:16-alpine
-    volumes: [pgdata:/var/lib/postgresql/data]
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: scrolloop_sentry
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --requirepass password
-
-volumes:
-  pgdata:
-```
-
-## Kubernetes (Helm)
-
-A production-grade Helm chart lives in `helm/`:
-
-```bash
-helm install sentry ./helm \
-  --set authService.env.DATABASE_URL=<value> \
-  --set authService.env.MASTER_ENCRYPTION_KEY=<value> \
-  --set authService.env.SESSION_SECRET=<value>
-```
-
-Key Helm values:
-
-| Value | Description |
-|-------|-------------|
-| `authService.image.tag` | Auth service Docker image tag |
-| `adminPortal.image.tag` | Admin portal Docker image tag |
-| `authService.replicaCount` | Number of auth-service replicas |
-| `authService.env.*` | All environment variables (as a map) |
-| `ingress.enabled` | Enable Kubernetes Ingress |
-| `ingress.host` | Hostname (e.g. `sentry.yourdomain.com`) |
-| `postgresql.enabled` | Use bundled PostgreSQL subchart |
-| `redis.enabled` | Use bundled Redis subchart |
+- `NODE_ENV=production`
+- `TRUST_PROXY` matches your proxy topology (otherwise rate limits key on the proxy IP)
+- `DB_SSL=true` with `DB_SSL_CA` set
+- secrets (`JWT_SECRET`, `SESSION_SECRET`, `KEYRING_MASTER_KEY`, `TOKEN_ENCRYPTION_KEY`) come
+  from a secret manager
+- `COOKIE_DOMAIN` and `SENTRY_PLATFORM_DOMAIN` are set for subdomain tenancy
+- migrations run before the new version starts: `yarn db:migrate`
+- probes: liveness `GET /health`, readiness `GET /health/ready`
+- `SEED_*` and `DISABLE_RATE_LIMIT` are never set

@@ -25,7 +25,6 @@ import { SecurityEventService } from "@/common/service/security-event.service";
   controllers: [EmailController],
   providers: [
     EmailService,
-    SecurityEventService,
     NodeMailerProvider,
     SESProvider,
   ],

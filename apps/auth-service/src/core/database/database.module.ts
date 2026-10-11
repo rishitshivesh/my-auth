@@ -1,31 +1,61 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { TypeOrmModule, TypeOrmModuleOptions } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { dataSourceOptions } from "@repo/database";
+import { buildDataSourceOptions } from "@repo/database";
 import { DataSource, ObjectLiteral, EntityTarget, QueryRunner } from "typeorm";
 import { TenantContextService, tenantStorage } from "./tenant-context.service";
 import { CorsRefreshService } from "@/core/cors-refresh.service";
 import { SessionRepository } from "./session.repository";
+import { TenantJobRunner } from "./tenant-job-runner.service";
 
+const DATABASE_ENV_KEYS = [
+  "DB_URL",
+  "DATABASE_URL",
+  "DATABASE_HOST",
+  "DATABASE_PORT",
+  "DATABASE_USER",
+  "DATABASE_PASSWORD",
+  "DATABASE_NAME",
+  "DB_SSL",
+  "DATABASE_SSL",
+  "DB_SSL_CA",
+  "DB_SSL_REJECT_UNAUTHORIZED",
+  "DB_LOGGING",
+  "DATABASE_LOGGING",
+  "DATABASE_POOL_MAX",
+  "DATABASE_POOL_MIN",
+] as const;
+
+/**
+ * DatabaseModule — the ONE TypeORM root connection for the process.
+ *
+ * @Global so that `SessionRepository`, `TenantContextService` and the
+ * tenant-scoping DataSource are visible to every module (guards such as
+ * SessionGuard are instantiated in the host module's context, so a
+ * non-global DatabaseModule made boot depend on every feature module
+ * remembering to import it).
+ *
+ * The dataSourceFactory wraps getRepository() in a proxy so that every
+ * repository call made inside a tenant request runs on the request's
+ * QueryRunner (whose search_path points at the tenant schema).
+ */
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (
-        configService: ConfigService,
-      ): TypeOrmModuleOptions | Promise<TypeOrmModuleOptions> => {
-        const baseOptions = dataSourceOptions as unknown as Record<string, unknown>;
+      useFactory: (configService: ConfigService): TypeOrmModuleOptions => {
+        // Resolve connection settings from ConfigService (which has loaded
+        // .env by now) rather than from module-import-time process.env.
+        const env: Record<string, string | undefined> = {};
+        for (const key of DATABASE_ENV_KEYS) {
+          env[key] = configService.get<string>(key);
+        }
         return {
-          ...baseOptions,
-          host: configService.get<string>("DATABASE_HOST"),
-          port: configService.get<number>("DATABASE_PORT"),
-          username: configService.get<string>("DATABASE_USER"),
-          password: configService.get<string>("DATABASE_PASSWORD"),
-          database: configService.get<string>("DATABASE_NAME"),
-          logging: configService.get<string>("DATABASE_LOGGING") === "true",
+          ...(buildDataSourceOptions(env) as TypeOrmModuleOptions),
           autoLoadEntities: true,
-          synchronize: false, // NEVER use in production
+          synchronize: false, // schema changes go through migrations only
         };
       },
       dataSourceFactory: async (options) => {
@@ -72,8 +102,8 @@ import { SessionRepository } from "./session.repository";
       },
     }),
   ],
-  providers: [TenantContextService, CorsRefreshService, SessionRepository],
-  exports: [TenantContextService, CorsRefreshService, SessionRepository],
+  providers: [TenantContextService, TenantJobRunner, CorsRefreshService, SessionRepository],
+  exports: [TenantContextService, TenantJobRunner, CorsRefreshService, SessionRepository],
 })
 export class DatabaseModule {}
 

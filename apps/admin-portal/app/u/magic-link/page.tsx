@@ -26,8 +26,8 @@ function MagicLinkInner() {
     verifyMagicLink(token)
       .then(() => {
         setStatus("success")
-        const claims = authClient.getTokenClaims()
-        const slug = (claims?.tenantSlug as string) ?? process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? "sentry"
+        const session = authClient.getSessionClaims()
+        const slug = session?.tenantSlug ?? process.env.NEXT_PUBLIC_SENTRY_TENANT_SLUG ?? "sentry"
         setTimeout(() => router.replace(`/t/${slug}/dashboard`), 1500)
       })
       .catch((err: unknown) => {
