@@ -102,3 +102,11 @@ export class BackupCodesResponseDto {
   @ApiProperty({ description: "Number of codes generated" })
   count!: number;
 }
+
+/** Body of POST /mfa/verify-email-otp. */
+export class VerifyEmailOtpDto {
+  @ApiProperty({ example: "123456", description: "6-digit code from the email" })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "code must be a 6-digit code" })
+  code!: string;
+}

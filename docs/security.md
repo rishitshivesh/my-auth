@@ -19,7 +19,7 @@ gaps. Open gaps reference [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Vulnerabil
 | Refresh tokens | Opaque, hashed at rest, rotated, family revocation on reuse | `OAuthRefreshTokenService` | `session-management.service.spec` |
 | Sessions | Server-side sessions (Postgres + Redis); logout revokes both; tokens rejected after logout | `SessionService`, `SessionGuard` | smoke |
 | Cookies | httpOnly, Secure (production), SameSite=Strict, optional shared domain; one definition | `common/http/auth-cookies.ts` | live header check |
-| MFA | TOTP, Argon2id-hashed backup codes, WebAuthn with atomic counter (replay detection), tenant MFA policy enforced on all login paths | `mfa` module | `mfa-enforcement.spec`, `webauthn.service.spec` |
+| MFA | Email OTP in Redis (hashed, TTL, 5 attempts, single use); TOTP, Argon2id-hashed backup codes, WebAuthn with atomic counter (replay detection), tenant MFA policy enforced on all login paths | `mfa` module | `mfa-enforcement.spec`, `webauthn.service.spec` |
 | Tenant isolation | Schema-per-tenant + `tenant_id` filters + token/tenant binding guard | middleware, guards | `tenant-schema.middleware.spec`, `scripts/verify-tenant-isolation.ts` |
 | Authorization | IAM-style policies, explicit deny, permission boundaries | `rbac` | `policy-evaluation.service.spec`, `rbac-permissions-boundary.spec` |
 | Input validation | Global `ValidationPipe` (whitelist, transform) on class DTOs | `app.module.ts` | — (gaps: P0-5) |
@@ -37,7 +37,6 @@ gaps. Open gaps reference [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Vulnerabil
 | SAML assertions unsigned; SSO endpoint not wired | SAML unusable / unsafe if enabled | P0-3 |
 | Per-tenant signing keys not provisioned | Weaker tenant blast-radius isolation | P0-4 |
 | Some request bodies are not class DTOs | Unvalidated input reaches services | P0-5 |
-| Email OTP codes held in process memory | Fails across replicas/restarts | P0-6 |
 | Access token also returned in response body | Token exposure to page scripts | P0-8 / ADR-0003 |
 | Per-request pinned DB connection | Pool exhaustion → availability | P1-9 |
 | Audit log mutable; no retention / GDPR erasure endpoints | Compliance evidence | P1-13 |

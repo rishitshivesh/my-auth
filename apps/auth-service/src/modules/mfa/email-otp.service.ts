@@ -1,131 +1,111 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
 import * as crypto from "crypto";
 import { EmailService } from "@/modules/email/email.service";
 import { UserService } from "@/modules/user/user.service";
+import { RedisService } from "@/common/service/redis.service";
 import { logger } from "@/common/logger";
 
-interface OtpEntry {
-  code: string;
-  expiresAt: Date;
-  attempts: number;
-}
+/** Six-digit codes, valid for 10 minutes, at most 5 verification attempts. */
+export const EMAIL_OTP_LENGTH = 6;
+export const EMAIL_OTP_TTL_SECONDS = 10 * 60;
+export const EMAIL_OTP_MAX_ATTEMPTS = 5;
 
+const CODE_RESOURCE = "email-otp";
+const ATTEMPTS_RESOURCE = "email-otp-attempts";
+
+/**
+ * Email one-time codes for MFA.
+ *
+ * State lives in Redis (keyed per tenant + user) so codes survive restarts
+ * and work across replicas. The previous implementation kept codes in a
+ * process-local Map, so a code sent by one replica could not be verified by
+ * another, and every restart invalidated outstanding codes.
+ *
+ * Only a SHA-256 hash of the code is stored; comparison is constant-time.
+ */
 @Injectable()
 export class EmailOtpService {
-  // In-memory store (replace with Redis in production)
-  private otpStore = new Map<string, OtpEntry>();
-
   constructor(
     private readonly emailService: EmailService,
     private readonly userService: UserService,
-  ) {
-    // Cleanup expired OTPs every 5 minutes
-    setInterval(() => this.cleanupExpiredOtps(), 5 * 60 * 1000);
-  }
+    private readonly redisService: RedisService,
+  ) {}
 
-  /**
-   * Generate and send OTP via email
-   */
+  /** Generate a code, store its hash, reset the attempt budget, and email it. */
   async sendOtp(userId: string, tenantId: string): Promise<void> {
-    // Generate 6-digit OTP
-    const code = this.generateOtpCode();
     const user = await this.userService.findById(tenantId, userId);
-
     if (!user) {
       throw new NotFoundException("User not found");
     }
 
-    // Store OTP (expires in 10 minutes)
-    const key = `${userId}:${tenantId}`;
-    this.otpStore.set(key, {
-      code: await this.hashCode(code),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      attempts: 0,
-    });
+    const code = crypto
+      .randomInt(0, 10 ** EMAIL_OTP_LENGTH)
+      .toString()
+      .padStart(EMAIL_OTP_LENGTH, "0");
+
+    await this.redisService.set(
+      tenantId,
+      CODE_RESOURCE,
+      userId,
+      EmailOtpService.hash(code),
+      EMAIL_OTP_TTL_SECONDS,
+    );
+    await this.redisService.delete(tenantId, ATTEMPTS_RESOURCE, userId);
 
     await this.emailService.sendOTPEmail(user, code);
-
-    logger.info({ email: user.email }, "OTP sent (expires in 10 minutes)");
+    logger.info({ userId }, "Email OTP sent");
   }
 
   /**
-   * Verify OTP code
+   * Verify a code. Returns false for unknown, expired or wrong codes.
+   * After EMAIL_OTP_MAX_ATTEMPTS wrong guesses the code is destroyed.
+   * A correct code is consumed (single use).
    */
-  async verifyOtp(
-    userId: string,
-    tenantId: string,
-    code: string,
-  ): Promise<boolean> {
-    const key = `${userId}:${tenantId}`;
-    const entry = this.otpStore.get(key);
-
-    if (!entry) {
-      logger.warn("No OTP found for user");
+  async verifyOtp(userId: string, tenantId: string, code: string): Promise<boolean> {
+    const storedHash = await this.redisService.get<string>(tenantId, CODE_RESOURCE, userId);
+    if (!storedHash) {
+      logger.warn({ userId }, "Email OTP not found or expired");
       return false;
     }
 
-    // Check expiration
-    if (entry.expiresAt < new Date()) {
-      logger.warn("OTP expired");
-      this.otpStore.delete(key);
+    const attempts = await this.redisService.incr(tenantId, ATTEMPTS_RESOURCE, userId);
+    if (attempts === 1) {
+      await this.redisService.extendTTL(
+        tenantId,
+        ATTEMPTS_RESOURCE,
+        userId,
+        EMAIL_OTP_TTL_SECONDS,
+      );
+    }
+    if (attempts > EMAIL_OTP_MAX_ATTEMPTS) {
+      await this.invalidate(tenantId, userId);
+      logger.warn({ userId, attempts }, "Email OTP attempt budget exhausted — code destroyed");
       return false;
     }
 
-    // Check attempts (max 5)
-    if (entry.attempts >= 5) {
-      logger.warn("Too many OTP attempts");
-      this.otpStore.delete(key);
+    if (!EmailOtpService.matches(code, storedHash)) {
+      logger.warn({ userId, attempts }, "Invalid email OTP");
       return false;
     }
 
-    // Increment attempts
-    entry.attempts++;
-
-    // Verify code
-    const hashedCode = await this.hashCode(code);
-    if (hashedCode !== entry.code) {
-      logger.warn("Invalid OTP code");
-      return false;
-    }
-
-    // Valid! Delete OTP (one-time use)
-    this.otpStore.delete(key);
-    logger.info("OTP verified");
+    await this.invalidate(tenantId, userId);
+    logger.info({ userId }, "Email OTP verified");
     return true;
   }
 
-  /**
-   * Generate 6-digit OTP
-   */
-  private generateOtpCode(): string {
-    return crypto.randomInt(100000, 999999).toString();
+  private async invalidate(tenantId: string, userId: string): Promise<void> {
+    await this.redisService.delete(tenantId, CODE_RESOURCE, userId);
+    await this.redisService.delete(tenantId, ATTEMPTS_RESOURCE, userId);
   }
 
-  /**
-   * Hash OTP code for storage
-   */
-  private async hashCode(code: string): Promise<string> {
+  private static hash(code: string): string {
     return crypto.createHash("sha256").update(code).digest("hex");
   }
 
-  /**
-   * Cleanup expired OTPs
-   */
-  private cleanupExpiredOtps(): void {
-    const now = new Date();
-    let cleaned = 0;
-
-    for (const [key, entry] of this.otpStore.entries()) {
-      if (entry.expiresAt < now) {
-        this.otpStore.delete(key);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      logger.info({ count: cleaned }, "Cleaned up expired OTPs");
-    }
+  private static matches(code: string, storedHash: string): boolean {
+    if (!/^\d+$/.test(code)) return false;
+    const presented = Buffer.from(EmailOtpService.hash(code), "hex");
+    const stored = Buffer.from(storedHash, "hex");
+    return presented.length === stored.length && crypto.timingSafeEqual(presented, stored);
   }
 }

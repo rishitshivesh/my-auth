@@ -24,6 +24,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | CI: typecheck, unit tests, boot + e2e smoke |
 | ✅ | P0-1 Docs consolidation (this file, README, AGENTS.md, architecture, security, ADRs) |
 | ✅ | P0-2 Background jobs run per tenant (`TenantJobRunner`) |
+| ✅ | P0-6 Email OTP moved to Redis |
 | ✅ | P0-7 PKCE is S256-only and mandatory for public clients |
 
 ## P0 — correctness & security
@@ -49,13 +50,13 @@ active + retired keys.
 
 **P0-5 🔜 Request bodies that bypass validation.** About 15 `@Body()` parameters are typed as
 inline objects, `object`, interfaces or bare `string` (admin tenant status/featureFlags, social
-provider toggle, WebAuthn register/finish, social claim `{ ct }`, `{ code }`, `{ email }` ×2, five
+provider toggle, WebAuthn register/finish, social claim `{ ct }`, `{ email }` ×2, five
 `string` bodies). Convert each to a `class-validator` DTO.
 *AC:* `grep` finds no `@Body()` whose type is not a DTO class; invalid payloads return 400.
 
-**P0-6 🔜 Email OTP stored in process memory** (`EmailOtpService` `Map` + `setInterval`).
-Breaks with >1 replica or a restart. Move to Redis with TTL and an attempt budget (same pattern
-as password reset). *AC:* unit test; works across two service instances.
+**P0-6 ✅ Email OTP stored in process memory.** Fixed: codes live in Redis per tenant + user
+(hash only, 10-minute TTL, 5-attempt budget, single use, constant-time compare). Tests:
+`email-otp.service.spec` (incl. cross-replica); verified live.
 
 **P0-7 ✅ PKCE `plain` accepted and advertised.** Fixed: authorize accepts only
 `code_challenge_method=S256` (explicit, since RFC 7636 defaults to plain), validates challenge

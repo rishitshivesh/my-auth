@@ -25,6 +25,7 @@ import {
   MfaStatusDto,
   MfaEnabledResponseDto,
   BackupCodesResponseDto,
+  VerifyEmailOtpDto,
 } from "./dto/mfa.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
@@ -289,7 +290,7 @@ export class MfaController {
     summary: "Verify email OTP code",
     description: "Verify the 6-digit code received via email",
   })
-  async verifyEmailOtp(@Request() req: AuthenticatedRequest, @Body() dto: { code: string }) {
+  async verifyEmailOtp(@Request() req: AuthenticatedRequest, @Body() dto: VerifyEmailOtpDto) {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
