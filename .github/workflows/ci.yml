@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Typecheck (auth-service, admin-portal, SDK)
+        run: |
+          yarn workspace auth-service typecheck
+          yarn workspace admin-portal exec tsc --noEmit
+          yarn workspace @scrolloop/sdk typecheck
+      - name: Unit tests (auth-service)
+        run: yarn workspace auth-service test --ci
+
+  e2e-smoke:
+    name: Boot + end-to-end smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scrolloop_sentry
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d scrolloop_sentry"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      NODE_ENV: test
+      PORT: 4000
+      ISSUER_BASE_URL: http://localhost:4000
+      FRONTEND_URL: http://localhost:3000
+      JWT_ISSUER: http://localhost:4000
+      CORS_ORIGINS: http://localhost:3000
+      DB_URL: postgresql://postgres:postgres@localhost:5432/scrolloop_sentry
+      REDIS_HOST: localhost
+      SENTRY_SETUP_LOG_DIR: ${{ github.workspace }}/.sentry
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Generate ephemeral secrets
+        working-directory: apps/auth-service
+        run: |
+          {
+            echo "JWT_SECRET=$(openssl rand -hex 32)"
+            echo "SESSION_SECRET=$(openssl rand -hex 32)"
+            echo "KEYRING_MASTER_KEY=$(openssl rand -base64 32)"
+            echo "TOKEN_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Migrate
+        working-directory: apps/auth-service
+        run: yarn db:migrate
+      - name: Seed
+        working-directory: apps/auth-service
+        run: yarn db:seed
+      - name: Boot
+        working-directory: apps/auth-service
+        run: |
+          nohup yarn dev > /tmp/auth-service.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4000/health >/dev/null && exit 0
+            sleep 2
+          done
+          cat /tmp/auth-service.log; exit 1
+      - name: Smoke test
+        run: |
+          SETUP_TOKEN=$(grep -o 'FIRST RUN SETUP TOKEN: [a-f0-9]*' /tmp/auth-service.log | tail -1 | awk '{print $NF}')
+          SETUP_TOKEN="$SETUP_TOKEN" scripts/smoke-test.sh
+      - name: Service log on failure
+        if: failure()
+        run: tail -200 /tmp/auth-service.log
