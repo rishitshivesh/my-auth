@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule, TypeOrmModuleOptions } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { dataSourceOptions } from "@repo/database";
-import { DataSource, ObjectLiteral, EntityTarget, QueryRunner } from "typeorm";
+import { DataSource, DataSourceOptions, ObjectLiteral, EntityTarget, QueryRunner } from "typeorm";
 import { TenantContextService, tenantStorage } from "./tenant-context.service";
 import { CorsRefreshService } from "@/core/cors-refresh.service";
 import { SessionRepository } from "./session.repository";
@@ -28,7 +28,7 @@ import { SessionRepository } from "./session.repository";
           synchronize: false, // NEVER use in production
         };
       },
-      dataSourceFactory: async (options) => {
+      dataSourceFactory: async (options: DataSourceOptions | undefined) => {
         if (!options) {
           throw new Error("No DataSourceOptions provided");
         }

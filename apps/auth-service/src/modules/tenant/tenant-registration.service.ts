@@ -300,6 +300,19 @@ export class TenantRegistrationService {
       await qr.commitTransaction();
       transactionStarted = false;
 
+      // Insert cross-tenant membership record in public schema (best-effort — do not roll back tenant on failure)
+      try {
+        await qr.query(`SET search_path TO public, extensions`);
+        await qr.query(
+          `INSERT INTO public.user_tenant_memberships (user_id, user_email, tenant_id, tenant_slug, role_slug)
+           VALUES ($1, $2, $3, $4, 'owner')
+           ON CONFLICT (user_id, tenant_id) DO NOTHING`,
+          [result.user.id, result.user.email, tenant.id, tenant.slug],
+        );
+      } catch (membershipErr) {
+        logger.warn({ err: membershipErr, tenantId: tenant.id }, "Failed to insert user_tenant_memberships — non-fatal");
+      }
+
       logger.info(
         { tenantId: tenant.id, slug: tenant.slug },
         "Tenant self-service registration completed",

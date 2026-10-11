@@ -3,6 +3,7 @@ import { JwksService } from "./jwks.service";
 import { Repository } from "typeorm";
 import { KeyPair } from "@repo/database";
 import { ConfigService } from "@nestjs/config";
+import { EncryptionService } from "@repo/security";
 
 const MASTER_KEY = "0123456789abcdef0123456789abcdef";
 
@@ -72,9 +73,9 @@ describe("JwksService", () => {
         algorithm: "RS256",
         use: "sig",
         publicKeyPem,
-        encryptedPrivateKey: privateKeyPem,
-        iv: "test-iv",
-        authTag: "",
+        encryptedPrivateKey: "encrypted-placeholder",
+        iv: "aabbccddeeff0011aabbccdd",
+        authTag: "aabbccddeeff00112233445566778899",
         status: "active",
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
@@ -93,31 +94,24 @@ describe("JwksService", () => {
         getOrThrow: jest.fn().mockReturnValue(MASTER_KEY),
       } as unknown as ConfigService;
 
-      jest.mock("@repo/security", () => ({
-        EncryptionService: {
-          encrypt: jest.fn().mockResolvedValue({
-            encrypted: "enc",
-            iv: "",
-            authTag: "tag",
-          }),
-          decrypt: jest
-            .fn()
-            .mockResolvedValue(privateKeyPem),
-        },
-      }));
+      // Spy on the static decrypt so the real AES-GCM path is never hit
+      const decryptSpy = jest
+        .spyOn(EncryptionService, 'decrypt')
+        .mockResolvedValue(privateKeyPem);
 
-      const { EncryptionService } = jest.requireMock("@repo/security");
-      EncryptionService.decrypt.mockResolvedValue(privateKeyPem);
+      try {
+        const service = new JwksService(mockRepo, mockConfig);
+        await service.onModuleInit();
 
-      const service = new JwksService(mockRepo, mockConfig);
-      await service.onModuleInit();
-
-      const jwks = service.getJWKS();
-      expect(jwks.keys).toHaveLength(1);
-      expect(jwks.keys[0]?.kid).toBe("platform-kid");
-      expect(jwks.keys[0]?.kty).toBe("RSA");
-      expect(jwks.keys[0]?.alg).toBe("RS256");
-      expect(jwks.keys[0]?.e).toBe("AQAB");
+        const jwks = service.getJWKS();
+        expect(jwks.keys).toHaveLength(1);
+        expect(jwks.keys[0]?.kid).toBe("platform-kid");
+        expect(jwks.keys[0]?.kty).toBe("RSA");
+        expect(jwks.keys[0]?.alg).toBe("RS256");
+        expect(jwks.keys[0]?.e).toBe("AQAB");
+      } finally {
+        decryptSpy.mockRestore();
+      }
     });
   });
 });

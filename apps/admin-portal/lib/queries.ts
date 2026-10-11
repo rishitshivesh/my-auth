@@ -185,6 +185,30 @@ export function useTenantSettings() {
   });
 }
 
+export function useCurrentTenant() {
+  return useQuery<{ id: string; name: string; slug: string }>({
+    queryKey: ["tenant", "current"],
+    queryFn: withErrorHandler<[], { id: string; name: string; slug: string }>(
+      async () => authClient.request({ url: apiUrl("/tenants/current"), method: "GET" })
+    ),
+  });
+}
+
+export function useUpdateTenantName() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; name: string }, Error, string>({
+    mutationFn: withErrorHandler<[string], { id: string; name: string }>(
+      async (name) => authClient.request({
+        url: apiUrl("/tenants/current/name"),
+        method: "PATCH",
+        body: { name },
+      }),
+      { successMessage: "Workspace name updated", showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "settings"] }),
+  });
+}
+
 export function useUpdateTenantSettings() {
   const qc = useQueryClient();
   return useMutation<void, Error, { featureFlags: Record<string, boolean> }>({
@@ -647,6 +671,36 @@ export function useUploadLogo() {
       { showErrorToast: true }
     ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", "branding"] }),
+  });
+}
+
+// ─── Tenant MFA Policy ───────────────────────────────────────
+
+export interface TenantMfaPolicy {
+  id?: string;
+  enforceForAllUsers: boolean;
+  enforceForAdmins: boolean;
+  gracePeriodDays: number;
+  exemptRoleSlugs: string[];
+}
+
+export function useTenantMfaPolicy() {
+  return useQuery<TenantMfaPolicy>({
+    queryKey: ['tenant', 'mfa-policy'],
+    queryFn: withErrorHandler<[], TenantMfaPolicy>(
+      async () => authClient.request({ url: apiUrl('/tenant/mfa-policy'), method: 'GET' })
+    ),
+  });
+}
+
+export function useUpdateTenantMfaPolicy() {
+  const qc = useQueryClient();
+  return useMutation<TenantMfaPolicy, Error, TenantMfaPolicy>({
+    mutationFn: withErrorHandler<[TenantMfaPolicy], TenantMfaPolicy>(
+      async (body) => authClient.request({ url: apiUrl('/tenant/mfa-policy'), method: 'PATCH', body }),
+      { successMessage: 'MFA policy updated', showSuccessToast: true, showErrorToast: true }
+    ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenant', 'mfa-policy'] }),
   });
 }
 

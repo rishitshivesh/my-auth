@@ -7,6 +7,7 @@ import { Session, Tenant } from "@repo/database";
 import { RedisService } from "./redis.service";
 import { ConfigService } from "@nestjs/config";
 import { logger } from "@/common/logger";
+import { SessionRepository } from "@/core/database/session.repository";
 
 export interface SessionData {
   id: string;
@@ -32,6 +33,7 @@ export class SessionService {
     private readonly cacheManager: Cache,
     private redisService: RedisService,
     private configService: ConfigService,
+    private readonly sessionRepository: SessionRepository,
   ) {
     this.sessionTTL = this.configService.get("SESSION_TTL", 604800); // 7 days
   }
@@ -342,27 +344,12 @@ export class SessionService {
 
   /**
    * Get active sessions for user
+   *
+   * Uses SessionRepository (TenantAwareRepository) so queries route through the
+   * correct fk_{slug} schema established by TenantSchemaMiddleware.
    */
   async getUserSessions(tenantId: string, userId: string): Promise<Session[]> {
-    const schemaName = await this.getSchemaName(tenantId);
-    const rows = await this.dataSource.manager.query(
-      `SELECT * FROM "${schemaName}"."sessions"
-       WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
-       ORDER BY last_activity DESC`,
-      [userId, tenantId]
-    );
-    return rows.map((rawSession: Record<string, unknown>) => ({
-      id: rawSession['id'] as string,
-      userId: rawSession['user_id'] as string,
-      tenantId: rawSession['tenant_id'] as string,
-      refreshTokenFamilyId: rawSession['refresh_token_family_id'] as string | null,
-      refreshTokenHash: rawSession['refresh_token_hash'] as string | null,
-      ipAddress: rawSession['ip_address'] as string | null,
-      userAgent: rawSession['user_agent'] as string | null,
-      deviceId: rawSession['device_id'] as string | null,
-      lastActivity: rawSession['last_activity'] ? new Date(rawSession['last_activity'] as string) : null,
-      expiresAt: rawSession['expires_at'] ? new Date(rawSession['expires_at'] as string) : null,
-      createdAt: rawSession['created_at'] ? new Date(rawSession['created_at'] as string) : null,
-    })) as Session[];
+    // Defense-in-depth: tenantId filter retained alongside schema-level isolation
+    return this.sessionRepository.findActiveByUserId(userId, tenantId);
   }
 }

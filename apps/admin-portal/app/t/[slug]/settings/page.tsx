@@ -6,10 +6,15 @@ import { GlassCard, PageHeader, SentryButton, SentryInput, SentrySkeleton } from
 import {
   useTenantSettings,
   useUpdateTenantSettings,
+  useUpdateTenantName,
+  useCurrentTenant,
   useUpdateSocialProvider,
   useBranding,
   useUpdateBranding,
   useUploadLogo,
+  useTenantMfaPolicy,
+  useUpdateTenantMfaPolicy,
+  type TenantMfaPolicy,
 } from '@/lib/queries';
 import { FONT_FAMILY_OPTIONS, type HeaderWeight, type BackgroundStyle } from '@/lib/types';
 import { useParams } from 'next/navigation';
@@ -32,11 +37,44 @@ export default function SettingsPage() {
 
   const { data: settings, isLoading: settingsLoading } = useTenantSettings();
   const { mutate: updateSettings, isPending: settingsSaving } = useUpdateTenantSettings();
+  const { mutate: updateTenantName, isPending: nameSaving } = useUpdateTenantName();
+  const { data: currentTenant } = useCurrentTenant();
   const { mutate: updateSocialProvider, isPending: socialSaving } = useUpdateSocialProvider();
+
+  const [workspaceName, setWorkspaceName] = React.useState('');
+  React.useEffect(() => {
+    if (currentTenant?.name) setWorkspaceName(currentTenant.name);
+  }, [currentTenant]);
 
   const { data: branding, isLoading: brandingLoading } = useBranding();
   const { mutate: updateBranding, isPending: brandingSaving } = useUpdateBranding();
   const { mutate: uploadLogo, isPending: logoUploading } = useUploadLogo();
+
+  const { data: mfaPolicy, isLoading: mfaPolicyLoading } = useTenantMfaPolicy();
+  const { mutate: updateMfaPolicy, isPending: mfaPolicySaving } = useUpdateTenantMfaPolicy();
+
+  const [mfaEnforcement, setMfaEnforcement] = React.useState<'none' | 'admins' | 'all'>('none');
+  const [mfaGracePeriod, setMfaGracePeriod] = React.useState<number>(7);
+
+  React.useEffect(() => {
+    if (mfaPolicy) {
+      if (mfaPolicy.enforceForAllUsers) setMfaEnforcement('all');
+      else if (mfaPolicy.enforceForAdmins) setMfaEnforcement('admins');
+      else setMfaEnforcement('none');
+      setMfaGracePeriod(mfaPolicy.gracePeriodDays ?? 7);
+    }
+  }, [mfaPolicy]);
+
+  const handleSaveMfaPolicy = () => {
+    const draft: TenantMfaPolicy = {
+      ...(mfaPolicy ?? {}),
+      enforceForAllUsers: mfaEnforcement === 'all',
+      enforceForAdmins: mfaEnforcement !== 'none',
+      gracePeriodDays: mfaGracePeriod,
+      exemptRoleSlugs: mfaPolicy?.exemptRoleSlugs ?? [],
+    };
+    updateMfaPolicy(draft);
+  };
 
   const [activeTab, setActiveTab] = React.useState<Tab>('general');
 
@@ -62,30 +100,6 @@ export default function SettingsPage() {
     }
   }, [branding]);
 
-  const [graceDays, setGraceDays] = React.useState('7');
-  React.useEffect(() => {
-    if (settings?.featureFlags) {
-      if (settings.featureFlags.mfa_grace_1d) setGraceDays('1');
-      else if (settings.featureFlags.mfa_grace_3d) setGraceDays('3');
-      else if (settings.featureFlags.mfa_grace_5d) setGraceDays('5');
-      else if (settings.featureFlags.mfa_grace_7d) setGraceDays('7');
-      else if (settings.featureFlags.mfa_grace_14d) setGraceDays('14');
-    }
-  }, [settings]);
-
-  const handleGraceDaysChange = (value: string) => {
-    setGraceDays(value);
-    updateSettings({
-      featureFlags: {
-        ...settings?.featureFlags,
-        mfa_grace_1d: value === '1',
-        mfa_grace_3d: value === '3',
-        mfa_grace_5d: value === '5',
-        mfa_grace_7d: value === '7',
-        mfa_grace_14d: value === '14',
-      }
-    });
-  };
 
 
   return (
@@ -128,6 +142,26 @@ export default function SettingsPage() {
           {activeTab === 'general' && (
             <div className="space-y-6">
               <GlassCard tier={1} className="p-8 space-y-6">
+                <div className="flex items-end justify-between gap-4">
+                  <SentryInput
+                    label="Workspace Name"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    placeholder="Acme Corp"
+                    className="flex-1"
+                  />
+                  <SentryButton
+                    variant="accent"
+                    size="sm"
+                    isLoading={nameSaving}
+                    disabled={!workspaceName.trim() || workspaceName.trim() === currentTenant?.name}
+                    onClick={() => updateTenantName(workspaceName.trim())}
+                    className="shrink-0 mb-0.5"
+                  >
+                    <Save className="w-3.5 h-3.5 mr-2" />
+                    Save
+                  </SentryButton>
+                </div>
                 <SentryInput
                   label="Workspace Slug"
                   value={slug}
@@ -407,28 +441,87 @@ export default function SettingsPage() {
               </GlassCard>
 
               <GlassCard tier={1} className="p-8 space-y-6">
-                <h3 className="text-sm font-display font-semibold">MFA & Authentication Policies</h3>
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-display font-bold uppercase tracking-[0.09em] text-muted-foreground block">
-                      MFA Grace Period
-                    </label>
-                    <select
-                      value={graceDays}
-                      onChange={(e) => handleGraceDaysChange(e.target.value)}
-                      className="w-full h-[42px] px-4 rounded-sm border border-border bg-black/5 text-sm font-body focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all cursor-pointer"
-                    >
-                      <option value="1">1 Day</option>
-                      <option value="3">3 Days</option>
-                      <option value="5">5 Days</option>
-                      <option value="7">7 Days (Default)</option>
-                      <option value="14">14 Days</option>
-                    </select>
-                    <p className="text-xs font-body text-muted-foreground mt-1.5">
-                      The maximum duration (grace period) a user can log in and access this tenant's console without enabling multi-factor authentication (MFA).
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-display font-semibold">MFA Enforcement Policy</h3>
+                  <SentryButton
+                    variant="accent"
+                    size="sm"
+                    isLoading={mfaPolicySaving}
+                    onClick={handleSaveMfaPolicy}
+                  >
+                    <Save className="w-3.5 h-3.5 mr-2" />
+                    Save Policy
+                  </SentryButton>
                 </div>
+
+                {mfaPolicyLoading ? (
+                  <div className="space-y-3">
+                    <SentrySkeleton className="h-12 w-full" />
+                    <SentrySkeleton className="h-12 w-full" />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Enforcement radio group */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-display font-bold uppercase tracking-[0.09em] text-muted-foreground block">
+                        Require MFA for
+                      </label>
+                      <div className="space-y-2">
+                        {([
+                          { value: 'none', label: 'No enforcement', description: 'Users choose whether to enable MFA' },
+                          { value: 'admins', label: 'Admins only', description: 'Users with admin roles must enroll in MFA' },
+                          { value: 'all', label: 'All users', description: 'Every user must enroll in MFA before accessing the workspace' },
+                        ] as const).map((opt) => (
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              'flex items-start gap-3 p-4 rounded-sm border cursor-pointer transition-all',
+                              mfaEnforcement === opt.value
+                                ? 'border-accent bg-accent/5'
+                                : 'border-border bg-black/5 hover:bg-black/10'
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="mfa-enforcement"
+                              value={opt.value}
+                              checked={mfaEnforcement === opt.value}
+                              onChange={() => setMfaEnforcement(opt.value)}
+                              className="mt-0.5 accent-accent"
+                            />
+                            <div>
+                              <p className="text-sm font-body font-medium">{opt.label}</p>
+                              <p className="text-xs font-body text-muted-foreground mt-0.5">{opt.description}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Grace period */}
+                    {mfaEnforcement !== 'none' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-display font-bold uppercase tracking-[0.09em] text-muted-foreground block">
+                          Enrollment Grace Period
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <SentryInput
+                            type="number"
+                            min={0}
+                            max={90}
+                            value={String(mfaGracePeriod)}
+                            onChange={(e) => setMfaGracePeriod(Number(e.target.value))}
+                            className="w-24"
+                          />
+                          <span className="text-sm font-body text-muted-foreground">days</span>
+                        </div>
+                        <p className="text-xs font-body text-muted-foreground">
+                          How many days users have to enroll in MFA after the policy is enforced. Set to 0 for immediate enforcement.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </GlassCard>
             </div>
           )}

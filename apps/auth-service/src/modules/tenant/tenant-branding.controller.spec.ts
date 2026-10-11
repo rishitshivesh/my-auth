@@ -6,6 +6,12 @@ import { SecurityEventService } from '@/common/service/security-event.service';
 import { ValidationPipe } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { TenantBrandingDto } from './dto/tenant-branding.dto';
+import { JwtAuthGuard } from '@/common/guards';
+import { TenantBindingGuard } from '@/common/guards/tenant-binding.guard';
+import { SessionGuard } from '@/common/guards/session.guard';
+import { PermissionsGuard } from '@/modules/rbac/guards/permissions.guard';
+
+const PASS_GUARD = { canActivate: () => true };
 
 // ── DTO validation ─────────────────────────────────────────────
 
@@ -102,7 +108,12 @@ describe('TenantBrandingController – logo upload guards', () => {
         { provide: TenantBrandingService, useValue: mockBrandingService },
         { provide: SecurityEventService, useValue: mockSecurityEvents },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue(PASS_GUARD)
+      .overrideGuard(TenantBindingGuard).useValue(PASS_GUARD)
+      .overrideGuard(SessionGuard).useValue(PASS_GUARD)
+      .overrideGuard(PermissionsGuard).useValue(PASS_GUARD)
+      .compile();
 
     controller = module.get(TenantBrandingController);
   });
@@ -184,7 +195,12 @@ describe('TenantBrandingController – save round-trip', () => {
         { provide: TenantBrandingService, useValue: mockBrandingService },
         { provide: SecurityEventService, useValue: mockSecurityEvents },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard).useValue(PASS_GUARD)
+      .overrideGuard(TenantBindingGuard).useValue(PASS_GUARD)
+      .overrideGuard(SessionGuard).useValue(PASS_GUARD)
+      .overrideGuard(PermissionsGuard).useValue(PASS_GUARD)
+      .compile();
 
     controller = module.get(TenantBrandingController);
   });

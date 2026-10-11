@@ -1,6 +1,5 @@
 "use client"
 
-import { useQueryClient } from "@tanstack/react-query"
 import {
   useTenantClients,
   useDeleteTenantClient,
@@ -10,17 +9,14 @@ import type { Client } from "@/lib/types"
 import { useState } from "react"
 import { Button } from "@repo/ui"
 import { StatusBadge } from "./status-badge"
-import { CreateApplicationModal } from "./create-application-modal"
 import { format } from "date-fns"
 import { Loader2, Plus, RotateCcw, Trash2 } from "lucide-react"
 
 interface ApplicationsTableProps {
-  tenantSlug: string
+  onCreateClick: () => void
 }
 
-export function ApplicationsTable({ tenantSlug }: ApplicationsTableProps) {
-  const queryClient = useQueryClient()
-  const [showCreateModal, setShowCreateModal] = useState(false)
+export function ApplicationsTable({ onCreateClick }: ApplicationsTableProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<Client | null>(null)
   const [deleteInput, setDeleteInput] = useState("")
   const [revealedSecret, setRevealedSecret] = useState<{ id: string; secret: string } | null>(null)
@@ -72,19 +68,9 @@ export function ApplicationsTable({ tenantSlug }: ApplicationsTableProps) {
     return (
       <div className="py-10 text-center">
         <p className="text-sm text-muted-foreground mb-4">No applications yet.</p>
-        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+        <Button size="sm" onClick={onCreateClick}>
           <Plus className="w-4 h-4 mr-1" /> Create Application
         </Button>
-        {showCreateModal && (
-          <CreateApplicationModal
-            tenantSlug={tenantSlug}
-            onClose={() => setShowCreateModal(false)}
-            onCreated={() => {
-              void queryClient.invalidateQueries({ queryKey: ["tenant", "clients"] })
-              setShowCreateModal(false)
-            }}
-          />
-        )}
       </div>
     )
   }
@@ -215,16 +201,6 @@ export function ApplicationsTable({ tenantSlug }: ApplicationsTableProps) {
         </div>
       )}
 
-      {showCreateModal && (
-        <CreateApplicationModal
-          tenantSlug={tenantSlug}
-          onClose={() => setShowCreateModal(false)}
-          onCreated={() => {
-            void queryClient.invalidateQueries({ queryKey: ["tenant", "clients"] })
-            setShowCreateModal(false)
-          }}
-        />
-      )}
     </div>
   )
 }

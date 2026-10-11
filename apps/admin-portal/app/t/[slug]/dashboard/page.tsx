@@ -204,7 +204,7 @@ export default function DashboardPage() {
               icon={Plus} 
               title="Add Application" 
               desc="Integrate Sentry with a new service"
-              href={`/t/${slug}/applications/new`}
+              href={`/t/${slug}/applications`}
             />
             <QuickActionCard 
               icon={Users} 

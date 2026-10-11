@@ -126,8 +126,10 @@ function PasskeySection({ email, onSuccess }: { email: string; onSuccess?: () =>
     try {
       const serverData = await startPasskeyLogin(email);
       const { sessionNonce, ...optionsJSON } = serverData;
-      const { startAuthentication } = await import('@simplewebauthn/browser');
-      const assertion = await startAuthentication({ optionsJSON });
+      const simplewebauthn = await import('@simplewebauthn/browser' as string) as {
+        startAuthentication: (opts: { optionsJSON: Record<string, unknown> }) => Promise<unknown>;
+      };
+      const assertion = await simplewebauthn.startAuthentication({ optionsJSON });
       await finishPasskeyLogin(email, assertion, sessionNonce);
       setStatus('success');
       onSuccess?.();
@@ -211,9 +213,23 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
     try {
       const result = await client.login({ email: flow.email, password });
 
-      if (result.mfaRequired && result.mfaChallenge) {
-        setMfaTempToken(result.mfaChallenge.tempToken);
-        setMfaScreen(result.mfaChallenge.methods.includes('totp') ? 'totp' : 'sms');
+      // Cast to inspect the union type returned by login
+      const loginResult = result as {
+        mfaRequired?: boolean;
+        mfaChallenge?: { tempToken: string; methods: string[] };
+        status?: string;
+        enrollmentToken?: string;
+      };
+
+      if (loginResult.status === 'mfa_enrollment_required' && loginResult.enrollmentToken) {
+        // Backend requires MFA enrollment before granting access
+        router.push(`/mfa/enroll?token=${encodeURIComponent(loginResult.enrollmentToken)}`);
+        return;
+      }
+
+      if (loginResult.mfaRequired && loginResult.mfaChallenge) {
+        setMfaTempToken(loginResult.mfaChallenge.tempToken);
+        setMfaScreen(loginResult.mfaChallenge.methods.includes('totp') ? 'totp' : 'sms');
         setMfaDigits(['', '', '', '', '', '']);
         setMfaError(null);
         return;

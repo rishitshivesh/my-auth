@@ -24,7 +24,7 @@ export default function ApplicationsPage() {
       <div className="space-y-6">
         <div className="rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 text-lg font-semibold text-foreground">Your Applications</h3>
-          <ApplicationsTable tenantSlug={slug} />
+          <ApplicationsTable onCreateClick={() => setShowCreate(true)} />
         </div>
       </div>
 
