@@ -11,6 +11,7 @@ import type { CookieOptions, Response } from "express";
 export const ACCESS_TOKEN_COOKIE = "accessToken";
 export const REFRESH_TOKEN_COOKIE = "refreshToken";
 export const MFA_ENROLLMENT_COOKIE = "mfa_enrollment_token";
+export const SAML_SSO_NONCE_COOKIE = "saml_sso_nonce";
 
 /** Matches the RS256 access-token TTL. */
 export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
@@ -19,6 +20,8 @@ export const ACCESS_TOKEN_TTL_SECONDS = ACCESS_TOKEN_MAX_AGE_MS / 1000;
 /** Matches the refresh-token TTL issued by OAuthRefreshTokenService. */
 export const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const MFA_ENROLLMENT_MAX_AGE_MS = 5 * 60 * 1000;
+/** Matches the Redis TTL on the stashed pending SAML request. */
+export const SAML_SSO_NONCE_MAX_AGE_MS = 10 * 60 * 1000;
 
 function baseOptions(): CookieOptions {
   const domain = process.env["COOKIE_DOMAIN"] || undefined;
@@ -68,4 +71,26 @@ export function setMfaEnrollmentCookie(res: Response, enrollmentToken: string): 
     path: "/mfa/enroll",
     maxAge: MFA_ENROLLMENT_MAX_AGE_MS,
   });
+}
+
+/**
+ * Binds a stashed (pre-login) SAML SSO request to the browser that
+ * initiated it, so GET /saml/sso/continue/:nonce can refuse to complete a
+ * request whose nonce didn't come from a cookie this same browser holds —
+ * otherwise an attacker could stash their own SSO request, get the nonce,
+ * and trick a logged-in victim into visiting the continuation URL, silently
+ * completing SSO to an attacker-chosen SP under the victim's identity.
+ */
+export function setSamlSsoNonceCookie(res: Response, nonce: string): void {
+  const { domain: _domain, ...options } = baseOptions();
+  res.cookie(SAML_SSO_NONCE_COOKIE, nonce, {
+    ...options,
+    path: "/saml/sso",
+    maxAge: SAML_SSO_NONCE_MAX_AGE_MS,
+  });
+}
+
+export function clearSamlSsoNonceCookie(res: Response): void {
+  const { domain: _domain, maxAge: _maxAge, ...options } = baseOptions();
+  res.clearCookie(SAML_SSO_NONCE_COOKIE, { ...options, path: "/saml/sso" });
 }

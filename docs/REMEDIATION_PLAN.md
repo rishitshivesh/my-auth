@@ -52,6 +52,12 @@ same key is generated on the fly (`@peculiar/x509` + WebCrypto) and cached in me
 persisted. *AC met:* `saml.service.spec.ts` signs a response, validates it with a reference SP
 (`samlify.ServiceProvider.parseLoginResponse`), then tampers one byte and confirms that SP rejects
 it.
+Post-commit review follow-ups: (1) the SSO continuation nonce is now bound to the initiating
+browser via a short-lived cookie (`saml_sso_nonce`), closing a login-CSRF path where a leaked
+nonce could be completed from a different browser — fixed. (2) cross-tenant signing-key reuse
+(every tenant shares the platform key) is a known, explicitly-documented limitation tracked under
+P0-4, not fixed here. Two further findings from that review were not delivered with enough detail
+to act on (notification body was truncated) — flagged to the user; re-run if needed.
 
 **P0-4 🔜 Per-tenant signing keys are not real.** `getCurrentSigningKey(tenantId)` falls back to
 the platform key and provisioning never creates tenant keys. Write an ADR choosing either

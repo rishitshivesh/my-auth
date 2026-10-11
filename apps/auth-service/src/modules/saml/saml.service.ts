@@ -136,6 +136,17 @@ export class SamlService {
     return cert.toString("pem");
   }
 
+  /**
+   * KNOWN LIMITATION, tracked as P0-4 (not fixed here): this query has no
+   * tenant filter, so every tenant's SAML IdP — and the self-signed cert
+   * wrapping it — uses the exact same platform signing key. There is no
+   * cryptographic separation between tenants' SAML assertions until P0-4
+   * (real per-tenant signing keys) ships; this matches the existing,
+   * pre-P0-3 behavior of `getIdpMetadata()` and JWT issuance, it is not a
+   * regression introduced by SAML signing. Do not silently widen this
+   * query's scope without also addressing key provisioning/rotation per
+   * tenant — that's P0-4's job, not a one-line fix here.
+   */
   private async getActiveKeyPair(): Promise<{ publicKeyPem: string; privateKeyPem: string; signingCertPem: string }> {
     const keyPair = await this.keyPairRepo.findOne({
       where: { status: "active" },

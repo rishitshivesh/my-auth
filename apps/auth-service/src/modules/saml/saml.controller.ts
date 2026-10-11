@@ -21,10 +21,16 @@ import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 import { SamlService, SamlPostBinding } from "./saml.service";
+import {
+  setSamlSsoNonceCookie,
+  clearSamlSsoNonceCookie,
+  SAML_SSO_NONCE_COOKIE,
+} from "@/common/http/auth-cookies";
 
 interface AuthenticatedRequest {
   tenantId?: string;
   user?: { sub: string; tid?: string; tenantId?: string };
+  cookies?: Record<string, string>;
 }
 import { RegisterSPDto, UpdateSPDto } from "./saml.dto";
 
@@ -70,6 +76,10 @@ export class SamlController {
         samlRequest,
         relayState ?? "",
       );
+      // Bind the nonce to this browser so a different browser (e.g. a
+      // victim tricked into visiting a leaked continuation URL) can't
+      // complete someone else's stashed SSO request — see continueSSO.
+      setSamlSsoNonceCookie(res, nonce);
       return res.redirect(`/u/login?saml_continue=${nonce}`);
     }
 
@@ -95,6 +105,11 @@ export class SamlController {
    * Called by the hosted login page after a session is established for a
    * request that was stashed by handlePostSSO. One-time use — the nonce is
    * consumed whether or not the request is valid.
+   *
+   * Requires the `saml_sso_nonce` cookie set by handlePostSSO to match the
+   * `:nonce` path param — without this, anyone who learns a valid nonce
+   * (not just the browser that generated it) could get a victim to complete
+   * someone else's SSO request under the victim's own identity.
    */
   @UseGuards(RequestUserGuard)
   @Get("sso/continue/:nonce")
@@ -106,6 +121,11 @@ export class SamlController {
     if (!req.user?.sub) {
       return res.redirect(`/u/login?saml_continue=${nonce}`);
     }
+
+    if (req.cookies?.[SAML_SSO_NONCE_COOKIE] !== nonce) {
+      throw new UnauthorizedException("SSO continuation does not match this browser session");
+    }
+    clearSamlSsoNonceCookie(res);
 
     const pending = await this.samlService.popPendingRequest(nonce);
     if (!pending) {
