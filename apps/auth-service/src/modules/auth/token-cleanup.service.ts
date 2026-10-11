@@ -5,6 +5,8 @@ import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { SessionManagementService } from "@/modules/session/session-management.service";
+import { TenantJobRunner } from "@/core/database/tenant-job-runner.service";
+import { logger } from "@/common/logger";
 
 /**
  * TokenCleanupService
@@ -24,6 +26,7 @@ export class TokenCleanupService {
     private readonly sessionManagementService: SessionManagementService,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    private readonly tenantJobRunner: TenantJobRunner,
   ) {}
 
   /**
@@ -110,20 +113,18 @@ export class TokenCleanupService {
     timeZone: "UTC",
   })
   async hourlyCleanup() {
-    this.logger.debug("🧹 Starting hourly token cleanup...");
+    this.logger.debug("Starting hourly token cleanup");
 
-    try {
-      // Quick cleanup without tenant iteration
-      const deleted =
-        await this.oauthRefreshTokenService.cleanupExpiredTokens();
+    let deleted = 0;
+    const summary = await this.tenantJobRunner.forEachActiveTenant(
+      "token-cleanup-hourly",
+      async (tenant) => {
+        deleted += await this.oauthRefreshTokenService.cleanupExpiredTokens(tenant.id);
+      },
+    );
 
-      if (deleted > 0) {
-        this.logger.log(`Hourly cleanup: deleted ${deleted} expired tokens`);
-      }
-    } catch (error: unknown) {
-      this.logger.error("❌ Hourly token cleanup failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    if (deleted > 0 || summary.tenantsFailed > 0) {
+      logger.info({ deleted, ...summary }, "Hourly token cleanup finished");
     }
   }
 
@@ -137,21 +138,27 @@ export class TokenCleanupService {
     timeZone: "UTC",
   })
   async fifteenMinuteSessionCleanup() {
-    this.logger.debug("🧹 Starting 15-minute session cleanup...");
+    this.logger.debug("Starting 15-minute session cleanup");
 
-    try {
-      const { sessionsCleanedUp, tokensRevoked } =
-        await this.sessionManagementService.cleanupExpiredSessions();
+    let sessionsCleanedUp = 0;
+    let tokensRevoked = 0;
+    // cleanupExpiredSessions() uses tenant-aware repositories, so it must run
+    // inside a tenant context — without one it queried the public schema,
+    // where the sessions table does not exist, and failed every 15 minutes.
+    const summary = await this.tenantJobRunner.forEachActiveTenant(
+      "session-cleanup-15m",
+      async () => {
+        const result = await this.sessionManagementService.cleanupExpiredSessions();
+        sessionsCleanedUp += result.sessionsCleanedUp;
+        tokensRevoked += result.tokensRevoked;
+      },
+    );
 
-      if (sessionsCleanedUp > 0) {
-        this.logger.log(
-          `15m session cleanup: removed ${sessionsCleanedUp} sessions, revoked ${tokensRevoked} tokens`,
-        );
-      }
-    } catch (error: unknown) {
-      this.logger.error("❌ 15-minute session cleanup failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+    if (sessionsCleanedUp > 0 || summary.tenantsFailed > 0) {
+      logger.info(
+        { sessionsCleanedUp, tokensRevoked, ...summary },
+        "15-minute session cleanup finished",
+      );
     }
   }
 

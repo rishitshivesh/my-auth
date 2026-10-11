@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { logger } from "@/common/logger";
+import { tenantSchemaName } from "./tenant-schema-name";
 
 @Injectable()
 export class TenantSchemaService {
@@ -12,7 +13,7 @@ export class TenantSchemaService {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   getSchemaName(tenantSlug: string): string {
-    return `fk_${tenantSlug.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`;
+    return tenantSchemaName(tenantSlug);
   }
 
   /**

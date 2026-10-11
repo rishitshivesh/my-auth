@@ -6,6 +6,7 @@ import { DataSource, ObjectLiteral, EntityTarget, QueryRunner } from "typeorm";
 import { TenantContextService, tenantStorage } from "./tenant-context.service";
 import { CorsRefreshService } from "@/core/cors-refresh.service";
 import { SessionRepository } from "./session.repository";
+import { TenantJobRunner } from "./tenant-job-runner.service";
 
 const DATABASE_ENV_KEYS = [
   "DB_URL",
@@ -101,8 +102,8 @@ const DATABASE_ENV_KEYS = [
       },
     }),
   ],
-  providers: [TenantContextService, CorsRefreshService, SessionRepository],
-  exports: [TenantContextService, CorsRefreshService, SessionRepository],
+  providers: [TenantContextService, TenantJobRunner, CorsRefreshService, SessionRepository],
+  exports: [TenantContextService, TenantJobRunner, CorsRefreshService, SessionRepository],
 })
 export class DatabaseModule {}
 

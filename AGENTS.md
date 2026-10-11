@@ -39,8 +39,9 @@ changes (module boundaries, schema strategy, public API shape).
   request-scoped QueryRunner held in `AsyncLocalStorage` (`TenantContextService`); the
   DataSource proxy in `DatabaseModule` routes repository calls through it.
 - Keep `tenant_id` filters in every tenant query (defence in depth) — never remove them.
-- Code that runs **outside a request** (cron, queues, CLI) has no tenant context. It must iterate
-  tenants and run each unit inside `TenantContextService` explicitly.
+- Code that runs **outside a request** (cron, queues, CLI) has no tenant context. Use
+  `TenantJobRunner.forEachActiveTenant()` / `runInTenant()` — never call tenant repositories
+  directly from a job.
 - Raw SQL must obtain schema names from `TenantSchemaService.getSchemaName()`, never by
   string-building from user input.
 

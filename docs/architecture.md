@@ -101,4 +101,6 @@ cached by the single `RbacCacheService`.
 - DB connection: `buildDataSourceOptions()` in `packages/database` — used by the runtime,
   migrations, seeders and scripts.
 - Health: `GET /health` (liveness), `GET /health/ready` (Postgres + Redis, 503 when degraded).
-- Background work: `@nestjs/schedule` crons (token/session cleanup), BullMQ (webhook delivery).
+- Background work: `@nestjs/schedule` crons (token/session cleanup) run per tenant through
+  `TenantJobRunner` (tenant QueryRunner + cluster-wide advisory lock so one replica runs each
+  job); BullMQ handles webhook delivery.

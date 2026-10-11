@@ -23,16 +23,15 @@ Legend: ✅ done · 🔜 open
 | ✅ | 16 failing unit tests; audit metadata leaked secrets nested in arrays |
 | ✅ | CI: typecheck, unit tests, boot + e2e smoke |
 | ✅ | P0-1 Docs consolidation (this file, README, AGENTS.md, architecture, security, ADRs) |
+| ✅ | P0-2 Background jobs run per tenant (`TenantJobRunner`) |
 
 ## P0 — correctness & security
 
-**P0-2 🔜 Background jobs run without tenant context.**
-`TokenCleanupService` / `SessionManagementService.cleanupExpiredSessions` use
-`TenantAwareRepository` outside a request, so they query `public`, where tenant tables do not
-exist. Fix: iterate active tenants; run each unit inside `TenantContextService` bound to that
-tenant's schema (helper: `runInTenant(slug, fn)`).
-*AC:* unit test with two tenants proves expired rows are purged in both schemas; no cron error
-in logs over a 15-minute run.
+**P0-2 ✅ Background jobs run without tenant context.** Fixed: `TenantJobRunner`
+(`core/database`) runs work per active tenant inside a tenant QueryRunner, behind a
+cluster-wide advisory lock; hourly token and 15-minute session cleanups use it. Verified live
+(expired sessions in `fk_sentry` purged) and by `tenant-job-runner.service.spec`. Any new
+background job must use `TenantJobRunner`.
 
 **P0-3 🔜 SAML assertions unsigned; `/saml/sso` not wired** (`saml.service.ts`,
 `saml.controller.ts` — `SPRINT_N` markers). Implement XML-DSig with `xml-crypto` using the

@@ -33,7 +33,6 @@ gaps. Open gaps reference [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Vulnerabil
 
 | Gap | Risk | Plan item |
 |---|---|---|
-| Cron cleanups run without tenant context | Expired sessions/tokens not purged | P0-2 |
 | SAML assertions unsigned; SSO endpoint not wired | SAML unusable / unsafe if enabled | P0-3 |
 | Per-tenant signing keys not provisioned | Weaker tenant blast-radius isolation | P0-4 |
 | Some request bodies are not class DTOs | Unvalidated input reaches services | P0-5 |
