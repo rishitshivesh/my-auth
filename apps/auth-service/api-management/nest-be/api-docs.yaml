@@ -6113,6 +6113,52 @@
           "Ldap"
         ]
       }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "AuditController_listAuditEvents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "List audit events with server-side filters",
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
+    "/audit/export": {
+      "get": {
+        "operationId": "AuditController_exportAuditEvents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Export audit events as CSV",
+        "tags": [
+          "Audit"
+        ]
+      }
     }
   },
   "info": {
