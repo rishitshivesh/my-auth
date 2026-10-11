@@ -54,7 +54,7 @@ export function ResetPasswordForm({ primaryColor }: ResetPasswordFormProps) {
     }
     setLoading(true)
     try {
-      await resetPassword(otp, password)
+      await resetPassword(email, otp, password)
       router.push("/u/login?reset=success")
     } catch (err: any) {
       setError(err?.message || "Invalid or expired code. Please try again.")

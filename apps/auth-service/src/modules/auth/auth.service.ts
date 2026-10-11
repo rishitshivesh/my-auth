@@ -29,6 +29,7 @@ import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import { RedisService } from "@/common/service/redis.service";
 import { SessionService } from "@/common/service/session.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
@@ -49,6 +50,11 @@ import { logger } from "@/common/logger";
  * - Session management (tenant-scoped)
  * - Security event logging (tenant-scoped)
  */
+const PASSWORD_RESET_OTP_LENGTH = 6;
+const PASSWORD_RESET_TTL_SECONDS = 15 * 60;
+const PASSWORD_RESET_MAX_ATTEMPTS = 5;
+const PASSWORD_RESET_ATTEMPTS_RESOURCE = "pwreset-attempts";
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -79,6 +85,7 @@ export class AuthService {
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly securityEventService: SecurityEventService,
     private readonly jwksService: JwksService,
+    private readonly redisService: RedisService,
   ) {}
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
@@ -509,15 +516,21 @@ export class AuthService {
       return;
     }
 
-    // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate OTP with a CSPRNG (was Math.random)
+    const otp = crypto
+      .randomInt(0, 10 ** PASSWORD_RESET_OTP_LENGTH)
+      .toString()
+      .padStart(PASSWORD_RESET_OTP_LENGTH, "0");
     const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+
+    // A new code resets the attempt budget
+    await this.redisService.delete(tenantId, PASSWORD_RESET_ATTEMPTS_RESOURCE, user.id);
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
       {
         passwordResetToken: otpHash,
-        passwordResetExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+        passwordResetExpiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_SECONDS * 1000),
       },
     );
 
@@ -659,21 +672,75 @@ export class AuthService {
   /**
    * Reset password with token (TENANT SCOPED)
    */
-  async resetPassword(tenantId: string, otp: string, newPassword: string) {
-    const tokenHash = crypto.createHash("sha256").update(otp).digest("hex");
-
+  async resetPassword(
+    tenantId: string,
+    email: string,
+    otp: string,
+    newPassword: string,
+    ipAddress = "0.0.0.0",
+  ) {
+    // The code is bound to ONE account (tenant + email). Looking users up by
+    // code alone let an attacker brute-force the 6-digit space and reset the
+    // password of whichever user had an outstanding code.
     const user = await this.userRepository
       .createQueryBuilder("user")
       .addSelect("user.passwordResetToken")
       .addSelect("user.passwordHash")
       .addSelect("user.passwordHistory")
-      .where("user.passwordResetToken = :tokenHash", { tokenHash })
-      .andWhere("user.tenantId = :tenantId", { tenantId }) // ← Tenant filter
-      .andWhere("user.passwordResetExpiresAt > :now", { now: new Date() })
+      .where("user.tenantId = :tenantId", { tenantId }) // ← Tenant filter
+      .andWhere("LOWER(user.email) = LOWER(:email)", { email })
       .getOne();
 
-    if (!user) {
-      throw new BadRequestException("Invalid or expired password reset token");
+    const invalid = () =>
+      new BadRequestException("Invalid or expired password reset code");
+
+    if (
+      !user ||
+      !user.passwordResetToken ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt <= new Date()
+    ) {
+      throw invalid();
+    }
+
+    // Per-account attempt budget. Exceeding it burns the code, so guessing
+    // is capped at PASSWORD_RESET_MAX_ATTEMPTS tries per issued code.
+    const attempts = await this.redisService.incr(
+      tenantId,
+      PASSWORD_RESET_ATTEMPTS_RESOURCE,
+      user.id,
+    );
+    if (attempts === 1) {
+      await this.redisService.extendTTL(
+        tenantId,
+        PASSWORD_RESET_ATTEMPTS_RESOURCE,
+        user.id,
+        PASSWORD_RESET_TTL_SECONDS,
+      );
+    }
+    if (attempts > PASSWORD_RESET_MAX_ATTEMPTS) {
+      await this.userRepository.update(
+        { id: user.id, tenantId },
+        { passwordResetToken: null as unknown as string, passwordResetExpiresAt: null as unknown as Date },
+      );
+      await this.redisService.delete(tenantId, PASSWORD_RESET_ATTEMPTS_RESOURCE, user.id);
+      this.securityEventService.log({
+        userId: user.id,
+        tenantId,
+        actorEmail: user.email,
+        eventType: SecurityEventType.BRUTE_FORCE_THRESHOLD,
+        severity: "warning",
+        ipAddress,
+        userAgent: "system",
+        metadata: { flow: "password_reset", attempts },
+      });
+      throw invalid();
+    }
+
+    const presented = crypto.createHash("sha256").update(otp).digest();
+    const stored = Buffer.from(user.passwordResetToken, "hex");
+    if (stored.length !== presented.length || !crypto.timingSafeEqual(stored, presented)) {
+      throw invalid();
     }
 
     // Validate new password
@@ -710,10 +777,13 @@ export class AuthService {
       {
         passwordHash: newPasswordHash,
         passwordHistory: updatedHistory,
-        passwordResetToken: undefined,
-        passwordResetExpiresAt: undefined,
+        // `undefined` is skipped by TypeORM's update(); null actually clears
+        // the columns so the code cannot be replayed.
+        passwordResetToken: null as unknown as string,
+        passwordResetExpiresAt: null as unknown as Date,
       },
     );
+    await this.redisService.delete(tenantId, PASSWORD_RESET_ATTEMPTS_RESOURCE, user.id);
 
     // Log password reset
     this.securityEventService.log({
@@ -729,18 +799,11 @@ export class AuthService {
     // Send password changed confirmation email
     await this.emailService.sendPasswordChangedEmail(user);
 
-    // Revoke all sessions IN THIS TENANT (force re-login)
-    await this.sessionRepository.update(
-      {
-        userId: user.id,
-        tenantId, // ← Tenant filter
-        revokedAt: IsNull(),
-      },
-      {
-        revokedAt: new Date(),
-        revokedReason: "password_reset",
-      },
-    );
+    // Revoke every session and refresh token IN THIS TENANT (force re-login).
+    // SessionService clears the Redis session cache too — updating only the
+    // sessions table left cached sessions valid for up to SESSION_TTL.
+    await this.sessionService.revokeAllUserSessions(tenantId, user.id, "password_reset");
+    await this.oauthRefreshTokenService.revokeAllUserTokens(user.id, tenantId, "password_reset");
   }
 
   /**

@@ -221,6 +221,7 @@ export class AuthController {
    * Reset password with token
    */
   @Post("reset-password")
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reset password using token" })
   @ApiResponse({ status: 200, description: "Password reset successful" })
@@ -228,13 +229,16 @@ export class AuthController {
   async resetPassword(
     @Req() req: Request,
     @Body() resetPasswordDto: ResetPasswordDto,
+    @Ip() ip: string,
   ) {
     const tenantId = req.tenantId!;
 
     await this.authService.resetPassword(
       tenantId,
+      resetPasswordDto.email,
       resetPasswordDto.otp,
       resetPasswordDto.password,
+      ip,
     );
     return { message: "Password reset successfully" };
   }
@@ -243,6 +247,7 @@ export class AuthController {
    * Verify email address
    */
   @Post("verify-email")
+  @RateLimit({ max: 20, windowMs: 900000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Verify email address" })
   @ApiResponse({ status: 200, description: "Email verified successfully" })
@@ -257,6 +262,7 @@ export class AuthController {
    * Resend verification email
    */
   @Post("resend-verification")
+  @RateLimit({ max: 3, windowMs: 3600000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resend email verification" })
   @ApiResponse({ status: 200, description: "Verification email sent" })

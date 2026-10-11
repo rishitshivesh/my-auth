@@ -143,9 +143,10 @@ export class SentryClient {
   }
 
   /**
-   * Reset password with OTP
+   * Reset password with the code emailed by forgotPassword().
+   * The code is bound to `email`; it is rejected for any other account.
    */
-  async resetPassword(otp: string, password: string): Promise<void> {
+  async resetPassword(email: string, otp: string, password: string): Promise<void> {
     this.log("Reset password with OTP");
     const response = await this.transport({
       url: `${this.config.baseURL}/auth/reset-password`,
@@ -154,7 +155,7 @@ export class SentryClient {
         "Content-Type": "application/json",
         "X-Tenant-Slug": this.config.tenant,
       },
-      body: { otp, password },
+      body: { email, otp, password },
     });
 
     if (!response.ok) {

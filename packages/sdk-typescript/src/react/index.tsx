@@ -27,7 +27,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (otp: string, password: string) => Promise<void>;
+  resetPassword: (email: string, otp: string, password: string) => Promise<void>;
 
   // MFA
   verifyMfaLogin: (tempToken: string, code: string) => Promise<void>;
@@ -183,10 +183,10 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     }
   };
 
-  const resetPassword = async (otp: string, password: string) => {
+  const resetPassword = async (email: string, otp: string, password: string) => {
     try {
       setError(null);
-      await client.resetPassword(otp, password);
+      await client.resetPassword(email, otp, password);
     } catch (err) {
       setError(err as Error);
       throw err;
