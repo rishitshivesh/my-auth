@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { ConfigService } from "@nestjs/config";
 import { TenantJobRunner } from "@/core/database/tenant-job-runner.service";
@@ -15,12 +15,16 @@ import { logger } from "@/common/logger";
  * Then revokes any retired key past KEY_ROTATION_GRACE_DAYS, so tokens
  * signed before a rotation keep verifying only within that grace window.
  *
- * The platform key is rotated the same way but outside the per-tenant
- * advisory lock (it isn't a tenant) — see ADR-0004's Consequences for why
- * that's an accepted, harmless gap rather than a second lock primitive.
+ * The platform key's rotation runs under its own cluster-wide advisory
+ * lock (TenantJobRunner.runExclusive) — without it, two replicas racing
+ * the 3 AM cron could each decide the platform key is due and both
+ * generate a new "active" row, leaving two simultaneously-active platform
+ * keys with nothing to reconcile them.
  */
 @Injectable()
 export class KeyRotationService {
+  private readonly logger = new Logger(KeyRotationService.name);
+
   constructor(
     private readonly jwksService: JwksService,
     private readonly tenantJobRunner: TenantJobRunner,
@@ -32,22 +36,34 @@ export class KeyRotationService {
     timeZone: "UTC",
   })
   async dailyRotation(): Promise<void> {
-    const activeTtlDays = this.configService.get<number>("KEY_ACTIVE_TTL_DAYS", 90);
-    const graceDays = this.configService.get<number>("KEY_ROTATION_GRACE_DAYS", 7);
+    try {
+      const activeTtlDays = this.configService.get<number>("KEY_ACTIVE_TTL_DAYS", 90);
+      const graceDays = this.configService.get<number>("KEY_ROTATION_GRACE_DAYS", 7);
 
-    await this.jwksService.rotateIfDue(null, activeTtlDays);
+      await this.tenantJobRunner.runExclusive("key-rotation-platform", () =>
+        this.jwksService.rotateIfDue(null, activeTtlDays),
+      );
 
-    const summary = await this.tenantJobRunner.forEachActiveTenant(
-      "key-rotation-daily",
-      async (tenant) => {
-        await this.jwksService.rotateIfDue(tenant.id, activeTtlDays);
-      },
-    );
+      const summary = await this.tenantJobRunner.forEachActiveTenant(
+        "key-rotation-daily",
+        async (tenant) => {
+          await this.jwksService.rotateIfDue(tenant.id, activeTtlDays);
+        },
+      );
 
-    const revoked = await this.jwksService.revokeExpiredRetiredKeys(graceDays);
+      const revoked = await this.jwksService.revokeExpiredRetiredKeys(graceDays);
 
-    if (revoked > 0 || summary.tenantsFailed > 0) {
-      logger.info({ revoked, ...summary }, "Daily key rotation finished");
+      if (revoked > 0 || summary.tenantsFailed > 0) {
+        logger.info({ revoked, ...summary }, "Daily key rotation finished");
+      }
+    } catch (error: unknown) {
+      // Never let a rotation failure vanish silently — a stuck/misconfigured
+      // rotation job (e.g. KEYRING_MASTER_KEY rotated out from under it)
+      // should be loud, not leave keys un-rotated with no visibility.
+      this.logger.error("Daily key rotation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
   }
 }

@@ -48,13 +48,20 @@ material once every tenant has its own key.
   fixed.
 
 ## Consequences
-- Platform-key rotation runs unlocked across replicas (the per-tenant advisory lock only covers
-  the tenant loop) — worst case is momentary double-rotation of the platform key, which is
-  harmless key churn, not a correctness bug. Not worth a second lock primitive for this.
 - Tenants created before this ships get their dedicated key on the next rotation-job tick
   (within 24h), not instantly — acceptable since they were sharing the platform key safely
   until then anyway.
-- **Security review follow-ups, both fixed before merge:**
+- **Security review follow-ups, all fixed before merge:**
+  - Platform-key rotation initially ran unlocked across replicas (the per-tenant advisory lock
+    only covered the tenant loop) — this was first accepted here as "harmless double-rotation
+    churn," but a follow-up review correctly identified it as a real race: two replicas could
+    each decide the platform key is due, both generate a new "active" row, and leave two
+    simultaneously-active platform keys with nothing to reconcile them (not just harmless churn).
+    Fixed: `TenantJobRunner.runExclusive()` is now a public, reusable version of the same
+    cluster-wide advisory lock `forEachActiveTenant` already used internally; platform-key
+    rotation runs under it (job name `key-rotation-platform`). `dailyRotation()` also gained a
+    top-level try/catch so a failure (e.g. a misconfigured `KEYRING_MASTER_KEY`) is logged loudly
+    instead of vanishing as an unhandled cron rejection.
   - The in-memory signing-key cache (`JwksService.signingKeys`) was originally trusted
     indefinitely once populated. Since rotation now runs automatically and only updates the
     cache of the replica that performed it (the one holding the advisory lock that tick), every

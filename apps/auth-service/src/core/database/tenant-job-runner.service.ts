@@ -67,7 +67,7 @@ export class TenantJobRunner {
     jobName: string,
     work: (tenant: TenantJobTarget) => Promise<void>,
   ): Promise<TenantJobSummary> {
-    return this.withJobLock(jobName, async () => {
+    const { ran, result } = await this.runExclusive(jobName, async () => {
       const tenants = await this.dataSource.manager.find(Tenant, {
         where: { active: true },
         select: { id: true, slug: true, name: true },
@@ -90,14 +90,28 @@ export class TenantJobRunner {
         }
       }
 
-      return { ran: true, tenantsProcessed: tenants.length, tenantsFailed };
+      return { tenantsProcessed: tenants.length, tenantsFailed };
     });
+
+    return ran
+      ? { ran: true, ...result! }
+      : { ran: false, tenantsProcessed: 0, tenantsFailed: 0 };
   }
 
-  private async withJobLock(
+  /**
+   * Run `work` while holding a cluster-wide Postgres advisory lock keyed by
+   * `jobName`, so when several replicas fire the same cron only one of them
+   * runs it. Non-blocking: if another replica already holds the lock,
+   * returns `{ ran: false }` immediately instead of running `work`.
+   *
+   * Use this directly (instead of `forEachActiveTenant`) for scheduled work
+   * that isn't per-tenant — e.g. a platform-wide step that must not run
+   * concurrently with itself across replicas.
+   */
+  async runExclusive<T>(
     jobName: string,
-    body: () => Promise<TenantJobSummary>,
-  ): Promise<TenantJobSummary> {
+    work: () => Promise<T>,
+  ): Promise<{ ran: boolean; result?: T }> {
     const lockRunner = this.dataSource.createQueryRunner();
     await lockRunner.connect();
     try {
@@ -107,10 +121,11 @@ export class TenantJobRunner {
       );
       if (!rows[0]?.locked) {
         this.logger.debug({ jobName }, "Job already running on another replica — skipped");
-        return { ran: false, tenantsProcessed: 0, tenantsFailed: 0 };
+        return { ran: false };
       }
       try {
-        return await body();
+        const result = await work();
+        return { ran: true, result };
       } finally {
         await lockRunner.query("SELECT pg_advisory_unlock(hashtext($1)::bigint)", [
           `job:${jobName}`,
