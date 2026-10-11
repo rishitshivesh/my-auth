@@ -155,7 +155,7 @@
 | Log retention configuration | ✅ | ❌ | |
 | GDPR: data export | ✅ | ✅ | `/api/audit/gdpr-export` |
 | GDPR: right to erasure | ✅ | ✅ | `/api/audit/gdpr-delete` |
-| GDPR: IP anonymization | ✅ | ✅ | GDPR_IP_SALT hashing |
+| GDPR: IP anonymization | ✅ | 🔜 | Planned (REMEDIATION_PLAN P1-13) |
 | SOC 2 Type II | ✅ | ⚠️ | Architecture is SOC 2 ready; cert requires infra audit |
 | HIPAA BAA availability | ✅ | ❌ | |
 | PCI DSS | ❌ | ❌ | Neither handles card data |
@@ -197,7 +197,7 @@
 | Swagger / OpenAPI docs | ✅ | ✅ | NestJS Swagger wired |
 | Local dev setup (Docker Compose) | ✅ | ✅ | postgres + redis + mailhog |
 | Self-hosted option | ❌ | ✅ | Docker + Helm chart — key differentiator |
-| Kubernetes Helm chart | ❌ | ✅ | `helm/` directory |
+| Kubernetes Helm chart | ✅ | 🔜 | Planned (REMEDIATION_PLAN P2-20) |
 
 ---
 

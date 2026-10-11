@@ -10,22 +10,18 @@ description: Monorepo structure, service responsibilities, and request lifecycle
 ```
 /
 ├── apps/
-│   ├── auth-service/     NestJS 10 — auth server, all API endpoints
-│   ├── admin-portal/     Next.js 15 — admin UI + user-facing auth flows
+│   ├── auth-service/     NestJS 11 — auth server, all API endpoints
+│   ├── admin-portal/     Next.js 16 — admin UI + user-facing auth flows
 │   └── docs/             This documentation site (Fumadocs + Next.js)
 ├── packages/
-│   ├── sdk-typescript/   Browser + React + Next.js SDK
-│   ├── sdk-node/         Node.js server SDK (JWT verify, Express/Fastify middleware)
-│   ├── sdk-vue/          Vue 3 composables
-│   ├── sdk-angular/      Angular module + guards
-│   ├── sdk-java/         Spring Boot starter
-│   ├── sdk-go/           Go HTTP middleware
-│   ├── sdk-python/       Django / FastAPI / Flask
-│   ├── sdk-ruby/         Rack middleware
-│   ├── sdk-rust/         Axum / Actix middleware
-│   └── sdk-nginx/        OpenResty Lua module
-├── helm/                 Kubernetes Helm chart
-└── docs/                 Developer documentation (static MD files)
+│   ├── database/         TypeORM entities, migrations, connection builder
+│   ├── security/         Argon2id, AES-256-GCM, rate limiter
+│   ├── sdk-typescript/   @scrolloop/sdk — browser + React + Next.js
+│   ├── admin-client/     Admin API client
+│   ├── sentry-config/    SDK configuration
+│   ├── sentry-types/     Shared types
+│   └── ui/, shared/      UI kit and shared utilities
+└── docs/                 Internal engineering docs (architecture, security, ADRs)
 ```
 
 ## Services
@@ -35,7 +31,7 @@ description: Monorepo structure, service responsibilities, and request lifecycle
 The core auth server. Responsibilities:
 
 - All authentication flows (password, magic link, social OAuth, WebAuthn)
-- JWT issuance (RS256, per-tenant key pairs)
+- JWT issuance (RS256 with persisted, encrypted key pairs)
 - JWKS endpoint and OIDC discovery
 - OAuth 2.0 / OIDC authorization server
 - RBAC + policy engine
@@ -44,7 +40,7 @@ The core auth server. Responsibilities:
 - User management API
 - Audit logging
 
-**Stack:** NestJS 10, TypeORM, PostgreSQL 16, Redis, Argon2id, AES-256-GCM, BullMQ, Pino
+**Stack:** NestJS 11, TypeORM, PostgreSQL 16, Redis, Argon2id, AES-256-GCM, BullMQ, Pino
 
 ### admin-portal (port 3000)
 
@@ -54,7 +50,7 @@ The frontend application. Serves two audiences:
 2. **Tenant admins** — workspace dashboards at `/t/{slug}/dashboard`
 3. **End users** — auth flows at `/u/login`, `/u/signup`, `/mfa/enroll`
 
-**Stack:** Next.js 15 App Router, TanStack Query v5, Tailwind CSS v4, shadcn/ui
+**Stack:** Next.js 16 App Router, TanStack Query v5, Tailwind CSS v4, shadcn/ui
 
 ## Request lifecycle
 

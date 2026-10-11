@@ -254,7 +254,6 @@ apps/admin-portal/hooks/     ← only add new hooks, don't modify existing
 *.dto.ts                     ← NestJS DTOs
 migrations/                  ← database migrations
 docker-compose.yml           ← infrastructure
-helm/                        ← Helm charts
 .env*                        ← environment files
 turbo.json                   ← build config
 ```
@@ -314,4 +313,4 @@ Storybook:      [ComponentName].stories.tsx (add if Storybook is configured)
 - [ ] Test dark theme
 - [ ] Test keyboard navigation
 - [ ] Complete visual QA checklist above
-- [ ] Update CLAUDE.md and GEMINI.md screen inventory if needed
+- [ ] Update the screen inventory in docs/audits/admin-portal.md if needed

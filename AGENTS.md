@@ -1,167 +1,94 @@
 # AGENTS.md — Scrolloop Sentry
 
-> Governs AI agent behavior in this repository.
-> Applies to Claude Code, Gemini CLI, GitHub Copilot, and all other AI tools.
-> Read every line before touching any file. These rules override default agent behavior.
+Rules for every contributor, human or AI (Claude Code, Gemini, Copilot, …). `CLAUDE.md` imports
+this file; there is no other rulebook. Read it fully before changing code.
 
----
+## 1. Orientation
 
-## SESSION TRACKING — REQUIRED ON EVERY RUN
+| Need | Read |
+|---|---|
+| What exists and how it fits | [`docs/architecture.md`](docs/architecture.md) |
+| What to work on next | [`docs/REMEDIATION_PLAN.md`](docs/REMEDIATION_PLAN.md) |
+| Why something is the way it is | [`docs/adr/`](docs/adr/) |
+| Security expectations | [`docs/security.md`](docs/security.md) |
+| UI work | [`docs/ui-process.md`](docs/ui-process.md) |
 
-At the start of every session, append an entry to `docs/agent-sessions.md`:
+Only the workspaces listed in the root README exist. Do not reference SDKs, Helm charts or
+services that are not in the tree.
 
-```markdown
-## Session: YYYY-MM-DD — <model name, e.g. Claude Sonnet 4.6>
-**Prompt:** <first user message or task description, verbatim or paraphrased>
-**Files touched:** <comma-separated list of modified files>
-**Work done:**
-- bullet 1
-- bullet 2
-**Outcome:** completed / partial / blocked
-```
+## 2. Definition of done
 
-This is not optional. Every session must log its work. At the end of a session, update the entry's **Files touched** and **Work done** fields with what was actually done.
-
----
-
-## WHAT TO READ FIRST (in order)
-
-1. `CLAUDE.md` — full project rules, tech stack, architecture decisions
-2. `docs/sprints/sprint-status.md` — what's done, what's in progress
-3. `docs/agent-sessions.md` — what prior AI sessions did (avoid duplicating work)
-
----
-
-## CRITICAL RULES
-
-These match `CLAUDE.md` and are repeated here for agents that may not load CLAUDE.md first.
-
-### No `console.log`
-Use `this.logger` (Pino/NestJS Logger) in the backend. No logging in the frontend. Zero exceptions.
-
-### No TypeScript `any`
-Define the type or use `unknown` with a type guard. `catch (err: any)` → `catch (err: unknown)`. Run `tsc --noEmit` before committing.
-
-### No mock data
-No `setTimeout` fakes, no hardcoded arrays, no `Math.random()` IDs. If an endpoint isn't implemented, throw `NotImplementedException`.
-
-### No hardcoded values
-All config comes from environment variables. No hardcoded URLs, secrets, UUIDs, or tenant slugs in source code.
-
-### No `fetch()` in the frontend
-All API calls go through the SDK (`authClient` or `adminClient`). No raw `fetch()` or `axios` calls in `apps/admin-portal`.
-
-### No inline styles for design values
-CSS variables or Tailwind tokens only. No hardcoded hex colors, pixel values, or font sizes in components.
-
-### Tokens are httpOnly cookies only
-Never put access tokens or refresh tokens in response bodies or localStorage.
-
-### Backend and frontend are separate
-When doing UI work: do not touch any backend file.
-When doing backend work: do not touch any frontend file.
-
-UI files: `apps/admin-portal/**`, `packages/sdk-typescript/src/react/**`
-Backend files: everything else.
-
----
-
-## BEFORE TOUCHING BACKEND
-
-### Tenant isolation — understand this before writing any query
-
-The database uses **two isolation layers simultaneously**:
-
-**Layer 1 — Schema (search_path):** `TenantSchemaMiddleware` runs on every tenant request. It sets `SET search_path TO "fk_{slug}", public` on a dedicated `QueryRunner` stored in `AsyncLocalStorage` via `TenantContextService`. Services use `TenantAwareRepository` which reads from this scoped `EntityManager`.
-
-**Layer 2 — Row-level (tenant_id):** All tenant entities have a `tenant_id` column. All queries retain `WHERE tenant_id = ?`. This is defense-in-depth — a bug in Layer 1 cannot expose Layer 2.
-
-Key files:
-- `apps/auth-service/src/core/database/tenant-context.service.ts` — AsyncLocalStorage
-- `apps/auth-service/src/core/database/tenant-aware.repository.ts` — base repository
-- `apps/auth-service/src/common/midllewares/tenant-schema.middleware.ts` — sets search_path
-- `apps/auth-service/src/modules/user/user.repository.ts` — example implementation
-
-When writing a new repository: extend `TenantAwareRepository`. When writing a service: inject the repository, not `@InjectRepository(Entity)` directly.
-
-### JWT payload shape
-
-Every issued JWT includes:
-```json
-{ "sub": "userId", "tid": "tenantId", "tenantSlug": "acme", "sid": "sessionId",
-  "jti": "uuid", "iss": "https://sentry.scrolloop.com/t/{slug}", "aud": "clientId" }
-```
-
-### Auth endpoints are public unless decorated
-
-Use `@Public()` for unauthenticated endpoints. All others require a valid JWT.
-
-### IAM policy engine
-
-Use `@UseGuards(PermissionsGuard)` + `@RequirePermissions("resource:action")`. Do not use `if (user.role === 'admin')` checks anywhere.
-
----
-
-## BEFORE TOUCHING FRONTEND
-
-### Design system — Stitch MCP first
-
-Before writing any component or page:
-1. Connect to Stitch MCP: `stitch.getDesignSystem({ name: "scrolloop-sentry" })`
-2. Extract token values
-3. Reference those values — never invent colors, spacing, or font sizes
-
-### CSS variable reference
-
-```css
---color-bg-base: #F7F6F4
---color-surface-1: rgba(255,255,255,0.68)   /* glass tier 1 */
---color-surface-2: rgba(255,255,255,0.80)   /* glass tier 2 */
---color-text-primary: #1A1916
---color-text-secondary: #4A4845
---color-text-tertiary: #8A8784
---color-accent: #2ABF6C
---color-danger: #C0392B
---color-warning: #C4830A
-```
-
-### Data fetching
-
-Use React Query (`useQuery` / `useMutation`) via the hooks in `apps/admin-portal/lib/queries.ts`. All hooks call `authClient.request()` via `withErrorHandler`. No bare `useEffect` for data fetching.
-
-### API response shape
-
-All responses are wrapped: `{ data: T, message?: string, statusCode: number }`. The `withErrorHandler` HOF unwraps this — components receive `T` directly.
-
----
-
-## ENVIRONMENT
-
-Root `.env` (monorepo root) is loaded by all apps and packages. Key vars:
-
-```
-SENTRY_PLATFORM_NAME=Scrolloop Sentry
-SENTRY_PLATFORM_SLUG=sentry
-NEXT_PUBLIC_AUTH_SERVICE_URL=http://localhost:4000
-NEXT_PUBLIC_SENTRY_TENANT_SLUG=sentry
-```
-
-Never read env vars that don't go through `apps/auth-service/src/config/env.validation.ts` on the backend.
-
----
-
-## BEFORE COMMITTING
+A change is done when **all** of these pass locally:
 
 ```bash
-# Auth service
-cd apps/auth-service && npx tsc --noEmit
-grep -r "console\." src --include="*.ts" --exclude-path="*/seeder/*"
-grep -r ": any" src --include="*.ts"
-
-# Admin portal
-cd apps/admin-portal && npx tsc --noEmit
-grep -r "#[0-9A-Fa-f]\{3,6\}" components --include="*.tsx"
-grep -r "fetch(" app components --include="*.tsx" --include="*.ts" | grep -v node_modules
+yarn workspace auth-service typecheck && yarn workspace auth-service test
+yarn workspace admin-portal exec tsc --noEmit      # if the portal or SDK changed
+scripts/smoke-test.sh                               # if auth-service runtime behaviour changed
 ```
 
-All checks must return empty output before committing.
+…and, where applicable: the env contract, a migration, and docs are updated (§5–§7). CI runs the
+same checks plus a real boot against Postgres and Redis.
+
+Work in small, reviewable commits with a body that says *why*. Confirm before large structural
+changes (module boundaries, schema strategy, public API shape).
+
+## 3. Backend (apps/auth-service)
+
+**Tenant isolation is the invariant that matters most.**
+- Tenant data lives in schema `fk_{slug}`. `TenantSchemaMiddleware` sets `search_path` on a
+  request-scoped QueryRunner held in `AsyncLocalStorage` (`TenantContextService`); the
+  DataSource proxy in `DatabaseModule` routes repository calls through it.
+- Keep `tenant_id` filters in every tenant query (defence in depth) — never remove them.
+- Code that runs **outside a request** (cron, queues, CLI) has no tenant context. It must iterate
+  tenants and run each unit inside `TenantContextService` explicitly.
+- Raw SQL must obtain schema names from `TenantSchemaService.getSchemaName()`, never by
+  string-building from user input.
+
+**Module structure**
+- `DatabaseModule`, `SharedServicesModule` and `GuardsModule` are `@Global`. Never list their
+  services (`RedisService`, `SecurityEventService`, `SessionService`, `JwksService`,
+  `OAuthRefreshTokenService`, RBAC services/guards, `TenantContextService`,
+  `SessionRepository`) in a feature module's `providers` — that creates duplicate instances.
+- A feature module provides only its own services and imports other feature modules for theirs.
+
+**Request handling**
+- Every `@Body()` / `@Query()` is a class with `class-validator` decorators. Interfaces and inline
+  types bypass the `ValidationPipe`.
+- Protect routes with `@Protected()` / `@ProtectedWithPermissions()`; never hand-roll auth checks.
+- Auth cookies are set only through `common/http/auth-cookies.ts`.
+- Spec-defined payloads (JWKS, OIDC discovery, health) use `@RawResponse()`.
+- Missing functionality throws `NotImplementedException`. No fake success responses or mock data.
+
+**Code quality**
+- No `console.*` outside seeders/CLI — use the Pino `logger` / Nest `Logger`.
+- No `any`. Use `unknown` plus narrowing, or define the type.
+- Secrets and tokens are never logged or written to audit metadata.
+
+## 4. Frontend (apps/admin-portal, packages/sdk-typescript)
+
+- Network calls go through the SDK (`authClient`, `adminClient` / `authClient.request`), wrapped
+  with `withErrorHandler` (`lib/with-error-handler.ts`). No raw `fetch`/`axios` in the portal.
+- Server state via TanStack Query. No `console.*`; surface errors in the UI.
+- Styling uses design tokens (CSS variables / Tailwind theme) only — no hard-coded colours,
+  spacing or font sizes. Follow `docs/ui-process.md`.
+- Keep UI-only changes and backend changes in separate commits.
+
+## 5. Configuration
+
+- Every environment variable is declared in `apps/auth-service/src/config/env.validation.ts`
+  **and** documented in `apps/auth-service/.env.example`. Add both in the same commit.
+- No hard-coded URLs, secrets, tenant slugs or UUIDs in source.
+
+## 6. Database
+
+- Schema changes ship as TypeORM migrations in `packages/database/src/migrations`. Never use
+  `synchronize`.
+- Tenant tables must also be added to tenant provisioning (`TenantSchemaService`).
+
+## 7. Documentation
+
+- Internal engineering docs: `docs/`. Public API/SDK docs: `apps/docs/content/docs/`.
+- New or changed endpoint → update the matching `apps/docs` page.
+- Significant decisions → new ADR in `docs/adr/` (copy the format of an existing one).
+- Do not create session logs, sprint prompts or status files; use commits, PRs and the
+  remediation plan.

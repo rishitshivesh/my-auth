@@ -1,109 +1,64 @@
 ---
 title: Quickstart
-description: Get Scrolloop Sentry running locally in under 5 minutes.
+description: Run Scrolloop Sentry locally.
 ---
 
 # Quickstart
 
 ## Prerequisites
 
-- Node.js 20+
-- Docker + Docker Compose
-- Yarn 4 (`corepack enable`)
+- Node.js 20 (`.nvmrc`)
+- Yarn 4 via Corepack (`corepack enable`)
+- Docker (for Postgres, Redis and Mailpit)
 
-## 1. Clone and install
+## 1. Install and start dependencies
 
 ```bash
-git clone https://github.com/rishitshivesh/my-auth.git scrolloop-sentry
-cd scrolloop-sentry
 yarn install
+docker compose up -d   # Postgres 16, Redis 7, Mailpit (http://localhost:8025)
 ```
 
-## 2. Configure environment
+## 2. Configure
 
 ```bash
 cp apps/auth-service/.env.example apps/auth-service/.env
 ```
 
-Open `apps/auth-service/.env` and fill in at minimum:
+Fill in the four secrets (the generation command for each is in the file):
 
 ```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_NAME=scrolloop_sentry
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=password
-
-MASTER_ENCRYPTION_KEY=<run: openssl rand -base64 32>
-SESSION_SECRET=<run: openssl rand -base64 32>
-GDPR_IP_SALT=<run: openssl rand -base64 32>
-
-CORS_ORIGINS=http://localhost:3000
-ADMIN_PORTAL_ORIGIN=http://localhost:3000
+JWT_SECRET=            # openssl rand -hex 32
+SESSION_SECRET=        # openssl rand -hex 32
+KEYRING_MASTER_KEY=    # openssl rand -base64 32
+TOKEN_ENCRYPTION_KEY=  # openssl rand -hex 32
 ```
 
-See [Environment Variables](/docs/setup/env) for the full reference.
+The defaults already point at the Docker services. See
+[Environment Variables](/docs/setup/env) for everything else.
 
-## 3. Start the local stack
-
-```bash
-docker-compose up -d
-```
-
-This starts PostgreSQL, Redis, and Mailhog (SMTP catcher at `http://localhost:8025`).
-
-## 4. Run database migrations
+## 3. Migrate and seed
 
 ```bash
 cd apps/auth-service
-yarn migration:run
+yarn db:migrate
+yarn db:seed
 ```
 
-## 5. Start the services
+## 4. Run
 
 ```bash
-# From the repo root — starts both services in parallel
-yarn dev
+yarn dev                                # auth-service → http://localhost:4000
+yarn dev --filter=admin-portal          # from repo root → http://localhost:3000
 ```
 
-- **auth-service** → `http://localhost:4000`
-- **admin-portal** → `http://localhost:3000`
-- **API docs (Swagger)** → `http://localhost:4000/api-docs`
-- **These docs** → `http://localhost:3001`
+On first boot the auth-service prints `FIRST RUN SETUP TOKEN: …`. Open
+`http://localhost:3000/setup`, paste it, and create the first superadmin.
 
-## 6. Complete first-run setup
+## 5. Verify
 
-On a clean database, visiting `http://localhost:3000` redirects to `/setup`.
+```bash
+curl localhost:4000/health/ready
+curl localhost:4000/.well-known/openid-configuration
+```
 
-1. **Get your setup token** — it was written to `~/.sentry/setup.log` at startup:
-   ```bash
-   cat ~/.sentry/setup.log
-   ```
-2. Enter the token in the wizard
-3. Name your platform (optional)
-4. Create the superadmin account
-5. Click **Go to Login** — you're ready
-
-The setup token is single-use and invalidated immediately after the admin account is created.
-
-## 7. Create your first tenant workspace
-
-After logging in as superadmin, or by visiting `http://localhost:3000/onboarding`:
-
-1. Enter a workspace name (e.g. "Acme Corp")
-2. Choose a subdomain (e.g. `acme`) — availability is checked in real-time
-3. Create the workspace admin account
-4. Your workspace dashboard is at `/t/acme/dashboard`
-
----
-
-## What's next?
-
-- [Invite users](/docs/api/users) — `POST /api/users/invite`
-- [Configure RBAC](/docs/rbac) — roles, permissions, policies
-- [Add an OAuth client](/docs/api/oauth) — for your application's login flow
-- [Integrate an SDK](/docs/sdks) — drop Sentry into your app
+Swagger (development only): `http://localhost:4000/api-docs`.
