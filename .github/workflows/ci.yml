@@ -24,13 +24,8 @@ jobs:
           node-version-file: .nvmrc
       - run: corepack enable
       - run: yarn install --immutable
-      - name: Typecheck (auth-service, admin-portal, SDK)
-        run: |
-          yarn workspace auth-service typecheck
-          yarn workspace admin-portal exec tsc --noEmit
-          yarn workspace @scrolloop/sdk typecheck
-      - name: Unit tests (auth-service)
-        run: yarn workspace auth-service test --ci
+      - name: Typecheck + unit tests (all workspaces, via turbo)
+        run: yarn verify
 
   e2e-smoke:
     name: Boot + end-to-end smoke

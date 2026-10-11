@@ -66,3 +66,4 @@ venv/
 
 # ── Local service data ──────────────────────────────────────────
 dump.rdb
+apps/docs/.source/
