@@ -15,6 +15,7 @@ import { AdminService } from "./admin.service";
 import { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { Public } from "@/common/decorators/public.decorator";
+import { setAuthCookies } from "@/common/http/auth-cookies";
 
 /**
  * Public endpoints for first-run platform initialization.
@@ -112,23 +113,8 @@ export class SuperadminSetupController {
       userAgent ?? "unknown",
     );
 
-    const isProduction = process.env["NODE_ENV"] === "production";
-    const cookieBase = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax" as const,
-      path: "/",
-    };
-
     // Tokens go into httpOnly cookies — never in the response body
-    res.cookie("accessToken", result.accessToken, {
-      ...cookieBase,
-      maxAge: 15 * 60 * 1000, // 15 min
-    });
-    res.cookie("refreshToken", result.refreshToken, {
-      ...cookieBase,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    setAuthCookies(res, result.accessToken, result.refreshToken);
 
     return { user: result.user };
   }

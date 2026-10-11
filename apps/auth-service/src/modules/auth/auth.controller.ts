@@ -43,6 +43,11 @@ import { type Request, type Response } from "express";
 import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
+import {
+  clearAuthCookies,
+  setAuthCookies,
+  setMfaEnrollmentCookie,
+} from "@/common/http/auth-cookies";
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string; tenantId?: string };
@@ -68,40 +73,6 @@ interface AuthenticatedRequest {
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  /**
-   * Set both access and refresh tokens as httpOnly cookies.
-   * Tokens are NEVER returned in the response body — cookie-only per project rules.
-   *
-   * accessToken maxAge = 15 min (matches RS256 JWT TTL)
-   * refreshToken maxAge = 30 days (matches DB refresh token TTL)
-   *
-   * Set COOKIE_DOMAIN=.sentry.scrolloop.com in production so cookies are shared
-   * across tenant subdomains (acme.sentry.scrolloop.com, beta.sentry.scrolloop.com).
-   * Leave unset in development — defaults to exact hostname, works for localhost.
-   */
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
-    const isProduction = process.env['NODE_ENV'] === 'production';
-    const domain = process.env['COOKIE_DOMAIN'] || undefined;
-
-    const base = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'strict' as const,
-      path: '/',
-      ...(domain ? { domain } : {}),
-    };
-
-    res.cookie('accessToken', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { ...base, maxAge: 30 * 24 * 60 * 60 * 1000 });
-  }
-
-  private clearAuthCookies(res: Response): void {
-    const domain = process.env['COOKIE_DOMAIN'] || undefined;
-    const base = { httpOnly: true, path: '/', ...(domain ? { domain } : {}) };
-    res.clearCookie('accessToken', base);
-    res.clearCookie('refreshToken', base);
-  }
 
   /**
    * Register a new user
@@ -160,7 +131,7 @@ export class AuthController {
       return response;
     }
 
-    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    setAuthCookies(res, response.accessToken, response.refreshToken);
     // Return access token in body so SDK clients can cache it in state.
     // Bearer token auth requires the SDK to hold the token in memory;
     // the httpOnly cookie provides fallback for server-side cookie auth.
@@ -186,7 +157,7 @@ export class AuthController {
     const sessionId = req.user.sessionId ?? '';
     await this.authService.logout(tenantId, userId, sessionId, userAgent, ip);
 
-    this.clearAuthCookies(res);
+    clearAuthCookies(res);
 
     return { message: "Logged out successfully" };
   }
@@ -291,7 +262,7 @@ export class AuthController {
 
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
-    this.setAuthCookies(res, response.accessToken, response.refreshToken);
+    setAuthCookies(res, response.accessToken, response.refreshToken);
     // Return the access token in the body so SDK clients can cache it in memory.
     // The httpOnly cookie is the authoritative token; this is a convenience copy.
     return { accessToken: response.accessToken };
@@ -493,7 +464,7 @@ export class AuthController {
         userAgent,
       );
 
-      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      setAuthCookies(res, result.accessToken, result.refreshToken);
       return { message: result.message, tenantSlug: result.tenantSlug };
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
@@ -570,7 +541,7 @@ export class AuthController {
         ip,
         userAgent,
       );
-      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      setAuthCookies(res, result.accessToken, result.refreshToken);
       return { message: result.message, tenantSlug: result.tenantSlug, warning: result.warning };
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
@@ -686,16 +657,10 @@ export class AuthController {
     });
 
     if ('status' in result) {
-      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
-        httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
-        sameSite: 'strict',
-        path: '/mfa/enroll',
-        maxAge: 5 * 60 * 1000,
-      });
+      setMfaEnrollmentCookie(res, result.enrollmentToken);
       return res.json({ status: result.status });
     }
-    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
     return res.json({ user: result.user, tenantSlug: result.tenantSlug });
   }
 
@@ -739,16 +704,10 @@ export class AuthController {
     );
 
     if ('status' in result) {
-      res.cookie('mfa_enrollment_token', result.enrollmentToken, {
-        httpOnly: true,
-        secure: process.env['NODE_ENV'] === 'production',
-        sameSite: 'strict',
-        path: '/mfa/enroll',
-        maxAge: 5 * 60 * 1000,
-      });
+      setMfaEnrollmentCookie(res, result.enrollmentToken);
       return res.json({ status: result.status });
     }
-    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    setAuthCookies(res, result.accessToken, result.refreshToken);
     return res.json({ tenantSlug: result.tenantSlug });
   }
 
