@@ -3,6 +3,7 @@ import { JwksService } from "./jwks.service";
 import { Repository } from "typeorm";
 import { KeyPair } from "@repo/database";
 import { ConfigService } from "@nestjs/config";
+import { EncryptionService } from "@repo/security";
 
 const MASTER_KEY = "0123456789abcdef0123456789abcdef";
 
@@ -93,21 +94,11 @@ describe("JwksService", () => {
         getOrThrow: jest.fn().mockReturnValue(MASTER_KEY),
       } as unknown as ConfigService;
 
-      jest.mock("@repo/security", () => ({
-        EncryptionService: {
-          encrypt: jest.fn().mockResolvedValue({
-            encrypted: "enc",
-            iv: "",
-            authTag: "tag",
-          }),
-          decrypt: jest
-            .fn()
-            .mockResolvedValue(privateKeyPem),
-        },
-      }));
-
-      const { EncryptionService } = jest.requireMock("@repo/security");
-      EncryptionService.decrypt.mockResolvedValue(privateKeyPem);
+      // jest.mock() inside a test body is not hoisted and never applied; spy
+      // on the real class instead so decryption returns the fixture PEM.
+      const decryptSpy = jest
+        .spyOn(EncryptionService, "decrypt")
+        .mockResolvedValue(privateKeyPem);
 
       const service = new JwksService(mockRepo, mockConfig);
       await service.onModuleInit();
@@ -118,6 +109,45 @@ describe("JwksService", () => {
       expect(jwks.keys[0]?.kty).toBe("RSA");
       expect(jwks.keys[0]?.alg).toBe("RS256");
       expect(jwks.keys[0]?.e).toBe("AQAB");
+      expect(decryptSpy).toHaveBeenCalledTimes(1);
+      decryptSpy.mockRestore();
+    });
+  });
+
+  describe("onModuleInit (first boot)", () => {
+    it("generates exactly one platform key, encrypted at rest, and can sign with it", async () => {
+      const saved: Partial<KeyPair>[] = [];
+      const repo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((entity: Partial<KeyPair>) => entity),
+        save: jest.fn(async (entity: Partial<KeyPair>) => {
+          saved.push(entity);
+          return entity;
+        }),
+      } as unknown as Repository<KeyPair>;
+      const config = {
+        getOrThrow: jest.fn().mockReturnValue(MASTER_KEY),
+      } as unknown as ConfigService;
+
+      const service = new JwksService(repo, config);
+      await service.onModuleInit();
+
+      expect(saved).toHaveLength(1);
+      const stored = saved[0]!;
+      expect(stored.tenantId).toBeNull();
+      expect(stored.status).toBe("active");
+      expect(stored.encryptedPrivateKey).not.toContain("PRIVATE KEY");
+
+      const { kid, privateKey } = await service.getCurrentSigningKey();
+      expect(kid).toBe(stored.kid);
+      const signature = crypto.sign("sha256", Buffer.from("payload"), privateKey);
+      const verified = crypto.verify(
+        "sha256",
+        Buffer.from("payload"),
+        crypto.createPublicKey(stored.publicKeyPem as string),
+        signature,
+      );
+      expect(verified).toBe(true);
     });
   });
 });

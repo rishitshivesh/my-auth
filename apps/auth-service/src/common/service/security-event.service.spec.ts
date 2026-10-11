@@ -121,15 +121,24 @@ describe("SecurityEventService.sanitizeMetadata", () => {
     });
   });
 
-  it("keeps arrays inside nested objects without inspecting their elements", () => {
+  it("sanitizes objects nested inside arrays", () => {
     const input = {
-      items: [{ password: "should not be stripped" }],
+      items: [{ password: "must be stripped", label: "a" }, "plain", 3],
       safe: "yes",
     };
     const result = sanitizeMetadata(input);
     expect(result).toHaveProperty("safe", "yes");
-    // Arrays are preserved as-is
-    expect(result.items).toEqual([{ password: "should not be stripped" }]);
+    expect(result.items).toEqual([{ label: "a" }, "plain", 3]);
+  });
+
+  it("keeps descriptor keys that only describe secrets", () => {
+    expect(
+      sanitizeMetadata({ keyId: "kid-1", tokenType: "refresh", secretCount: 2, token_ttl: 60 }),
+    ).toEqual({ keyId: "kid-1", tokenType: "refresh", secretCount: 2, token_ttl: 60 });
+  });
+
+  it("strips otp, cookie and authorization values", () => {
+    expect(sanitizeMetadata({ otp: "123456", cookie: "a=b", Authorization: "Bearer x", ok: true })).toEqual({ ok: true });
   });
 
   // ── Edge cases ────────────────────────────────────────────────────────

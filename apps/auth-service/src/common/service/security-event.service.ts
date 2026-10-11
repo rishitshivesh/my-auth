@@ -73,36 +73,57 @@ export class SecurityEventService {
     });
   }
 
+  /** Key fragments that mark a value as secret material. */
+  private static readonly SENSITIVE_KEY =
+    /password|passwd|secret|token|hash|key|credential|private|otp|cookie|authorization/i;
+
   /**
-   * Recursively strips object keys whose name (case-insensitive) contains any
-   * of the following substrings:
-   *   password · secret · token · hash · key · credential · private
+   * Suffixes that describe secret material without containing it
+   * (tokenExpiry, keyId, secretType, passwordChangedAt ...). These are kept so
+   * audit events stay useful.
+   */
+  private static readonly DESCRIPTOR_SUFFIX =
+    /(expiry|expires|expiresat|expiresin|ttl|type|count|length|id|ids|version|alg|algorithm|changedat|createdat|rotatedat|usedat)$/i;
+
+  private static isSensitiveKey(key: string): boolean {
+    if (!SecurityEventService.SENSITIVE_KEY.test(key)) return false;
+    const normalised = key.replace(/[_-]/g, "");
+    return !SecurityEventService.DESCRIPTOR_SUFFIX.test(normalised);
+  }
+
+  /**
+   * Returns a copy of `obj` with secret-bearing keys removed, recursively —
+   * including objects nested inside arrays (previously arrays were copied
+   * verbatim, so `items: [{ password }]` reached the audit log).
    *
-   * Arrays are preserved as-is (their elements are not inspected).
-   * Non-object inputs return an empty object.
-   *
-   * This is a pure function — no side effects.
+   * A key is removed when its name contains a sensitive fragment (password,
+   * secret, token, hash, key, credential, private, otp, cookie,
+   * authorization) unless it ends in a descriptor suffix (Expiry, Id, Type,
+   * Count, ...). Non-object inputs return {}. Pure function.
    */
   static sanitizeMetadata(obj: unknown): Record<string, unknown> {
     if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
       return {};
     }
+    return SecurityEventService.sanitizeObject(obj as Record<string, unknown>);
+  }
 
-    const SENSITIVE = /password|secret|token|hash|key|credential|private/i;
+  private static sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-
-    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (SENSITIVE.test(k)) {
-        continue;
-      }
-
-      if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-        result[k] = SecurityEventService.sanitizeMetadata(v);
-      } else {
-        result[k] = v;
-      }
+    for (const [k, v] of Object.entries(obj)) {
+      if (SecurityEventService.isSensitiveKey(k)) continue;
+      result[k] = SecurityEventService.sanitizeValue(v);
     }
-
     return result;
+  }
+
+  private static sanitizeValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => SecurityEventService.sanitizeValue(item));
+    }
+    if (typeof value === "object" && value !== null && !(value instanceof Date)) {
+      return SecurityEventService.sanitizeObject(value as Record<string, unknown>);
+    }
+    return value;
   }
 }
