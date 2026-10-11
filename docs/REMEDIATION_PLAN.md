@@ -29,6 +29,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | P0-5 Request bodies validated via class-validator DTOs |
 | ✅ | P0-8 ADR-0003 accepted; access tokens removed from all response bodies |
 | ✅ | P0-3 SAML SSO wired and assertions signed (XML-DSig via samlify) |
+| ✅ | P0-4 Real per-tenant signing keys, scheduled rotation (ADR-0004) |
 
 ## P0 — correctness & security
 
@@ -59,12 +60,19 @@ nonce could be completed from a different browser — fixed. (2) cross-tenant si
 P0-4, not fixed here. Two further findings from that review were not delivered with enough detail
 to act on (notification body was truncated) — flagged to the user; re-run if needed.
 
-**P0-4 🔜 Per-tenant signing keys are not real.** `getCurrentSigningKey(tenantId)` falls back to
-the platform key and provisioning never creates tenant keys. Write an ADR choosing either
-(a) generate at provisioning + scheduled rotation with grace period, or (b) one platform key by
-design. For (a): re-introduce `KEY_ACTIVE_TTL_DAYS` / `KEY_ROTATION_GRACE_DAYS`.
-*AC:* rotation test — tokens signed before rotation still verify during grace; JWKS lists
-active + retired keys.
+**P0-4 ✅ Per-tenant signing keys are not real.** Fixed: ADR-0004 accepted option (a) — generate
+at provisioning, scheduled rotation with a grace period. `JwksService.ensureTenantKeyExists`
+provisions a tenant's first key at creation (both `admin.service.ts#createTenant` and
+self-service `tenant-registration.service.ts`); the new `KeyRotationService` (`@Cron` daily)
+rotates keys past `KEY_ACTIVE_TTL_DAYS` (default 90), backfills any tenant missing a key
+entirely, and revokes `retired` keys past `KEY_ROTATION_GRACE_DAYS` (default 7). Removed
+`JwksService.getJWKS()` as confirmed dead code — both real JWKS endpoints already used the
+correct `getVerificationKeys()` (active+retired, tenant-scoped), satisfying that half of the AC
+without changes. Security review caught two real gaps, both fixed: the in-memory signing-key
+cache was stale across replicas after a rotation (now re-validates against the DB every 5
+minutes); a failed self-service registration could orphan an encrypted private-key row (now
+cleaned up in the rollback path). Tests: `jwks.service.spec.ts` (11 cases covering provisioning,
+rotation, backfill, grace-period verification, and cross-replica cache staleness).
 
 **P0-5 ✅ Request bodies that bypass validation.** Fixed: all ~15 inline-typed `@Body()`
 parameters (admin tenant status/featureFlags, SCIM user/group/patch, WebAuthn register/finish,

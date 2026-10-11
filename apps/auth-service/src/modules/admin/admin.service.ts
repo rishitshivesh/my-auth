@@ -383,6 +383,7 @@ export class AdminService implements OnModuleInit {
     if (dto.plan) (tenant as unknown as Record<string, unknown>).plan = dto.plan;
 
     const saved = await this.tenantRepository.save(tenant);
+    await this.jwksService.ensureTenantKeyExists(saved.id);
 
     if (dto.currentUserId) {
       await this.provisionAdminUser(saved.id, dto.slug, dto.currentUserId);

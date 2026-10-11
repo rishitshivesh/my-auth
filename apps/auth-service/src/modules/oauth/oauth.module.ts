@@ -20,6 +20,7 @@ import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
 import { JwksService } from "./services/jwks.service";
+import { KeyRotationService } from "./services/key-rotation.service";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { RbacModule } from "@/modules/rbac/rbac.module";
 
@@ -46,6 +47,7 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
     OAuthTokenService,
     OAuthConsentService,
     PasswordService,
+    KeyRotationService,
   ],
   exports: [OAuthClientService, OAuthTokenService, OAuthConsentService],
 })

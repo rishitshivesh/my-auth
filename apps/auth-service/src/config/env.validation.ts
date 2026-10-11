@@ -57,6 +57,10 @@ export const validationSchema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required(),
   // Wraps RSA private keys at rest. 32 random bytes, base64 (44 chars).
   KEYRING_MASTER_KEY: Joi.string().base64().length(44).required(),
+  // How long a signing key (platform or per-tenant) stays active before scheduled rotation.
+  KEY_ACTIVE_TTL_DAYS: Joi.number().integer().positive().default(90),
+  // How long a retired key keeps verifying tokens signed before rotation, before it's revoked.
+  KEY_ROTATION_GRACE_DAYS: Joi.number().integer().positive().default(7),
   // Encrypts stored third-party OAuth tokens. 32 random bytes, hex (64 chars).
   TOKEN_ENCRYPTION_KEY: requiredInProduction(
     Joi.string().pattern(/^[0-9a-fA-F]{64}$/),
