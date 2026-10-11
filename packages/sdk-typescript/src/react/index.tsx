@@ -448,25 +448,18 @@ export function useUser() {
 }
 
 /**
- * Hook to access session state
+ * Hook to access session state.
+ *
+ * `session` carries non-secret claims (tenantId, tenantSlug, groups) cached
+ * from the last login/refresh — never the access token itself, which lives
+ * only in an httpOnly cookie (see docs/adr/0003-access-token-delivery.md).
  */
 export function useSession() {
   const { isAuthenticated, isLoading, client } = useAuth();
-  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    client.getAccessToken().then((token) => {
-      if (!cancelled) setAccessToken(token);
-    }).catch(() => {
-      if (!cancelled) setAccessToken(undefined);
-    });
-    return () => { cancelled = true; };
-  }, [client, isAuthenticated]);
 
   return {
     isAuthenticated,
     isLoading,
-    accessToken,
+    session: client.getSessionClaims(),
   };
 }

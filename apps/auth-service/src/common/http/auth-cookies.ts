@@ -14,6 +14,8 @@ export const MFA_ENROLLMENT_COOKIE = "mfa_enrollment_token";
 
 /** Matches the RS256 access-token TTL. */
 export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
+/** Same TTL in seconds — safe to hand to clients so they can schedule a proactive refresh. */
+export const ACCESS_TOKEN_TTL_SECONDS = ACCESS_TOKEN_MAX_AGE_MS / 1000;
 /** Matches the refresh-token TTL issued by OAuthRefreshTokenService. */
 export const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const MFA_ENROLLMENT_MAX_AGE_MS = 5 * 60 * 1000;

@@ -29,9 +29,9 @@ export function TenantSwitcher() {
     staleTime: 60_000,
   });
 
-  // Derive current org from JWT claims (no extra fetch needed)
-  const claims = authClient.getTokenClaims();
-  const currentSlug = (claims?.tenantSlug as string) ?? '';
+  // Derive current org from cached session claims (no extra fetch needed)
+  const session = authClient.getSessionClaims();
+  const currentSlug = session?.tenantSlug ?? '';
   const currentOrg = orgs.find((o) => o.slug === currentSlug) ?? orgs[0];
 
   useEffect(() => {

@@ -27,6 +27,7 @@ import {
   setAccessTokenCookie,
   setMfaEnrollmentCookie,
   setRefreshTokenCookie,
+  ACCESS_TOKEN_TTL_SECONDS,
 } from "@/common/http/auth-cookies";
 import { ClaimSessionDto } from "./dto/claim-session.dto";
 
@@ -302,7 +303,8 @@ export class SocialAuthController {
    * Claim social session using completion token
    *
    * POST /auth/social/claim-session { ct: completionToken }
-   * Returns { accessToken } — refresh token is already in httpOnly cookie
+   * Sets the access token as an httpOnly cookie; refresh token is already
+   * cookied from the OAuth callback. Returns { tenantSlug, expiresIn } only.
    */
   @Post("claim-session")
   @HttpCode(HttpStatus.OK)
@@ -326,7 +328,10 @@ export class SocialAuthController {
 
       setAccessTokenCookie(res, payload['accessToken'] as string);
 
-      return { tenantSlug: (payload['tenantSlug'] as string) ?? '' };
+      return {
+        tenantSlug: (payload['tenantSlug'] as string) ?? '',
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      };
     } catch {
       throw new UnauthorizedException("Invalid or expired completion token");
     }

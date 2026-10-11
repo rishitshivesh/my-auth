@@ -53,6 +53,17 @@ import { logger } from "@/common/logger";
 const PASSWORD_RESET_OTP_LENGTH = 6;
 const PASSWORD_RESET_TTL_SECONDS = 15 * 60;
 const PASSWORD_RESET_MAX_ATTEMPTS = 5;
+
+/**
+ * Non-secret session metadata returned alongside (never instead of) the
+ * httpOnly auth cookies, so clients can read tenant/group context without
+ * ever holding the signed access token. See docs/adr/0003-access-token-delivery.md.
+ */
+export interface SessionClaims {
+  tenantId: string;
+  tenantSlug: string;
+  groups: string[];
+}
 const PASSWORD_RESET_ATTEMPTS_RESOURCE = "pwreset-attempts";
 
 @Injectable()
@@ -135,6 +146,21 @@ export class AuthService {
       tenantSlug: resolvedTenant?.slug ?? '',
       groups,
       sessionId,
+    };
+  }
+
+  /**
+   * Non-secret session metadata for clients that need it without ever holding
+   * the signed access token (see docs/adr/0003-access-token-delivery.md).
+   * These are the same claims the JWT payload already carries in plaintext —
+   * exposing them here is not a new disclosure, it just removes the need for
+   * the client to hold the credential itself to read them.
+   */
+  private toSessionClaims(payload: Record<string, unknown>): SessionClaims {
+    return {
+      tenantId: payload.tenantId as string,
+      tenantSlug: (payload.tenantSlug as string) ?? '',
+      groups: (payload.groups as string[]) ?? [],
     };
   }
 
@@ -249,7 +275,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
+    | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | { mfaRequired: boolean; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string }
     | { status: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
@@ -450,6 +476,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       tenantSlug: user.tenant?.slug ?? '',
+      session: this.toSessionClaims(accessTokenPayloadData),
       user: {
         email: user.email,
         firstName: user.firstName,
@@ -587,7 +614,7 @@ export class AuthService {
     ip: string,
     userAgent: string,
   ): Promise<
-    | { accessToken: string; refreshToken: string; tenantSlug: string }
+    | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }
     | { status: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -666,7 +693,12 @@ export class AuthService {
       metadata: { authMethod: "magic_link", sessionId: session.id },
     });
 
-    return { accessToken, refreshToken, tenantSlug: (magicLinkPayload.tenantSlug as string) ?? '' };
+    return {
+      accessToken,
+      refreshToken,
+      tenantSlug: (magicLinkPayload.tenantSlug as string) ?? '',
+      session: this.toSessionClaims(magicLinkPayload),
+    };
   }
 
   /**
@@ -887,7 +919,7 @@ export class AuthService {
     refreshToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }> {
     // Use OAuthRefreshTokenService for rotation
     let accessTokenPayload: Record<string, unknown>;
     let newToken: string;
@@ -963,6 +995,7 @@ export class AuthService {
       accessToken,
       refreshToken: newToken,
       tenantSlug: (enrichedPayload.tenantSlug as string) ?? '',
+      session: this.toSessionClaims(enrichedPayload),
     };
   }
 
@@ -1110,6 +1143,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       tenantSlug: (mfaPayload.tenantSlug as string) ?? '',
+      session: this.toSessionClaims(mfaPayload),
       message: "MFA verified successfully",
     };
   }
@@ -1179,6 +1213,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       tenantSlug: (backupPayload.tenantSlug as string) ?? '',
+      session: this.toSessionClaims(backupPayload),
       message: "Backup code verified successfully",
       warning:
         remaining <= 2
@@ -1240,7 +1275,7 @@ export class AuthService {
     userAgent: string;
     deviceId?: string;
   }): Promise<
-    | { accessToken: string; refreshToken: string; tenantSlug: string; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
+    | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims; user: { email: string; firstName?: string; lastName?: string; emailVerified: boolean } }
     | { status: 'mfa_enrollment_required'; enrollmentToken: string }
   > {
     const { tenantId, email, webauthnResponse, sessionNonce, ip, userAgent, deviceId } = data;
@@ -1347,6 +1382,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       tenantSlug: user.tenant?.slug ?? '',
+      session: this.toSessionClaims(passkeyPayload),
       user: {
         email: user.email,
         firstName: user.firstName,

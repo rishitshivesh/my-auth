@@ -27,6 +27,7 @@ Legend: ✅ done · 🔜 open
 | ✅ | P0-6 Email OTP moved to Redis |
 | ✅ | P0-7 PKCE is S256-only and mandatory for public clients |
 | ✅ | P0-5 Request bodies validated via class-validator DTOs |
+| ✅ | P0-8 ADR-0003 accepted; access tokens removed from all response bodies |
 
 ## P0 — correctness & security
 
@@ -65,8 +66,14 @@ per-DTO `*.dto.spec.ts` files.
 format, and always requires PKCE for public clients; token exchange compares in constant time and
 rejects legacy `plain` codes; discovery advertises `["S256"]`. Tests: `oauth-token.pkce.spec`.
 
-**P0-8 🔜 Access token returned in response bodies** despite the cookie-only rule. Decide
-ADR-0003, then implement. *AC:* first-party portal works with no token in any response body.
+**P0-8 ✅ Access token returned in response bodies.** Fixed: ADR-0003 accepted (cookie-only
+everywhere, no opt-in header — no in-repo consumer needs bearer delivery). `accessToken` removed
+from every first-party auth response body (login, refresh, MFA verify ×2, WebAuthn login,
+magic-link verify, social claim-session, first-admin bootstrap); each now returns `expiresIn` and,
+where available, non-secret `session` claims (`tenantId`, `tenantSlug`, `groups`) instead.
+`@scrolloop/sdk` no longer tracks the token client-side — `isAuthenticated()` reflects session
+state, not token possession; `getSessionClaims()` replaces `getTokenClaims()`. Tests:
+`packages/sdk-typescript/src/core/state.spec.ts`.
 
 ## P1 — reliability & compliance readiness
 

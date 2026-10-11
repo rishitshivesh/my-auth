@@ -15,7 +15,7 @@ import { AdminService } from "./admin.service";
 import { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { Public } from "@/common/decorators/public.decorator";
-import { setAuthCookies } from "@/common/http/auth-cookies";
+import { setAuthCookies, ACCESS_TOKEN_TTL_SECONDS } from "@/common/http/auth-cookies";
 
 /**
  * Public endpoints for first-run platform initialization.
@@ -97,7 +97,7 @@ export class SuperadminSetupController {
     description:
       "One-shot endpoint for first-run setup. Returns 409 if already initialized.",
   })
-  @ApiResponse({ status: 201, description: "Superadmin created, access token returned" })
+  @ApiResponse({ status: 201, description: "Superadmin created, tokens set as httpOnly cookies" })
   @ApiResponse({ status: 409, description: "Platform already initialized" })
   async createFirstAdmin(
     @Body() body: CreateFirstAdminDto,
@@ -116,6 +116,6 @@ export class SuperadminSetupController {
     // Tokens go into httpOnly cookies — never in the response body
     setAuthCookies(res, result.accessToken, result.refreshToken);
 
-    return { user: result.user };
+    return { user: result.user, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
   }
 }

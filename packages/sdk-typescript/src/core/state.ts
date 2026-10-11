@@ -5,7 +5,7 @@
  * Never persisted, never exposed
  */
 
-import type { AuthState, PendingRequest } from './types';
+import type { AuthState, PendingRequest, SessionClaims } from './types';
 
 /**
  * Creates a new auth state
@@ -13,49 +13,58 @@ import type { AuthState, PendingRequest } from './types';
  */
 export function createAuthState(): AuthState {
   return {
-    accessToken: undefined,
-    accessTokenExp: undefined,
+    authenticated: false,
+    expiresAt: undefined,
+    session: undefined,
     isRefreshing: false,
     refreshPromise: undefined,
     pendingRequests: [],
   };
 }
 
-// Access token is intentionally stored in module memory only.
-// It is never written to localStorage, sessionStorage, or any
-// JS-accessible cookie. Loss of the token on page refresh is
-// intentional — the httpOnly refresh token cookie is used to
-// silently re-issue a new access token via getAccessToken().
+// The SDK never holds the access token itself — it lives only in an httpOnly
+// cookie the browser cannot read. `authenticated` reflects the outcome of the
+// last login/refresh/getCurrentUser call, not possession of a credential.
 
 /**
- * Set access token and parse expiration
+ * Mark the session established (or renewed) after a successful
+ * login/refresh/verify call.
+ *
+ * @param expiresInSeconds - TTL the server reported for the access token it
+ *   just issued, used only to schedule a proactive refresh ahead of expiry.
  */
-export function setAccessToken(state: AuthState, token: string): void {
-  state.accessToken = token;
-  state.accessTokenExp = parseTokenExpiry(token);
+export function markAuthenticated(
+  state: AuthState,
+  expiresInSeconds?: number,
+  session?: SessionClaims,
+): void {
+  state.authenticated = true;
+  state.expiresAt = expiresInSeconds ? Date.now() + expiresInSeconds * 1000 : undefined;
+  if (session) state.session = session;
 }
 
 /**
- * Clear access token
+ * Clear local session state (logout, or refresh failed for good)
  */
-export function clearAccessToken(state: AuthState): void {
-  state.accessToken = undefined;
-  state.accessTokenExp = undefined;
+export function clearAuthentication(state: AuthState): void {
+  state.authenticated = false;
+  state.expiresAt = undefined;
+  state.session = undefined;
 }
 
 /**
- * Check if token is expired or about to expire
- * @param margin - Seconds before expiry to consider token expired (default: 30)
+ * Is the session expiring soon enough that we should proactively refresh?
+ * Returns false (not expiring) when the server didn't report an expiry —
+ * the reactive 401-retry path still covers that case.
+ *
+ * @param margin - Seconds before expiry to treat as "expiring soon" (default: 30)
  */
-export function isTokenExpired(state: AuthState, margin: number = 30): boolean {
-  if (!state.accessToken || !state.accessTokenExp) {
-    return true;
-  }
+export function isSessionExpiringSoon(state: AuthState, margin: number = 30): boolean {
+  if (!state.authenticated) return true;
+  if (!state.expiresAt) return false;
 
-  const now = Date.now();
-  const expiryWithMargin = state.accessTokenExp - (margin * 1000);
-
-  return now >= expiryWithMargin;
+  const expiryWithMargin = state.expiresAt - margin * 1000;
+  return Date.now() >= expiryWithMargin;
 }
 
 /**
@@ -92,23 +101,4 @@ export function rejectPendingRequests(
   state.pendingRequests = [];
 
   requests.forEach((req) => req.reject(error));
-}
-
-/**
- * Parse JWT to get expiration timestamp
- */
-function parseTokenExpiry(token: string): number | undefined {
-  try {
-    // JWT format: header.payload.signature
-    const parts = token.split('.');
-    if (parts.length !== 3) return undefined;
-
-    // Decode payload (base64url)
-    const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')));
-
-    // exp is in seconds, convert to milliseconds
-    return payload.exp ? payload.exp * 1000 : undefined;
-  } catch (error) {
-    return undefined;
-  }
 }

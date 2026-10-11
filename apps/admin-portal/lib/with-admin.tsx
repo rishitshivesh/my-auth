@@ -13,14 +13,13 @@ interface AdminUser {
 
 function isSuperAdmin(user: AdminUser | null): boolean {
   if (!user) return false
-  const claims = authClient.getTokenClaims()
-  if (!claims) return false
+  const session = authClient.getSessionClaims()
+  if (!session) return false
   const sentryTenantId = process.env.NEXT_PUBLIC_SENTRY_TENANT_ID
   const tenantOk = sentryTenantId
-    ? claims.tenantId === sentryTenantId
-    : claims.tenantSlug === 'sentry'
-  const groupOk = Array.isArray(claims.groups) &&
-    claims.groups.includes('sentry-internal')
+    ? session.tenantId === sentryTenantId
+    : session.tenantSlug === 'sentry'
+  const groupOk = session.groups.includes('sentry-internal')
   return tenantOk && groupOk
 }
 

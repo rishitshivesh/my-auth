@@ -48,6 +48,7 @@ import {
   clearAuthCookies,
   setAuthCookies,
   setMfaEnrollmentCookie,
+  ACCESS_TOKEN_TTL_SECONDS,
 } from "@/common/http/auth-cookies";
 interface AuthenticatedRequest {
   tenantId: string;
@@ -133,10 +134,14 @@ export class AuthController {
     }
 
     setAuthCookies(res, response.accessToken, response.refreshToken);
-    // Return access token in body so SDK clients can cache it in state.
-    // Bearer token auth requires the SDK to hold the token in memory;
-    // the httpOnly cookie provides fallback for server-side cookie auth.
-    return { user: response.user, tenantSlug: response.tenantSlug, accessToken: response.accessToken };
+    // Tokens are httpOnly cookies only (ADR-0003) — the body carries no
+    // credential, just non-secret session metadata for the client to use.
+    return {
+      user: response.user,
+      tenantSlug: response.tenantSlug,
+      session: response.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    };
   }
 
   /**
@@ -249,6 +254,7 @@ export class AuthController {
    */
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
+  @RateLimit({ max: 30, windowMs: 60000, keyBy: "ip" })
   @ApiOperation({ summary: "Refresh access token" })
   @ApiResponse({ status: 200, description: "Token refreshed successfully" })
   @ApiResponse({ status: 401, description: "Invalid refresh token" })
@@ -264,9 +270,12 @@ export class AuthController {
     const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
 
     setAuthCookies(res, response.accessToken, response.refreshToken);
-    // Return the access token in the body so SDK clients can cache it in memory.
-    // The httpOnly cookie is the authoritative token; this is a convenience copy.
-    return { accessToken: response.accessToken };
+    // Tokens are httpOnly cookies only (ADR-0003) — no credential in the body.
+    return {
+      tenantSlug: response.tenantSlug,
+      session: response.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    };
   }
 
   /**
@@ -433,13 +442,13 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "MFA verified successfully, tokens issued",
+    description: "MFA verified successfully, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
         message: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
       },
     },
   })
@@ -466,7 +475,12 @@ export class AuthController {
       );
 
       setAuthCookies(res, result.accessToken, result.refreshToken);
-      return { message: result.message, tenantSlug: result.tenantSlug };
+      return {
+        message: result.message,
+        tenantSlug: result.tenantSlug,
+        session: result.session,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      };
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
@@ -507,13 +521,13 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "Backup code verified, tokens issued",
+    description: "Backup code verified, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
         message: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
         warning: {
           type: "string",
           description: "Warning about remaining backup codes",
@@ -543,7 +557,13 @@ export class AuthController {
         userAgent,
       );
       setAuthCookies(res, result.accessToken, result.refreshToken);
-      return { message: result.message, tenantSlug: result.tenantSlug, warning: result.warning };
+      return {
+        message: result.message,
+        tenantSlug: result.tenantSlug,
+        session: result.session,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+        warning: result.warning,
+      };
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
@@ -617,12 +637,12 @@ export class AuthController {
   })
   @ApiResponse({
     status: 200,
-    description: "Authentication successful",
+    description: "Authentication successful, tokens set as httpOnly cookies",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
-        refreshToken: { type: "string" },
+        tenantSlug: { type: "string" },
+        expiresIn: { type: "number" },
         user: {
           type: "object",
           properties: {
@@ -662,7 +682,12 @@ export class AuthController {
       return res.json({ status: result.status });
     }
     setAuthCookies(res, result.accessToken, result.refreshToken);
-    return res.json({ user: result.user, tenantSlug: result.tenantSlug });
+    return res.json({
+      user: result.user,
+      tenantSlug: result.tenantSlug,
+      session: result.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    });
   }
 
   /**
@@ -709,7 +734,11 @@ export class AuthController {
       return res.json({ status: result.status });
     }
     setAuthCookies(res, result.accessToken, result.refreshToken);
-    return res.json({ tenantSlug: result.tenantSlug });
+    return res.json({
+      tenantSlug: result.tenantSlug,
+      session: result.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    });
   }
 
   /**
