@@ -35,14 +35,16 @@ import {
   ListUsersResponseDto,
   InviteUserDto,
 } from "./user.dto";
-import { JwtAuthGuard } from "@/common/guards";
+import { JwtAuthGuard, RequireRecentAuth } from "@/common/guards";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 
 interface AuthenticatedRequest {
   tenantId: string;
-  user: { sub: string; email?: string; mfaVerified?: boolean };
+  user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string };
+  requestId?: string;
+  headers?: Record<string, string | string[] | undefined>;
   ip?: string;
   route?: { path: string };
   params?: Record<string, string>;
@@ -95,6 +97,7 @@ export class UserController {
    * Anyone authenticated can change their own password
    */
   @Post("me/change-password")
+  @RequireRecentAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Change user password" })
   @ApiResponse({ status: 200, description: "Password changed successfully" })
@@ -112,6 +115,12 @@ export class UserController {
       req.user.sub,
       changePasswordDto.currentPassword,
       changePasswordDto.newPassword,
+      {
+        ip: req.ip ?? "0.0.0.0",
+        userAgent: String(req.headers?.["user-agent"] ?? "unknown"),
+        requestId: req.requestId,
+        sessionId: req.user.sessionId,
+      },
     );
     return { message: "Password changed successfully" };
   }
@@ -195,12 +204,18 @@ export class UserController {
    * Anyone authenticated can delete their own account
    */
   @Delete("me")
+  @RequireRecentAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Delete user account" })
   @ApiResponse({ status: 200, description: "Account deleted successfully" })
   async deleteAccount(@Request() req: AuthenticatedRequest, @Body("password") password: string) {
     const tenantId = req.tenantId!;
-    await this.userService.deleteAccount(tenantId, req.user.sub, password);
+    await this.userService.deleteAccount(
+      tenantId,
+      req.user.sub,
+      password,
+      req.requestId,
+    );
     return { message: "Account deleted successfully" };
   }
 
@@ -361,7 +376,12 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async deleteUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    await this.userService.adminDeleteUser(tenantId, id);
+    await this.userService.adminDeleteUser(
+      tenantId,
+      id,
+      req.user.sub,
+      req.requestId,
+    );
   }
 
   /**
@@ -377,7 +397,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async forcePasswordReset(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    await this.userService.adminForcePasswordReset(tenantId, id);
+    await this.userService.adminForcePasswordReset(tenantId, id, req.user.sub);
     return { message: "User will be required to reset password on next login" };
   }
 
@@ -394,7 +414,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async lockUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    await this.userService.adminLockUser(tenantId, id);
+    await this.userService.adminLockUser(tenantId, id, req.user.sub);
     return { message: "User account locked" };
   }
 
@@ -407,7 +427,7 @@ export class UserController {
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   async unlockUser(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId!;
-    await this.userService.adminUnlockUser(tenantId, id);
+    await this.userService.adminUnlockUser(tenantId, id, req.user.sub);
     return { message: "User account unlocked" };
   }
 

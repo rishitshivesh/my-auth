@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import { BadRequestException } from "@nestjs/common";
+import { ProtocolException } from "@/common/http";
 import { OAuthTokenService } from "./oauth-token.service";
 
 /** validatePKCE() is pure; call it without constructing the service graph. */
@@ -31,6 +31,6 @@ describe("OAuthTokenService.validatePKCE (S256 only)", () => {
 
   it("refuses the plain method, even when verifier equals challenge", async () => {
     const plain = "p".repeat(43);
-    await expect(validatePKCE(plain, plain, "plain")).rejects.toThrow(BadRequestException);
+    await expect(validatePKCE(plain, plain, "plain")).rejects.toMatchObject({ constructor: ProtocolException, body: { error: "invalid_request" } });
   });
 });

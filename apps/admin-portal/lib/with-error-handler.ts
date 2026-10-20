@@ -1,4 +1,6 @@
 import { toast } from "sonner";
+import { SentryApiError, describeError } from "./api-error";
+import { SESSION_ENDED_CODES } from "./error-messages";
 
 export interface ErrorHandlerConfig {
   showErrorToast?: boolean;
@@ -15,13 +17,33 @@ interface TransportResponseLike {
   ok: boolean;
   status: number;
   statusText: string;
+  headers?: Record<string, string>;
   data?: unknown;
+}
+
+const LOGIN_PATH = "/u/login";
+
+function redirectToLogin() {
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith(LOGIN_PATH)) {
+    window.location.href = LOGIN_PATH;
+  }
+}
+
+/** Show a toast for an error: friendly message plus a small support reference. */
+export function toastApiError(error: unknown, override?: string) {
+  const view = describeError(error);
+  const options: { description?: string; action?: { label: string; onClick: () => void } } = {};
+  if (view.reference) options.description = view.reference;
+  if (error instanceof SentryApiError && error.code === "ACCESS_RECENT_AUTH_REQUIRED") {
+    options.action = { label: "Sign in again", onClick: redirectToLogin };
+  }
+  toast.error(override ?? view.message, options);
 }
 
 /**
  * Higher-Order Function to wrap API requests with error handling and toasts.
  * Automatically handles backend responses wrapped in { data: T } and returns
- * the unwrapped data payload.
+ * the unwrapped data payload. Failures are thrown as SentryApiError.
  */
 export function withErrorHandler<Args extends unknown[], R>(
   fn: (...args: Args) => Promise<unknown>,
@@ -34,14 +56,6 @@ export function withErrorHandler<Args extends unknown[], R>(
     errorMessage,
   } = config;
 
-  const handleSessionExpired = () => {
-    if (typeof window !== "undefined") {
-      if (!window.location.pathname.startsWith("/u/login")) {
-        window.location.href = "/u/login";
-      }
-    }
-  };
-
   return async (...args: Args): Promise<R> => {
     try {
       const response = await fn(...args);
@@ -50,23 +64,7 @@ export function withErrorHandler<Args extends unknown[], R>(
       if (response && typeof response === "object" && "ok" in response) {
         const resObj = response as TransportResponseLike;
         if (!resObj.ok) {
-          if (resObj.status === 401) {
-            handleSessionExpired();
-            throw new Error("Session expired");
-          }
-
-          const resData = resObj.data as Record<string, unknown> | undefined;
-          const msg =
-            resData?.message ??
-            resData?.error ??
-            resObj.statusText ??
-            "An unexpected error occurred";
-          const finalErrorMsg = errorMessage ?? (Array.isArray(msg) ? msg.join("; ") : String(msg));
-
-          if (showErrorToast) {
-            toast.error(finalErrorMsg);
-          }
-          throw new Error(finalErrorMsg);
+          throw SentryApiError.fromResponse(resObj);
         }
 
         // Extract { data: T } or { data: { data: T } }
@@ -96,19 +94,21 @@ export function withErrorHandler<Args extends unknown[], R>(
 
       return result as R;
     } catch (error: unknown) {
-      const err = error as Error & { status?: number };
-      const msg = err?.message ?? "An unexpected error occurred";
-      const finalErrorMsg = errorMessage ?? msg;
+      if (error instanceof SentryApiError && SESSION_ENDED_CODES.has(error.code)) {
+        redirectToLogin();
+        throw error;
+      }
 
-      if (
-        msg === "SESSION_EXPIRED" ||
-        msg.toLowerCase().includes("session expired") ||
-        msg.toLowerCase().includes("not authenticated") ||
-        err?.status === 401
-      ) {
-        handleSessionExpired();
+      const legacyExpired =
+        !(error instanceof SentryApiError) &&
+        error instanceof Error &&
+        (error.message === "SESSION_EXPIRED" ||
+          error.message.toLowerCase().includes("session expired") ||
+          error.message.toLowerCase().includes("not authenticated"));
+      if (legacyExpired) {
+        redirectToLogin();
       } else if (showErrorToast) {
-        toast.error(finalErrorMsg);
+        toastApiError(error, errorMessage);
       }
       throw error;
     }

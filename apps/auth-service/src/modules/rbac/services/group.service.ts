@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ApiException } from '../../../common/http';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Group, UserGroup, GroupPolicy, Policy } from '@repo/database';
@@ -26,7 +22,7 @@ export class GroupService {
       where: { tenantId, name: dto.name },
     });
     if (existing) {
-      throw new ConflictException(`Group "${dto.name}" already exists`);
+      throw new ApiException("RESOURCE_CONFLICT", { detail: `Group "${dto.name}" already exists` });
     }
 
     let path = '/';
@@ -35,7 +31,7 @@ export class GroupService {
         where: { id: dto.parentGroupId, tenantId },
       });
       if (!parent) {
-        throw new NotFoundException('Parent group not found');
+        throw new ApiException("RESOURCE_NOT_FOUND");
       }
       path = `${parent.path}${dto.name}/`;
     } else {
@@ -65,7 +61,7 @@ export class GroupService {
   async getGroup(id: string, tenantId: string): Promise<Group> {
     const group = await this.groupRepo.findOne({ where: { id, tenantId } });
     if (!group) {
-      throw new NotFoundException('Group not found');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
     return group;
   }
@@ -93,7 +89,7 @@ export class GroupService {
     const group = await this.getGroup(id, tenantId);
 
     if (group.isSystem) {
-      throw new BadRequestException('Cannot modify system group');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot modify system group' });
     }
 
     if (dto.description !== undefined) group.description = dto.description ?? null;
@@ -133,21 +129,21 @@ export class GroupService {
     const group = await this.getGroup(id, tenantId);
 
     if (group.isSystem) {
-      throw new BadRequestException('Cannot delete system group');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete system group' });
     }
 
     const memberCount = await this.userGroupRepo.count({
       where: { groupId: id, tenantId },
     });
     if (memberCount > 0) {
-      throw new BadRequestException('Cannot delete group with members. Remove all members first.');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete group with members. Remove all members first.' });
     }
 
     const childCount = await this.groupRepo.count({
       where: { parentGroupId: id, tenantId },
     });
     if (childCount > 0) {
-      throw new BadRequestException('Cannot delete group with child groups. Remove children first.');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete group with child groups. Remove children first.' });
     }
 
     await this.groupRepo.remove(group);
@@ -162,7 +158,7 @@ export class GroupService {
       where: { groupId, userId, tenantId },
     });
     if (existing) {
-      throw new ConflictException('User already in group');
+      throw new ApiException("RESOURCE_CONFLICT", { detail: 'User already in group' });
     }
 
     const ug = await this.userGroupRepo.save({
@@ -182,7 +178,7 @@ export class GroupService {
       where: { groupId, userId, tenantId },
     });
     if (!ug) {
-      throw new NotFoundException('User not in group');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     await this.userGroupRepo.remove(ug);
@@ -195,14 +191,14 @@ export class GroupService {
 
     const policy = await this.policyRepo.findOne({ where: { id: policyId, tenantId } });
     if (!policy) {
-      throw new NotFoundException('Policy not found');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     const existing = await this.groupPolicyRepo.findOne({
       where: { groupId, policyId, tenantId },
     });
     if (existing) {
-      throw new ConflictException('Policy already attached to group');
+      throw new ApiException("RESOURCE_CONFLICT", { detail: 'Policy already attached to group' });
     }
 
     await this.groupPolicyRepo.save({ tenantId, groupId, policyId });
@@ -215,7 +211,7 @@ export class GroupService {
       where: { groupId, policyId, tenantId },
     });
     if (!gp) {
-      throw new NotFoundException('Policy not attached to group');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     await this.groupPolicyRepo.remove(gp);

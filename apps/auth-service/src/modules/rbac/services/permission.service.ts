@@ -1,10 +1,7 @@
 // apps/auth-service/src/modules/rbac/services/permission.service.ts
 
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException, isConflict } from "../../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Permission } from "@repo/database";
@@ -49,7 +46,7 @@ export class PermissionService {
     });
 
     if (existing) {
-      throw new ConflictException(`Permission ${name} already exists`);
+      throw new ApiException("RESOURCE_CONFLICT", { detail: `Permission ${name} already exists` });
     }
 
     const permission = await this.permissionRepository.save({
@@ -93,7 +90,7 @@ export class PermissionService {
         created.push(permission);
       } catch (error) {
         // Skip if already exists
-        if (error instanceof ConflictException) {
+        if (isConflict(error)) {
           logger.info({ permission: `${perm.resource}:${perm.action}` }, "Skipping existing permission");
         } else {
           throw error;
@@ -113,7 +110,7 @@ export class PermissionService {
     });
 
     if (!permission) {
-      throw new NotFoundException("Permission not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return permission;
@@ -205,7 +202,7 @@ export class PermissionService {
     const permission = await this.getPermission(id, tenantId);
 
     if (permission.isSystem) {
-      throw new ConflictException("Cannot update system permission");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot update system permission" });
     }
 
     Object.assign(permission, data);
@@ -224,7 +221,7 @@ export class PermissionService {
     const permission = await this.getPermission(id, tenantId);
 
     if (permission.isSystem) {
-      throw new ConflictException("Cannot delete system permission");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot delete system permission" });
     }
 
     await this.permissionRepository.remove(permission);

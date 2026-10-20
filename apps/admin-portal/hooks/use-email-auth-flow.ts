@@ -2,6 +2,7 @@
 
 import { useAuth } from "@scrolloop/sdk"
 import { useState } from "react"
+import { getErrorMessage } from "@/lib/api-error";
 
 export interface LoginIntentResponse {
   exists: boolean
@@ -56,7 +57,7 @@ export function useEmailAuthFlow(): UseEmailAuthFlowReturn {
       setSelectedMethod(response.preferredMethod)
       setStep("method-selection")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(getErrorMessage(err, "An error occurred"))
     } finally {
       setLoading(false)
     }

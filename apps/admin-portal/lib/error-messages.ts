@@ -1,0 +1,64 @@
+import type { ErrorCode } from "@scrolloop/types";
+
+/**
+ * Single source of friendly copy for API error codes. Keyed by the shared
+ * ErrorCode union so a new backend code fails the type check until it has
+ * a message here.
+ */
+export const ERROR_MESSAGES: Record<ErrorCode, string> = {
+  AUTH_INVALID_CREDENTIALS: "Incorrect email or password.",
+  AUTH_EMAIL_NOT_VERIFIED: "Verify your email address before signing in.",
+  AUTH_MFA_REQUIRED: "Multi-factor verification is required to continue.",
+  AUTH_MFA_INVALID: "That verification code is not valid. Try again.",
+  AUTH_OTP_INVALID: "That code is invalid or has expired.",
+  AUTH_TOKEN_INVALID: "Your session is not valid. Please sign in again.",
+  AUTH_TOKEN_EXPIRED: "Your session has expired. Please sign in again.",
+  AUTH_SESSION_REVOKED: "This session was signed out. Please sign in again.",
+  AUTH_REFRESH_REUSED: "For your security, this session was ended. Please sign in again.",
+  AUTH_ACCOUNT_LOCKED: "This account is temporarily locked after too many failed attempts.",
+  ACCESS_FORBIDDEN: "You do not have permission to do that.",
+  ACCESS_RECENT_AUTH_REQUIRED: "For your security, sign in again to continue with this action.",
+  HIERARCHY_VIOLATION: "You cannot change a user with equal or higher privileges.",
+  TENANT_MISMATCH: "This request does not belong to the current workspace.",
+  TENANT_SUSPENDED: "This workspace is suspended. Contact your administrator.",
+  USER_SUSPENDED: "This account is suspended. Contact your administrator.",
+  RESOURCE_NOT_FOUND: "We could not find what you were looking for.",
+  RESOURCE_CONFLICT: "That conflicts with something that already exists.",
+  TENANT_NOT_FOUND: "We could not find that workspace.",
+  LAST_OWNER: "A workspace must keep at least one owner.",
+  INVITE_INVALID: "This invitation is invalid or has expired.",
+  PASSWORD_POLICY: "That password does not meet the workspace password policy.",
+  MFA_ALREADY_ENABLED: "Multi-factor authentication is already enabled.",
+  MFA_NOT_ENABLED: "Multi-factor authentication is not enabled.",
+  MFA_NOT_STARTED: "Start multi-factor setup before verifying a code.",
+  PASSKEY_INVALID: "The passkey could not be verified.",
+  PASSKEY_LIMIT: "You have reached the maximum number of passkeys.",
+  SOCIAL_PROVIDER_DISABLED: "That sign-in provider is not enabled for this workspace.",
+  SOCIAL_PROVIDER_ERROR: "The sign-in provider returned an error. Try again shortly.",
+  BAD_REQUEST: "The request was not valid.",
+  VALIDATION_FAILED: "Some fields need your attention.",
+  UPLOAD_TOO_LARGE: "That file is too large.",
+  RATE_LIMITED: "Too many attempts. Please wait before trying again.",
+  NOT_IMPLEMENTED: "This feature is not available yet.",
+  INTERNAL_ERROR: "Something went wrong on our side. Please try again.",
+};
+
+/** Codes whose friendly copy beats whatever generic detail the server sends. */
+export const PREFER_FRIENDLY_COPY: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+  "RATE_LIMITED",
+  "ACCESS_RECENT_AUTH_REQUIRED",
+  "AUTH_ACCOUNT_LOCKED",
+  "INTERNAL_ERROR",
+]);
+
+/** Codes meaning the session itself is gone, so the user must sign in again. */
+export const SESSION_ENDED_CODES: ReadonlySet<string> = new Set([
+  "AUTH_TOKEN_INVALID",
+  "AUTH_TOKEN_EXPIRED",
+  "AUTH_SESSION_REVOKED",
+  "AUTH_REFRESH_REUSED",
+]);
+
+export function isKnownErrorCode(code: string): code is ErrorCode {
+  return Object.prototype.hasOwnProperty.call(ERROR_MESSAGES, code);
+}

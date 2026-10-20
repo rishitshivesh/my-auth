@@ -1,8 +1,5 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { oauthError } from "../oauth-errors";
 import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, LessThan } from "typeorm";
@@ -103,7 +100,7 @@ export class OAuthTokenService {
     });
 
     if (!client) {
-      throw new BadRequestException("Invalid client");
+      throw oauthError("invalid_client", "Unknown client");
     }
 
     // Generate random code
@@ -156,23 +153,23 @@ export class OAuthTokenService {
     });
 
     if (!authCode) {
-      throw new UnauthorizedException("Invalid authorization code");
+      throw oauthError("invalid_grant", "Invalid authorization code");
     }
 
     // Check expiry
     if (authCode.expiresAt < new Date()) {
-      throw new UnauthorizedException("Authorization code expired");
+      throw oauthError("invalid_grant", "Authorization code expired");
     }
 
     // Check redirect URI matches
     if (authCode.redirectUri !== redirectUri) {
-      throw new UnauthorizedException("Redirect URI mismatch");
+      throw oauthError("invalid_grant", "Redirect URI mismatch");
     }
 
     // Validate PKCE if present
     if (authCode.codeChallenge) {
       if (!codeVerifier) {
-        throw new UnauthorizedException("code_verifier required for PKCE");
+        throw oauthError("invalid_grant", "code_verifier required for PKCE");
       }
 
       const isValid = await this.validatePKCE(
@@ -182,7 +179,7 @@ export class OAuthTokenService {
       );
 
       if (!isValid) {
-        throw new UnauthorizedException("Invalid code_verifier");
+        throw oauthError("invalid_grant", "Invalid code_verifier");
       }
     }
 
@@ -205,7 +202,7 @@ export class OAuthTokenService {
   ): Promise<boolean> {
     // Only S256. Codes issued with "plain" before this change are rejected.
     if (method !== "S256") {
-      throw new BadRequestException("Unsupported code_challenge_method");
+      throw oauthError("invalid_request", "Unsupported code_challenge_method");
     }
     if (!/^[A-Za-z0-9\-._~]{43,128}$/.test(codeVerifier)) {
       return false;
@@ -236,7 +233,7 @@ export class OAuthTokenService {
     });
 
     if (!client) {
-      throw new BadRequestException("Invalid client");
+      throw oauthError("invalid_client", "Unknown client");
     }
 
     // Generate JTI (JWT ID)
@@ -312,7 +309,7 @@ export class OAuthTokenService {
         algorithms: ['RS256'],
       }) as Record<string, unknown>;
     } catch (error: unknown) {
-      throw new UnauthorizedException("Invalid access token");
+      throw oauthError("invalid_token", "Invalid access token");
     }
 
     // Look up token in database (for revocation check)
@@ -327,12 +324,12 @@ export class OAuthTokenService {
     });
 
     if (!accessToken) {
-      throw new UnauthorizedException("Access token revoked or invalid");
+      throw oauthError("invalid_token", "Access token revoked or invalid");
     }
 
     // Check expiry
     if (accessToken.expiresAt < new Date()) {
-      throw new UnauthorizedException("Access token expired");
+      throw oauthError("invalid_token", "Access token expired");
     }
 
     // Update last used
@@ -384,7 +381,7 @@ export class OAuthTokenService {
     });
 
     if (!client) {
-      throw new BadRequestException("Invalid client");
+      throw oauthError("invalid_client", "Unknown client");
     }
 
     // Generate random token
@@ -433,12 +430,12 @@ export class OAuthTokenService {
     });
 
     if (!refreshToken) {
-      throw new UnauthorizedException("Invalid refresh token");
+      throw oauthError("invalid_grant", "Invalid refresh token");
     }
 
     // Check expiry
     if (refreshToken.expiresAt < new Date()) {
-      throw new UnauthorizedException("Refresh token expired");
+      throw oauthError("invalid_grant", "Refresh token expired");
     }
 
     // REUSE DETECTION
@@ -452,9 +449,7 @@ export class OAuthTokenService {
         "token_reuse_detected",
       );
 
-      throw new UnauthorizedException(
-        "Token reuse detected - all sessions revoked",
-      );
+      throw oauthError("invalid_grant", "Refresh token reuse detected");
     }
 
     return refreshToken;

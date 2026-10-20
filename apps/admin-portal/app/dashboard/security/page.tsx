@@ -7,6 +7,7 @@ import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { useMfaStatus, useSetupTotp, useVerifyTotp, useDisableTotp } from "@/lib/queries"
 import type { TotpSetupData } from "@/lib/types"
 import { ShieldCheck, ShieldOff, QrCode, Key } from "lucide-react"
+import { getErrorMessage } from "@/lib/api-error";
 
 export default function SecurityPage() {
   const { data: mfaStatus, isLoading } = useMfaStatus()
@@ -38,10 +39,9 @@ export default function SecurityPage() {
   }
 
   const error =
-    setupTotp.error?.message ??
-    verifyTotp.error?.message ??
-    disableTotp.error?.message ??
-    null
+    [setupTotp.error, verifyTotp.error, disableTotp.error]
+      .filter((e): e is Error => e instanceof Error)
+      .map((e) => getErrorMessage(e))[0] ?? null
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

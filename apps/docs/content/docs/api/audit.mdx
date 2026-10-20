@@ -1,0 +1,34 @@
+---
+title: Audit Log
+description: List and export audit events, with server-side filters including requestId.
+---
+
+# Audit Log
+
+Requires the `audit:read` permission (list) or `audit:export` (CSV).
+
+### GET /audit
+
+**Headers:** `Authorization: Bearer <token>`, `x-tenant-id: <slug>`
+
+**Query:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| userId | string | | Filter by actor |
+| eventType | string | | Filter by event type |
+| requestId | string | | Only events produced by this `x-request-id` |
+| startDate | ISO 8601 | | Inclusive lower bound |
+| endDate | ISO 8601 | | Inclusive upper bound |
+| cursor | string | | Cursor from a previous page |
+| limit | integer | | 1 to 200 |
+
+**Response 200:** each row includes `requestId` and `outcome`.
+```json
+{ "data": [ { "id": "...", "eventType": "mfa.enabled", "userId": "...", "outcome": "success", "requestId": "3f1c9a52-...", "metadata": {}, "createdAt": "..." } ] }
+```
+
+Metadata is redacted recursively; secrets never appear in responses.
+
+### GET /audit/export
+
+Same query parameters (including `requestId`). Returns `text/csv` with a `requestId` column.

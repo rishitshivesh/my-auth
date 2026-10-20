@@ -1,11 +1,7 @@
 // apps/auth-service/src/modules/rbac/services/role.service.ts
 
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException, isConflict } from "../../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import { Role, RolePermission, Permission } from "@repo/database";
@@ -58,7 +54,7 @@ export class RoleService {
     });
 
     if (existing) {
-      throw new ConflictException(`Role ${data.name} already exists`);
+      throw new ApiException("RESOURCE_CONFLICT", { detail: `Role ${data.name} already exists` });
     }
 
     const role = await this.roleRepository.save({
@@ -112,7 +108,7 @@ export class RoleService {
     const role = await query.getOne();
 
     if (!role) {
-      throw new NotFoundException("Role not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return role;
@@ -196,7 +192,7 @@ export class RoleService {
     const role = await this.getRole(id, tenantId);
 
     if (role.isSystem) {
-      throw new ConflictException("Cannot update system role");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot update system role" });
     }
 
     Object.assign(role, data);
@@ -215,11 +211,11 @@ export class RoleService {
     const role = await this.getRole(id, tenantId);
 
     if (role.isSystem) {
-      throw new ConflictException("Cannot delete system role");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot delete system role" });
     }
 
     if (role.isDefault) {
-      throw new ConflictException("Cannot delete default role");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot delete default role" });
     }
 
     await this.roleRepository.remove(role);
@@ -239,7 +235,7 @@ export class RoleService {
     const role = await this.getRole(roleId, tenantId);
 
     if (role.isSystem) {
-      throw new ConflictException("Cannot modify system role permissions");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot modify system role permissions" });
     }
 
     // Get permissions by names
@@ -255,9 +251,7 @@ export class RoleService {
       const missing = permissionNames.filter(
         (name) => !foundNames.includes(name),
       );
-      throw new BadRequestException(
-        `Permissions not found: ${missing.join(", ")}`,
-      );
+      throw new ApiException("BAD_REQUEST", { detail: `Permissions not found: ${missing.join(", ")}` });
     }
 
     // Get existing role permissions
@@ -298,7 +292,7 @@ export class RoleService {
     const role = await this.getRole(roleId, tenantId);
 
     if (role.isSystem) {
-      throw new ConflictException("Cannot modify system role permissions");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot modify system role permissions" });
     }
 
     // Get permissions by names
@@ -333,7 +327,7 @@ export class RoleService {
     const role = await this.getRole(roleId, tenantId);
 
     if (role.isSystem) {
-      throw new ConflictException("Cannot modify system role permissions");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot modify system role permissions" });
     }
 
     // Remove all existing permissions
@@ -436,7 +430,7 @@ export class RoleService {
         });
         created.push(role);
       } catch (error) {
-        if (error instanceof ConflictException) {
+        if (isConflict(error)) {
           logger.info({ roleName: roleData.name }, "Skipping existing role");
         } else {
           throw error;

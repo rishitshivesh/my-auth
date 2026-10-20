@@ -13,6 +13,8 @@ import { SamlModule } from "@/modules/saml/saml.module";
 import { ScimModule } from "@/modules/scim/scim.module";
 import { LdapModule } from "@/modules/ldap/ldap.module";
 import { AuditModule } from "@/modules/audit/audit.module";
+import { SecurityNotifierModule } from "@/modules/notifier/security-notifier.module";
+import { DomainEventsModule } from "@/common/service/domain-events.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -31,6 +33,8 @@ import { ScheduleModule } from "@nestjs/schedule";
     ScimModule,
     LdapModule,
     AuditModule,
+    DomainEventsModule,
+    SecurityNotifierModule,
     ScheduleModule.forRoot(),
   ],
 })

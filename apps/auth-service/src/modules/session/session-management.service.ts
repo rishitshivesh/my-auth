@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, LessThan, In } from "typeorm";
 import { Session, OAuthRefreshToken } from "@repo/database";
@@ -166,7 +167,7 @@ export class SessionManagementService {
     });
 
     if (!session) {
-      throw new NotFoundException("Session not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Session not found." });
     }
 
     if (session.revokedAt) {

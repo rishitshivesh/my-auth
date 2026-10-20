@@ -1,11 +1,5 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  UnauthorizedException,
-  Logger,
-} from "@nestjs/common";
+import { Injectable, CanActivate, ExecutionContext, Logger } from "@nestjs/common";
+import { ApiException } from "../http";
 
 /**
  * TenantBindingGuard
@@ -34,15 +28,13 @@ export class TenantBindingGuard implements CanActivate {
     if (!requestTenantId) {
       // This means TenantResolverMiddleware didn't run or failed
       this.logger.error("TenantBindingGuard: No tenantId on request");
-      throw new ForbiddenException(
-        "Tenant context not found. This route requires tenant resolution.",
-      );
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: "Tenant context not found. This route requires tenant resolution." });
     }
 
     if (!user) {
       // This means JwtAuthGuard didn't run or token is invalid
       this.logger.error("TenantBindingGuard: No user on request");
-      throw new UnauthorizedException("Authentication required");
+      throw new ApiException("AUTH_TOKEN_INVALID", { detail: "Authentication required" });
     }
 
     // Step 2: Extract tenant from token payload
@@ -54,7 +46,7 @@ export class TenantBindingGuard implements CanActivate {
         userId: user.sub,
         email: user.email,
       });
-      throw new ForbiddenException("Invalid token: missing tenant context");
+      throw new ApiException("TENANT_MISMATCH", { detail: "Invalid token: missing tenant context" });
     }
 
     // Step 3: Enforce tenant binding
@@ -73,9 +65,7 @@ export class TenantBindingGuard implements CanActivate {
         path: request.path,
       });
 
-      throw new ForbiddenException(
-        "Token is not valid for this tenant. Please authenticate with the correct tenant.",
-      );
+      throw new ApiException("TENANT_MISMATCH", { detail: "Token is not valid for this tenant. Please authenticate with the correct tenant." });
     }
 
     // Step 4: Success - tenant binding is valid

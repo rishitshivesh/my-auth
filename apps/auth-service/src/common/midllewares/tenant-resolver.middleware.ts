@@ -1,4 +1,5 @@
 // apps/auth-service/src/common/middleware/tenant-resolver.middleware.ts
+import { ApiException } from "@/common/http";
 import {
   Injectable,
   NestMiddleware,
@@ -51,9 +52,9 @@ export class TenantResolverMiddleware implements NestMiddleware {
           return next();
         }
 
-        throw new NotFoundException(
-          "Tenant not found. Please check your domain or tenant ID.",
-        );
+        throw new ApiException("TENANT_NOT_FOUND", {
+          detail: "Tenant not found. Please check your domain or tenant ID.",
+        });
       }
 
       req.tenant = tenant;

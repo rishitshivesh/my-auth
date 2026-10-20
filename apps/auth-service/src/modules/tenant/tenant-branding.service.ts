@@ -3,7 +3,7 @@
  *
  * Manages the tenant_branding table (one row per tenant).
  */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantBranding } from '@repo/database';

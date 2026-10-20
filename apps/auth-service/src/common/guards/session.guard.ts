@@ -2,11 +2,11 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  UnauthorizedException,
   Logger,
 } from "@nestjs/common";
 import { Session } from "@repo/database";
 import { SessionRepository } from "@/core/database/session.repository";
+import { ApiException } from "../http";
 
 /**
  * SessionGuard
@@ -30,9 +30,7 @@ export class SessionGuard implements CanActivate {
 
     if (!sessionId) {
       this.logger.error("SessionGuard: No sessionId in token payload");
-      throw new UnauthorizedException(
-        "Invalid token: missing session reference",
-      );
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     // Fetch session from database
@@ -83,7 +81,7 @@ export class SessionGuard implements CanActivate {
 
     if (!session) {
       this.logger.warn("SessionGuard: Session not found", { sessionId });
-      throw new UnauthorizedException("Session not found. Please login again.");
+      throw new ApiException("AUTH_SESSION_REVOKED");
     }
 
     if (session.revokedAt) {
@@ -91,9 +89,7 @@ export class SessionGuard implements CanActivate {
         sessionId,
         revokedAt: session.revokedAt,
       });
-      throw new UnauthorizedException(
-        "Session has been revoked. Please login again.",
-      );
+      throw new ApiException("AUTH_SESSION_REVOKED");
     }
 
     if (session.expiresAt && session.expiresAt < new Date()) {
@@ -101,9 +97,7 @@ export class SessionGuard implements CanActivate {
         sessionId,
         expiresAt: session.expiresAt,
       });
-      throw new UnauthorizedException(
-        "Session has expired. Please login again.",
-      );
+      throw new ApiException("AUTH_TOKEN_EXPIRED");
     }
 
     request.sentrySession = session;

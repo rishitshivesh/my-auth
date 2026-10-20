@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { TenantAwareRepository } from '@/core/database/tenant-aware.repository';
 import { TenantContextService } from '@/core/database/tenant-context.service';
 import { User, UserRole, Tenant } from '@repo/database';
+import { isOwnerLevel, maxPriority } from '../rbac/role-hierarchy';
 
 export interface OrgMembership {
   tenantId: string;
@@ -37,6 +38,31 @@ export class UserRepository extends TenantAwareRepository<User> {
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     // Both layers must match for a query to succeed
     return this.findOne({ where: { id: userId, tenantId } });
+  }
+
+  /** Highest priority among the user's non-expired roles (0 when none). */
+  async getMaxRolePriority(userId: string, tenantId: string): Promise<number> {
+    const userRoles = await this.manager.find(UserRole, {
+      where: { userId, tenantId },
+      relations: ['role'],
+    });
+    return maxPriority(
+      userRoles.filter((ur) => !ur.isExpired).map((ur) => ur.role?.priority ?? 0),
+    );
+  }
+
+  /** True when no other user in the tenant holds an owner-level role. */
+  async isLastOwnerLevelHolder(userId: string, tenantId: string): Promise<boolean> {
+    const userRoles = await this.manager.find(UserRole, {
+      where: { tenantId },
+      relations: ['role'],
+    });
+    const holders = new Set(
+      userRoles
+        .filter((ur) => !ur.isExpired && isOwnerLevel(ur.role?.priority ?? 0))
+        .map((ur) => ur.userId),
+    );
+    return holders.has(userId) && holders.size === 1;
   }
 
   async getUserOrgs(userId: string, tenantId: string): Promise<OrgMembership[]> {

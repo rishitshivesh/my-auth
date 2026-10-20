@@ -67,6 +67,13 @@ export const validationSchema = Joi.object({
   ),
   SESSION_SECRET: Joi.string().min(32).required(),
   SESSION_TTL: Joi.number().integer().min(300).default(604800),
+  // How recent a login must be for sensitive actions (change password, disable MFA, delete account).
+  RECENT_AUTH_WINDOW_SECONDS: Joi.number().integer().min(30).default(300),
+  // Login throttle: attempts per hashed email / per IP inside the window. Over either limit,
+  // attempts are refused exactly like a wrong password. Successful logins refund the email charge.
+  LOGIN_THROTTLE_EMAIL_LIMIT: Joi.number().integer().min(1).default(10),
+  LOGIN_THROTTLE_IP_LIMIT: Joi.number().integer().min(1).default(30),
+  LOGIN_THROTTLE_WINDOW_SECONDS: Joi.number().integer().min(30).default(900),
 
   // ── Database (DB_URL preferred; DATABASE_URL or DATABASE_* accepted) ─
   DB_URL: Joi.string().uri({ scheme: ["postgres", "postgresql"] }).optional(),

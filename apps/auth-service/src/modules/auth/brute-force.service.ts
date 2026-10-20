@@ -1,25 +1,30 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
 import { User, SecurityEventType } from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { logger } from "@/common/logger";
+import { EmailService } from "@/modules/email/email.service";
 
 @Injectable()
 export class BruteForceService {
   private readonly MAX_ATTEMPTS = 5;
   private readonly LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in ms
-  private readonly PROGRESSIVE_DELAYS = [0, 1000, 2000, 5000, 10000]; // Delays in ms
 
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private readonly securityEventService: SecurityEventService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
-   * Check if account is currently locked
-   * @throws UnauthorizedException if account is locked
+   * Check if account is currently locked.
+   * Call only AFTER the password was verified: the lock state must not be
+   * visible to someone who does not know the password (it would reveal that
+   * the account exists).
+   * @throws ApiException AUTH_ACCOUNT_LOCKED if account is locked
    */
   async checkAccountLock(user: User): Promise<void> {
     if (user.lockedUntil && user.lockedUntil > new Date()) {
@@ -29,15 +34,21 @@ export class BruteForceService {
 
       logger.info({ userId: user.id, minutesLeft }, "Account locked for user");
 
-      throw new UnauthorizedException({
-        message: `Account temporarily locked due to too many failed login attempts`,
-        lockedUntil: user.lockedUntil,
-        minutesRemaining: minutesLeft,
-        statusCode: 423, // 423 Locked
+      throw new ApiException("AUTH_ACCOUNT_LOCKED", {
+        detail: `Too many failed sign-in attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`,
       });
     }
 
-    // Clear lock if expired
+    await this.clearExpiredLock(user);
+  }
+
+  /** True while a lock is in force. */
+  isLocked(user: User): boolean {
+    return !!user.lockedUntil && user.lockedUntil > new Date();
+  }
+
+  /** Clears an expired lock so the failure counter starts fresh. */
+  async clearExpiredLock(user: User): Promise<void> {
     if (user.lockedUntil && user.lockedUntil <= new Date()) {
       user.lockedUntil = undefined;
       user.failedLoginAttempts = 0;
@@ -48,7 +59,9 @@ export class BruteForceService {
 
   /**
    * Record a failed login attempt
-   * Implements progressive delays and account lockout
+   * Implements account lockout. No per-attempt delay: it would take longer for
+   * existing accounts than unknown ones and so reveal which emails exist;
+   * LoginThrottleService limits attempt rate instead.
    */
   async recordFailedAttempt(
     user: User,
@@ -100,37 +113,23 @@ export class BruteForceService {
         },
       });
 
-      // TODO: Send email notification about account lock
-      // await this.emailService.sendAccountLockedEmail(user);
+      // Queued, never throws: a mail outage must not change the lockout response.
+      await this.emailService.sendAccountLockedEmail(
+        user,
+        this.LOCKOUT_DURATION / 60000,
+        { ipAddress },
+      );
 
-      throw new UnauthorizedException({
-        message: `Account locked due to too many failed login attempts. Try again in 15 minutes.`,
-        lockedUntil: user.lockedUntil,
-        statusCode: 423,
-      });
+      // Same answer as any wrong password: the lock is only disclosed (by
+      // checkAccountLock) to someone who then proves they know the password.
+      throw new ApiException("AUTH_INVALID_CREDENTIALS");
     }
 
     // Save failed attempt count
     await this.userRepository.save(user);
 
-    // Apply progressive delay (prevents brute force timing attacks)
-    const delayIndex = Math.min(
-      user.failedLoginAttempts - 1,
-      this.PROGRESSIVE_DELAYS.length - 1,
-    );
-    const delay = this.PROGRESSIVE_DELAYS[delayIndex] as number;
-
-    if (delay > 0) {
-      logger.info({ delayMs: delay }, "Applying progressive delay for failed attempt");
-      await this.sleep(delay);
-    }
-
-    // Throw error after delay
-    const attemptsLeft = this.MAX_ATTEMPTS - user.failedLoginAttempts;
-    throw new UnauthorizedException({
-      message: "Invalid email or password",
-      attemptsRemaining: attemptsLeft,
-    });
+    // Never disclose the remaining attempts: unknown emails have none.
+    throw new ApiException("AUTH_INVALID_CREDENTIALS");
   }
 
   /**
@@ -157,7 +156,7 @@ export class BruteForceService {
     });
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found." });
     }
 
     user.lockedUntil = null;
@@ -185,7 +184,7 @@ export class BruteForceService {
     });
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found." });
     }
 
     const isLocked = user.lockedUntil && user.lockedUntil > new Date();
@@ -205,12 +204,5 @@ export class BruteForceService {
       minutesUntilUnlock,
       lastFailedLogin: user.lastFailedLogin,
     };
-  }
-
-  /**
-   * Helper: Sleep for specified milliseconds
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

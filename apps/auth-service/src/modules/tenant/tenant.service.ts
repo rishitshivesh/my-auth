@@ -1,11 +1,6 @@
 // apps/auth-service/src/modules/tenant/tenant.service.ts
-import {
-  Injectable,
-  NotFoundException,
-  Inject,
-  BadRequestException,
-  InternalServerErrorException,
-} from "@nestjs/common";
+import { Injectable, Inject } from "@nestjs/common";
+import { ApiException } from "../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Tenant } from "@repo/database";
@@ -104,7 +99,7 @@ export class TenantService {
 
       return tenant;
     } catch (e) {
-      throw new BadRequestException("Tenant Not found");
+      throw new ApiException("TENANT_NOT_FOUND");
     }
   }
 
@@ -155,7 +150,7 @@ export class TenantService {
         { err: schemaError instanceof Error ? schemaError.message : String(schemaError), tenantId: saved.id },
         "Schema creation failed — tenant rolled back",
       );
-      throw new InternalServerErrorException('Workspace provisioning failed. Please try again.');
+      throw new ApiException("INTERNAL_ERROR", { detail: 'Workspace provisioning failed. Please try again.' });
     }
 
     return saved;
@@ -170,7 +165,7 @@ export class TenantService {
     });
 
     if (!tenant) {
-      throw new NotFoundException("Tenant not found");
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
     tenant.customDomain = domain;
@@ -191,7 +186,7 @@ export class TenantService {
     });
 
     if (!tenant) {
-      throw new NotFoundException("Tenant not found");
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
     tenant.customDomainVerified = true;

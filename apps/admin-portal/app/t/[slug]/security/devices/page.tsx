@@ -50,6 +50,7 @@ import {
 import { MfaWizard } from "@/components/mfa/mfa-wizard";
 import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
 import { formatRelativeTime } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/api-error";
 
 export default function MfaDevicesPage() {
   const params = useParams();
@@ -169,7 +170,7 @@ export default function MfaDevicesPage() {
       await requestEmailOtpMutation.mutateAsync();
       setEmailStep("verify");
     } catch (err: unknown) {
-      setEmailError(err instanceof Error ? err.message : "Failed to send code");
+      setEmailError(getErrorMessage(err, "Failed to send code"));
     }
   };
 
@@ -184,7 +185,7 @@ export default function MfaDevicesPage() {
       setEmailOtpOpen(false);
       setEmailCode("");
     } catch (err: unknown) {
-      setEmailError(err instanceof Error ? err.message : "Verification failed");
+      setEmailError(getErrorMessage(err, "Verification failed"));
     }
   };
 

@@ -9,6 +9,7 @@ import { SentryInput as Input, SentryButton as Button, Label, SentrySkeleton } f
 import { useBranding, useUpdateBranding, useUploadLogo } from "@/lib/queries";
 import { FONT_FAMILY_OPTIONS } from "@/lib/types";
 import type { BrandingConfig } from "@/lib/types";
+import { getErrorMessage } from "@/lib/api-error";
 
 // ── Minimal toast ─────────────────────────────────────────────
 type ToastKind = "success" | "error";
@@ -60,7 +61,7 @@ export default function BrandingPage({
       showToast("Branding saved successfully", "success");
     } catch (err: unknown) {
       showToast(
-        err instanceof Error ? err.message : "Failed to save branding",
+        getErrorMessage(err, "Failed to save branding"),
         "error",
       );
     }
@@ -75,7 +76,7 @@ export default function BrandingPage({
       showToast("Logo uploaded", "success");
     } catch (err: unknown) {
       showToast(
-        err instanceof Error ? err.message : "Logo upload failed",
+        getErrorMessage(err, "Logo upload failed"),
         "error",
       );
     }

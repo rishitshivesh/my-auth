@@ -21,6 +21,7 @@ import { SecurityEventService } from "@/common/service/security-event.service";
 import { DatabaseModule } from "@/core/database/database.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { SessionModule } from "@/modules/session/session.module";
+import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { SessionModule } from "@/modules/session/session.module";
   providers: [
     UserRepository,
     UserService,
+    PasswordChangeEffectsService,
   ],
   exports: [UserService],
 })

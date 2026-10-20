@@ -8,6 +8,7 @@ import { useCreateTenant } from '@/lib/admin-queries'
 import { useDashboard } from '@/lib/queries'
 import { withAdmin } from '@/lib/with-admin'
 import { AdminSidebar } from '@/components/admin-sidebar'
+import { getErrorMessage } from "@/lib/api-error";
 
 type Plan = 'free' | 'pro' | 'enterprise'
 
@@ -100,7 +101,7 @@ function NewTenantPage() {
           }
         },
         onError: (err) => {
-          setError(err.message)
+          setError(getErrorMessage(err))
         },
       }
     )

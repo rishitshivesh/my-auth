@@ -1,0 +1,37 @@
+---
+title: Email Templates
+description: Reference for every transactional email template in @repo/emails.
+---
+
+# Email Templates
+
+All templates are React Email components in `packages/emails` (`@repo/emails`), rendered by
+`renderEmail`, which sanitises display text and rejects non-`http(s)` URLs. Delivery is described in
+[Mail Pipeline](/docs/architecture/mail-and-events).
+
+| Template | Category | Sent when |
+|----------|----------|-----------|
+| `verify-email` | Account | A user must confirm their address |
+| `otp-code` | Account | A one-time code is issued |
+| `magic-link` | Sign-in | A magic-link sign-in is requested |
+| `invitation` | Account | A user is invited to a tenant |
+| `account-exists` | Account | Sign-up attempted with an already registered email |
+| `password-reset` | Security | A password reset is requested |
+| `password-changed` | Security | A password is changed |
+| `session-reuse-alert` | Security | Refresh-token reuse or cloned passkey detected |
+| `account-locked` | Security | Too many failed sign-ins |
+| `mfa-enabled` | Security | MFA is enabled |
+| `mfa-disabled` | Security | MFA is disabled |
+| `sign-in-method-changed` | Security | A sign-in method is added or removed |
+| `social-account-link-request` | Security | A social login asks to link to an existing account |
+| `passkey-added` | Security | A passkey is registered |
+| `passkey-removed` | Security | A passkey is removed |
+| `account-suspended` | Lifecycle | A user account is suspended |
+| `account-restored` | Lifecycle | A suspended account is restored |
+| `account-deleted` | Lifecycle | A user account is deleted |
+| `ownership-transferred-from` | Lifecycle | To the previous owner after an ownership transfer |
+| `ownership-transferred-to` | Lifecycle | To the new owner after an ownership transfer |
+| `tenant-suspended` | Tenant | A tenant is suspended |
+| `tenant-restored` | Tenant | A tenant is restored |
+| `tenant-deletion-scheduled` | Tenant | Tenant deletion is scheduled |
+| `tenant-deletion-cancelled` | Tenant | Scheduled tenant deletion is cancelled |

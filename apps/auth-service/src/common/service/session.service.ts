@@ -21,6 +21,9 @@ export interface SessionData {
   expiresAt: Date;
 }
 
+/** Matches no session row; lets "all sessions" and "all but one" share one query. */
+const NO_SESSION_ID = "00000000-0000-0000-0000-000000000000";
+
 @Injectable()
 export class SessionService {
   private sessionTTL: number;
@@ -282,6 +285,46 @@ export class SessionService {
     }
 
     logger.info({ userId }, "All sessions revoked for user");
+  }
+
+  /**
+   * Revoke every session of a user except `exceptSessionId` (all when omitted),
+   * together with those sessions' refresh tokens. Used after a password change.
+   * Returns the revoked session ids.
+   */
+  async revokeOtherUserSessions(
+    tenantId: string,
+    userId: string,
+    exceptSessionId: string | undefined,
+    reason: string,
+  ): Promise<string[]> {
+    const schemaName = await this.getSchemaName(tenantId);
+    const keepId = exceptSessionId ?? NO_SESSION_ID;
+    const revokedAt = new Date();
+
+    const revoked: Array<{ id: string }> = await this.dataSource.manager.query(
+      `UPDATE "${schemaName}"."sessions"
+       SET revoked_at = $1, revoked_reason = $2, refresh_token_hash = NULL
+       WHERE user_id = $3 AND tenant_id = $4 AND revoked_at IS NULL AND id <> $5
+       RETURNING id`,
+      [revokedAt, reason, userId, tenantId, keepId],
+    );
+    await this.dataSource.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens"
+       SET revoked_at = $1, revoked_reason = $2
+       WHERE user_id = $3 AND tenant_id = $4 AND revoked_at IS NULL
+         AND (session_id IS NULL OR session_id <> $5)`,
+      [revokedAt, reason, userId, tenantId, keepId],
+    );
+
+    // Postgres returns [rows, count] for UPDATE ... RETURNING through TypeORM
+    const rows = Array.isArray(revoked[0]) ? (revoked[0] as unknown as Array<{ id: string }>) : revoked;
+    const ids = rows.map((row) => row.id);
+    for (const id of ids) {
+      await this.redisService.delete(tenantId, "session", id);
+    }
+    logger.info({ userId, count: ids.length }, "Other sessions revoked for user");
+    return ids;
   }
 
   /**

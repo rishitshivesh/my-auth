@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useAdminTenant, useUpdateTenant, useDeleteTenant } from '@/lib/admin-queries'
 import type { ActivityEvent } from '@/lib/admin-queries'
 import { formatRelativeTime, formatEventDescription } from '@/lib/utils'
+import { getErrorMessage } from "@/lib/api-error";
 
 function tenantColor(slug: string): string {
   const colors = [
@@ -55,7 +56,7 @@ export default function TenantDetailPage() {
       setSuspendPhase('idle')
       updateTenant(
         { status: tenant?.status === 'active' ? 'suspended' : 'active' },
-        { onError: (e) => alert(e.message) }
+        { onError: (e) => alert(getErrorMessage(e)) }
       )
     }
   }
@@ -64,7 +65,7 @@ export default function TenantDetailPage() {
     if (confirmText !== tenant?.slug) return
     deleteTenant(tenantId, {
       onSuccess: () => router.push('/tenants'),
-      onError: (e) => alert(e.message),
+      onError: (e) => alert(getErrorMessage(e)),
     })
   }
 

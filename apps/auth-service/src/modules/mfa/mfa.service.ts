@@ -1,11 +1,13 @@
 // apps/auth-service/src/modules/mfa/mfa.service.ts
 
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  UnauthorizedException,
-} from "@nestjs/common";
+  DomainEventName,
+  DomainEventsService,
+} from "@/common/service/domain-events.service";
+import { MfaGuardService, TOTP_STEP_SECONDS } from "./mfa-guard.service";
+import { SYSTEM_MFA_CONTEXT, type MfaRequestContext } from "./mfa-context";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { MfaSettings, Tenant, User, SecurityEventType } from "@repo/database";
@@ -52,7 +54,44 @@ export class MfaService {
     @InjectRepository(Tenant)
     private tenantRepository: Repository<Tenant>,
     private readonly securityEventService: SecurityEventService,
+    private readonly guard: MfaGuardService,
+    private readonly domainEvents: DomainEventsService,
   ) {}
+
+  /**
+   * The TOTP time step a code belongs to (within one step of drift), or null.
+   * The step is what makes replay detection possible.
+   */
+  private matchTotpStep(secret: string, token: string): number | null {
+    const result = speakeasy.totp.verifyDelta({
+      secret,
+      encoding: "base32",
+      token,
+      window: 1,
+    });
+    if (!result) return null;
+    return Math.floor(Date.now() / 1000 / TOTP_STEP_SECONDS) + result.delta;
+  }
+
+  /** Tells the user (via the notifier) that a factor changed. Never throws. */
+  private async notifyMfaChange(
+    name: typeof DomainEventName.MFA_ENABLED | typeof DomainEventName.MFA_DISABLED,
+    userId: string,
+    tenantId: string,
+    ctx: MfaRequestContext,
+  ): Promise<void> {
+    const user = await this.userRepository
+      .findOne({ where: { id: userId, tenantId } })
+      .catch(() => null);
+    this.domainEvents.publish(name, {
+      tenantId,
+      userId,
+      email: user?.email,
+      name: user?.firstName ?? undefined,
+      ip: ctx.ipAddress,
+      requestId: ctx.requestId,
+    });
+  }
 
   // ============================================================
   // TOTP (Google Authenticator, Authy, etc.)
@@ -71,7 +110,7 @@ export class MfaService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
     }
 
     // Generate secret
@@ -117,6 +156,7 @@ export class MfaService {
     userId: string,
     tenantId: string,
     token: string,
+    ctx: MfaRequestContext = SYSTEM_MFA_CONTEXT,
   ): Promise<{ backupCodes: string[] }> {
     // addSelect() is required to load select:false columns in TypeORM 0.3.x
     const mfaSettings = await this.mfaRepository
@@ -127,25 +167,17 @@ export class MfaService {
       .getOne();
 
     if (!mfaSettings || !mfaSettings.totpSecret) {
-      throw new BadRequestException(
-        "TOTP not set up. Call /mfa/setup/totp first",
-      );
+      throw new ApiException("MFA_NOT_STARTED");
     }
 
     if (mfaSettings.totpEnabled) {
-      throw new BadRequestException("TOTP already enabled");
+      throw new ApiException("MFA_ALREADY_ENABLED");
     }
 
     // Verify token
-    const verified = speakeasy.totp.verify({
-      secret: mfaSettings.totpSecret,
-      encoding: "base32",
-      token,
-      window: 1,
-    });
-
-    if (!verified) {
-      throw new UnauthorizedException("Invalid TOTP token");
+    const step = this.matchTotpStep(mfaSettings.totpSecret, token);
+    if (step === null || !(await this.guard.claimTotpStep(tenantId, userId, step))) {
+      throw new ApiException("AUTH_MFA_INVALID");
     }
 
     // Enable TOTP
@@ -167,9 +199,11 @@ export class MfaService {
       tenantId,
       eventType: SecurityEventType.TOTP_ENABLED,
       severity: "info",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     });
+    await this.notifyMfaChange(DomainEventName.MFA_ENABLED, userId, tenantId, ctx);
 
     return { backupCodes };
   }
@@ -181,7 +215,12 @@ export class MfaService {
     userId: string,
     tenantId: string,
     token: string,
+    challengeId?: string,
   ): Promise<boolean> {
+    if (challengeId) {
+      await this.guard.assertChallengeActive(tenantId, challengeId);
+    }
+
     const mfaSettings = await this.mfaRepository
       .createQueryBuilder("mfa")
       .addSelect("mfa.totpSecret")
@@ -191,18 +230,19 @@ export class MfaService {
       .getOne();
 
     if (!mfaSettings || !mfaSettings.totpSecret) {
-      throw new BadRequestException("TOTP not enabled for this user");
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
-    const verified = speakeasy.totp.verify({
-      secret: mfaSettings.totpSecret,
-      encoding: "base32",
-      token,
-      window: 1,
-    });
+    // A code is single-use: its time step is spent on the first success.
+    const step = this.matchTotpStep(mfaSettings.totpSecret, token);
+    const accepted =
+      step !== null && (await this.guard.claimTotpStep(tenantId, userId, step));
 
-    if (!verified) {
-      logger.warn({ userId }, "Invalid TOTP token for user");
+    if (!accepted) {
+      logger.warn({ userId }, "Invalid or replayed TOTP token for user");
+      if (challengeId) {
+        return this.guard.rejectWrongCode(tenantId, challengeId);
+      }
       return false;
     }
 
@@ -213,13 +253,17 @@ export class MfaService {
   /**
    * Disable TOTP MFA
    */
-  async disableTotp(userId: string, tenantId: string): Promise<void> {
+  async disableTotp(
+    userId: string,
+    tenantId: string,
+    ctx: MfaRequestContext = SYSTEM_MFA_CONTEXT,
+  ): Promise<void> {
     const mfaSettings = await this.mfaRepository.findOne({
       where: { userId, tenantId },
     });
 
     if (!mfaSettings) {
-      throw new NotFoundException("MFA settings not found");
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
     mfaSettings.totpEnabled = false;
@@ -235,9 +279,11 @@ export class MfaService {
       tenantId,
       eventType: SecurityEventType.TOTP_DISABLED,
       severity: "warning",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     });
+    await this.notifyMfaChange(DomainEventName.MFA_DISABLED, userId, tenantId, ctx);
   }
 
   // ============================================================
@@ -274,7 +320,12 @@ export class MfaService {
     userId: string,
     tenantId: string,
     code: string,
+    challengeId?: string,
   ): Promise<boolean> {
+    if (challengeId) {
+      await this.guard.assertChallengeActive(tenantId, challengeId);
+    }
+
     const mfaSettings = await this.mfaRepository
       .createQueryBuilder("mfa")
       .addSelect("mfa.backupCodes")
@@ -283,27 +334,42 @@ export class MfaService {
       .getOne();
 
     if (!mfaSettings || !mfaSettings.backupCodes) {
-      throw new BadRequestException("No backup codes available");
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
     let codeIndex = -1;
+    let matchedStored: string | null = null;
     const sha256Hash = crypto.createHash("sha256").update(code).digest("hex");
     for (let i = 0; i < mfaSettings.backupCodes.length; i++) {
       const stored = mfaSettings.backupCodes[i];
       if (!stored) continue;
       if (stored === sha256Hash) {
         codeIndex = i;
+        matchedStored = stored;
         break;
       }
       const matches = await PasswordService.verify(stored, code);
       if (matches) {
         codeIndex = i;
+        matchedStored = stored;
         break;
       }
     }
 
-    if (codeIndex === -1) {
+    // Single use even under concurrency: only one request may claim a stored code.
+    const storedId =
+      matchedStored === null
+        ? null
+        : crypto.createHash("sha256").update(matchedStored).digest("hex");
+    const claimed =
+      storedId !== null &&
+      (await this.guard.claimRecoveryCode(tenantId, userId, storedId));
+
+    if (!claimed) {
       logger.warn({ userId }, "Invalid backup code for user");
+      if (challengeId) {
+        return this.guard.rejectWrongCode(tenantId, challengeId);
+      }
       return false;
     }
 
@@ -327,13 +393,11 @@ export class MfaService {
     });
 
     if (!mfaSettings) {
-      throw new NotFoundException("MFA settings not found");
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
     if (!mfaSettings.totpEnabled) {
-      throw new BadRequestException(
-        "MFA must be enabled to generate backup codes",
-      );
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
     // Generate new codes
@@ -451,7 +515,11 @@ export class MfaService {
   /**
    * Disable all MFA methods
    */
-  async disableAllMfa(userId: string, tenantId: string): Promise<void> {
+  async disableAllMfa(
+    userId: string,
+    tenantId: string,
+    ctx: MfaRequestContext = SYSTEM_MFA_CONTEXT,
+  ): Promise<void> {
     const mfaSettings = await this.mfaRepository.findOne({
       where: { userId, tenantId },
     });
@@ -471,6 +539,18 @@ export class MfaService {
     await this.mfaRepository.save(mfaSettings);
 
     logger.info({ userId }, "All MFA methods disabled for user");
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.TOTP_DISABLED,
+      severity: "warning",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
+      metadata: { scope: "all_methods" },
+    });
+    await this.notifyMfaChange(DomainEventName.MFA_DISABLED, userId, tenantId, ctx);
   }
 
   // ============================================================

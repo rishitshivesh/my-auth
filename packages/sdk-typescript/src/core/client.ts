@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { AuthError as AuthErrorClass } from "./types";
 import { createFetchTransport } from "./transport";
+import { SentryApiError } from "./errors";
 import {
   createAuthState,
   markAuthenticated,
@@ -926,35 +927,12 @@ export class SentryClient {
    * Create AuthError from response
    */
   private createError(response: TransportResponse): AuthError {
-    const data = response.data;
-
-    const code = data?.code || this.statusToErrorCode(response.status);
-    const message = data?.message || response.statusText || "Request failed";
-
-    const error = new AuthErrorClass(code, message, data);
+    const error = SentryApiError.fromResponse(response);
 
     this.emit({ type: "error", error });
     this.config.onError(error);
 
     return error;
-  }
-
-  /**
-   * Map HTTP status to error code
-   */
-  private statusToErrorCode(status: number): any {
-    switch (status) {
-      case 401:
-        return "UNAUTHORIZED";
-      case 403:
-        return "FORBIDDEN";
-      case 404:
-        return "USER_NOT_FOUND";
-      case 429:
-        return "RATE_LIMIT_EXCEEDED";
-      default:
-        return "UNKNOWN_ERROR";
-    }
   }
 
   /**

@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@scrolloop/sdk"
 import { authClient } from "@/lib/auth-client"
+import { getErrorMessage } from "@/lib/api-error";
 
 function MagicLinkInner() {
   const router = useRouter()
@@ -32,7 +33,7 @@ function MagicLinkInner() {
       })
       .catch((err: unknown) => {
         setStatus("error")
-        setErrorMsg(err instanceof Error ? err.message : "This magic link has expired or already been used.")
+        setErrorMsg(getErrorMessage(err, "This magic link has expired or already been used."))
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

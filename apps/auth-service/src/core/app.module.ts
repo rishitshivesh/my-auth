@@ -4,12 +4,14 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppApiModule } from "./modules/app-module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { logger } from '@/common/logger';
+import { ProblemDetailsFilter, validationExceptionFactory } from "@/common/http";
 import { ResponseInterceptor } from '@/common/interceptors/response.interceptors';
 import { CorsRefreshService } from "./cors-refresh.service";
 import { AdminService } from "@/modules/admin/admin.service";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
+import { requestIdMiddleware } from "@/common/midllewares/request-id.middleware";
 
 /**
  * TRUST_PROXY accepts the same values as Express' "trust proxy" setting:
@@ -41,6 +43,9 @@ export class AppModule {
     const app = await NestFactory.create<NestExpressApplication>(AppApiModule, {
       bufferLogs: true,
     });
+
+    // Must be first so every later middleware, guard and log line sees req.requestId.
+    app.use(requestIdMiddleware);
 
     // Behind a load balancer / ingress, request.ip is the proxy's address
     // unless Express is told how many hops to trust. Without this every
@@ -115,8 +120,9 @@ export class AppModule {
         "x-authorization",
         "x-csrf-token",
         "x-setup-token",
+        "x-request-id",
       ],
-      exposedHeaders: ["set-cookie"],
+      exposedHeaders: ["set-cookie", "x-request-id"],
       optionsSuccessStatus: 204,
     });
 
@@ -124,8 +130,10 @@ export class AppModule {
       new ValidationPipe({
         whitelist: true,
         transform: true,
+        exceptionFactory: validationExceptionFactory,
       }),
     );
+    app.useGlobalFilters(new ProblemDetailsFilter());
 
     // Swagger — disabled in production
     if (!isProduction) {

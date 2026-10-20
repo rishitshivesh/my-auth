@@ -30,6 +30,8 @@ import { JwtAuthGuard } from "@/common/guards";
 import { SessionService } from "@/common/service/session.service";
 import { RedisService } from "@/common/service/redis.service";
 import { BruteForceService } from "@/modules/auth/brute-force.service";
+import { LoginThrottleService } from "@/modules/auth/login-throttle.service";
+import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
@@ -71,8 +73,10 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     PasswordService,
     JwtStrategy,
     BruteForceService,
+    LoginThrottleService,
+    PasswordChangeEffectsService,
     TokenCleanupService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, PasswordChangeEffectsService],
 })
 export class AuthModule {}

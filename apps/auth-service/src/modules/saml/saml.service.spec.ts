@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
-import { BadRequestException } from "@nestjs/common";
+import { ProtocolException } from "@/common/http";
 import * as crypto from "crypto";
 import * as samlify from "samlify";
 import { SamlServiceProvider, KeyPair, User, Tenant } from "@repo/database";
@@ -122,7 +122,7 @@ describe("SamlService — assertion signing", () => {
       ).toString("base64");
 
       await expect(service.parseAuthnRequest(tenantId, tenantSlug, authnRequest)).rejects.toThrow(
-        BadRequestException,
+        ProtocolException,
       );
     });
 
@@ -133,7 +133,7 @@ describe("SamlService — assertion signing", () => {
       ).toString("base64");
 
       await expect(service.parseAuthnRequest(tenantId, tenantSlug, authnRequest)).rejects.toThrow(
-        BadRequestException,
+        ProtocolException,
       );
     });
   });

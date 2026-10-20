@@ -1,11 +1,11 @@
 import {
   CanActivate,
   ExecutionContext,
-  HttpException,
   Injectable,
   Logger,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { ApiException } from "../http";
 import { RedisService } from "@/common/service/redis.service";
 import { SlidingWindowRateLimiter } from "@repo/security";
 import {
@@ -58,14 +58,7 @@ export class RateLimitGuard implements CanActivate {
     if (!result.allowed) {
       const retryAfter = result.retryAfter ?? Math.ceil(config.windowMs / 1000);
       response.setHeader("Retry-After", retryAfter);
-      throw new HttpException(
-        {
-          statusCode: 429,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded",
-        },
-        429,
-      );
+      throw new ApiException("RATE_LIMITED", { retryAfterSeconds: retryAfter });
     }
 
     return true;

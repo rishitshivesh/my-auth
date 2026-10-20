@@ -9,6 +9,7 @@ import { useAuth } from '@scrolloop/sdk';
 import { SentryButton, SentryInput } from "@repo/ui";
 import { cn } from "@repo/ui/lib/utils";
 import { AlertCircle, Github, Lock, Mail, Fingerprint, Chrome, CheckCircle, Key, Loader2 } from 'lucide-react';
+import { getErrorMessage } from "@/lib/api-error";
 
 function SocialIcon({ provider }: { provider: string }) {
   if (provider === 'google') {
@@ -50,7 +51,7 @@ function MagicLinkSection({ email }: { email: string }) {
       await sendMagicLink(email);
       setStage('sent');
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to send magic link');
+      setError(getErrorMessage(err, 'Failed to send magic link'));
       setStage('error');
     } finally {
       setLoading(false);
@@ -137,7 +138,7 @@ function PasskeySection({ email, onSuccess }: { email: string; onSuccess?: () =>
         return;
       }
       setStatus('error');
-      setError(err?.message ?? 'Failed to authenticate with passkey');
+      setError(getErrorMessage(err, 'Failed to authenticate with passkey'));
     }
   };
 
@@ -255,7 +256,7 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
       await verifyMfaLogin(mfaTempToken, mfaCode);
       onSuccess?.();
     } catch (err) {
-      setMfaError(err instanceof Error ? err.message : 'Invalid code. Please try again.');
+      setMfaError(getErrorMessage(err, 'Invalid code. Please try again.'));
       setMfaDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
@@ -272,7 +273,7 @@ export function SentryAuthFlow({ onSuccess }: SentryAuthFlowProps) {
       await verifyMfaBackupLogin(mfaTempToken, backupCode.trim());
       onSuccess?.();
     } catch (err) {
-      setMfaError(err instanceof Error ? err.message : 'Invalid backup code. Please try again.');
+      setMfaError(getErrorMessage(err, 'Invalid backup code. Please try again.'));
       setBackupCode('');
     } finally {
       setMfaLoading(false);

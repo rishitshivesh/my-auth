@@ -1,10 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In, FindOptionsWhere } from "typeorm";
 import {
@@ -16,12 +11,15 @@ import {
 } from "@repo/database";
 import { SessionRepository } from "@/core/database/session.repository";
 import { SecurityEventService } from "@/common/service/security-event.service";
-import { PasswordService } from "@repo/security";
 import { EmailService } from "@/modules/email/email.service";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { logger } from "@/common/logger";
 import { UserRepository, OrgMembership } from "./user.repository";
+import { canManage } from "../rbac/role-hierarchy";
+import { assertPasswordPolicy } from "../auth/password-policy";
+import { hashPassword, verifyPassword } from "../auth/password-hashing";
+import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 
 /**
  * User Service
@@ -46,6 +44,7 @@ export class UserService {
     private readonly securityEventService: SecurityEventService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly passwordChangeEffects: PasswordChangeEffectsService,
   ) {}
 
   /**
@@ -57,7 +56,7 @@ export class UserService {
     const user = await this.userRepository.findByTenantAndId(tenantId, id);
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return user;
@@ -124,6 +123,7 @@ export class UserService {
     userId: string,
     currentPassword: string,
     newPassword: string,
+    context: { ip: string; userAgent: string; requestId?: string; sessionId?: string },
   ) {
     // Get user with password hash
     const user = await this.userRepository
@@ -131,16 +131,16 @@ export class UserService {
       .addSelect("user.passwordHash")
       .addSelect("user.passwordHistory")
       .where("user.id = :id", { id: userId })
-      .where("user.tenant_id = :tenantId", { tenantId })
+      .andWhere("user.tenant_id = :tenantId", { tenantId })
       .getOne();
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     if (user.passwordHash) {
       // Verify current password
-      const isValid = await PasswordService.verify(
+      const isValid = await verifyPassword(
         user.passwordHash,
         currentPassword,
       );
@@ -157,33 +157,24 @@ export class UserService {
           metadata: { reason: "invalid_current_password" },
         });
 
-        throw new UnauthorizedException("Current password is incorrect");
+        throw new ApiException("AUTH_INVALID_CREDENTIALS", { detail: "Current password is incorrect" });
       }
     }
 
     // Validate new password strength
-    const validation = PasswordService.validateStrength(newPassword);
-    if (!validation.isValid) {
-      throw new BadRequestException({
-        message: "New password does not meet security requirements",
-        errors: validation.errors,
-        score: validation.score,
-      });
-    }
+    assertPasswordPolicy(newPassword, { email: user.email });
 
     // Check password history
     const passwordHistory = user.passwordHistory || [];
     for (const oldHash of passwordHistory) {
-      const isReused = await PasswordService.verify(oldHash, newPassword);
+      const isReused = await verifyPassword(oldHash, newPassword);
       if (isReused) {
-        throw new BadRequestException(
-          "Password has been used recently. Please choose a different password.",
-        );
+        throw new ApiException("BAD_REQUEST", { detail: "Password has been used recently. Please choose a different password." });
       }
     }
 
     // Hash new password
-    const newHash = await PasswordService.hash(newPassword);
+    const newHash = await hashPassword(newPassword);
 
     // Update password and history
     const updatedHistory = [
@@ -198,25 +189,15 @@ export class UserService {
       forcePasswordChange: false,
     });
 
-    // Log password change
-    this.securityEventService.log({
-      userId,
-      tenantId: user.tenantId,
-      actorEmail: user.email,
-      eventType: SecurityEventType.PASSWORD_CHANGED,
-      severity: "info",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
+    // Revokes other sessions, emails the user and records the event with the request id.
+    await this.passwordChangeEffects.afterPasswordChange({
+      user,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      requestId: context.requestId,
+      keepSessionId: context.sessionId,
+      reason: "password_change",
     });
-
-    // Revoke all sessions except current (force re-login on other devices)
-    await this.sessionRepository.update(
-      { userId, revokedAt: IsNull() },
-      {
-        revokedAt: new Date(),
-        revokedReason: "password_changed",
-      },
-    );
   }
 
   /**
@@ -258,7 +239,7 @@ export class UserService {
     });
 
     if (!session) {
-      throw new NotFoundException("Session not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     await this.sessionRepository.update(sessionId, {
@@ -331,21 +312,26 @@ export class UserService {
   /**
    * Delete account (soft delete)
    */
-  async deleteAccount(tenantId: string, userId: string, password: string) {
+  async deleteAccount(
+    tenantId: string,
+    userId: string,
+    password: string,
+    requestId?: string,
+  ) {
     // Get user with password hash
     const user = await this.userRepository
       .createQueryBuilder("user")
       .addSelect("user.passwordHash")
-      .where("user.id = :id", { id: userId })
-      .where("user.tenant_id = :id", { id: tenantId })
+      .where("user.id = :userId", { userId })
+      .andWhere("user.tenant_id = :tenantId", { tenantId })
       .getOne();
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     // Verify password
-    const isValid = await PasswordService.verify(
+    const isValid = await verifyPassword(
       user.passwordHash ?? "",
       password,
     );
@@ -362,8 +348,10 @@ export class UserService {
         metadata: { reason: "invalid_password" },
       });
 
-      throw new UnauthorizedException("Password is incorrect");
+      throw new ApiException("AUTH_INVALID_CREDENTIALS", { detail: "Password is incorrect" });
     }
+
+    await this.assertNotLastOwner(userId, tenantId);
 
     // Soft delete user
     await this.userRepository.softDelete(userId);
@@ -386,7 +374,33 @@ export class UserService {
       severity: "critical",
       ipAddress: "0.0.0.0",
       userAgent: "system",
+      requestId,
     });
+
+    await this.emailService.sendAccountDeletedEmail(user);
+  }
+
+  /** Refuse to remove the only owner-level (admin/super_admin) user of a tenant. */
+  private async assertNotLastOwner(userId: string, tenantId: string): Promise<void> {
+    if (await this.userRepository.isLastOwnerLevelHolder(userId, tenantId)) {
+      throw new ApiException("LAST_OWNER");
+    }
+  }
+
+  /** An actor may only act on users strictly below their own role tier. */
+  private async assertOutranks(
+    actorId: string,
+    targetId: string,
+    tenantId: string,
+  ): Promise<void> {
+    if (actorId === targetId) return;
+    const [actor, target] = await Promise.all([
+      this.userRepository.getMaxRolePriority(actorId, tenantId),
+      this.userRepository.getMaxRolePriority(targetId, tenantId),
+    ]);
+    if (!canManage(actor, target)) {
+      throw new ApiException("HIERARCHY_VIOLATION");
+    }
   }
 
   /**
@@ -511,9 +525,7 @@ export class UserService {
     ];
 
     if (!allowedSortFields.includes(sortBy)) {
-      throw new BadRequestException(
-        `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}`,
-      );
+      throw new ApiException("BAD_REQUEST", { detail: `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}` });
     }
 
     // Build query
@@ -566,7 +578,7 @@ export class UserService {
     }
 
     // Apply sorting
-    queryBuilder.orderBy(`user.${sortBy}`, sortOrder);
+    queryBuilder.orderBy(`user.${sortBy}`, sortOrder).addOrderBy("user.id", "DESC");
 
     // Get total count
     const total = await queryBuilder.getCount();
@@ -678,9 +690,7 @@ export class UserService {
     });
 
     if (users.length !== userIds.length) {
-      throw new BadRequestException(
-        "Some users not found or belong to different tenant",
-      );
+      throw new ApiException("BAD_REQUEST", { detail: "Some users not found or belong to different tenant" });
     }
 
     // Update all users
@@ -716,11 +726,12 @@ export class UserService {
     return { updated: result.affected || 0 };
   }
 
-  async adminForcePasswordReset(tenantId: string, userId: string) {
+  async adminForcePasswordReset(tenantId: string, userId: string, actorId?: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new ApiException("RESOURCE_NOT_FOUND");
+    if (actorId) await this.assertOutranks(actorId, userId, tenantId);
 
     user.forcePasswordChange = true;
     await this.userRepository.save(user);
@@ -739,11 +750,12 @@ export class UserService {
     logger.info({ userId, tenantId }, "Admin forced password reset for user");
   }
 
-  async adminLockUser(tenantId: string, userId: string) {
+  async adminLockUser(tenantId: string, userId: string, actorId?: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new ApiException("RESOURCE_NOT_FOUND");
+    if (actorId) await this.assertOutranks(actorId, userId, tenantId);
 
     user.status = "suspended";
     user.lockedUntil = new Date("2099-12-31T23:59:59Z");
@@ -768,11 +780,12 @@ export class UserService {
     logger.info({ userId, tenantId }, "Admin locked user account");
   }
 
-  async adminUnlockUser(tenantId: string, userId: string) {
+  async adminUnlockUser(tenantId: string, userId: string, actorId?: string) {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new ApiException("RESOURCE_NOT_FOUND");
+    if (actorId) await this.assertOutranks(actorId, userId, tenantId);
 
     user.status = "active";
     user.lockedUntil = null;
@@ -797,11 +810,18 @@ export class UserService {
     return this.userRepository.getUserOrgs(userId, tenantId);
   }
 
-  async adminDeleteUser(tenantId: string, userId: string) {
+  async adminDeleteUser(
+    tenantId: string,
+    userId: string,
+    actorId?: string,
+    requestId?: string,
+  ) {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new ApiException("RESOURCE_NOT_FOUND");
+    if (actorId) await this.assertOutranks(actorId, userId, tenantId);
+    await this.assertNotLastOwner(userId, tenantId);
 
     user.status = "deleted";
     user.isActive = false;
@@ -820,8 +840,11 @@ export class UserService {
       severity: "high",
       ipAddress: "0.0.0.0",
       userAgent: "admin",
-      metadata: { action: "admin_soft_delete" },
+      metadata: { action: "admin_soft_delete", performedBy: actorId },
+      requestId,
     });
+
+    await this.emailService.sendAccountDeletedEmail(user);
 
     logger.info({ userId, tenantId }, "Admin soft-deleted user account");
   }
@@ -839,21 +862,21 @@ export class UserService {
   ): Promise<{ message: string }> {
     const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
     if (!tenant) {
-      throw new NotFoundException("Tenant not found");
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
     const existing = await this.userRepository.findOne({
       where: { email: data.email, tenantId },
     });
     if (existing) {
-      throw new ConflictException("A user with this email already exists in this workspace");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "A user with this email already exists in this workspace" });
     }
 
     const pending = await this.userInviteRepository.findOne({
       where: { email: data.email, tenantId },
     });
     if (pending && pending.expiresAt > new Date() && !pending.acceptedAt) {
-      throw new ConflictException("An active invitation already exists for this email");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "An active invitation already exists for this email" });
     }
 
     const inviter = await this.userRepository.findOne({ where: { id: invitedBy, tenantId } });

@@ -16,6 +16,7 @@ import {
 } from '@/components/mfa/mfa-wizard-steps';
 import { useSetupTotp, useVerifyTotp } from '@/lib/queries';
 import { addTotpDevice } from '@/lib/mfa-device-store';
+import { getErrorMessage } from "@/lib/api-error";
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -113,7 +114,7 @@ export function MfaWizard({ open, onClose }: MfaWizardProps) {
       setStep('save-backup');
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Verification failed. Please try again.';
+        getErrorMessage(err, 'Verification failed. Please try again.');
       setVerifyError(message);
     }
   }

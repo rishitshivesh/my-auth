@@ -1,11 +1,10 @@
 /**
- * Email Service
+ * Email Service (facade)
  *
- * Main email service that:
- * - Auto-detects which provider to use (SES > SMTP > Console)
- * - Handles email templating with Handlebars
- * - Logs all email attempts to security_events
- * - Supports multi-tenant branding
+ * Keeps the public method names callers already use, builds the template
+ * props and hands them to MailService, which queues the send. Rendering and
+ * delivery happen in the mail worker (modules/mail). EMAIL_SENT security
+ * events are logged at enqueue time.
  */
 
 import { Injectable } from "@nestjs/common";
@@ -13,371 +12,202 @@ import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User, Tenant, SecurityEventType } from "@repo/database";
+import type { EmailName, EmailPropsByName } from "@repo/emails";
 import { SecurityEventService } from "@/common/service/security-event.service";
-import * as Handlebars from "handlebars";
-import * as fs from "fs";
-import * as path from "path";
-import { EmailProvider } from "./providers/email-provider.interface";
-import { NodeMailerProvider } from "./providers/nodemailer.provider";
-import { SESProvider } from "./providers/ses.provider";
+import { MailService } from "@/modules/mail/mail.service";
 import { logger } from "@/common/logger";
+
+const VERIFY_EMAIL_EXPIRY_HOURS = 24;
+const PASSWORD_RESET_EXPIRY_MINUTES = 60;
+const PASSWORD_RESET_OTP_EXPIRY_MINUTES = 15;
+const MAGIC_LINK_EXPIRY_MINUTES = 10;
+const OTP_EXPIRY_MINUTES = 10;
+const ACCOUNT_LINK_EXPIRY_MINUTES = 60;
+const ACCOUNT_PURGE_GRACE_DAYS = 30;
+const DEFAULT_INVITE_ROLE = "member";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const EMAIL_EVENT_USER_AGENT = "email-service";
+const EMAIL_EVENT_IP = "0.0.0.0";
+
+export type SecurityAlertTemplate =
+  | "session-reuse-alert"
+  | "mfa-enabled"
+  | "mfa-disabled"
+  | "passkey-added"
+  | "passkey-removed";
+
+/** Context for security-alert emails (when / where the action happened). */
+export interface AlertContext {
+  ipAddress?: string | null;
+  requestId?: string;
+  when?: Date;
+}
+
+interface AlertProps {
+  name: string;
+  when: string;
+  ip: string | null;
+  requestId?: string;
+  tenantName?: string;
+}
 
 @Injectable()
 export class EmailService {
-  private provider: EmailProvider | null = null;
-  private templateCache: Map<string, HandlebarsTemplateDelegate> = new Map();
-
   constructor(
     private readonly configService: ConfigService,
     private readonly securityEventService: SecurityEventService,
+    private readonly mailService: MailService,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
-  ) {
-    this.initializeProvider();
+  ) {}
+
+  private frontendUrl(path: string, token: string): string {
+    const base = this.configService.get<string>("FRONTEND_URL");
+    return `${base}${path}?token=${encodeURIComponent(token)}`;
   }
 
-  /**
-   * Auto-detect and initialize email provider
-   * Priority: SES > SMTP > Console (development)
-   */
-  private initializeProvider(): void {
-    const awsSesAccessKey = this.configService.get<string>(
-      "AWS_SES_ACCESS_KEY_ID",
-    );
-    const awsSesSecretKey = this.configService.get<string>(
-      "AWS_SES_SECRET_ACCESS_KEY",
-    );
-    const smtpHost = this.configService.get<string>("SMTP_HOST");
-
-    if (awsSesAccessKey && awsSesSecretKey) {
-      // Use SES
-      this.provider = new SESProvider(this.configService);
-      logger.info("Email provider: AWS SES");
-    } else if (smtpHost) {
-      // Use SMTP (NodeMailer)
-      this.provider = new NodeMailerProvider(this.configService);
-      logger.info("Email provider: SMTP (NodeMailer)");
-    } else {
-      // Development mode - log to console
-      this.provider = null;
-      logger.warn(
-        "Email provider: CONSOLE (Development) - No email provider configured",
-      );
-    }
+  private displayName(user: User): string {
+    return user.firstName || user.email.split("@")[0] || user.email;
   }
 
-  /**
-   * Send email using the configured provider
-   */
-  async sendEmail(options: {
-    to: string;
-    subject: string;
-    html: string;
-    text?: string;
-    tenantId: string;
-    userId?: string;
-    emailType: string;
-  }): Promise<boolean> {
-    const startTime = Date.now();
-    let success = false;
-
-    logger.info({ provider: this.provider?.getProviderName() || "console" }, "Email provider in use");
-
-    try {
-      if (this.provider) {
-        // Use configured provider (SES or SMTP)
-        await this.provider.sendEmail({
-          to: options.to,
-          subject: options.subject,
-          html: options.html,
-          text: options.text,
-        });
-        success = true;
-        logger.info({ to: options.to, provider: this.provider.getProviderName() }, "Email sent");
-      } else {
-        // Development mode - log to console
-        logger.info({ to: options.to, subject: options.subject, emailType: options.emailType, htmlLength: options.html.length }, "Email (development mode)");
-        success = true;
-      }
-    } catch (error: any) {
-      logger.error({ err: error, to: options.to }, "Failed to send email");
-      success = false;
-    }
-
-    // Log to security events
-    await this.logEmailEvent({
-      tenantId: options.tenantId,
-      userId: options.userId,
-      emailType: options.emailType,
-      recipient: options.to,
-      provider: this.provider?.getProviderName() || "console",
-      success,
-      duration: Date.now() - startTime,
-    });
-
-    return success;
+  private formatWhen(when: Date = new Date()): string {
+    return `${when.toISOString().slice(0, 16).replace("T", " ")} UTC`;
   }
 
-  /**
-   * Load and compile template
-   */
-  private async loadTemplate(
-    templateName: string,
-  ): Promise<HandlebarsTemplateDelegate> {
-    // Check cache first
-    if (this.templateCache.has(templateName)) {
-      return this.templateCache.get(templateName)!;
-    }
-
-    const templatePath = path.join(
-      __dirname,
-      "../../../",
-      "templates",
-      `${templateName}.html`,
-    );
-
-    try {
-      const templateContent = fs.readFileSync(templatePath, "utf-8");
-      const compiledTemplate = Handlebars.compile(templateContent);
-      this.templateCache.set(templateName, compiledTemplate);
-      return compiledTemplate;
-    } catch (error: any) {
-      logger.error({ err: error, templateName }, "Failed to load template");
-      throw new Error(`Template ${templateName} not found`);
-    }
-  }
-
-  /**
-   * Render template with data
-   */
-  private async renderTemplate(
-    templateName: string,
-    data: Record<string, any>,
-  ): Promise<string> {
-    const template = await this.loadTemplate(templateName);
-    return template({
-      ...data,
-      currentYear: new Date().getFullYear(),
-    });
-  }
-
-  /**
-   * Get tenant branding information
-   */
-  private async getTenantBranding(tenantId: string): Promise<{
-    tenantName: string;
-    tenantLogo: string;
-  }> {
+  private async getTenantName(tenantId: string): Promise<string | undefined> {
     try {
       const tenant = await this.tenantRepository.findOne({
         where: { id: tenantId },
       });
-
-      return {
-        tenantName: tenant?.name || "Scrolloop Sentry",
-        tenantLogo:
-          // TODO Tenant Logo URL
-          // tenant?.metadata?.logoUrl ||
-          "https://via.placeholder.com/150x50?text=Scrolloop+Sentry",
-      };
-    } catch (error) {
+      return tenant?.name || undefined;
+    } catch {
       logger.warn({ tenantId }, "Failed to load tenant branding, using defaults");
-      return {
-        tenantName: "Scrolloop Sentry",
-        tenantLogo: "https://via.placeholder.com/150x50?text=Scrolloop+Sentry",
-      };
+      return undefined;
     }
   }
 
-  /**
-   * Send welcome email after registration
-   */
-  async sendWelcomeEmail(
-    user: User,
-    verificationToken: string,
-  ): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-    const verificationUrl = `${this.configService.get<string>("FRONTEND_URL")}/verify-email?token=${verificationToken}`;
-
-    const html = await this.renderTemplate("welcome", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      actionUrl: verificationUrl,
-      expiresIn: "24 hours",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: `Welcome to ${branding.tenantName}!`,
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "welcome",
-    });
+  private async alertProps(user: User, ctx: AlertContext): Promise<AlertProps> {
+    return {
+      name: this.displayName(user),
+      when: this.formatWhen(ctx.when),
+      ip: ctx.ipAddress ?? null,
+      requestId: ctx.requestId,
+      tenantName: await this.getTenantName(user.tenantId),
+    };
   }
 
-  /**
-   * Send email verification
-   */
+  /** Queue an email and log the EMAIL_SENT security event (at enqueue). */
+  private async dispatch<N extends EmailName>(
+    template: N,
+    to: string,
+    props: EmailPropsByName[N],
+    meta: { tenantId: string; userId?: string; emailType: string },
+  ): Promise<boolean> {
+    const queued = await this.mailService.send(template, to, props);
+    this.securityEventService.log({
+      tenantId: meta.tenantId,
+      userId: meta.userId,
+      eventType: SecurityEventType.EMAIL_SENT,
+      severity: queued ? "info" : "warning",
+      ipAddress: EMAIL_EVENT_IP,
+      userAgent: EMAIL_EVENT_USER_AGENT,
+      metadata: {
+        emailType: meta.emailType,
+        // recipient email is retained for audit traceability — not a secret
+        recipient: to,
+        queued,
+      },
+    });
+    return queued;
+  }
+
+  /** Welcome email: the verification email is the welcome message. */
+  async sendWelcomeEmail(user: User, verificationToken: string): Promise<boolean> {
+    return this.sendVerificationEmail(user, verificationToken, "welcome");
+  }
+
   async sendVerificationEmail(
     user: User,
     verificationToken: string,
+    emailType = "verification",
   ): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-    const verificationUrl = `${this.configService.get<string>("FRONTEND_URL")}/verify-email?token=${verificationToken}`;
-
-    const html = await this.renderTemplate("verify-email", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      actionUrl: verificationUrl,
-      expiresIn: "24 hours",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Verify your email address",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "verification",
-    });
+    return this.dispatch(
+      "verify-email",
+      user.email,
+      {
+        name: this.displayName(user),
+        verifyUrl: this.frontendUrl("/verify-email", verificationToken),
+        expiresInHours: VERIFY_EMAIL_EXPIRY_HOURS,
+        tenantName: await this.getTenantName(user.tenantId),
+      },
+      { tenantId: user.tenantId, userId: user.id, emailType },
+    );
   }
 
-  /**
-   * Send password reset email
-   */
-  async sendPasswordResetEmail(
-    user: User,
-    resetToken: string,
-  ): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-    const resetUrl = `${this.configService.get<string>("FRONTEND_URL")}/reset-password?token=${resetToken}`;
-
-    const html = await this.renderTemplate("password-reset", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      actionUrl: resetUrl,
-      expiresIn: "1 hour",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Reset your password",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "password_reset",
-    });
+  async sendPasswordResetEmail(user: User, resetToken: string): Promise<boolean> {
+    return this.dispatch(
+      "password-reset",
+      user.email,
+      {
+        name: this.displayName(user),
+        resetUrl: this.frontendUrl("/reset-password", resetToken),
+        expiresInMinutes: PASSWORD_RESET_EXPIRY_MINUTES,
+        tenantName: await this.getTenantName(user.tenantId),
+      },
+      { tenantId: user.tenantId, userId: user.id, emailType: "password_reset" },
+    );
   }
 
-  /**
-   * Send password reset OTP email
-   */
-  async sendPasswordResetOtpEmail(
-    user: User,
-    otp: string,
-  ): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-
-    const html = await this.renderTemplate("otp", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      code: otp,
-      expiresIn: "15 minutes",
-      purpose: "password reset",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Your password reset code",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "password_reset_otp",
-    });
+  async sendPasswordResetOtpEmail(user: User, otp: string): Promise<boolean> {
+    return this.sendOtp(user, otp, PASSWORD_RESET_OTP_EXPIRY_MINUTES, "password_reset_otp");
   }
 
-  /**
-   * Send password changed confirmation
-   */
-  async sendPasswordChangedEmail(user: User): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-
-    const html = await this.renderTemplate("password-changed", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Your password has been changed",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "password_changed",
-    });
-  }
-
-  /**
-   * Send magic link email
-   */
-  async sendMagicLinkEmail(
-    user: User,
-    magicLinkToken: string,
-  ): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-    const magicLinkUrl = `${this.configService.get<string>("FRONTEND_URL")}/u/magic-link?token=${magicLinkToken}`;
-
-    const html = await this.renderTemplate("magic-link", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      actionUrl: magicLinkUrl,
-      expiresIn: "10 minutes",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: `Your sign-in link for ${branding.tenantName}`,
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "magic_link",
-    });
-  }
-
-  /**
-   * Send OTP code email
-   */
   async sendOTPEmail(user: User, otpCode: string): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-
-    const html = await this.renderTemplate("otp", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      code: otpCode,
-      expiresIn: "10 minutes",
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Your verification code",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "otp",
-    });
+    return this.sendOtp(user, otpCode, OTP_EXPIRY_MINUTES, "otp");
   }
 
-  /**
-   * Send user invite email
-   */
+  private async sendOtp(
+    user: User,
+    code: string,
+    expiresInMinutes: number,
+    emailType: string,
+  ): Promise<boolean> {
+    return this.dispatch(
+      "otp-code",
+      user.email,
+      {
+        name: this.displayName(user),
+        code,
+        expiresInMinutes,
+        tenantName: await this.getTenantName(user.tenantId),
+      },
+      { tenantId: user.tenantId, userId: user.id, emailType },
+    );
+  }
+
+  async sendPasswordChangedEmail(user: User, ctx: AlertContext = {}): Promise<boolean> {
+    return this.dispatch(
+      "password-changed",
+      user.email,
+      await this.alertProps(user, ctx),
+      { tenantId: user.tenantId, userId: user.id, emailType: "password_changed" },
+    );
+  }
+
+  async sendMagicLinkEmail(user: User, magicLinkToken: string): Promise<boolean> {
+    return this.dispatch(
+      "magic-link",
+      user.email,
+      {
+        name: this.displayName(user),
+        magicLinkUrl: this.frontendUrl("/u/magic-link", magicLinkToken),
+        expiresInMinutes: MAGIC_LINK_EXPIRY_MINUTES,
+        tenantName: await this.getTenantName(user.tenantId),
+      },
+      { tenantId: user.tenantId, userId: user.id, emailType: "magic_link" },
+    );
+  }
+
   async sendInviteEmail(data: {
     to: string;
     inviterName: string;
@@ -385,72 +215,80 @@ export class EmailService {
     tenantId: string;
     inviteUrl: string;
     expiresInDays: number;
+    role?: string;
   }): Promise<boolean> {
-    const html = await this.renderTemplate("invite", {
-      inviterName: data.inviterName,
-      tenantName: data.tenantName,
-      actionUrl: data.inviteUrl,
-      expiresIn: `${data.expiresInDays} days`,
-    });
-
-    return this.sendEmail({
-      to: data.to,
-      subject: `You've been invited to join ${data.tenantName}`,
-      html,
-      tenantId: data.tenantId,
-      emailType: "invite",
-    });
-  }
-
-  /**
-   * Send account deleted confirmation
-   */
-  async sendAccountDeletedEmail(user: User): Promise<boolean> {
-    const branding = await this.getTenantBranding(user.tenantId);
-
-    const html = await this.renderTemplate("account-deleted", {
-      userName: user.firstName || user.email.split("@")[0],
-      userEmail: user.email,
-      ...branding,
-    });
-
-    return this.sendEmail({
-      to: user.email,
-      subject: "Your account has been deleted",
-      html,
-      tenantId: user.tenantId,
-      userId: user.id,
-      emailType: "account_deleted",
-    });
-  }
-
-  /**
-   * Log email event to security_events table
-   */
-  private logEmailEvent(data: {
-    tenantId: string;
-    userId?: string;
-    emailType: string;
-    recipient: string;
-    provider: string;
-    success: boolean;
-    duration: number;
-  }): void {
-    this.securityEventService.log({
-      tenantId: data.tenantId,
-      userId: data.userId,
-      eventType: SecurityEventType.EMAIL_SENT,
-      severity: data.success ? "info" : "warning",
-      ipAddress: "0.0.0.0",
-      userAgent: "email-service",
-      metadata: {
-        emailType: data.emailType,
-        // recipient email is retained for audit traceability — not a secret
-        recipient: data.recipient,
-        provider: data.provider,
-        success: data.success,
-        duration: data.duration,
+    return this.dispatch(
+      "invitation",
+      data.to,
+      {
+        inviterName: data.inviterName,
+        tenantName: data.tenantName,
+        role: data.role ?? DEFAULT_INVITE_ROLE,
+        acceptUrl: data.inviteUrl,
+        expiresInDays: data.expiresInDays,
       },
-    });
+      { tenantId: data.tenantId, emailType: "invite" },
+    );
+  }
+
+  async sendAccountDeletedEmail(user: User, purgeOn?: Date): Promise<boolean> {
+    const purgeDate =
+      purgeOn ?? new Date(Date.now() + ACCOUNT_PURGE_GRACE_DAYS * MS_PER_DAY);
+    return this.dispatch(
+      "account-deleted",
+      user.email,
+      {
+        name: this.displayName(user),
+        purgeOn: purgeDate.toISOString().slice(0, 10),
+        tenantName: await this.getTenantName(user.tenantId),
+      },
+      { tenantId: user.tenantId, userId: user.id, emailType: "account_deleted" },
+    );
+  }
+
+  async sendAccountLockedEmail(
+    user: User,
+    unlockMinutes: number,
+    ctx: AlertContext = {},
+  ): Promise<boolean> {
+    return this.dispatch(
+      "account-locked",
+      user.email,
+      { ...(await this.alertProps(user, ctx)), unlockMinutes },
+      { tenantId: user.tenantId, userId: user.id, emailType: "account_locked" },
+    );
+  }
+
+  async sendAccountLinkRequest(data: {
+    user: User;
+    provider: string;
+    token: string;
+  }): Promise<boolean> {
+    return this.dispatch(
+      "social-account-link-request",
+      data.user.email,
+      {
+        name: this.displayName(data.user),
+        provider: data.provider,
+        confirmUrl: this.frontendUrl("/u/link/confirm", data.token),
+        expiresInMinutes: ACCOUNT_LINK_EXPIRY_MINUTES,
+        tenantName: await this.getTenantName(data.user.tenantId),
+      },
+      { tenantId: data.user.tenantId, userId: data.user.id, emailType: "account_link_request" },
+    );
+  }
+
+  /** Security alerts that share the alert props shape. */
+  async sendSecurityAlertEmail(
+    template: SecurityAlertTemplate,
+    user: User,
+    ctx: AlertContext = {},
+  ): Promise<boolean> {
+    return this.dispatch(
+      template,
+      user.email,
+      await this.alertProps(user, ctx),
+      { tenantId: user.tenantId, userId: user.id, emailType: template.replace(/-/g, "_") },
+    );
   }
 }

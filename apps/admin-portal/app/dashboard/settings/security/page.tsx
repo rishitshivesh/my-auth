@@ -9,6 +9,7 @@ import { useMfaStatus, useListPasskeys, useDeletePasskey, useActiveSessions, use
 import type { PasskeyCredential, ActiveSessionDto } from "@/lib/types";
 import { PasskeyRegisterModal } from "@/components/auth/passkey-register-modal";
 import { formatRelativeTime } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/api-error";
 
 function formatDate(dateStr: string): string {
   try {
@@ -67,7 +68,7 @@ export default function SecuritySettingsPage() {
       await revokeSessionMutation.mutateAsync(sessionId);
       flash("Session revoked");
     } catch (err: unknown) {
-      flash((err as Error)?.message || "Failed to revoke session", true);
+      flash(getErrorMessage(err, "Failed to revoke session"), true);
     } finally {
       setRevokingId(null);
     }
@@ -78,7 +79,7 @@ export default function SecuritySettingsPage() {
       await revokeAllOtherMutation.mutateAsync();
       flash("All other sessions revoked");
     } catch (err: unknown) {
-      flash((err as Error)?.message || "Failed to revoke sessions", true);
+      flash(getErrorMessage(err, "Failed to revoke sessions"), true);
     }
   };
 
@@ -88,7 +89,7 @@ export default function SecuritySettingsPage() {
       await deletePasskeyMutation.mutateAsync(credentialId);
       flash("Passkey removed");
     } catch (err: unknown) {
-      flash(err instanceof Error ? err.message : "Failed to remove passkey", true);
+      flash(getErrorMessage(err, "Failed to remove passkey"), true);
     } finally {
       setDeletingId(null);
     }

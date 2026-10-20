@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { ApiException } from '../../../common/http';
 import { Reflector } from '@nestjs/core';
 import { PolicyEvaluationService } from '../services/policy-evaluation.service';
 import { RbacService } from '../services/rbac.service';
@@ -34,7 +30,7 @@ export class PermissionsGuard implements CanActivate {
     const tenantId = request.tenantId;
 
     if (!user || !user.sub) {
-      throw new ForbiddenException('Authentication required');
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: 'Authentication required' });
     }
 
     if (user.isSuperAdmin) {
@@ -42,7 +38,7 @@ export class PermissionsGuard implements CanActivate {
     }
 
     if (!tenantId) {
-      throw new ForbiddenException('Tenant context not found');
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: 'Tenant context not found' });
     }
 
     // Try IAM policy evaluation first
@@ -71,9 +67,9 @@ export class PermissionsGuard implements CanActivate {
         });
 
         if (!result.allowed) {
-          throw new ForbiddenException(
-            `Access denied: ${result.reason}${result.deniedBy?.length ? ` (${result.deniedBy.join(', ')})` : ''}`,
-          );
+          throw new ApiException("ACCESS_FORBIDDEN", {
+            detail: `Access denied: ${result.reason}${result.deniedBy?.length ? ` (${result.deniedBy.join(', ')})` : ''}`,
+          });
         }
       }
       return true;
@@ -87,9 +83,7 @@ export class PermissionsGuard implements CanActivate {
         permission,
       );
       if (!hasPermission) {
-        throw new ForbiddenException(
-          `Access denied: missing permission "${permission}"`,
-        );
+        throw new ApiException("ACCESS_FORBIDDEN", { detail: `Access denied: missing permission "${permission}"` });
       }
     }
 

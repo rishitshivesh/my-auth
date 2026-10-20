@@ -1,6 +1,7 @@
 // apps/auth-service/src/modules/oauth/services/oauth-consent.service.ts
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
@@ -87,7 +88,7 @@ export class OAuthConsentService {
     });
 
     if (!client) {
-      throw new NotFoundException("Client not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Client not found" });
     }
 
     // Validate user exists
@@ -96,7 +97,7 @@ export class OAuthConsentService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
     }
 
     // Calculate expiry

@@ -9,6 +9,7 @@ import { SentryButton } from "@repo/ui"
 import { useVerifyEmail, useResendVerification } from "@/lib/queries"
 import { useAuth } from "@scrolloop/sdk"
 import { CheckCircle2, AlertCircle, Mail, LogOut } from "lucide-react"
+import { getErrorMessage } from "@/lib/api-error";
 
 function VerifyEmailInner() {
   const router = useRouter()
@@ -36,7 +37,7 @@ function VerifyEmailInner() {
       onSuccess: () => setStatus("success"),
       onError: (err) => {
         setStatus("error")
-        setErrorMsg(err.message || "This verification link has expired or already been used.")
+        setErrorMsg(getErrorMessage(err, "This verification link has expired or already been used."))
       },
     })
   }, [user, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { scimError } from "./scim-errors";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, FindOptionsWhere } from "typeorm";
 import { User, Group, UserGroup } from "@repo/database";
@@ -76,13 +77,13 @@ export class ScimService {
 
   async getUser(tenantId: string, userId: string, baseUrl: string): Promise<ScimUser> {
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw scimError(404, "User not found");
     return this.userToScim(user, baseUrl);
   }
 
   async createUser(tenantId: string, scimUser: ScimUser, baseUrl: string): Promise<ScimUser> {
     const existing = await this.userRepo.findOne({ where: { tenantId, email: scimUser.userName } });
-    if (existing) throw new ConflictException("User already exists");
+    if (existing) throw scimError(409, "User already exists", "uniqueness");
 
     const user = this.userRepo.create({
       tenantId,
@@ -100,7 +101,7 @@ export class ScimService {
 
   async replaceUser(tenantId: string, userId: string, scimUser: ScimUser, baseUrl: string): Promise<ScimUser> {
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw scimError(404, "User not found");
 
     user.firstName = scimUser.name?.givenName ?? user.firstName;
     user.lastName = scimUser.name?.familyName ?? user.lastName;
@@ -113,7 +114,7 @@ export class ScimService {
 
   async patchUser(tenantId: string, userId: string, ops: ScimPatchOp[], baseUrl: string): Promise<ScimUser> {
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw scimError(404, "User not found");
 
     for (const op of ops) {
       this.applyUserPatch(user, op);
@@ -136,7 +137,7 @@ export class ScimService {
 
   async deleteUser(tenantId: string, userId: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw scimError(404, "User not found");
     await this.userRepo.softDelete(userId);
   }
 
@@ -176,7 +177,7 @@ export class ScimService {
 
   async getGroup(tenantId: string, groupId: string, baseUrl: string): Promise<ScimGroup> {
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
-    if (!group) throw new NotFoundException("Group not found");
+    if (!group) throw scimError(404, "Group not found");
     return this.groupToScim(group, baseUrl);
   }
 
@@ -196,7 +197,7 @@ export class ScimService {
 
   async patchGroup(tenantId: string, groupId: string, ops: ScimPatchOp[], baseUrl: string): Promise<ScimGroup> {
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
-    if (!group) throw new NotFoundException("Group not found");
+    if (!group) throw scimError(404, "Group not found");
 
     for (const op of ops) {
       if (op.path === "displayName" && op.op === "replace") {
@@ -229,7 +230,7 @@ export class ScimService {
 
   async deleteGroup(tenantId: string, groupId: string): Promise<void> {
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
-    if (!group) throw new NotFoundException("Group not found");
+    if (!group) throw scimError(404, "Group not found");
     await this.userGroupRepo.delete({ groupId });
     await this.groupRepo.softDelete(groupId);
   }

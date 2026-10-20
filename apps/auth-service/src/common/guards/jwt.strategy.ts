@@ -1,6 +1,7 @@
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { PassportStrategy } from "@nestjs/passport";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "../http";
 import { Request } from "express";
 import { JwksService } from "../../modules/oauth/services/jwks.service";
 import * as crypto from "crypto";
@@ -62,7 +63,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: Record<string, unknown>) {
     if (!payload.sub || typeof payload.sub !== "string") {
-      throw new UnauthorizedException("Invalid token payload");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     const roles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
@@ -84,6 +85,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: payload.tenantId as string | undefined,
       tenantSlug: payload.tenantSlug as string | undefined,
       sessionId: payload.sessionId as string | undefined,
+      authTime: typeof payload.authTime === "number" ? payload.authTime : undefined,
       email: payload.email as string | undefined,
       roles,
       groups,

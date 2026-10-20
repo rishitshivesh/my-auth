@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
-import { withErrorHandler } from "./with-error-handler";
+import { withErrorHandler, toastApiError } from "./with-error-handler";
+import { SentryApiError } from "./api-error";
 import type {
   DashboardData,
   DashboardUser,
@@ -1048,7 +1049,15 @@ export function useExportAuditCsv(tenantSlug?: string) {
       });
 
       if (!response.ok) {
-        throw new Error(`Export failed: ${response.status}`);
+        const body: unknown = await response.json().catch(() => undefined);
+        const apiError = SentryApiError.fromResponse({
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          data: body,
+        });
+        toastApiError(apiError);
+        throw apiError;
       }
 
       const blob = await response.blob();

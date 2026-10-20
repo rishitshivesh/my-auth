@@ -2,9 +2,9 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { Request } from "express";
+import { scimError } from "./scim-errors";
 import { ScimTokenService } from "./scim-token.service";
 
 @Injectable()
@@ -16,7 +16,7 @@ export class ScimAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader?.startsWith("Bearer ")) {
-      throw new UnauthorizedException("SCIM requests require a Bearer token");
+      throw scimError(401, "SCIM requests require a Bearer token");
     }
 
     const rawToken = authHeader.slice(7);

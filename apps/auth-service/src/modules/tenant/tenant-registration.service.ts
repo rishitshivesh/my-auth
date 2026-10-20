@@ -1,8 +1,7 @@
-import {
-  Injectable,
-  ConflictException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "../../common/http";
+import { assertPasswordPolicy } from "../auth/password-policy";
+import { hashPassword } from "../auth/password-hashing";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
@@ -16,7 +15,6 @@ import {
   Policy,
   RolePolicy,
 } from "@repo/database";
-import { PasswordService } from "@repo/security";
 import { TenantService } from "./tenant.service";
 import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
@@ -117,17 +115,13 @@ export class TenantRegistrationService {
     // Validate slug
     const slugCheck = await this.checkSlugAvailability(dto.slug);
     if (!slugCheck.available) {
-      throw new ConflictException(slugCheck.reason ?? "Slug is not available");
+      throw new ApiException("RESOURCE_CONFLICT", {
+        detail: slugCheck.reason ?? "Slug is not available",
+      });
     }
 
     // Validate password
-    const strength = PasswordService.validateStrength(dto.adminPassword);
-    if (!strength.isValid) {
-      throw new BadRequestException({
-        message: "Password does not meet security requirements",
-        errors: strength.errors,
-      });
-    }
+    assertPasswordPolicy(dto.adminPassword, { email: dto.adminEmail });
 
     const schemaName = this.tenantSchemaService.getSchemaName(dto.slug);
     const qr = this.dataSource.createQueryRunner();
@@ -149,7 +143,7 @@ export class TenantRegistrationService {
         .getRepository(Tenant)
         .findOne({ where: { slug: dto.slug } });
       if (existing) {
-        throw new ConflictException("This slug is already taken");
+        throw new ApiException("RESOURCE_CONFLICT", { detail: "This slug is already taken" });
       }
 
       // Create the tenant record + tenant schema (auto-committed, inside the lock).
@@ -169,7 +163,7 @@ export class TenantRegistrationService {
       const result = await this.tenantContext.run(
         { queryRunner: qr, schemaName },
         async () => {
-          const passwordHash = await PasswordService.hash(dto.adminPassword);
+          const passwordHash = await hashPassword(dto.adminPassword);
           const nameParts = dto.adminName.trim().split(/\s+/);
           const firstName = nameParts[0] ?? dto.adminName;
           const lastName = nameParts.slice(1).join(" ") || undefined;

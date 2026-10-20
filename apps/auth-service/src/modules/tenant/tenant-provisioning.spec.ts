@@ -4,7 +4,7 @@ import { TenantSchemaService } from '@/core/tenant/tenant-schema.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Tenant } from '@repo/database';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { InternalServerErrorException } from '@nestjs/common';
+import { ApiException } from '../../common/http';
 
 const mockTenantRepo = () => ({
   create: jest.fn(),
@@ -55,7 +55,7 @@ describe('TenantService.create (M-006)', () => {
 
     await expect(
       service.create({ slug: 'acme', name: 'Acme Corp' }),
-    ).rejects.toThrow(InternalServerErrorException);
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
 
     // Tenant row must be deleted
     expect(tenantRepo.delete).toHaveBeenCalledWith('tenant-1');
@@ -72,10 +72,10 @@ describe('TenantService.create (M-006)', () => {
     try {
       await service.create({ slug: 'acme', name: 'Acme Corp' });
     } catch (err) {
-      expect(err).toBeInstanceOf(InternalServerErrorException);
-      const body = (err as InternalServerErrorException).getResponse() as { message: string };
-      expect(body.message).toBe('Workspace provisioning failed. Please try again.');
-      expect(body.message).not.toContain('disk full');
+      expect(err).toBeInstanceOf(ApiException);
+      const detail = (err as ApiException).detail as string;
+      expect(detail).toBe('Workspace provisioning failed. Please try again.');
+      expect(detail).not.toContain('disk full');
     }
   });
 });

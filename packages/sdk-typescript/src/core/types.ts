@@ -9,6 +9,7 @@
 // Re-export shared types so internal SDK modules can import from './types'
 // and external consumers can import from '@scrolloop/sdk' without knowing about @scrolloop/types.
 // export type { User, Session, SecurityEventType } from '@scrolloop/types';
+import type { ErrorCode } from '@scrolloop/types';
 
 // ============================================================
 // TRANSPORT ABSTRACTION
@@ -172,7 +173,7 @@ export interface MfaChallenge {
 
 export class AuthError extends Error {
   constructor(
-    public code: AuthErrorCode,
+    public code: AuthErrorCode | ErrorCode,
     message: string,
     public details?: any,
   ) {

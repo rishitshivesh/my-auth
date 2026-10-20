@@ -1,10 +1,6 @@
-import {
-  Injectable,
-  ExecutionContext,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable, ExecutionContext } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
-import { Observable } from "rxjs";
+import { ApiException } from "../http";
 
 interface AuthenticatedUser {
   userId: string;
@@ -16,6 +12,12 @@ interface AuthenticatedUser {
   roles: string[];
   groups: string[];
   isSuperAdmin: boolean;
+  /** Epoch seconds of the login this session started with. */
+  authTime: number | undefined;
+}
+
+function isExpiredInfo(info: unknown): boolean {
+  return info instanceof Error && info.name === "TokenExpiredError";
 }
 
 /**
@@ -25,9 +27,12 @@ interface AuthenticatedUser {
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
-  handleRequest<TUser = any>(err: unknown, user: unknown, info: unknown, context: ExecutionContext, status?: unknown): TUser {
+  handleRequest<TUser = AuthenticatedUser>(err: unknown, user: unknown, info: unknown, context: ExecutionContext, status?: unknown): TUser {
     if (err || !user) {
-      throw err || new UnauthorizedException("Invalid or expired token");
+      if (err) throw err;
+      throw new ApiException(
+        isExpiredInfo(info) ? "AUTH_TOKEN_EXPIRED" : "AUTH_TOKEN_INVALID",
+      );
     }
 
     const req = context.switchToHttp().getRequest();
@@ -38,11 +43,13 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     const requestTenant = req.tenant?.id;
 
     if (!tokenTenant || !requestTenant) {
-      throw new UnauthorizedException("Tenant missing");
+      throw new ApiException("TENANT_MISMATCH", { detail: "Tenant context is missing." });
     }
 
     if (tokenTenant !== requestTenant) {
-      throw new UnauthorizedException("Cross-tenant token");
+      throw new ApiException("TENANT_MISMATCH", {
+        detail: "This session belongs to a different tenant.",
+      });
     }
 
     return authedUser as unknown as TUser;

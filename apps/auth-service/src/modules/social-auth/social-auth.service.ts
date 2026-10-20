@@ -1,10 +1,8 @@
 import {
   Injectable,
   Logger,
-  UnauthorizedException,
-  ConflictException,
-  NotFoundException,
 } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -27,6 +25,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { MfaPolicyService } from '@/modules/mfa/mfa-policy.service';
 import { MfaService } from '@/modules/mfa/mfa.service';
+import { EmailService } from '@/modules/email/email.service';
 export interface SocialProfile {
   provider: "google" | "github" | "microsoft" | "apple" | "linkedin";
   providerId: string;
@@ -79,6 +78,7 @@ export class SocialAuthService {
     private readonly userRoleRepository: Repository<UserRole>,
     private readonly mfaPolicyService: MfaPolicyService,
     private readonly mfaService: MfaService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
@@ -150,7 +150,16 @@ export class SocialAuthService {
     });
 
     if (existingUser) {
-      // Email exists, require account linking
+      // Never link on the strength of an email the provider has not verified:
+      // anyone can add an unverified address to a provider account.
+      if (profile.emailVerified === false) {
+        throw new ApiException("SOCIAL_PROVIDER_ERROR", {
+          detail: "The sign-in provider has not verified this email address.",
+        });
+      }
+
+      // Email exists, require account linking (never auto-link; the mailbox
+      // owner must confirm). See confirmLinking for unverified local accounts.
       this.logger.log("User exists with email, requiring account linking", {
         userId: existingUser.id,
         email: profile.email,
@@ -483,17 +492,15 @@ export class SocialAuthService {
       userAgent,
     });
 
-    // TODO: Send email with link
-    // await this.emailService.sendAccountLinkRequest({
-    //   to: user.email,
-    //   provider: profile.provider,
-    //   linkUrl: `https://${tenant}.auth.scrolloop.com/auth/link/confirm?token=${token}`,
-    // });
+    await this.emailService.sendAccountLinkRequest({
+      user,
+      provider: profile.provider,
+      token,
+    });
 
     this.logger.log("Account link request created", {
       userId: user.id,
       provider: profile.provider,
-      token,
     });
   }
 
@@ -506,7 +513,7 @@ export class SocialAuthService {
     success: boolean;
     message: string;
   }> {
-    this.logger.log("Confirming account linking", { token });
+    this.logger.log("Confirming account linking");
 
     // Find link request
     const linkRequest = await this.linkRequestRepository.findOne({
@@ -515,11 +522,23 @@ export class SocialAuthService {
     });
 
     if (!linkRequest) {
-      throw new UnauthorizedException("Invalid or expired linking token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     if (linkRequest.isExpired) {
-      throw new UnauthorizedException("Linking token has expired");
+      throw new ApiException("AUTH_TOKEN_EXPIRED");
+    }
+
+    // Pre-registration takeover guard: a local account whose email was never
+    // verified may have been created by someone other than the mailbox owner,
+    // who then knows its password. The owner has now proven control of the
+    // mailbox through the link email, so keep the account but drop that password.
+    const reclaimedUnverified = linkRequest.user?.emailVerified === false;
+    if (reclaimedUnverified) {
+      await this.userRepository.update(linkRequest.userId, {
+        emailVerified: true,
+        passwordHash: () => "NULL",
+      });
     }
 
     // Create social connection
@@ -556,6 +575,7 @@ export class SocialAuthService {
       userAgent: linkRequest.userAgent ?? "",
       metadata: {
         provider: linkRequest.provider,
+        reclaimedUnverified,
       },
     });
 
@@ -594,7 +614,7 @@ export class SocialAuthService {
     });
 
     if (!connection) {
-      throw new UnauthorizedException("Social connection not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Social connection not found" });
     }
 
     // Check if user has password or other auth method
@@ -611,9 +631,9 @@ export class SocialAuthService {
     });
 
     if (!user?.passwordHash && otherConnections <= 1) {
-      throw new ConflictException(
-        "Cannot unlink last authentication method. Set a password first.",
-      );
+      throw new ApiException("RESOURCE_CONFLICT", {
+        detail: "Cannot unlink your last sign-in method. Set a password first.",
+      });
     }
 
     // Delete connection
@@ -699,7 +719,7 @@ export class SocialAuthService {
         algorithms: ["RS256"],
       }) as { userId: string; tenantId: string };
     } catch {
-      throw new UnauthorizedException("Invalid or expired link token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
   }
 
@@ -730,7 +750,7 @@ export class SocialAuthService {
     const user = await this.userRepository.findOne({
       where: { id: userId, tenantId },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
 
     const connection = this.socialConnectionRepository.create({
       userId,

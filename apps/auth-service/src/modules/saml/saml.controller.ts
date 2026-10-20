@@ -12,10 +12,10 @@ import {
   Request,
   UseGuards,
   Res,
-  BadRequestException,
-  UnauthorizedException,
 } from "@nestjs/common";
 import type { Response } from "express";
+import { ApiException } from "@/common/http";
+import { samlError } from "./saml-errors";
 import { JwtAuthGuard, RequestUserGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
@@ -65,7 +65,7 @@ export class SamlController {
     @Res() res: Response,
   ) {
     if (!samlRequest) {
-      throw new BadRequestException("Missing SAMLRequest");
+      throw samlError(400, "Missing SAMLRequest");
     }
 
     const tenant = await this.samlService.resolveTenant(tenantSlug);
@@ -124,13 +124,13 @@ export class SamlController {
     }
 
     if (req.cookies?.[SAML_SSO_NONCE_COOKIE] !== nonce) {
-      throw new UnauthorizedException("SSO continuation does not match this browser session");
+      throw samlError(401, "SSO continuation does not match this browser session");
     }
     clearSamlSsoNonceCookie(res);
 
     const pending = await this.samlService.popPendingRequest(nonce);
     if (!pending) {
-      throw new BadRequestException("SSO request has expired or was already used");
+      throw samlError(400, "SSO request has expired or was already used");
     }
 
     const tenant = await this.samlService.resolveTenant(pending.tenantSlug);
@@ -214,7 +214,7 @@ export class SamlController {
    */
   private requireTenantId(req: AuthenticatedRequest): string {
     if (!req.tenantId) {
-      throw new UnauthorizedException("Tenant context not found");
+      throw new ApiException("TENANT_MISMATCH", { detail: "Tenant context not found" });
     }
     return req.tenantId;
   }

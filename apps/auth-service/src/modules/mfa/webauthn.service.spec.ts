@@ -1,12 +1,22 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { getDataSourceToken } from "@nestjs/typeorm";
-import { BadRequestException } from "@nestjs/common";
+import { ApiException } from "@/common/http";
+import { DomainEventName, DomainEventsService } from "@/common/service/domain-events.service";
 import { MfaSettings, User, WebAuthnCredential } from "@repo/database";
 import { WebAuthnService } from "./webauthn.service";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@/common/service/redis.service";
 import { SecurityEventService } from "@/common/service/security-event.service";
+
+jest.mock("@simplewebauthn/server", () => {
+  const actual = jest.requireActual("@simplewebauthn/server");
+  return {
+    ...actual,
+    verifyAuthenticationResponse: jest.fn(actual.verifyAuthenticationResponse),
+  };
+});
+import * as simplewebauthn from "@simplewebauthn/server";
 
 // ── Minimal stubs ──────────────────────────────────────────────────────────
 
@@ -80,6 +90,8 @@ const mockSecurityEventService = {
   log: jest.fn(),
 };
 
+const mockDomainEvents = { publish: jest.fn() };
+
 const mockConfigService = {
   get: jest.fn((key: string, def?: any) => {
     if (key === "WEBAUTHN_RP_ID") return "localhost";
@@ -106,6 +118,7 @@ describe("WebAuthnService", () => {
         { provide: RedisService, useValue: mockRedisService },
         { provide: getDataSourceToken(), useValue: mockDataSource },
         { provide: SecurityEventService, useValue: mockSecurityEventService },
+        { provide: DomainEventsService, useValue: mockDomainEvents },
       ],
     }).compile();
 
@@ -163,7 +176,7 @@ describe("WebAuthnService", () => {
 
       await expect(
         service.finishRegistration("user-1", "tenant-1", {} as any),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toBeInstanceOf(ApiException);
 
       expect(mockRedisService.delete).toHaveBeenCalledTimes(1);
     });
@@ -196,31 +209,23 @@ describe("WebAuthnService", () => {
 
   // ── Expired challenge (400, not 500) ─────────────────────────────────────
 
-  describe("Expired challenge → HTTP 400, error code WEBAUTHN_CHALLENGE_EXPIRED", () => {
-    it("throws BadRequestException with WEBAUTHN_CHALLENGE_EXPIRED on missing register challenge", async () => {
+  describe("Expired challenge → PASSKEY_INVALID", () => {
+    it("throws PASSKEY_INVALID for an expired challenge on missing register challenge", async () => {
       mockRedisService.get.mockResolvedValueOnce(null); // expired / never set
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
         service.finishRegistration("user-1", "tenant-1", {} as any),
-      ).rejects.toMatchObject({
-        response: {
-          error: "WEBAUTHN_CHALLENGE_EXPIRED",
-        },
-      });
+      ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
     });
 
-    it("throws BadRequestException with WEBAUTHN_CHALLENGE_EXPIRED on missing authenticate challenge", async () => {
+    it("throws PASSKEY_INVALID for an expired challenge on missing authenticate challenge", async () => {
       mockRedisService.get.mockResolvedValueOnce(null);
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
         service.finishAuthentication("user-1", "tenant-1", {} as any, "some-nonce"),
-      ).rejects.toMatchObject({
-        response: {
-          error: "WEBAUTHN_CHALLENGE_EXPIRED",
-        },
-      });
+      ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
     });
 
     it("does NOT throw a 500-class error for an expired challenge", async () => {
@@ -234,14 +239,14 @@ describe("WebAuthnService", () => {
         caughtStatus = err?.status ?? err?.getStatus?.();
       }
 
-      expect(caughtStatus).toBe(400);
+      expect(caughtStatus).toBe(401);
     });
   });
 
   // ── Counter rollback → WEBAUTHN_REPLAY_DETECTED ───────────────────────────
 
   describe("Counter rollback → WEBAUTHN_REPLAY_DETECTED", () => {
-    it("throws BadRequestException with WEBAUTHN_REPLAY_DETECTED when UPDATE affects 0 rows", async () => {
+    it("throws PASSKEY_INVALID when UPDATE affects 0 rows", async () => {
       const cred = makeCredential({ counter: 5 });
 
       mockRedisService.get.mockResolvedValueOnce("valid-challenge");
@@ -290,7 +295,7 @@ describe("WebAuthnService", () => {
       // by calling finishAuthentication and catching the error
       await expect(
         service.finishAuthentication("user-1", "tenant-1", fakeResponse as any, "some-nonce"),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toBeInstanceOf(ApiException);
     });
   });
 
@@ -300,16 +305,14 @@ describe("WebAuthnService", () => {
   // (because the browser was cancelled before /start was called).
 
   describe("Cancelled browser flow — server side", () => {
-    it("returns WEBAUTHN_CHALLENGE_EXPIRED (not 500) when /finish is called without prior /start", async () => {
+    it("returns PASSKEY_INVALID (not 500) when /finish is called without prior /start", async () => {
       // Redis returns null — challenge was never stored
       mockRedisService.get.mockResolvedValueOnce(null);
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
         service.finishRegistration("user-1", "tenant-1", {} as any),
-      ).rejects.toMatchObject({
-        response: { error: "WEBAUTHN_CHALLENGE_EXPIRED" },
-      });
+      ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
 
       // Status must be 400
       let status: number | undefined;
@@ -318,7 +321,75 @@ describe("WebAuthnService", () => {
       } catch (err: any) {
         status = err?.status ?? err?.getStatus?.();
       }
-      expect(status).toBe(400);
+      expect(status).toBe(401);
+    });
+  });
+
+  // ── Signature counter regression (cloned authenticator) ───────────────────
+
+  describe("Counter regression → credential retired", () => {
+    const fakeResponse = { rawId: "cred-id-base64url", id: "cred-id-base64url" };
+    const ctx = { requestId: "req-9", ipAddress: "203.0.113.7", userAgent: "jest" };
+
+    beforeEach(() => {
+      mockRedisService.get.mockResolvedValueOnce("valid-challenge");
+      mockRedisService.delete.mockResolvedValue(undefined);
+      mockCredentialRepo.findOne.mockResolvedValueOnce(makeCredential({ counter: 9 }));
+      mockCredentialRepo.remove.mockResolvedValue(undefined);
+      mockCredentialRepo.count.mockResolvedValue(0);
+      mockUserRepo.findOne.mockResolvedValue(makeUser());
+      (simplewebauthn.verifyAuthenticationResponse as jest.Mock).mockRejectedValueOnce(
+        new Error("Response counter value 3 was lower than expected 9"),
+      );
+    });
+
+    it("removes the credential and clears the webauthn flag when none remain", async () => {
+      await expect(
+        service.finishAuthentication("user-1", "tenant-1", fakeResponse as never, "nonce", ctx),
+      ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
+
+      expect(mockCredentialRepo.remove).toHaveBeenCalledTimes(1);
+      expect(mockMfaRepo.update).toHaveBeenCalledWith(
+        { userId: "user-1", tenantId: "tenant-1" },
+        { webauthnEnabled: false },
+      );
+    });
+
+    it("records PASSKEY_CLONED with the request id", async () => {
+      await expect(
+        service.finishAuthentication("user-1", "tenant-1", fakeResponse as never, "nonce", ctx),
+      ).rejects.toBeInstanceOf(ApiException);
+
+      expect(mockSecurityEventService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "passkey.cloned",
+          severity: "critical",
+          requestId: "req-9",
+          ipAddress: "203.0.113.7",
+        }),
+      );
+    });
+
+    it("publishes the passkey-removed event so the user is emailed", async () => {
+      await expect(
+        service.finishAuthentication("user-1", "tenant-1", fakeResponse as never, "nonce", ctx),
+      ).rejects.toBeInstanceOf(ApiException);
+
+      expect(mockDomainEvents.publish).toHaveBeenCalledWith(
+        DomainEventName.PASSKEY_REMOVED,
+        expect.objectContaining({ email: "test@example.com", requestId: "req-9" }),
+      );
+    });
+  });
+
+  describe("Passkey limit", () => {
+    it("rejects registration start with PASSKEY_LIMIT at the cap", async () => {
+      mockUserRepo.findOne.mockResolvedValueOnce(makeUser());
+      mockCredentialRepo.count.mockResolvedValueOnce(10);
+
+      await expect(service.startRegistration("user-1", "tenant-1")).rejects.toMatchObject({
+        code: "PASSKEY_LIMIT",
+      });
     });
   });
 });

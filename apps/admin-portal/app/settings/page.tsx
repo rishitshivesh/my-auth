@@ -14,6 +14,7 @@ import { withAdmin } from '@/lib/with-admin'
 import { AdminSidebar } from '@/components/admin-sidebar'
 import { usePortalBranding, useUpdatePortalBranding } from '@/lib/portal-queries'
 import type { PortalBranding } from '@/lib/portal-queries'
+import { getErrorMessage } from "@/lib/api-error";
 
 const TABS = ['general', 'branding', 'team'] as const
 type Tab = (typeof TABS)[number]
@@ -193,7 +194,7 @@ function TeamSettings() {
       { email: email.trim() },
       {
         onSuccess: () => setEmail(''),
-        onError: (e) => setError(e.message),
+        onError: (e) => setError(getErrorMessage(e)),
       }
     )
   }
@@ -202,7 +203,7 @@ function TeamSettings() {
     setRemovingId(member.id)
     removeMember(member.id, {
       onSettled: () => setRemovingId(null),
-      onError: (e) => alert(e.message),
+      onError: (e) => alert(getErrorMessage(e)),
     })
   }
 
@@ -427,7 +428,7 @@ function BrandingSettings() {
               <span className="text-xs text-emerald-600 font-medium">Saved</span>
             )}
             {saveError && (
-              <span className="text-xs text-destructive">{saveError.message}</span>
+              <span className="text-xs text-destructive">{getErrorMessage(saveError)}</span>
             )}
           </div>
           <button

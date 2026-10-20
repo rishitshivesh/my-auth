@@ -10,8 +10,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  UnauthorizedException,
-  BadRequestException,
   Headers,
   Delete,
   Put,
@@ -55,6 +53,8 @@ import { buildOpenIdConfiguration } from "./openid-configuration";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { logger } from "@/common/logger";
 import { OAuthClient } from "@repo/database";
+import { ApiException } from "@/common/http";
+import { oauthError } from "./oauth-errors";
 
 interface JwtUser {
   sub: string;
@@ -141,7 +141,14 @@ export class OAuthController {
     }
 
     // Validate client
-    const client = await this.clientService.getClient(query.client_id);
+    const client = await this.clientService
+      .getClient(query.client_id)
+      .catch((error: unknown) => {
+        if (error instanceof ApiException && error.code === "RESOURCE_NOT_FOUND") {
+          throw oauthError("invalid_request", "Unknown client_id");
+        }
+        throw error;
+      });
 
     // Validate redirect URI
     await this.clientService.validateRedirectUri(client, query.redirect_uri);
@@ -163,10 +170,10 @@ export class OAuthController {
     // "plain" under RFC 7636, so it must be explicit.
     const pkceRequired = client.requirePkce || client.clientType === "public";
     if (pkceRequired && !query.code_challenge) {
-      throw new BadRequestException("code_challenge required for this client");
+      throw oauthError("invalid_request", "code_challenge required for this client");
     }
     if (query.code_challenge && query.code_challenge_method !== "S256") {
-      throw new BadRequestException("code_challenge_method must be S256");
+      throw oauthError("invalid_request", "code_challenge_method must be S256");
     }
 
     // Check if consent is required
@@ -263,7 +270,7 @@ export class OAuthController {
     );
 
     if (!clientId) {
-      throw new BadRequestException("client_id required");
+      throw oauthError("invalid_request", "client_id required");
     }
 
     const client = await this.clientService.validateClient(
@@ -301,7 +308,7 @@ export class OAuthController {
         );
 
       default:
-        throw new BadRequestException("unsupported_grant_type");
+        throw oauthError("unsupported_grant_type", "Unsupported grant_type");
     }
   }
 
@@ -316,11 +323,11 @@ export class OAuthController {
     userAgent?: string,
   ): Promise<TokenResponseDto> {
     if (!body.code) {
-      throw new BadRequestException("code required");
+      throw oauthError("invalid_request", "code required");
     }
 
     if (!body.redirect_uri) {
-      throw new BadRequestException("redirect_uri required");
+      throw oauthError("invalid_request", "redirect_uri required");
     }
 
     // Validate and consume authorization code
@@ -385,7 +392,7 @@ export class OAuthController {
     userAgent?: string,
   ): Promise<TokenResponseDto> {
     if (!body.refresh_token) {
-      throw new BadRequestException("refresh_token required");
+      throw oauthError("invalid_request", "refresh_token required");
     }
 
     // Validate refresh token
@@ -395,7 +402,7 @@ export class OAuthController {
 
     // Verify client matches
     if (refreshToken.clientId !== client.id) {
-      throw new UnauthorizedException("client_mismatch");
+      throw oauthError("invalid_grant", "Refresh token was issued to another client");
     }
 
     // Rotate refresh token
@@ -436,9 +443,7 @@ export class OAuthController {
   ): Promise<TokenResponseDto> {
     // Client must be confidential
     if (client.clientType !== "confidential") {
-      throw new BadRequestException(
-        "client_credentials requires confidential client",
-      );
+      throw oauthError("unauthorized_client", "client_credentials requires a confidential client");
     }
 
     // Validate scopes
@@ -526,7 +531,7 @@ export class OAuthController {
         await this.clientService.validateClient(clientId, clientSecret);
       } catch {
         logger.warn({ clientId }, "Revoke attempt with invalid client credentials");
-        throw new UnauthorizedException("Invalid client credentials");
+        throw oauthError("invalid_client", "Invalid client credentials");
       }
     }
 
@@ -563,7 +568,7 @@ export class OAuthController {
   ): Promise<IntrospectTokenResponseDto> {
     const { clientId, clientSecret } = this.parseClientCredentials(authHeader);
     if (!clientId) {
-      throw new UnauthorizedException("Client authentication required");
+      throw oauthError("invalid_client", "Client authentication required");
     }
     await this.clientService.validateClient(clientId, clientSecret);
 

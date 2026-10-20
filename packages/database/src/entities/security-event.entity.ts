@@ -55,6 +55,11 @@ export const SecurityEventType = {
   // MFA
   TOTP_ENABLED: "mfa.totp_enabled",
   TOTP_DISABLED: "mfa.totp_disabled",
+  // Session / account protection
+  SESSION_REFRESH_REUSE_DETECTED: "session.refresh_reuse_detected",
+  PASSKEY_CLONED: "passkey.cloned",
+  ACCOUNT_LOCKED: "account.locked",
+  OWNERSHIP_TRANSFERRED: "tenant.ownership_transferred",
   // Brute force
   BRUTE_FORCE_THRESHOLD: "security.brute_force_threshold",
   // Email
@@ -88,6 +93,7 @@ export type SecurityEventType =
 @Index(["severity"])
 @Index(["createdAt"])
 @Index(["ipAddress"])
+@Index(["requestId"])
 export class SecurityEvent extends BaseEntity {
   @Column({ type: "uuid", nullable: true, name: "user_id" })
   userId?: string;
@@ -217,4 +223,23 @@ export class SecurityEvent extends BaseEntity {
     comment: "Type of the affected entity",
   })
   resourceType?: string;
+
+  /** Correlation id of the HTTP request that produced this event. */
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    name: "request_id",
+    comment: "x-request-id of the originating request",
+  })
+  requestId?: string;
+
+  @Column({
+    type: "varchar",
+    length: 16,
+    default: "success",
+    name: "outcome",
+    comment: "success | failure",
+  })
+  outcome!: "success" | "failure";
 }

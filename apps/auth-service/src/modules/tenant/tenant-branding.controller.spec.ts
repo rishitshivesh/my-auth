@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, PayloadTooLargeException, UnsupportedMediaTypeException } from '@nestjs/common';
+import { UnsupportedMediaTypeException } from '@nestjs/common';
 import { TenantBrandingController } from './tenant-branding.controller';
 import { TenantBrandingService } from './tenant-branding.service';
 import { SecurityEventService } from '@/common/service/security-event.service';
@@ -140,15 +140,11 @@ describe('TenantBrandingController – logo upload guards', () => {
       size: 501 * 1024,
     } as Express.Multer.File;
 
-    await expect(controller.uploadLogo(mockReq as any, file)).rejects.toThrow(
-      PayloadTooLargeException,
-    );
+    await expect(controller.uploadLogo(mockReq as any, file)).rejects.toMatchObject({ code: 'UPLOAD_TOO_LARGE' });
   });
 
   it('throws BadRequestException when no file is provided', async () => {
-    await expect(controller.uploadLogo(mockReq as any, undefined)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(controller.uploadLogo(mockReq as any, undefined)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('returns correct logoUrl on success', async () => {

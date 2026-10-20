@@ -11,8 +11,7 @@ import { ConfigModule } from "@nestjs/config";
 import { SecurityEvent, Tenant } from "@repo/database";
 import { EmailService } from "./email.service";
 import { EmailController } from "./email.controller";
-import { NodeMailerProvider } from "./providers/nodemailer.provider";
-import { SESProvider } from "./providers/ses.provider";
+import { MailModule } from "@/modules/mail/mail.module";
 import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 
@@ -21,13 +20,10 @@ import { SecurityEventService } from "@/common/service/security-event.service";
     ConfigModule,
     TypeOrmModule.forFeature([Tenant, SecurityEvent]),
     SecurityEventModule,
+    MailModule,
   ],
   controllers: [EmailController],
-  providers: [
-    EmailService,
-    NodeMailerProvider,
-    SESProvider,
-  ],
+  providers: [EmailService],
   exports: [EmailService],
 })
 export class EmailModule {}

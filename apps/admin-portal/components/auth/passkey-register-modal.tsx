@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button, Input, Label, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@repo/ui"
 import { Key, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import { useAuth } from "@scrolloop/sdk"
+import { getErrorMessage, SentryApiError } from "@/lib/api-error";
 
 type RegistrationStatus =
   | 'idle'
@@ -52,12 +53,12 @@ export function PasskeyRegisterModal({
         method: 'POST',
       })
       if (!res.ok) {
-        throw new Error(res.data?.message || 'Failed to contact server')
+        throw SentryApiError.fromResponse(res)
       }
       options = res.data?.data || res.data
     } catch (err: any) {
       setStatus('error')
-      setErrorMessage(err.message || 'Failed to start registration')
+      setErrorMessage(getErrorMessage(err, 'Failed to start registration'))
       return
     }
 
@@ -86,7 +87,7 @@ export function PasskeyRegisterModal({
       setStatus('success')
     } catch (err: any) {
       setStatus('error')
-      setErrorMessage(err.message || 'Verification failed. Please try again.')
+      setErrorMessage(getErrorMessage(err, 'Verification failed. Please try again.'))
     }
   }
 

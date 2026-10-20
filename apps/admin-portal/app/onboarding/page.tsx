@@ -10,6 +10,7 @@ import { PasswordStrength } from "@/components/onboarding/PasswordStrength";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
 import { authClient } from "@/lib/auth-client";
 import { withErrorHandler } from "@/lib/with-error-handler";
+import { getErrorMessage } from "@/lib/api-error";
 
 const AUTH_SERVICE_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:4000";
@@ -132,12 +133,6 @@ export default function OnboardingPage() {
           },
         });
 
-        if (res.status === 409) {
-          throw new Error("That workspace slug was just taken. Try another.");
-        }
-        if (res.status === 429) {
-          throw new Error("Too many attempts. Please try again later.");
-        }
         return res;
       },
       { showErrorToast: true }
@@ -148,7 +143,7 @@ export default function OnboardingPage() {
       setCreatedSlug(slug);
       goTo(3);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setError(getErrorMessage(err, "Something went wrong. Try again."));
     } finally {
       setIsLoading(false);
     }

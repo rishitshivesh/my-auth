@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
   Delete,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { JwtService } from "@nestjs/jwt";
@@ -20,6 +19,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
 import * as crypto from "crypto";
 import type { StringValue } from "ms";
+import { ApiException } from "@/common/http";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
@@ -58,6 +58,15 @@ export class SocialAuthController {
     private readonly jwksService: JwksService,
   ) {}
 
+  /** A provider with no client id/callback configured is simply not offered to this deployment. */
+  private providerConfig(key: string): string {
+    const value = this.configService.get<string>(key);
+    if (!value) {
+      throw new ApiException("SOCIAL_PROVIDER_DISABLED");
+    }
+    return value;
+  }
+
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
     const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
@@ -88,8 +97,8 @@ export class SocialAuthController {
     const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
 
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow("INTERNAL_GOOGLE_CLIENT_ID"),
-      redirect_uri: this.configService.getOrThrow("INTERNAL_GOOGLE_CALLBACK_URL"),
+      client_id: this.providerConfig("INTERNAL_GOOGLE_CLIENT_ID"),
+      redirect_uri: this.providerConfig("INTERNAL_GOOGLE_CALLBACK_URL"),
       response_type: "code",
       scope: "openid email profile",
       access_type: "offline",
@@ -127,8 +136,8 @@ export class SocialAuthController {
     const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
 
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow("INTERNAL_GITHUB_CLIENT_ID"),
-      redirect_uri: this.configService.getOrThrow("INTERNAL_GITHUB_CALLBACK_URL"),
+      client_id: this.providerConfig("INTERNAL_GITHUB_CLIENT_ID"),
+      redirect_uri: this.providerConfig("INTERNAL_GITHUB_CALLBACK_URL"),
       scope: "user:email",
       state,
     });
@@ -162,8 +171,8 @@ export class SocialAuthController {
     const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
 
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow("INTERNAL_MICROSOFT_CLIENT_ID"),
-      redirect_uri: this.configService.getOrThrow("INTERNAL_MICROSOFT_CALLBACK_URL"),
+      client_id: this.providerConfig("INTERNAL_MICROSOFT_CLIENT_ID"),
+      redirect_uri: this.providerConfig("INTERNAL_MICROSOFT_CALLBACK_URL"),
       response_type: "code",
       scope: "openid email profile User.Read",
       response_mode: "query",
@@ -333,7 +342,7 @@ export class SocialAuthController {
         expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       };
     } catch {
-      throw new UnauthorizedException("Invalid or expired completion token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
   }
 
@@ -398,7 +407,7 @@ export class SocialAuthController {
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow<string>("INTERNAL_GOOGLE_CLIENT_ID"),
+      client_id: this.providerConfig("INTERNAL_GOOGLE_CLIENT_ID"),
       redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/google/callback`,
       response_type: "code",
       scope: "email profile",
@@ -423,7 +432,7 @@ export class SocialAuthController {
       }),
     ).toString("base64url");
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow<string>("INTERNAL_GITHUB_CLIENT_ID"),
+      client_id: this.providerConfig("INTERNAL_GITHUB_CLIENT_ID"),
       redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/github/callback`,
       response_type: "code",
       scope: "user:email",
@@ -452,7 +461,7 @@ export class SocialAuthController {
       "common",
     );
     const params = new URLSearchParams({
-      client_id: this.configService.getOrThrow<string>("INTERNAL_MICROSOFT_CLIENT_ID"),
+      client_id: this.providerConfig("INTERNAL_MICROSOFT_CLIENT_ID"),
       redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/microsoft/callback`,
       response_type: "code",
       scope: "openid email profile",

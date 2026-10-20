@@ -8,7 +8,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  UnauthorizedException,
   Param,
 } from "@nestjs/common";
 import {
@@ -17,7 +16,9 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from "@nestjs/swagger";
+import { ApiException } from "@/common/http";
 import { MfaService } from "./mfa.service";
+import { mfaContextFromRequest } from "./mfa-context";
 import {
   VerifyTotpDto,
   VerifyBackupCodeDto,
@@ -37,6 +38,8 @@ interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean };
   ip?: string;
+  requestId?: string;
+  get?(name: string): string | undefined;
   route?: { path: string };
   params?: Record<string, string>;
 }
@@ -107,6 +110,7 @@ export class MfaController {
       userId,
       tenantId,
       dto.token,
+      mfaContextFromRequest(req),
     );
 
     return {
@@ -129,7 +133,7 @@ export class MfaController {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
-    await this.mfaService.disableTotp(userId, tenantId);
+    await this.mfaService.disableTotp(userId, tenantId, mfaContextFromRequest(req));
 
     return { message: "TOTP MFA disabled successfully" };
   }
@@ -242,7 +246,7 @@ export class MfaController {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
-    await this.mfaService.disableAllMfa(userId, tenantId);
+    await this.mfaService.disableAllMfa(userId, tenantId, mfaContextFromRequest(req));
 
     return { message: "All MFA methods disabled successfully" };
   }
@@ -291,7 +295,7 @@ export class MfaController {
     );
 
     if (!verified) {
-      throw new UnauthorizedException("Invalid or expired OTP code");
+      throw new ApiException("AUTH_OTP_INVALID");
     }
 
     return { message: "Email OTP verified" };
@@ -375,7 +379,12 @@ export class MfaController {
     const userId = req.user.sub;
     const tenantId = req.tenantId!;
 
-    await this.webauthnService.deleteCredential(userId, tenantId, credentialId);
+    await this.webauthnService.deleteCredential(
+      userId,
+      tenantId,
+      credentialId,
+      mfaContextFromRequest(req),
+    );
 
     return {
       success: true,

@@ -1,11 +1,6 @@
+import { randomUUID } from "crypto";
 import type { StringValue } from 'ms';
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-  NotFoundException,
-  ConflictException,
-} from "@nestjs/common";
+import { HttpException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { SessionRepository } from "@/core/database/session.repository";
@@ -25,7 +20,6 @@ import {
   SecurityEventService,
 } from "@/common/service/security-event.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
-import { PasswordService } from "@repo/security";
 import { EmailService } from "../email/email.service";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
@@ -39,6 +33,15 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { GetProvidersResponseDto, SocialProviderDto, LoginIntentResponseDto } from "./auth.dto";
 import { logger } from "@/common/logger";
+import { ApiException } from "@/common/http";
+import {
+  DomainEventName,
+  DomainEventsService,
+} from "@/common/service/domain-events.service";
+import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
+import { LoginThrottleService } from "./login-throttle.service";
+import { assertPasswordPolicy } from "./password-policy";
+import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password-hashing";
 /**
  * Authentication Service (Updated for Multi-Tenant)
  *
@@ -86,7 +89,6 @@ export class AuthService {
     private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly passwordService: PasswordService,
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
     private readonly bruteForceService: BruteForceService,
@@ -97,6 +99,9 @@ export class AuthService {
     private readonly securityEventService: SecurityEventService,
     private readonly jwksService: JwksService,
     private readonly redisService: RedisService,
+    private readonly loginThrottle: LoginThrottleService,
+    private readonly domainEvents: DomainEventsService,
+    private readonly passwordEffects: PasswordChangeEffectsService,
   ) {}
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
@@ -132,6 +137,7 @@ export class AuthService {
     tenantId: string,
     sessionId: string,
     tenant?: Tenant,
+    authTime: number = Math.floor(Date.now() / 1000),
   ): Promise<Record<string, unknown>> {
     const [groups, resolvedTenant] = await Promise.all([
       this.getUserGroups(userId, tenantId),
@@ -146,6 +152,9 @@ export class AuthService {
       tenantSlug: resolvedTenant?.slug ?? '',
       groups,
       sessionId,
+      // Epoch seconds of the login this session started with; RecentAuthGuard
+      // compares it to RECENT_AUTH_WINDOW_SECONDS for sensitive actions.
+      authTime,
     };
   }
 
@@ -182,19 +191,14 @@ export class AuthService {
     });
 
     if (!tenant) {
-      throw new BadRequestException("Invalid or inactive tenant");
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
-    // Validate password strength
-    const validation = PasswordService.validateStrength(data.password);
+    assertPasswordPolicy(data.password, { email: data.email });
 
-    if (!validation.isValid) {
-      throw new BadRequestException({
-        message: "Password does not meet security requirements",
-        errors: validation.errors,
-        score: validation.score,
-      });
-    }
+    // Hash before looking the email up so a taken email costs the same time
+    // as a free one.
+    const passwordHash = await hashPassword(data.password);
 
     // Check if user already exists IN THIS TENANT
     const existingUser = await this.userRepository.findOne({
@@ -204,24 +208,30 @@ export class AuthService {
       },
     });
 
+    // Same response whether or not the email is taken, so registration cannot
+    // be used to discover which emails have accounts.
+    const response = {
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      message:
+        "Registration successful. Please check your email to verify your account.",
+    };
+
     if (existingUser) {
       // Log failed registration attempt (tenant-scoped)
       this.securityEventService.log({
         tenantId: data.tenantId,
+        userId: existingUser.id,
         eventType: SecurityEventType.REGISTRATION_FAILED,
         severity: "warning",
         ipAddress: data.ip,
         userAgent: data.userAgent,
-        metadata: { reason: "email_exists", email: data.email },
+        metadata: { reason: "email_exists" },
       });
 
-      throw new ConflictException(
-        "User with this email already exists in this tenant",
-      );
+      return response;
     }
-
-    // Hash password with Argon2id
-    const passwordHash = await PasswordService.hash(data.password);
 
     // Generate email verification token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
@@ -248,20 +258,13 @@ export class AuthService {
       severity: "info",
       ipAddress: data.ip,
       userAgent: data.userAgent,
-      metadata: { email: savedUser.email },
+      metadata: {},
     });
 
     // Send welcome and verification email
     await this.emailService.sendWelcomeEmail(savedUser, emailVerificationToken);
 
-    return {
-      id: savedUser.id,
-      email: savedUser.email,
-      firstName: savedUser.firstName,
-      lastName: savedUser.lastName,
-      message:
-        "Registration successful. Please check your email to verify your account.",
-    };
+    return response;
   }
 
   /**
@@ -281,62 +284,41 @@ export class AuthService {
   > {
     const { tenantId, email, password, ip, userAgent } = data;
 
+    // Charge the attempt before anything slow runs (parallel guesses must not
+    // all slip past a check-then-record gap). A blocked attempt is answered
+    // exactly like a wrong password.
+    const { blocked } = await this.loginThrottle.charge(tenantId, email, ip);
+
     // Find user — use QueryBuilder to avoid TypeORM 0.3.x DISTINCT pagination bug
     // with findOne+select(object form)+relations that causes pg "insufficient data" errors
-    const user = await this.userRepository
-      .createQueryBuilder("user")
-      .addSelect("user.passwordHash") // Force-select the hidden field
-      .leftJoinAndSelect("user.tenant", "tenant")
-      .where("user.email = :email", { email })
-      .andWhere("user.tenantId = :tenantId", { tenantId })
-      .getOne();
+    const user = blocked
+      ? null
+      : await this.userRepository
+          .createQueryBuilder("user")
+          .addSelect("user.passwordHash") // Force-select the hidden field
+          .leftJoinAndSelect("user.tenant", "tenant")
+          .where("user.email = :email", { email })
+          .andWhere("user.tenantId = :tenantId", { tenantId })
+          .getOne();
 
-    logger.info({ email, tenantId, userFound: !!user }, "Login attempt");
-
-    if (!user) {
-      this.securityEventService.log({
-        tenantId,
-        eventType: SecurityEventType.LOGIN_FAILED,
-        severity: "critical",
-        ipAddress: ip,
-        userAgent,
-        metadata: { reason: "user_not_found" },
-      });
-      throw new UnauthorizedException("Invalid email or password");
+    if (user) {
+      // An expired lock must not leave a stale failure counter behind.
+      await this.bruteForceService.clearExpiredLock(user);
     }
 
+    // Unknown email, passwordless (social-only) account and throttled attempts
+    // all pay for one Argon2 verification so timing reveals nothing.
+    const isValid = user?.passwordHash
+      ? await verifyPassword(user.passwordHash, password)
+      : await verifyAgainstDummy(password);
+
+    if (!user || !isValid) {
+      return this.rejectLogin(user, { tenantId, ip, userAgent }, blocked ? "throttled" : user ? "invalid_password" : "user_not_found");
+    }
+
+    // Only someone who knows the password learns the account is locked.
     await this.bruteForceService.checkAccountLock(user);
-
-    logger.info({ userId: user.id, hasPassword: !!user.passwordHash }, "User found");
-
-    if (!user.passwordHash) {
-      throw new BadRequestException(
-        "Social Provider was used to login. Please use the same or link to this account.",
-      );
-    }
-
-    // Verify password
-    const isValid = await PasswordService.verify(user.passwordHash, password);
-
-    logger.info({ isValid }, "Password check");
-
-    if (!isValid) {
-      await this.bruteForceService.recordFailedAttempt(user, tenantId, ip);
-      this.securityEventService.log({
-        tenantId,
-        userId: user.id,
-        actorEmail: user.email,
-        eventType: SecurityEventType.LOGIN_FAILED,
-        severity: "critical",
-        ipAddress: ip,
-        userAgent,
-        // NOTE: `password` is intentionally omitted — sanitizeMetadata strips it
-        // anyway, but we never pass sensitive values in the first place.
-        metadata: { reason: "invalid_password" },
-      });
-      throw new UnauthorizedException("Invalid email or password");
-    }
-
+    await this.loginThrottle.refund(tenantId, email);
     await this.bruteForceService.resetFailedAttempts(user);
 
     // Check if email verified (if required)
@@ -344,15 +326,7 @@ export class AuthService {
       !user.emailVerified &&
       user.tenant.featureFlags?.emailVerificationRequired
     ) {
-      throw new UnauthorizedException("Please verify your email first");
-    }
-
-    // Check if account is active
-    if (
-      !user.emailVerified &&
-      user.tenant.featureFlags?.emailVerificationRequired
-    ) {
-      throw new UnauthorizedException("Please verify your email first");
+      throw new ApiException("AUTH_EMAIL_NOT_VERIFIED");
     }
 
     const mfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
@@ -365,6 +339,8 @@ export class AuthService {
           email: user.email,
           tenantId,
           type: "mfa_pending",
+          // Identifies this MFA challenge so wrong codes can be counted per challenge.
+          jti: randomUUID(),
         },
         "5m",
         tenantId,
@@ -484,6 +460,36 @@ export class AuthService {
         emailVerified: user.emailVerified,
       },
     };
+  }
+
+  /**
+   * Single exit for every failed password login. Records the failure against
+   * the account when there is one (and it is not already locked), then answers
+   * with the same AUTH_INVALID_CREDENTIALS whatever the reason.
+   */
+  private async rejectLogin(
+    user: User | null,
+    ctx: { tenantId: string; ip: string; userAgent: string },
+    reason: "throttled" | "invalid_password" | "user_not_found",
+  ): Promise<never> {
+    this.securityEventService.log({
+      tenantId: ctx.tenantId,
+      userId: user?.id,
+      actorEmail: user?.email,
+      eventType: SecurityEventType.LOGIN_FAILED,
+      severity: reason === "throttled" ? "warning" : "critical",
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+      // NOTE: `password` is intentionally omitted — never pass sensitive values.
+      outcome: "failure",
+      metadata: { reason },
+    });
+
+    if (user && reason === "invalid_password" && !this.bruteForceService.isLocked(user)) {
+      // Throws AUTH_INVALID_CREDENTIALS after counting the failure / locking.
+      await this.bruteForceService.recordFailedAttempt(user, ctx.tenantId, ctx.ip);
+    }
+    throw new ApiException("AUTH_INVALID_CREDENTIALS");
   }
 
   /**
@@ -628,7 +634,7 @@ export class AuthService {
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException("Invalid or expired magic link");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     // Clear the token (one-time use) and mark email as verified
@@ -710,6 +716,7 @@ export class AuthService {
     otp: string,
     newPassword: string,
     ipAddress = "0.0.0.0",
+    meta: { userAgent?: string; requestId?: string } = {},
   ) {
     // The code is bound to ONE account (tenant + email). Looking users up by
     // code alone let an attacker brute-force the 6-digit space and reset the
@@ -723,8 +730,7 @@ export class AuthService {
       .andWhere("LOWER(user.email) = LOWER(:email)", { email })
       .getOne();
 
-    const invalid = () =>
-      new BadRequestException("Invalid or expired password reset code");
+    const invalid = () => new ApiException("AUTH_OTP_INVALID");
 
     if (
       !user ||
@@ -775,28 +781,25 @@ export class AuthService {
       throw invalid();
     }
 
-    // Validate new password
-    const validation = PasswordService.validateStrength(newPassword);
-    if (!validation.isValid) {
-      throw new BadRequestException({
-        message: "Password does not meet security requirements",
-        errors: validation.errors,
-      });
-    }
+    assertPasswordPolicy(newPassword, { email: user.email });
 
     // Check password history
     const passwordHistory = user.passwordHistory || [];
     for (const oldHash of passwordHistory) {
-      const isReused = await PasswordService.verify(oldHash, newPassword);
+      const isReused = await verifyPassword(oldHash, newPassword);
       if (isReused) {
-        throw new BadRequestException(
-          "Password has been used recently. Please choose a different password.",
-        );
+        throw new ApiException("PASSWORD_POLICY", {
+          errors: [
+            {
+              field: "password",
+              message: "Password has been used recently. Please choose a different password.",
+            },
+          ],
+        });
       }
     }
 
-    // Hash new password
-    const newPasswordHash = await PasswordService.hash(newPassword);
+    const newPasswordHash = await hashPassword(newPassword);
 
     // Update password and history
     const updatedHistory = [
@@ -817,25 +820,16 @@ export class AuthService {
     );
     await this.redisService.delete(tenantId, PASSWORD_RESET_ATTEMPTS_RESOURCE, user.id);
 
-    // Log password reset
-    this.securityEventService.log({
-      userId: user.id,
-      tenantId: user.tenantId,
-      actorEmail: user.email,
+    // Revoke every session and refresh token IN THIS TENANT (force re-login),
+    // record the event with the request id and email the owner.
+    await this.passwordEffects.afterPasswordChange({
+      user,
+      ip: ipAddress,
+      userAgent: meta.userAgent ?? "unknown",
+      requestId: meta.requestId,
+      reason: "password_reset",
       eventType: SecurityEventType.PASSWORD_RESET_COMPLETED,
-      severity: "info",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
     });
-
-    // Send password changed confirmation email
-    await this.emailService.sendPasswordChangedEmail(user);
-
-    // Revoke every session and refresh token IN THIS TENANT (force re-login).
-    // SessionService clears the Redis session cache too — updating only the
-    // sessions table left cached sessions valid for up to SESSION_TTL.
-    await this.sessionService.revokeAllUserSessions(tenantId, user.id, "password_reset");
-    await this.oauthRefreshTokenService.revokeAllUserTokens(user.id, tenantId, "password_reset");
   }
 
   /**
@@ -851,7 +845,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException("Invalid or expired verification token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     await this.userRepository.update(
@@ -890,8 +884,9 @@ export class AuthService {
       return;
     }
 
+    // Silent, like an unknown email: the response must not say which it is.
     if (user.emailVerified) {
-      throw new BadRequestException("Email is already verified");
+      return;
     }
 
     // Generate new token
@@ -919,6 +914,7 @@ export class AuthService {
     refreshToken: string,
     ip: string,
     userAgent: string,
+    requestId?: string,
   ): Promise<{ accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }> {
     // Use OAuthRefreshTokenService for rotation
     let accessTokenPayload: Record<string, unknown>;
@@ -943,8 +939,17 @@ export class AuthService {
           reason: err instanceof Error ? err.message : "unknown",
         },
       });
+      if (this.isRefreshReuse(err)) {
+        await this.publishRefreshReuse(tenantId, refreshToken, ip, requestId);
+      }
       throw err;
     }
+
+    // Refreshing is not re-authenticating: keep the original login time.
+    const loginSession = await this.sessionRepository.findOne({
+      where: { id: accessTokenPayload.sessionId as string, tenantId },
+      select: { id: true, createdAt: true },
+    });
 
     // Enrich payload with groups and tenantSlug
     const enrichedPayload = await this.buildAccessTokenPayload(
@@ -952,6 +957,8 @@ export class AuthService {
       accessTokenPayload.email as string,
       accessTokenPayload.tenantId as string,
       accessTokenPayload.sessionId as string,
+      undefined,
+      loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0,
     );
     // Generate new access token
     const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
@@ -999,6 +1006,48 @@ export class AuthService {
     };
   }
 
+  private isRefreshReuse(err: unknown): boolean {
+    if (err instanceof ApiException) return err.code === "AUTH_REFRESH_REUSED";
+    return err instanceof HttpException && /reuse detected/i.test(err.message);
+  }
+
+  /**
+   * Tells the account owner a rotated-out refresh token was replayed (the
+   * family has already been revoked by the rotation service). Never throws:
+   * the caller must still answer with the original refresh failure.
+   */
+  private async publishRefreshReuse(
+    tenantId: string,
+    presentedToken: string,
+    ip: string,
+    requestId?: string,
+  ): Promise<void> {
+    try {
+      const tokenHash = crypto.createHash("sha256").update(presentedToken).digest("hex");
+      const stored = await this.oauthRefreshTokenRepository.findOne({
+        where: { tenantId, tokenHash },
+        select: { id: true, userId: true },
+      });
+      if (!stored) return;
+      const user = await this.userRepository.findOne({
+        where: { id: stored.userId, tenantId },
+        relations: ["tenant"],
+      });
+      if (!user) return;
+      this.domainEvents.publish(DomainEventName.SESSION_REFRESH_REUSE_DETECTED, {
+        tenantId,
+        userId: user.id,
+        email: user.email,
+        name: user.firstName || undefined,
+        tenantName: user.tenant?.name,
+        ip,
+        requestId,
+      });
+    } catch (err: unknown) {
+      logger.error({ err }, "Failed to publish refresh reuse event");
+    }
+  }
+
   /**
    * Get current user (TENANT SCOPED)
    */
@@ -1012,7 +1061,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return {
@@ -1082,6 +1131,28 @@ export class AuthService {
     logger.info({ familyId }, "Revoked all sessions in family");
   }
 
+  /** Verifies the short-lived mfa_pending token issued after the password step. */
+  private async verifyMfaTempToken(tempToken: string): Promise<Record<string, unknown>> {
+    let payload: Record<string, unknown>;
+    try {
+      const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
+      payload = this.jwtService.verify(tempToken, {
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
+        algorithms: ['RS256'],
+      }) as Record<string, unknown>;
+    } catch (err: unknown) {
+      throw new ApiException(
+        err instanceof Error && err.name === "TokenExpiredError"
+          ? "AUTH_TOKEN_EXPIRED"
+          : "AUTH_TOKEN_INVALID",
+      );
+    }
+    if (payload.type !== "mfa_pending") {
+      throw new ApiException("AUTH_TOKEN_INVALID");
+    }
+    return payload;
+  }
+
   /**
    * Verify MFA code and complete login
    */
@@ -1092,16 +1163,7 @@ export class AuthService {
     ip: string,
     userAgent: string,
   ) {
-    // Step 1: Verify temporary token
-    const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
-    const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
-      algorithms: ['RS256'],
-    }) as Record<string, unknown>;
-
-    if (payload.type !== "mfa_pending") {
-      throw new UnauthorizedException("Invalid token type");
-    }
+    const payload = await this.verifyMfaTempToken(tempToken);
 
     logger.info({ userId: payload.sub }, "Verifying MFA for user");
 
@@ -1110,10 +1172,11 @@ export class AuthService {
       payload.sub as string,
       tenantId,
       code,
+      typeof payload.jti === "string" ? payload.jti : undefined,
     );
 
     if (!verified) {
-      throw new UnauthorizedException("Invalid MFA code");
+      throw new ApiException("AUTH_MFA_INVALID");
     }
 
     // Step 3: Generate real session and tokens
@@ -1158,16 +1221,7 @@ export class AuthService {
     ip: string,
     userAgent: string,
   ) {
-    // Step 1: Verify temporary token
-    const publicKey = await this.jwksService.getPublicKeyForToken(tempToken);
-    const payload = this.jwtService.verify(tempToken, {
-      publicKey: publicKey.export({ type: 'spki', format: 'pem' }) as string,
-      algorithms: ['RS256'],
-    }) as Record<string, unknown>;
-
-    if (payload.type !== "mfa_pending") {
-      throw new UnauthorizedException("Invalid token type");
-    }
+    const payload = await this.verifyMfaTempToken(tempToken);
 
     logger.info({ userId: payload.sub }, "Verifying backup code for user");
 
@@ -1176,10 +1230,11 @@ export class AuthService {
       payload.sub as string,
       tenantId,
       code,
+      typeof payload.jti === "string" ? payload.jti : undefined,
     );
 
     if (!verified) {
-      throw new UnauthorizedException("Invalid backup code");
+      throw new ApiException("AUTH_MFA_INVALID");
     }
 
     // Step 3: Generate real session and tokens
@@ -1245,7 +1300,7 @@ export class AuthService {
 
     if (!user) {
       // Don't reveal if user exists
-      throw new UnauthorizedException("Invalid credentials");
+      throw new ApiException("AUTH_INVALID_CREDENTIALS");
     }
 
     // Generate authentication options via WebAuthnService (returns options + nonce)
@@ -1289,7 +1344,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new ApiException("AUTH_INVALID_CREDENTIALS");
     }
 
     // Verify WebAuthn response (passes nonce so service can look up challenge)
@@ -1312,12 +1367,12 @@ export class AuthService {
         metadata: { reason: "webauthn_verification_failed" },
       });
 
-      throw new UnauthorizedException("WebAuthn verification failed");
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     // Check if account is active
     if (!user.isActive) {
-      throw new UnauthorizedException("Account is disabled");
+      throw new ApiException("USER_SUSPENDED");
     }
 
     // MFA enforcement: check before issuing session
@@ -1405,7 +1460,7 @@ export class AuthService {
     });
 
     if (!tenant) {
-      throw new Error('Tenant not found');
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
     // Find user
@@ -1604,8 +1659,7 @@ export class AuthService {
     const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
 
     if (!tenant) {
-      const { NotFoundException } = await import('@nestjs/common');
-      throw new NotFoundException('Tenant not found');
+      throw new ApiException("TENANT_NOT_FOUND");
     }
 
     // Query the dedicated tenant_social_providers table for explicitly configured providers
@@ -1664,13 +1718,13 @@ export class AuthService {
     });
 
     if (!invite) {
-      throw new NotFoundException("Invitation not found");
+      throw new ApiException("INVITE_INVALID");
     }
     if (invite.acceptedAt) {
-      throw new BadRequestException("This invitation has already been used");
+      throw new ApiException("INVITE_INVALID", { detail: "This invitation has already been used." });
     }
     if (invite.expiresAt < new Date()) {
-      throw new BadRequestException("This invitation has expired");
+      throw new ApiException("INVITE_INVALID", { detail: "This invitation has expired." });
     }
 
     return {
@@ -1697,40 +1751,33 @@ export class AuthService {
     });
 
     if (!invite) {
-      throw new NotFoundException("Invitation not found");
+      throw new ApiException("INVITE_INVALID");
     }
     if (invite.acceptedAt) {
-      throw new BadRequestException("This invitation has already been used");
+      throw new ApiException("INVITE_INVALID", { detail: "This invitation has already been used." });
     }
     if (invite.expiresAt < new Date()) {
-      throw new BadRequestException("This invitation has expired");
+      throw new ApiException("INVITE_INVALID", { detail: "This invitation has expired." });
     }
 
     const tenant = invite.tenant;
     if (!tenant || !tenant.active) {
-      throw new BadRequestException("The workspace associated with this invitation is no longer active");
+      throw new ApiException("TENANT_SUSPENDED");
     }
 
     const existing = await this.userRepository.findOne({
       where: { email: invite.email, tenantId: tenant.id },
     });
     if (existing) {
-      throw new ConflictException("An account with this email already exists in this workspace");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "An account with this email already exists in this workspace." });
     }
 
-    const validation = PasswordService.validateStrength(data.password);
-    if (!validation.isValid) {
-      throw new BadRequestException({
-        message: "Password does not meet security requirements",
-        errors: validation.errors,
-        score: validation.score,
-      });
-    }
+    assertPasswordPolicy(data.password, { email: invite.email });
 
     const [firstName, ...rest] = data.name.trim().split(' ');
     const lastName = rest.join(' ') || undefined;
 
-    const passwordHash = await PasswordService.hash(data.password);
+    const passwordHash = await hashPassword(data.password);
 
     const user = this.userRepository.create({
       tenantId: tenant.id,

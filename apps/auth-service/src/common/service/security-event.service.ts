@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { SecurityEvent, SecurityEventType } from "@repo/database";
+import { redactMetadata } from "./audit-redaction";
 
 export interface LogSecurityEventDto {
   tenantId: string;
@@ -19,6 +20,10 @@ export interface LogSecurityEventDto {
   /** Type of the affected entity: 'session', 'user', 'api_key', … */
   resourceType?: string;
   metadata?: Record<string, unknown>;
+  /** Correlation id from the originating request (x-request-id). */
+  requestId?: string;
+  /** Defaults to 'success'. */
+  outcome?: "success" | "failure";
 }
 
 /**
@@ -29,9 +34,7 @@ export interface LogSecurityEventDto {
  * Key guarantees:
  * 1. log() is **fire-and-forget** — it never throws to the caller.
  *    A DB failure emits a structured WARN log instead of propagating.
- * 2. sanitizeMetadata() recursively strips any key whose name
- *    (case-insensitive) contains: password | secret | token | hash | key |
- *    credential | private — so raw sensitive values never reach the DB.
+ * 2. Metadata is passed through the recursive redactor (audit-redaction.ts).
  */
 @Injectable()
 export class SecurityEventService {
@@ -70,60 +73,13 @@ export class SecurityEventService {
       applicationId: data.applicationId,
       resourceId: data.resourceId,
       resourceType: data.resourceType,
+      requestId: data.requestId,
+      outcome: data.outcome ?? "success",
     });
   }
 
-  /** Key fragments that mark a value as secret material. */
-  private static readonly SENSITIVE_KEY =
-    /password|passwd|secret|token|hash|key|credential|private|otp|cookie|authorization/i;
-
-  /**
-   * Suffixes that describe secret material without containing it
-   * (tokenExpiry, keyId, secretType, passwordChangedAt ...). These are kept so
-   * audit events stay useful.
-   */
-  private static readonly DESCRIPTOR_SUFFIX =
-    /(expiry|expires|expiresat|expiresin|ttl|type|count|length|id|ids|version|alg|algorithm|changedat|createdat|rotatedat|usedat)$/i;
-
-  private static isSensitiveKey(key: string): boolean {
-    if (!SecurityEventService.SENSITIVE_KEY.test(key)) return false;
-    const normalised = key.replace(/[_-]/g, "");
-    return !SecurityEventService.DESCRIPTOR_SUFFIX.test(normalised);
-  }
-
-  /**
-   * Returns a copy of `obj` with secret-bearing keys removed, recursively —
-   * including objects nested inside arrays (previously arrays were copied
-   * verbatim, so `items: [{ password }]` reached the audit log).
-   *
-   * A key is removed when its name contains a sensitive fragment (password,
-   * secret, token, hash, key, credential, private, otp, cookie,
-   * authorization) unless it ends in a descriptor suffix (Expiry, Id, Type,
-   * Count, ...). Non-object inputs return {}. Pure function.
-   */
+  /** Recursive redactor; see audit-redaction.ts. */
   static sanitizeMetadata(obj: unknown): Record<string, unknown> {
-    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
-      return {};
-    }
-    return SecurityEventService.sanitizeObject(obj as Record<string, unknown>);
-  }
-
-  private static sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (SecurityEventService.isSensitiveKey(k)) continue;
-      result[k] = SecurityEventService.sanitizeValue(v);
-    }
-    return result;
-  }
-
-  private static sanitizeValue(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => SecurityEventService.sanitizeValue(item));
-    }
-    if (typeof value === "object" && value !== null && !(value instanceof Date)) {
-      return SecurityEventService.sanitizeObject(value as Record<string, unknown>);
-    }
-    return value;
+    return redactMetadata(obj);
   }
 }

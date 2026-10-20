@@ -1,0 +1,75 @@
+---
+title: Mail Pipeline & Audit Events
+description: How emails are queued, rendered and sent, and how domain events feed audit and security notifications.
+---
+
+# Mail Pipeline & Audit Events
+
+## Mail pipeline
+
+Emails are never sent inline with a request. `MailService` enqueues a job on the BullMQ queue
+`mail.send` (Redis-backed); `MailProcessor` picks it up, renders the template, and sends it.
+
+```
+Service ──▶ MailService.enqueue() ──▶ BullMQ queue "mail.send" ──▶ MailProcessor
+                                                                      │
+                                              @repo/emails renderEmail()  (HTML + text)
+                                                                      │
+                                                    Provider: SES > SMTP > Console
+```
+
+| Behaviour | Value |
+|-----------|-------|
+| Attempts | 3, exponential backoff |
+| Completed jobs | purged after 1 hour |
+| Failed jobs | kept 24 hours for inspection, then purged |
+| Provider order | AWS SES, then SMTP, then Console |
+| Console provider | Logs the message; **refused in production** |
+
+### Rendering and safety
+
+Templates live in the `@repo/emails` package (React Email). `renderEmail`:
+
+- sanitises all display text (names, tenant names, device labels) before it reaches the template
+- rejects any URL that is not `http` or `https`
+
+See [Email templates](/docs/architecture/email-templates) for the full catalogue. Provider
+configuration is described in [Environment Variables](/docs/setup/env#email).
+
+## Request IDs
+
+Every request carries an `x-request-id`. A client-supplied value is accepted only if it matches
+`/^[A-Za-z0-9._-]{8,64}$/`; otherwise a UUID is generated. The value is echoed in the response
+header, included as `requestId` in every `application/problem+json` error body, and stored on audit rows so a user-reported
+error can be traced to its audit trail. See [API Reference](/docs/api#request-ids-and-error-shape).
+
+## Audit and security events
+
+`security_events` rows carry two additional columns beyond the event payload:
+
+| Column | Purpose |
+|--------|---------|
+| `requestId` | The `x-request-id` of the request that produced the event |
+| `outcome` | Result of the action (for example success or failure) |
+
+Event `metadata` is redacted recursively before persistence: secrets, tokens and similar keys are
+masked at every nesting depth. Query the trail with the [Audit API](/docs/api/audit).
+
+## Domain events
+
+Services publish in-process `DomainEvents` **after the database transaction commits**, so
+listeners never observe rolled-back state.
+
+The `SecurityNotifier` subscribes and emails the affected user for:
+
+| Event | Email |
+|-------|-------|
+| Refresh-token reuse detected | `session-reuse-alert` |
+| Passkey cloned detected | `session-reuse-alert` family security alert |
+| MFA enabled / disabled | `mfa-enabled` / `mfa-disabled` |
+| Password changed | `password-changed` |
+| Account locked | `account-locked` |
+| Ownership transferred | `ownership-transferred-from` / `ownership-transferred-to` |
+
+Notification failures never fail the originating request; they are queued and retried like any
+other mail job.

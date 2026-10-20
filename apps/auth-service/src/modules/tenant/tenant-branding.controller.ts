@@ -6,20 +6,8 @@
  * POST /tenants/current/branding/logo   – upload logo (multipart/form-data)
  */
 
-import {
-  Controller,
-  Get,
-  Put,
-  Post,
-  Body,
-  Param,
-  Req,
-  BadRequestException,
-  UnsupportedMediaTypeException,
-  PayloadTooLargeException,
-  UseInterceptors,
-  UploadedFile,
-} from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, Param, Req, UnsupportedMediaTypeException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { ApiException } from '../../common/http';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantBrandingService } from './tenant-branding.service';
 import { Protected } from '@/common/decorators/protected.decorator';
@@ -114,11 +102,11 @@ export class TenantBrandingController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<LogoUploadResponse> {
     if (!file) {
-      throw new BadRequestException('No file uploaded. Use field name "logo".');
+      throw new ApiException("BAD_REQUEST", { detail: 'No file uploaded. Use field name "logo".' });
     }
 
     if (file.size > LOGO_MAX_BYTES) {
-      throw new PayloadTooLargeException('Logo must be 500 KB or smaller');
+      throw new ApiException("UPLOAD_TOO_LARGE", { detail: 'Logo must be 500 KB or smaller' });
     }
 
     const tenantId: string = req.tenantId!;

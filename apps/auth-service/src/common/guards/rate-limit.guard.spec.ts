@@ -1,6 +1,7 @@
 import { RateLimitGuard } from "./rate-limit.guard";
 import { Reflector } from "@nestjs/core";
-import { ExecutionContext, HttpException } from "@nestjs/common";
+import { ExecutionContext } from "@nestjs/common";
+import { ApiException } from "../http";
 import { RedisService } from "@/common/service/redis.service";
 
 const mockIsAllowed = jest.fn();
@@ -90,8 +91,10 @@ describe("RateLimitGuard", () => {
     });
 
     const ctx = createMockContext();
-    await expect(guard.canActivate(ctx)).rejects.toThrow(HttpException);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ApiException);
     await expect(guard.canActivate(ctx)).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+      retryAfterSeconds: 120,
       status: 429,
     });
 

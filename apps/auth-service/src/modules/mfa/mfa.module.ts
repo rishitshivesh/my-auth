@@ -13,6 +13,7 @@ import {
 } from "@repo/database";
 import { MfaController } from "./mfa.controller";
 import { MfaService } from "./mfa.service";
+import { MfaGuardService } from "./mfa-guard.service";
 import { MfaPolicyService } from "./mfa-policy.service";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import { EmailService } from "@/modules/email/email.service";
@@ -52,6 +53,7 @@ import { SecurityEventService } from "@/common/service/security-event.service";
   controllers: [MfaController],
   providers: [
     MfaService,
+    MfaGuardService,
     MfaPolicyService,
     EmailOtpService,
     WebAuthnService,

@@ -1,11 +1,7 @@
 // apps/auth-service/src/modules/rbac/guards/roles.guard.ts
 
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-} from "@nestjs/common";
+import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
+import { ApiException } from "../../../common/http";
 import { Reflector } from "@nestjs/core";
 import { RbacService } from "../services/rbac.service";
 
@@ -44,7 +40,7 @@ export class RolesGuard implements CanActivate {
     const tenantId = request.tenantId; // From TenantMiddleware
 
     if (!user || !user.sub) {
-      throw new ForbiddenException("User not authenticated");
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: "User not authenticated" });
     }
 
     if (user.isSuperAdmin) {
@@ -52,7 +48,7 @@ export class RolesGuard implements CanActivate {
     }
 
     if (!tenantId) {
-      throw new ForbiddenException("Tenant context not found");
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: "Tenant context not found" });
     }
 
     // Check if user has ANY of the required roles
@@ -63,9 +59,7 @@ export class RolesGuard implements CanActivate {
     );
 
     if (!hasRole) {
-      throw new ForbiddenException(
-        `Missing required role. Required one of: ${requiredRoles.join(", ")}`,
-      );
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: `Missing required role. Required one of: ${requiredRoles.join(", ")}` });
     }
 
     return true;

@@ -66,25 +66,83 @@ Paginated responses include:
 }
 ```
 
-## Error responses
+## Request IDs and error shape
+
+Every response carries an `x-request-id` header. Send your own `x-request-id` matching
+`/^[A-Za-z0-9._-]{8,64}$/` to correlate calls; anything else is replaced with a generated UUID.
+
+Successful responses use the `{ "status", "data" }` envelope. Every error is returned as
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details with
+`Content-Type: application/problem+json`:
 
 ```json
 {
-  "statusCode": 400,
-  "message": "Validation failed",
-  "errors": ["email must be a valid email"]
+  "type": "urn:scrolloop:problem:VALIDATION_FAILED",
+  "title": "Validation failed",
+  "status": 422,
+  "code": "VALIDATION_FAILED",
+  "detail": "One or more fields are invalid.",
+  "requestId": "3f1c9a52-8e7b-4d0a-9c11-2b6f5e0d7a41",
+  "errors": [{ "field": "email", "message": "email must be a valid email" }]
 }
 ```
 
-| Status | Meaning |
-|--------|---------|
-| `400` | Bad request / validation error |
-| `401` | Missing or invalid JWT |
-| `403` | Authenticated but unauthorized |
-| `404` | Resource not found |
-| `409` | Conflict (e.g. email already exists) |
-| `429` | Rate limit exceeded |
-| `500` | Internal server error |
+| Field | Type | Always present | Description |
+|-------|------|----------------|-------------|
+| `type` | string | yes | `urn:scrolloop:problem:<code>` |
+| `title` | string | yes | Short, stable, human-readable summary |
+| `status` | number | yes | HTTP status |
+| `code` | string | yes | Stable machine code from the table below. Branch on this, not on `title` or `detail` |
+| `detail` | string | no | Safe to show a user. Never reveals whether an account exists |
+| `requestId` | string | yes | Quote this when reporting a problem; also in the `x-request-id` header |
+| `errors` | `{ field, message }[]` | `VALIDATION_FAILED` only | Per-field messages; `field` is a dotted path |
+| `retryAfterSeconds` | number | `RATE_LIMITED` only | Mirrors the `Retry-After` header |
+
+Quote the `requestId` when reporting problems; it can be searched with the
+[audit log](/docs/api/audit) `requestId` filter.
+
+> **Note:** OAuth 2.0 (`/oauth/*`) and SCIM (`/scim/*`) protocol endpoints keep their native error formats
+(RFC 6749 `{ "error", "error_description" }` and RFC 7644 SCIM errors) so standard clients keep working.
+
+### Error codes
+
+| Code | Status | Title |
+|------|--------|-------|
+| `AUTH_INVALID_CREDENTIALS` | 401 | Invalid credentials |
+| `AUTH_EMAIL_NOT_VERIFIED` | 403 | Email not verified |
+| `AUTH_MFA_REQUIRED` | 401 | Two-step verification required |
+| `AUTH_MFA_INVALID` | 401 | Invalid verification code |
+| `AUTH_OTP_INVALID` | 401 | Invalid or expired code |
+| `AUTH_TOKEN_INVALID` | 401 | Invalid token |
+| `AUTH_TOKEN_EXPIRED` | 401 | Token expired |
+| `AUTH_SESSION_REVOKED` | 401 | Session ended |
+| `AUTH_REFRESH_REUSED` | 401 | Session ended for your safety |
+| `AUTH_ACCOUNT_LOCKED` | 423 | Account temporarily locked |
+| `ACCESS_FORBIDDEN` | 403 | Access denied |
+| `ACCESS_RECENT_AUTH_REQUIRED` | 403 | Please confirm it is you |
+| `HIERARCHY_VIOLATION` | 403 | Action not allowed for this role |
+| `TENANT_MISMATCH` | 403 | Wrong tenant |
+| `TENANT_SUSPENDED` | 403 | Tenant suspended |
+| `USER_SUSPENDED` | 403 | Account suspended |
+| `RESOURCE_NOT_FOUND` | 404 | Not found |
+| `RESOURCE_CONFLICT` | 409 | Conflict |
+| `TENANT_NOT_FOUND` | 404 | Tenant not found |
+| `LAST_OWNER` | 409 | Cannot remove the last owner |
+| `INVITE_INVALID` | 400 | Invitation is not valid |
+| `PASSWORD_POLICY` | 422 | Password does not meet the policy |
+| `MFA_ALREADY_ENABLED` | 409 | Two-step verification is already on |
+| `MFA_NOT_ENABLED` | 409 | Two-step verification is not on |
+| `MFA_NOT_STARTED` | 409 | Two-step setup has not started |
+| `PASSKEY_INVALID` | 401 | Passkey could not be verified |
+| `PASSKEY_LIMIT` | 409 | Passkey limit reached |
+| `SOCIAL_PROVIDER_DISABLED` | 404 | Sign-in method unavailable |
+| `SOCIAL_PROVIDER_ERROR` | 502 | Sign-in provider error |
+| `BAD_REQUEST` | 400 | Bad request |
+| `VALIDATION_FAILED` | 422 | Validation failed |
+| `UPLOAD_TOO_LARGE` | 413 | Upload too large |
+| `RATE_LIMITED` | 429 | Too many requests |
+| `NOT_IMPLEMENTED` | 501 | Not implemented |
+| `INTERNAL_ERROR` | 500 | Something went wrong |
 
 ## Rate limits
 

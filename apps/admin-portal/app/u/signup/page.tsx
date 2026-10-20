@@ -6,6 +6,7 @@ import { AuthLayout } from "@/components/layouts/AuthLayout"
 import { SentryButton, SentryInput, GlassCard } from "@repo/ui"
 import { useRegister } from "@/lib/queries"
 import { AlertCircle, CheckCircle2, UserPlus } from "lucide-react"
+import { getErrorMessage } from "@/lib/api-error";
 
 export default function SignupPage() {
   const router = useRouter()
@@ -25,7 +26,7 @@ export default function SignupPage() {
       { email, password, firstName: firstName || undefined, lastName: lastName || undefined },
       {
         onSuccess: () => setDone(true),
-        onError: (err) => setError(err.message),
+        onError: (err) => setError(getErrorMessage(err)),
       },
     )
   }

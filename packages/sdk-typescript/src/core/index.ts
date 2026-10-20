@@ -33,3 +33,5 @@ export type {
 } from './types';
 
 export { AuthError } from './types';
+export { SentryApiError, isSentryApiError } from './errors';
+export type { ApiErrorInit } from './errors';

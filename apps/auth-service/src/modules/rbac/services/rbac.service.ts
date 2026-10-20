@@ -1,15 +1,16 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException, isConflict } from "../../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import { User, Role, Permission, UserRole } from "@repo/database";
 import { RoleService } from "./role.service";
 import { PermissionService } from "./permission.service";
 import { logger } from "@/common/logger";
+import {
+  canManage,
+  isOwnerLevel,
+  maxPriority,
+} from "../role-hierarchy";
 
 export interface AssignRoleDto {
   userId: string;
@@ -55,11 +56,20 @@ export class RbacService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     // Verify role exists
     const role = await this.roleService.getRole(data.roleId, data.tenantId);
+
+    if (data.assignedBy) {
+      await this.assertActorCanManage(
+        data.assignedBy,
+        data.userId,
+        data.tenantId,
+        [role.priority],
+      );
+    }
 
     // Check if already assigned
     const existing = await this.userRoleRepository.findOne({
@@ -81,7 +91,7 @@ export class RbacService {
         return existing;
       }
 
-      throw new ConflictException("Role already assigned to user");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Role already assigned to user" });
     }
 
     // Create assignment
@@ -114,7 +124,7 @@ export class RbacService {
     for (const roleName of data.roleNames) {
       const role = roleMap.get(roleName);
       if (!role) {
-        throw new NotFoundException(`Role not found: ${roleName}`);
+        throw new ApiException("RESOURCE_NOT_FOUND");
       }
 
       try {
@@ -129,7 +139,7 @@ export class RbacService {
         assignments.push(userRole);
       } catch (error) {
         // Skip if already assigned
-        if (!(error instanceof ConflictException)) {
+        if (!(error instanceof ApiException && error.code === "RESOURCE_CONFLICT")) {
           throw error;
         }
       }
@@ -145,13 +155,24 @@ export class RbacService {
     userId: string,
     roleId: string,
     tenantId: string,
+    actorId?: string,
   ): Promise<void> {
     const userRole = await this.userRoleRepository.findOne({
       where: { userId, roleId, tenantId },
+      relations: ["role"],
     });
 
     if (!userRole) {
-      throw new NotFoundException("Role assignment not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
+    }
+
+    if (actorId) {
+      await this.assertActorCanManage(actorId, userId, tenantId, [
+        userRole.role?.priority ?? 0,
+      ]);
+    }
+    if (isOwnerLevel(userRole.role?.priority ?? 0)) {
+      await this.assertOtherOwnerRemains(userId, tenantId, []);
     }
 
     await this.userRoleRepository.remove(userRole);
@@ -166,14 +187,15 @@ export class RbacService {
     userId: string,
     roleName: string,
     tenantId: string,
+    actorId?: string,
   ): Promise<void> {
     const role = await this.roleService.getRoleByName(roleName, tenantId);
 
     if (!role) {
-      throw new NotFoundException(`Role not found: ${roleName}`);
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
-    await this.removeRole(userId, role.id, tenantId);
+    await this.removeRole(userId, role.id, tenantId, actorId);
   }
 
   /**
@@ -185,6 +207,20 @@ export class RbacService {
     tenantId: string,
     assignedBy?: string,
   ): Promise<UserRole[]> {
+    const roles = await this.roleService.listRoles(tenantId);
+    const requested = roles.filter((r) => roleNames.includes(r.name));
+    const current = await this.getUserRoles(userId, tenantId);
+    const affected = [...requested, ...current].map((r) => r.priority);
+
+    if (assignedBy) {
+      await this.assertActorCanManage(assignedBy, userId, tenantId, affected);
+    }
+    await this.assertOtherOwnerRemains(
+      userId,
+      tenantId,
+      requested.map((r) => r.priority),
+    );
+
     // Remove all existing roles
     await this.userRoleRepository.delete({
       userId,
@@ -202,6 +238,58 @@ export class RbacService {
     }
 
     return [];
+  }
+
+  /** Highest priority among a user's active roles (0 when none). */
+  private async getMaxPriority(userId: string, tenantId: string): Promise<number> {
+    const roles = await this.getUserRoles(userId, tenantId);
+    return maxPriority(roles.map((r) => r.priority));
+  }
+
+  /**
+   * The actor must outrank both the target user and every role being granted
+   * or revoked. Acting on yourself is allowed only for the target check.
+   */
+  private async assertActorCanManage(
+    actorId: string,
+    targetId: string,
+    tenantId: string,
+    rolePriorities: readonly number[],
+  ): Promise<void> {
+    const actor = await this.getMaxPriority(actorId, tenantId);
+    if (actorId !== targetId) {
+      const target = await this.getMaxPriority(targetId, tenantId);
+      if (!canManage(actor, target)) {
+        throw new ApiException("HIERARCHY_VIOLATION");
+      }
+    }
+    if (!canManage(actor, maxPriority(rolePriorities))) {
+      throw new ApiException("HIERARCHY_VIOLATION");
+    }
+  }
+
+  /**
+   * Refuse a change that would leave the tenant with no owner-level user.
+   * `keptPriorities` are the roles the user will still hold afterwards.
+   */
+  private async assertOtherOwnerRemains(
+    userId: string,
+    tenantId: string,
+    keptPriorities: readonly number[],
+  ): Promise<void> {
+    if (keptPriorities.some(isOwnerLevel)) return;
+    const assignments = await this.userRoleRepository.find({
+      where: { tenantId },
+      relations: ["role"],
+    });
+    const holders = new Set(
+      assignments
+        .filter((ur) => !ur.isExpired && isOwnerLevel(ur.role?.priority ?? 0))
+        .map((ur) => ur.userId),
+    );
+    if (holders.has(userId) && holders.size === 1) {
+      throw new ApiException("LAST_OWNER");
+    }
   }
 
   /**
@@ -236,7 +324,7 @@ export class RbacService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     // Filter out expired role assignments
@@ -371,7 +459,7 @@ export class RbacService {
         });
       } catch (error) {
         // Skip if already assigned
-        if (!(error instanceof ConflictException)) {
+        if (!(isConflict(error))) {
           throw error;
         }
       }
@@ -421,7 +509,7 @@ export class RbacService {
     const role = await this.roleService.getRoleByName(roleName, tenantId);
 
     if (!role) {
-      throw new NotFoundException(`Role not found: ${roleName}`);
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return this.getUsersByRole(role.id, tenantId);

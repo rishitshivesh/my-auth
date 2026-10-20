@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useCreateTenantClient } from "@/lib/queries"
 import { Button } from "@repo/ui"
 import { X } from "lucide-react"
+import { getErrorMessage } from "@/lib/api-error";
 
 type AppType = "spa" | "m2m" | "web"
 
@@ -147,9 +148,7 @@ export function CreateApplicationModal({ onClose, onCreated }: Props) {
             )}
             {createClient.isError && (
               <p className="text-sm text-destructive">
-                {createClient.error instanceof Error
-                  ? createClient.error.message
-                  : "Failed to create application"}
+                {getErrorMessage(createClient.error, "Failed to create application")}
               </p>
             )}
             <div className="flex gap-2">

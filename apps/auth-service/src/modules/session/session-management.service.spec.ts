@@ -1,5 +1,4 @@
 // apps/auth-service/src/modules/session/session-management.service.spec.ts
-import { UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Test, TestingModule } from "@nestjs/testing";
@@ -192,16 +191,16 @@ describe("OAuthRefreshTokenService — refresh-token reuse is rejected", () => {
     refreshService = module.get(OAuthRefreshTokenService);
   });
 
-  it("throws UnauthorizedException when an already-used token is presented", async () => {
+  it("rejects with 401 when an already-used token is presented", async () => {
     await expect(
       refreshService.rotateRefreshToken({ tenantId: "tenant-1", token: "raw-token" }),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toMatchObject({ status: 401 });
   });
 
   it("revokes the entire token family when reuse is detected", async () => {
     await expect(
       refreshService.rotateRefreshToken({ tenantId: "tenant-1", token: "raw-token" }),
-    ).rejects.toThrow(UnauthorizedException);
+    ).rejects.toMatchObject({ status: 401 });
 
     const familyRevocation = mockQuery.mock.calls.find(
       ([sql]) => typeof sql === "string" && sql.includes("WHERE family_id = $3"),

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import * as crypto from "crypto";
 import { EmailService } from "@/modules/email/email.service";
 import { UserService } from "@/modules/user/user.service";
@@ -35,7 +36,7 @@ export class EmailOtpService {
   async sendOtp(userId: string, tenantId: string): Promise<void> {
     const user = await this.userService.findById(tenantId, userId);
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
     }
 
     const code = crypto

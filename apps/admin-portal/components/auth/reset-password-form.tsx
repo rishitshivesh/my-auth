@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button, Input, Label, InputOTP, InputOTPGroup, InputOTPSlot } from "@repo/ui"
 import { useAuth } from "@scrolloop/sdk"
+import { getErrorMessage } from "@/lib/api-error";
 
 interface ResetPasswordFormProps {
   primaryColor?: string
@@ -32,7 +33,7 @@ export function ResetPasswordForm({ primaryColor }: ResetPasswordFormProps) {
       await forgotPassword(email)
       setStage("otp")
     } catch (err: any) {
-      setError(err?.message || "Failed to send reset code. Please try again.")
+      setError(getErrorMessage(err, "Failed to send reset code. Please try again."))
     } finally {
       setLoading(false)
     }
@@ -57,7 +58,7 @@ export function ResetPasswordForm({ primaryColor }: ResetPasswordFormProps) {
       await resetPassword(email, otp, password)
       router.push("/u/login?reset=success")
     } catch (err: any) {
-      setError(err?.message || "Invalid or expired code. Please try again.")
+      setError(getErrorMessage(err, "Invalid or expired code. Please try again."))
       setStage("otp")
       setOtp("")
     } finally {

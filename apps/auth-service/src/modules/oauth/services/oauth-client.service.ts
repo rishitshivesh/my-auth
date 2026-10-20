@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
+import { oauthError } from "../oauth-errors";
 import { logger } from "@/common/logger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -86,17 +83,17 @@ export class OAuthClientService {
       (g) => !validGrantTypes.includes(g),
     );
     if (invalidGrants.length > 0) {
-      throw new BadRequestException(
-        `Invalid grant types: ${invalidGrants.join(", ")}`,
-      );
+      throw new ApiException("VALIDATION_FAILED", {
+        errors: [{ field: "grantTypes", message: `Invalid grant types: ${invalidGrants.join(", ")}` }],
+      });
     }
 
     // Validate redirect URIs for authorization_code grant
     if (data.grantTypes.includes("authorization_code")) {
       if (!data.redirectUris || data.redirectUris.length === 0) {
-        throw new BadRequestException(
-          "redirect_uris required for authorization_code grant",
-        );
+        throw new ApiException("VALIDATION_FAILED", {
+          errors: [{ field: "redirectUris", message: "redirect_uris required for authorization_code grant" }],
+        });
       }
 
       // Validate URIs
@@ -109,12 +106,16 @@ export class OAuthClientService {
           const isHttps = url.protocol === "https:";
 
           if (!isHttps && !isLocalhost) {
-            throw new BadRequestException(
-              `Redirect URI must use HTTPS: ${uri}`,
-            );
+            throw new ApiException("VALIDATION_FAILED", {
+              errors: [{ field: "redirectUris", message: `Redirect URI must use HTTPS: ${uri}` }],
+            });
           }
         } catch (error) {
-          throw new BadRequestException(`Invalid redirect URI: ${uri}`);
+          throw error instanceof ApiException
+            ? error
+            : new ApiException("VALIDATION_FAILED", {
+                errors: [{ field: "redirectUris", message: `Invalid redirect URI: ${uri}` }],
+              });
         }
       }
     }
@@ -186,7 +187,7 @@ export class OAuthClientService {
     });
 
     if (!client) {
-      throw new NotFoundException("Client not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Client not found" });
     }
 
     return client;
@@ -204,7 +205,7 @@ export class OAuthClientService {
       .getOne();
 
     if (!client) {
-      throw new NotFoundException("Client not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Client not found" });
     }
 
     return client;
@@ -217,14 +218,20 @@ export class OAuthClientService {
     clientId: string,
     clientSecret?: string,
   ): Promise<OAuthClient> {
-    const client = await this.getClientWithSecret(clientId);
+    // Unknown and inactive clients look the same as a bad secret (RFC 6749 5.2).
+    const client = await this.getClientWithSecret(clientId).catch(
+      (error: unknown) => {
+        if (error instanceof ApiException && error.code === "RESOURCE_NOT_FOUND") {
+          throw oauthError("invalid_client", "Client authentication failed");
+        }
+        throw error;
+      },
+    );
 
     // Public clients don't have secrets
     if (client.clientType === "public") {
       if (clientSecret) {
-        throw new BadRequestException(
-          "Public clients should not send client_secret",
-        );
+        throw oauthError("invalid_client", "Public clients must not send client_secret");
       }
       return client;
     }
@@ -232,9 +239,7 @@ export class OAuthClientService {
     // Confidential clients must provide secret
     if (client.clientType === "confidential") {
       if (!clientSecret) {
-        throw new BadRequestException(
-          "client_secret required for confidential clients",
-        );
+        throw oauthError("invalid_client", "client_secret required for confidential clients");
       }
 
       if (!client.clientSecretHash) {
@@ -247,7 +252,7 @@ export class OAuthClientService {
       );
 
       if (!isValid) {
-        throw new BadRequestException("Invalid client credentials");
+        throw oauthError("invalid_client", "Invalid client credentials");
       }
 
       return client;
@@ -264,7 +269,7 @@ export class OAuthClientService {
     redirectUri: string,
   ): Promise<boolean> {
     if (!client.redirectUris.includes(redirectUri)) {
-      throw new BadRequestException("Invalid redirect_uri");
+      throw oauthError("invalid_request", "Invalid redirect_uri");
     }
 
     return true;
@@ -278,7 +283,7 @@ export class OAuthClientService {
     grantType: string,
   ): Promise<boolean> {
     if (!client.grantTypes.includes(grantType)) {
-      throw new BadRequestException(`Grant type not allowed: ${grantType}`);
+      throw oauthError("unauthorized_client", `Grant type not allowed: ${grantType}`);
     }
 
     return true;
@@ -328,12 +333,16 @@ export class OAuthClientService {
           const isHttps = url.protocol === "https:";
 
           if (!isHttps && !isLocalhost) {
-            throw new BadRequestException(
-              `Redirect URI must use HTTPS: ${uri}`,
-            );
+            throw new ApiException("VALIDATION_FAILED", {
+              errors: [{ field: "redirectUris", message: `Redirect URI must use HTTPS: ${uri}` }],
+            });
           }
         } catch (error) {
-          throw new BadRequestException(`Invalid redirect URI: ${uri}`);
+          throw error instanceof ApiException
+            ? error
+            : new ApiException("VALIDATION_FAILED", {
+                errors: [{ field: "redirectUris", message: `Invalid redirect URI: ${uri}` }],
+              });
         }
       }
     }
@@ -358,7 +367,7 @@ export class OAuthClientService {
     const client = await this.getClient(clientId);
 
     if (client.clientType !== "confidential") {
-      throw new BadRequestException("Only confidential clients have secrets");
+      throw new ApiException("BAD_REQUEST", { detail: "Only confidential clients have secrets" });
     }
 
     // Generate new secret

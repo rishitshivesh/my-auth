@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic"
 import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@scrolloop/sdk"
+import { getErrorMessage } from "@/lib/api-error";
 
 function CallbackInner() {
   const router = useRouter()
@@ -41,7 +42,7 @@ function CallbackInner() {
         router.replace(destination)
       })
       .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Authentication failed")
+        setError(getErrorMessage(err, "Authentication failed"))
       )
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

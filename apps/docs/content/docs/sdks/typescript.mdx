@@ -91,3 +91,43 @@ const token = await sentry.getAccessToken();
 // Verify a token using the JWKS endpoint
 const payload = await sentry.verifyToken(token);
 ```
+
+## Errors
+
+Failed API calls throw `SentryApiError`, parsed from the API's `application/problem+json`
+response. It extends `AuthError`, so existing `catch` blocks and `instanceof AuthError` checks keep working.
+`error.message` is `detail ?? title`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `code` | string | Stable machine code, for example `AUTH_INVALID_CREDENTIALS` (see the [API error codes](/docs/api#error-codes)) |
+| `status` | number | HTTP status |
+| `title` | string | Short summary |
+| `detail` | string \| undefined | User-safe explanation |
+| `requestId` | string \| undefined | Quote when contacting support |
+| `fieldErrors` | `{ field, message }[]` | Populated for `VALIDATION_FAILED` (empty otherwise) |
+| `retryAfterSeconds` | number \| undefined | Populated for `RATE_LIMITED` |
+
+```ts
+import { SentryApiError } from "@scrolloop/sdk";
+
+try {
+  await sentry.login({ email, password });
+} catch (err) {
+  if (err instanceof SentryApiError) {
+    switch (err.code) {
+      case "VALIDATION_FAILED":
+        showFieldErrors(err.fieldErrors);
+        break;
+      case "RATE_LIMITED":
+        showMessage(`Try again in ${err.retryAfterSeconds ?? 60}s`);
+        break;
+      default:
+        showMessage(`${err.message} (reference ${err.requestId})`);
+    }
+  }
+}
+```
+
+Responses from older API versions (`{ statusCode, message }` or `{ error: { code, message } }`) and
+non-JSON gateway errors are still converted into a `SentryApiError` with a best-effort `code`.

@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
+import { samlError } from "./saml-errors";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -28,7 +25,7 @@ function xmlEsc(s: string): string {
 
 function validateSlug(slug: string): void {
   if (!/^[a-z0-9-]{1,64}$/.test(slug)) {
-    throw new BadRequestException("Invalid tenant slug format");
+    throw samlError(400, "Invalid tenant slug format");
   }
 }
 
@@ -168,7 +165,7 @@ export class SamlService {
       });
     }
 
-    if (!keyPair) throw new BadRequestException("No active signing key found");
+    if (!keyPair) throw samlError(400, "No active signing key found");
 
     const privateKeyPem = this.decryptPrivateKey(keyPair);
 
@@ -221,7 +218,7 @@ export class SamlService {
     const existing = await this.spRepo.findOne({
       where: { tenantId, entityId: dto.entityId },
     });
-    if (existing) throw new BadRequestException("A service provider with this entityId already exists");
+    if (existing) throw new ApiException("RESOURCE_CONFLICT", { detail: "A service provider with this entityId already exists" });
 
     const sp = this.spRepo.create({
       tenantId,
@@ -261,7 +258,7 @@ export class SamlService {
 
   async findSP(tenantId: string, id: string): Promise<SamlServiceProvider> {
     const sp = await this.spRepo.findOne({ where: { id, tenantId } });
-    if (!sp) throw new NotFoundException("Service provider not found");
+    if (!sp) throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Service provider not found" });
     return sp;
   }
 
@@ -272,7 +269,7 @@ export class SamlService {
     validateSlug(tenantSlug);
     const tenant = await this.tenantService.findBySlug(tenantSlug);
     if (!tenant || !tenant.active) {
-      throw new NotFoundException("Tenant not found");
+      throw samlError(404, "Tenant not found");
     }
     return tenant;
   }
@@ -282,7 +279,7 @@ export class SamlService {
    * B's registered service providers. */
   assertSessionTenant(sessionTenantId: string | undefined, tenantId: string): void {
     if (sessionTenantId !== tenantId) {
-      throw new UnauthorizedException("Session does not belong to this tenant");
+      throw samlError(401, "Session does not belong to this tenant");
     }
   }
 
@@ -355,18 +352,18 @@ export class SamlService {
     try {
       decodedXml = Buffer.from(samlRequestB64, "base64").toString("utf8");
     } catch {
-      throw new BadRequestException("Malformed SAMLRequest");
+      throw samlError(400, "Malformed SAMLRequest");
     }
 
     const peek = samlify.Extractor.extract(decodedXml, samlify.Extractor.loginRequestFields);
     const issuer = Array.isArray(peek.issuer) ? peek.issuer[0] : peek.issuer;
     if (!issuer) {
-      throw new BadRequestException("AuthnRequest is missing an Issuer");
+      throw samlError(400, "AuthnRequest is missing an Issuer");
     }
 
     const sp = await this.spRepo.findOne({ where: { tenantId, entityId: issuer, active: true } });
     if (!sp) {
-      throw new BadRequestException("Unknown or inactive service provider");
+      throw samlError(400, "Unknown or inactive service provider");
     }
 
     const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair(tenantId);
@@ -380,7 +377,7 @@ export class SamlService {
       return { sp, requestInfo };
     } catch (error: unknown) {
       logger.warn({ err: error, tenantId, issuer }, "Rejected invalid SAML AuthnRequest");
-      throw new BadRequestException("Invalid or tampered AuthnRequest");
+      throw samlError(400, "Invalid or tampered AuthnRequest");
     }
   }
 
@@ -401,7 +398,7 @@ export class SamlService {
     const user = await this.tenantJobRunner.runInTenant(tenantSlug, () =>
       this.userRepo.findOne({ where: { id: userId } }),
     );
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw samlError(404, "User not found");
 
     const { signingCertPem, privateKeyPem } = await this.getActiveKeyPair(tenantId);
     const idp = this.buildIdp(tenantSlug, signingCertPem, privateKeyPem);

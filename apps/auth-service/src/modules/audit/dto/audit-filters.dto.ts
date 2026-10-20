@@ -1,10 +1,15 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsISO8601 } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsISO8601, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AuditFiltersDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  requestId?: string;
 
   @IsOptional()
   @IsString()

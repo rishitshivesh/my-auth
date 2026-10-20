@@ -1,11 +1,18 @@
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from "@nestjs/common";
+  DomainEventName,
+  DomainEventsService,
+} from "@/common/service/domain-events.service";
+import { SYSTEM_MFA_CONTEXT, type MfaRequestContext } from "./mfa-context";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
-import { MfaSettings, User, WebAuthnCredential, SecurityEventType } from "@repo/database";
+import {
+  MfaSettings,
+  User,
+  WebAuthnCredential,
+  SecurityEventType,
+} from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import {
   generateRegistrationOptions,
@@ -26,13 +33,18 @@ import * as crypto from "crypto";
 import { logger } from "@/common/logger";
 
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
+/** Registered passkeys allowed per user. */
+export const MAX_PASSKEYS_PER_USER = 10;
+// @simplewebauthn/server rejects an assertion whose signature counter did not
+// advance with "Response counter value X was lower than expected Y".
+const COUNTER_REGRESSION_PATTERN = /counter value/i;
 // Redis resource namespaces
 const REG_CHALLENGE_RESOURCE = "passkey:challenge:reg";
 const AUTH_CHALLENGE_RESOURCE = "passkey:challenge:auth";
 
 @Injectable()
 export class WebAuthnService {
-  private readonly rpName = "Scrolloop Sentry";
+  private readonly rpName: string;
   private readonly rpID: string;
   private readonly origin: string;
 
@@ -47,10 +59,13 @@ export class WebAuthnService {
     private redisService: RedisService,
     private dataSource: DataSource,
     private readonly securityEventService: SecurityEventService,
+    private readonly domainEvents: DomainEventsService,
   ) {
     this.rpID = this.configService.get("WEBAUTHN_RP_ID") || "localhost";
     this.origin =
       this.configService.get("WEBAUTHN_ORIGIN") || "http://localhost:3000";
+    this.rpName =
+      this.configService.get("WEBAUTHN_RP_NAME") || "Scrolloop Sentry";
   }
 
   // ── Challenge helpers ──────────────────────────────────────────────────────
@@ -123,7 +138,11 @@ export class WebAuthnService {
       sessionNonce,
     );
     // Always delete — ensures single-use even on failure
-    await this.redisService.delete(tenantId, AUTH_CHALLENGE_RESOURCE, sessionNonce);
+    await this.redisService.delete(
+      tenantId,
+      AUTH_CHALLENGE_RESOURCE,
+      sessionNonce,
+    );
     return challenge;
   }
 
@@ -138,7 +157,14 @@ export class WebAuthnService {
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
+    }
+
+    const registered = await this.credentialRepository.count({
+      where: { userId, tenantId },
+    });
+    if (registered >= MAX_PASSKEYS_PER_USER) {
+      throw new ApiException("PASSKEY_LIMIT");
     }
 
     // Ensure mfa_settings row exists
@@ -194,9 +220,8 @@ export class WebAuthnService {
     const challenge = await this.consumeRegistrationChallenge(tenantId, userId);
 
     if (!challenge) {
-      throw new BadRequestException({
-        message: "Registration challenge expired or not found",
-        error: "WEBAUTHN_CHALLENGE_EXPIRED",
+      throw new ApiException("PASSKEY_INVALID", {
+        detail: "The passkey request expired. Please try again.",
       });
     }
 
@@ -211,11 +236,11 @@ export class WebAuthnService {
       });
     } catch (error) {
       logger.error({ err: error }, "WebAuthn registration verification failed");
-      throw new BadRequestException("Registration verification failed");
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     if (!verification.verified || !verification.registrationInfo) {
-      throw new BadRequestException("Registration verification failed");
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     const { credential } = verification.registrationInfo;
@@ -235,9 +260,15 @@ export class WebAuthnService {
     await this.credentialRepository.save(newCredential);
 
     // Mark webauthn as enabled on mfa_settings
-    await this.mfaRepository.update({ userId, tenantId }, { webauthnEnabled: true });
+    await this.mfaRepository.update(
+      { userId, tenantId },
+      { webauthnEnabled: true },
+    );
 
-    logger.info({ credentialId: credentialID }, "WebAuthn credential registered");
+    logger.info(
+      { credentialId: credentialID },
+      "WebAuthn credential registered",
+    );
 
     this.securityEventService.log({
       userId,
@@ -275,7 +306,7 @@ export class WebAuthnService {
     });
 
     if (credentials.length === 0) {
-      throw new BadRequestException("WebAuthn not enabled for this user");
+      throw new ApiException("MFA_NOT_ENABLED");
     }
 
     const allowCredentials = credentials.map((cred) => ({
@@ -311,14 +342,14 @@ export class WebAuthnService {
     tenantId: string,
     response: AuthenticationResponseJSON,
     sessionNonce: string,
+    ctx: MfaRequestContext = SYSTEM_MFA_CONTEXT,
   ): Promise<boolean> {
     // Consume challenge by nonce — deleted from Redis regardless of outcome
     const challenge = await this.consumeAuthChallenge(tenantId, sessionNonce);
 
     if (!challenge) {
-      throw new BadRequestException({
-        message: "Authentication challenge expired or not found",
-        error: "WEBAUTHN_CHALLENGE_EXPIRED",
+      throw new ApiException("PASSKEY_INVALID", {
+        detail: "The passkey request expired. Please try again.",
       });
     }
 
@@ -329,7 +360,7 @@ export class WebAuthnService {
     });
 
     if (!credential) {
-      throw new BadRequestException("Credential not found");
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     let verification: VerifiedAuthenticationResponse;
@@ -347,12 +378,22 @@ export class WebAuthnService {
         },
       });
     } catch (error) {
-      logger.error({ err: error }, "WebAuthn authentication verification failed");
-      throw new BadRequestException("Authentication verification failed");
+      if (
+        error instanceof Error &&
+        COUNTER_REGRESSION_PATTERN.test(error.message)
+      ) {
+        await this.retireClonedCredential(credential, ctx);
+        throw new ApiException("PASSKEY_INVALID");
+      }
+      logger.error(
+        { err: error },
+        "WebAuthn authentication verification failed",
+      );
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     if (!verification.verified) {
-      throw new BadRequestException("Authentication verification failed");
+      throw new ApiException("PASSKEY_INVALID");
     }
 
     const newCounter = verification.authenticationInfo.newCounter;
@@ -370,16 +411,69 @@ export class WebAuthnService {
       .execute();
 
     if (!result.affected || result.affected === 0) {
-      logger.error({ credentialId: credential.credentialId }, "WebAuthn counter rollback detected for credential");
-      throw new BadRequestException({
-        message: "Counter rollback detected — possible replay attack",
-        error: "WEBAUTHN_REPLAY_DETECTED",
-      });
+      logger.error(
+        { credentialId: credential.credentialId },
+        "WebAuthn counter rollback detected for credential",
+      );
+      throw new ApiException("PASSKEY_INVALID");
     }
 
-    logger.info({ credentialId: credential.credentialId }, "WebAuthn authentication verified");
+    logger.info(
+      { credentialId: credential.credentialId },
+      "WebAuthn authentication verified",
+    );
 
     return true;
+  }
+
+  /**
+   * A signature counter that fails to advance means two authenticators hold
+   * the same private key (IAM PRD 29). Retire the credential, record it, and
+   * tell the user.
+   */
+  private async retireClonedCredential(
+    credential: WebAuthnCredential,
+    ctx: MfaRequestContext,
+  ): Promise<void> {
+    const { userId, tenantId, credentialId } = credential;
+    await this.credentialRepository.remove(credential);
+
+    const remaining = await this.credentialRepository.count({
+      where: { userId, tenantId },
+    });
+    if (remaining === 0) {
+      await this.mfaRepository.update(
+        { userId, tenantId },
+        { webauthnEnabled: false },
+      );
+    }
+
+    logger.error({ credentialId, userId }, "Passkey counter regression, credential retired");
+
+    this.securityEventService.log({
+      userId,
+      tenantId,
+      eventType: SecurityEventType.PASSKEY_CLONED,
+      severity: "critical",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
+      resourceId: credentialId,
+      resourceType: "passkey",
+      outcome: "failure",
+    });
+
+    const user = await this.userRepository
+      .findOne({ where: { id: userId, tenantId } })
+      .catch(() => null);
+    this.domainEvents.publish(DomainEventName.PASSKEY_REMOVED, {
+      tenantId,
+      userId,
+      email: user?.email,
+      name: user?.firstName ?? undefined,
+      ip: ctx.ipAddress,
+      requestId: ctx.requestId,
+    });
   }
 
   // ── Credential Management ─────────────────────────────────────────────────
@@ -420,13 +514,14 @@ export class WebAuthnService {
     userId: string,
     tenantId: string,
     credentialId: string,
+    ctx: MfaRequestContext = SYSTEM_MFA_CONTEXT,
   ): Promise<void> {
     const credential = await this.credentialRepository.findOne({
       where: { userId, tenantId, credentialId },
     });
 
     if (!credential) {
-      throw new NotFoundException("Credential not found");
+      throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Passkey not found" });
     }
 
     await this.credentialRepository.remove(credential);
@@ -450,8 +545,9 @@ export class WebAuthnService {
       tenantId,
       eventType: SecurityEventType.PASSKEY_REMOVED,
       severity: "warning",
-      ipAddress: "0.0.0.0",
-      userAgent: "system",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
       resourceId: credentialId,
       resourceType: "passkey",
     });

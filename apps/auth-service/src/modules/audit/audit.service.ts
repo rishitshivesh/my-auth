@@ -29,6 +29,7 @@ export class AuditService {
 
     const items = await qb
       .orderBy('event.createdAt', 'DESC')
+      .addOrderBy('event.id', 'DESC')
       .take(limit + 1)
       .getMany();
 
@@ -47,6 +48,7 @@ export class AuditService {
   async exportCsv(tenantId: string, filters: AuditFiltersDto): Promise<string> {
     const items = await this.buildQuery(tenantId, filters)
       .orderBy('event.createdAt', 'DESC')
+      .addOrderBy('event.id', 'DESC')
       .take(10000)
       .getMany();
 
@@ -56,7 +58,7 @@ export class AuditService {
     };
 
     const header =
-      'timestamp,eventType,severity,actorEmail,userId,ipAddress,resourceType,resourceId\n';
+      'timestamp,eventType,severity,actorEmail,userId,ipAddress,resourceType,resourceId,outcome,requestId\n';
     const rows = items.map((e) =>
       [
         e.createdAt.toISOString(),
@@ -67,6 +69,8 @@ export class AuditService {
         e.ipAddress,
         e.resourceType ?? '',
         e.resourceId ?? '',
+        e.outcome ?? '',
+        e.requestId ?? '',
       ]
         .map((v) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`)
         .join(','),
@@ -85,6 +89,9 @@ export class AuditService {
 
     if (filters.userId) {
       qb.andWhere('event.userId = :userId', { userId: filters.userId });
+    }
+    if (filters.requestId) {
+      qb.andWhere('event.requestId = :requestId', { requestId: filters.requestId });
     }
     if (filters.eventType) {
       qb.andWhere('event.eventType = :eventType', { eventType: filters.eventType });

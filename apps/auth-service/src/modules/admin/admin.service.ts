@@ -1,11 +1,7 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-  ForbiddenException,
-  OnModuleInit,
-} from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ApiException } from "../../common/http";
+import { assertPasswordPolicy } from "../auth/password-policy";
+import { hashPassword } from "../auth/password-hashing";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, IsNull, MoreThan, DataSource } from "typeorm";
 import {
@@ -23,7 +19,6 @@ import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { JwtService } from "@nestjs/jwt";
-import { PasswordService } from "@repo/security";
 import { randomBytes, timingSafeEqual } from "crypto";
 import * as fs from "fs";
 import * as os from "os";
@@ -305,7 +300,7 @@ export class AdminService implements OnModuleInit {
 
   async getTenantById(id: string): Promise<TenantDetailDto> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new ApiException("TENANT_NOT_FOUND");
 
     const [userCount, activeSessions, recentActivity] = await Promise.all([
       this.userRepository.count({ where: { tenantId: id } }),
@@ -359,15 +354,13 @@ export class AdminService implements OnModuleInit {
   }): Promise<TenantDetailDto> {
     // Validate slug format before any DB or SQL use (defense against identifier injection)
     if (!/^[a-z0-9][a-z0-9-]{2,62}[a-z0-9]$/.test(dto.slug)) {
-      throw new BadRequestException(
-        "Slug must be 4–63 characters, lowercase letters/numbers/hyphens, and cannot start or end with a hyphen",
-      );
+      throw new ApiException("BAD_REQUEST", { detail: "Slug must be 4–63 characters, lowercase letters/numbers/hyphens, and cannot start or end with a hyphen" });
     }
 
     const existing = await this.tenantRepository.findOne({
       where: { slug: dto.slug },
     });
-    if (existing) throw new ConflictException("Slug is already taken");
+    if (existing) throw new ApiException("RESOURCE_CONFLICT", { detail: "Slug is already taken" });
 
     const tenant = this.tenantRepository.create({
       name: dto.name,
@@ -483,7 +476,7 @@ export class AdminService implements OnModuleInit {
     dto: { status?: string; name?: string; plan?: string },
   ): Promise<TenantDetailDto> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new ApiException("TENANT_NOT_FOUND");
 
     const updates: Partial<Tenant> = {};
     if (dto.name) updates.name = dto.name;
@@ -496,7 +489,7 @@ export class AdminService implements OnModuleInit {
 
   async deleteTenant(id: string): Promise<void> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new ApiException("TENANT_NOT_FOUND");
     await this.tenantRepository.delete({ id });
   }
 
@@ -604,15 +597,13 @@ export class AdminService implements OnModuleInit {
 
   async addTeamMember(email: string): Promise<TeamMemberDto> {
     const sentryTenant = await this.getSentryTenant();
-    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
+    if (!sentryTenant) throw new ApiException("RESOURCE_NOT_FOUND");
 
     const user = await this.userRepository.findOne({
       where: { email, tenantId: sentryTenant.id },
     });
     if (!user) {
-      throw new NotFoundException(
-        `No user with email "${email}" found in the sentry tenant`,
-      );
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     let role = await this.getSentryInternalRole(sentryTenant.id);
@@ -630,7 +621,7 @@ export class AdminService implements OnModuleInit {
       where: { userId: user.id, roleId: role?.id, tenantId: sentryTenant.id },
     });
     if (existing) {
-      throw new ConflictException(`${email} is already a team member`);
+      throw new ApiException("RESOURCE_CONFLICT", { detail: `${email} is already a team member` });
     }
 
     const userRole = this.userRoleRepository.create({
@@ -651,15 +642,15 @@ export class AdminService implements OnModuleInit {
 
   async removeTeamMember(userId: string): Promise<void> {
     const sentryTenant = await this.getSentryTenant();
-    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
+    if (!sentryTenant) throw new ApiException("RESOURCE_NOT_FOUND");
 
     const role = await this.getSentryInternalRole(sentryTenant.id);
-    if (!role) throw new NotFoundException("Role not found");
+    if (!role) throw new ApiException("RESOURCE_NOT_FOUND");
 
     const userRole = await this.userRoleRepository.findOne({
       where: { userId, roleId: role.id, tenantId: sentryTenant.id },
     });
-    if (!userRole) throw new NotFoundException("Team member not found");
+    if (!userRole) throw new ApiException("RESOURCE_NOT_FOUND");
 
     await this.userRoleRepository.delete({ id: userRole.id });
   }
@@ -685,7 +676,7 @@ export class AdminService implements OnModuleInit {
     dto: Partial<PlatformSettingsDto>,
   ): Promise<PlatformSettingsDto> {
     const sentryTenant = await this.getSentryTenant();
-    if (!sentryTenant) throw new NotFoundException("Scrolloop Sentry tenant not found");
+    if (!sentryTenant) throw new ApiException("RESOURCE_NOT_FOUND");
 
     const current = (sentryTenant as unknown as Record<string, unknown>).settings as Record<string, unknown> ?? {};
     const updated = { ...current };
@@ -769,11 +760,11 @@ export class AdminService implements OnModuleInit {
     userAgent: string,
   ): Promise<FirstAdminResultDto> {
     if (!this.validateSetupToken(setupToken)) {
-      throw new ForbiddenException("Invalid or expired setup token");
+      throw new ApiException("ACCESS_FORBIDDEN", { detail: "Invalid or expired setup token" });
     }
 
     if (await this.isInitialized()) {
-      throw new ConflictException("Platform is already initialized");
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "Platform is already initialized" });
     }
 
     // Ensure the sentry tenant row exists in public.tenants
@@ -796,13 +787,7 @@ export class AdminService implements OnModuleInit {
     }
 
     // Validate password before doing any more writes
-    const validation = PasswordService.validateStrength(dto.password);
-    if (!validation.isValid) {
-      throw new BadRequestException({
-        message: "Password does not meet security requirements",
-        errors: validation.errors,
-      });
-    }
+    assertPasswordPolicy(dto.password, { email: dto.email });
 
     // Create the fk_sentry schema so all tenant-scoped tables land there,
     // not in public. This matches the schema-per-tenant architecture.
@@ -829,7 +814,7 @@ export class AdminService implements OnModuleInit {
         where: { email: dto.email, tenantId: sentryTenant.id },
       });
       if (existing) {
-        throw new ConflictException("A user with this email already exists");
+        throw new ApiException("RESOURCE_CONFLICT", { detail: "A user with this email already exists" });
       }
 
       // Ensure sentry-internal role exists in fk_sentry.roles
@@ -882,7 +867,7 @@ export class AdminService implements OnModuleInit {
       }
 
       // Create superadmin user in fk_sentry.users
-      const passwordHash = await PasswordService.hash(dto.password);
+      const passwordHash = await hashPassword(dto.password);
       const nameParts = dto.name.trim().split(/\s+/);
       const firstName = nameParts[0] ?? dto.name;
       const lastName = nameParts.slice(1).join(" ") || undefined;

@@ -5,7 +5,8 @@
  * Only works in development mode.
  */
 
-import { Controller, Get, Query, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
 import { User } from "@repo/database";
@@ -33,9 +34,9 @@ export class EmailController {
     // Only allow in development
     const nodeEnv = this.configService.get<string>("NODE_ENV");
     if (nodeEnv === "production") {
-      throw new BadRequestException(
-        "Email testing is not available in production",
-      );
+      throw new ApiException("ACCESS_FORBIDDEN", {
+        detail: "Email testing is not available in production",
+      });
     }
 
     // Mock user data for testing
@@ -95,9 +96,9 @@ export class EmailController {
         break;
 
       default:
-        throw new BadRequestException(
-          `Invalid email type. Valid types: welcome, verification, password-reset, password-changed, magic-link, otp, account-deleted`,
-        );
+        throw new ApiException("BAD_REQUEST", {
+          detail: "Invalid email type. Valid types: welcome, verification, password-reset, password-changed, magic-link, otp, account-deleted",
+        });
     }
 
     return {

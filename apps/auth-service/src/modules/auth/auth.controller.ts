@@ -11,8 +11,6 @@ import {
   Query,
   UseGuards,
   Req,
-  UnauthorizedException,
-  BadRequestException,
   Res,
 } from "@nestjs/common";
 import {
@@ -40,6 +38,7 @@ import {
 import { StartWebAuthnLoginDto, FinishWebAuthnLoginDto } from "./dto/webauthn-login.dto";
 import { JwtAuthGuard } from "@/common/guards";
 import { logger } from "@/common/logger";
+import { ApiException } from "@/common/http";
 import { type Request, type Response } from "express";
 import { SentryProtectedGuard } from "@/common/guards/sentry-protected-route.guard";
 import { Protected } from "@/common/decorators/protected.decorator";
@@ -207,6 +206,7 @@ export class AuthController {
     @Req() req: Request,
     @Body() resetPasswordDto: ResetPasswordDto,
     @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
 
@@ -216,6 +216,7 @@ export class AuthController {
       resetPasswordDto.otp,
       resetPasswordDto.password,
       ip,
+      { userAgent: userAgent || "unknown", requestId: req.requestId },
     );
     return { message: "Password reset successfully" };
   }
@@ -265,9 +266,18 @@ export class AuthController {
     @Headers("user-agent") userAgent: string,
   ) {
     const tenantId = req.tenantId!;
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken: string | undefined = req.cookies.refreshToken;
+    if (!refreshToken) {
+      throw new ApiException("AUTH_TOKEN_INVALID");
+    }
 
-    const response = await this.authService.refreshToken(tenantId, refreshToken, ip, userAgent);
+    const response = await this.authService.refreshToken(
+      tenantId,
+      refreshToken,
+      ip,
+      userAgent,
+      req.requestId,
+    );
 
     setAuthCookies(res, response.accessToken, response.refreshToken);
     // Tokens are httpOnly cookies only (ADR-0003) — no credential in the body.
@@ -364,7 +374,7 @@ export class AuthController {
     );
 
     if (!fullUser) {
-      throw new UnauthorizedException("User not found");
+      throw new ApiException("AUTH_SESSION_REVOKED");
     }
 
     return {
@@ -484,11 +494,11 @@ export class AuthController {
     } catch (error: unknown) {
       logger.error({ err: error }, "MFA verification failed");
 
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof ApiException) {
         throw error;
       }
 
-      throw new UnauthorizedException("Invalid or expired token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
   }
 
@@ -567,11 +577,11 @@ export class AuthController {
     } catch (error: unknown) {
       logger.error({ err: error }, "Backup code verification failed");
 
-      if (error instanceof UnauthorizedException) {
+      if (error instanceof ApiException) {
         throw error;
       }
 
-      throw new UnauthorizedException("Invalid backup code");
+      throw new ApiException("AUTH_MFA_INVALID");
     }
   }
 
@@ -769,9 +779,9 @@ export class AuthController {
     const tenantId = query.tenant_id ?? (req as unknown as { tenantId?: string }).tenantId;
 
     if (!tenantId) {
-      throw new BadRequestException(
-        'Tenant could not be resolved. Pass an X-Tenant-ID header or use a tenant subdomain.',
-      );
+      throw new ApiException("TENANT_NOT_FOUND", {
+        detail: "Tenant could not be resolved. Pass an X-Tenant-ID header or use a tenant subdomain.",
+      });
     }
 
     return this.authService.getProviders(tenantId);

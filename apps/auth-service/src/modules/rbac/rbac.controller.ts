@@ -328,7 +328,12 @@ export class RbacController {
     @Param("roleName") roleName: string,
   ) {
     const tenantId = req.tenantId;
-    await this.rbacService.removeRoleByName(userId, roleName, tenantId);
+    await this.rbacService.removeRoleByName(
+      userId,
+      roleName,
+      tenantId,
+      req.user.sub,
+    );
     return { message: "Role removed successfully" };
   }
 

@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ApiException } from '../../../common/http';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Policy, RolePolicy, UserPolicy, GroupPolicy } from '@repo/database';
@@ -28,7 +24,7 @@ export class PolicyService {
       where: { tenantId, name: dto.name },
     });
     if (existing) {
-      throw new ConflictException(`Policy "${dto.name}" already exists`);
+      throw new ApiException("RESOURCE_CONFLICT", { detail: `Policy "${dto.name}" already exists` });
     }
 
     const policy = this.policyRepo.create({
@@ -57,7 +53,7 @@ export class PolicyService {
   async getPolicy(id: string, tenantId: string): Promise<Policy> {
     const policy = await this.policyRepo.findOne({ where: { id, tenantId } });
     if (!policy) {
-      throw new NotFoundException('Policy not found');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
     return policy;
   }
@@ -66,7 +62,7 @@ export class PolicyService {
     const policy = await this.getPolicy(id, tenantId);
 
     if (policy.isSystem) {
-      throw new BadRequestException('Cannot modify system policy');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot modify system policy' });
     }
 
     if (dto.document) {
@@ -88,7 +84,7 @@ export class PolicyService {
     const policy = await this.getPolicy(id, tenantId);
 
     if (policy.isSystem) {
-      throw new BadRequestException('Cannot delete system policy');
+      throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete system policy' });
     }
 
     await this.policyRepo.remove(policy);
@@ -103,7 +99,7 @@ export class PolicyService {
       where: { roleId, policyId, tenantId },
     });
     if (existing) {
-      throw new ConflictException('Policy already attached to role');
+      throw new ApiException("RESOURCE_CONFLICT", { detail: 'Policy already attached to role' });
     }
 
     await this.rolePolicyRepo.save({ roleId, policyId, tenantId });
@@ -116,7 +112,7 @@ export class PolicyService {
       where: { roleId, policyId, tenantId },
     });
     if (!rp) {
-      throw new NotFoundException('Policy not attached to role');
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     await this.rolePolicyRepo.remove(rp);
@@ -134,22 +130,22 @@ export class PolicyService {
 
   private validateDocument(doc: { Version: string; Statement: Array<{ Effect: string; Action: string | string[]; Resource: string | string[] }> }): void {
     if (!doc.Version || !doc.Statement || !Array.isArray(doc.Statement)) {
-      throw new BadRequestException('Invalid policy document: Version and Statement[] required');
+      throw new ApiException("BAD_REQUEST", { detail: 'Invalid policy document: Version and Statement[] required' });
     }
 
     if (doc.Statement.length === 0) {
-      throw new BadRequestException('Policy document must have at least one statement');
+      throw new ApiException("BAD_REQUEST", { detail: 'Policy document must have at least one statement' });
     }
 
     for (const stmt of doc.Statement) {
       if (!['Allow', 'Deny'].includes(stmt.Effect)) {
-        throw new BadRequestException(`Invalid Effect: "${stmt.Effect}". Must be "Allow" or "Deny"`);
+        throw new ApiException("BAD_REQUEST", { detail: `Invalid Effect: "${stmt.Effect}". Must be "Allow" or "Deny"` });
       }
       if (!stmt.Action || (Array.isArray(stmt.Action) && stmt.Action.length === 0)) {
-        throw new BadRequestException('Statement must have at least one Action');
+        throw new ApiException("BAD_REQUEST", { detail: 'Statement must have at least one Action' });
       }
       if (!stmt.Resource || (Array.isArray(stmt.Resource) && stmt.Resource.length === 0)) {
-        throw new BadRequestException('Statement must have at least one Resource');
+        throw new ApiException("BAD_REQUEST", { detail: 'Statement must have at least one Resource' });
       }
     }
   }

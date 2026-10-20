@@ -1,4 +1,5 @@
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { OAuthRefreshToken, Tenant } from "@repo/database";
@@ -139,7 +140,7 @@ export class OAuthRefreshTokenService {
 
     if (!rawToken) {
       this.logger.warn("Refresh token not found", { tenantId });
-      throw new UnauthorizedException("Invalid refresh token");
+      throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
     // Fetch session
@@ -187,9 +188,7 @@ export class OAuthRefreshTokenService {
       // SECURITY: Revoke entire token family
       await this.revokeTokenFamily(storedToken.familyId, tenantId);
 
-      throw new UnauthorizedException(
-        "Token reuse detected. All sessions in this family have been revoked.",
-      );
+      throw new ApiException("AUTH_REFRESH_REUSED");
     }
 
     // ============================================================
@@ -201,7 +200,7 @@ export class OAuthRefreshTokenService {
         revokedAt: storedToken.revokedAt,
         reason: storedToken.revokedReason,
       });
-      throw new UnauthorizedException("Refresh token has been revoked");
+      throw new ApiException("AUTH_SESSION_REVOKED");
     }
 
     if (storedToken.expiresAt < new Date()) {
@@ -209,7 +208,7 @@ export class OAuthRefreshTokenService {
         tokenId: storedToken.id,
         expiresAt: storedToken.expiresAt,
       });
-      throw new UnauthorizedException("Refresh token has expired");
+      throw new ApiException("AUTH_TOKEN_EXPIRED");
     }
 
     // Check session is still valid
@@ -217,7 +216,7 @@ export class OAuthRefreshTokenService {
       this.logger.warn("Session revoked or not found", {
         sessionId: storedToken.sessionId,
       });
-      throw new UnauthorizedException("Session no longer valid");
+      throw new ApiException("AUTH_SESSION_REVOKED");
     }
 
     // ============================================================

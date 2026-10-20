@@ -24,6 +24,8 @@ import { SecurityEventService } from "@/common/service/security-event.service";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 
+import { EmailModule } from "../email/email.module";
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -38,6 +40,7 @@ import { MfaModule } from "@/modules/mfa/mfa.module";
     SecurityEventModule,
     OAuthModule,
     MfaModule,
+    EmailModule,
     JwtModule.register({}),
   ],
   controllers: [SocialAuthController],

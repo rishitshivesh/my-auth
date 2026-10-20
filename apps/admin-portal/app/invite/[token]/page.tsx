@@ -7,6 +7,7 @@ import { GlassCard, SentryButton, SentryInput } from "@repo/ui";
 import { useValidateInvite, useAcceptInvite } from '@/lib/queries';
 import { useParams, useRouter } from 'next/navigation';
 import { UserPlus, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getErrorMessage } from "@/lib/api-error";
 
 export default function InviteAcceptPage() {
   const params = useParams();
@@ -30,7 +31,7 @@ export default function InviteAcceptPage() {
         const slug = invite?.tenantSlug;
         setTimeout(() => router.push(slug ? `/t/${slug}/dashboard` : '/u/login'), 2000);
       },
-      onError: (err) => setError(err.message)
+      onError: (err) => setError(getErrorMessage(err))
     });
   };
 

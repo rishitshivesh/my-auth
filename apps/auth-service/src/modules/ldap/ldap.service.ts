@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  InternalServerErrorException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -50,7 +46,7 @@ export class LdapService {
 
   private decryptPassword(ciphertext: string): string {
     const [ivHex, tagHex, encHex] = ciphertext.split(":");
-    if (!ivHex || !tagHex || !encHex) throw new InternalServerErrorException("Invalid encrypted password format");
+    if (!ivHex || !tagHex || !encHex) throw new ApiException("INTERNAL_ERROR");
     const key = Buffer.from(
       this.config.getOrThrow<string>("KEYRING_MASTER_KEY").padEnd(32, "0").slice(0, 32),
     );
@@ -103,7 +99,7 @@ export class LdapService {
 
   async findOne(tenantId: string, id: string): Promise<LdapConnection> {
     const conn = await this.connectionRepo.findOne({ where: { id, tenantId } });
-    if (!conn) throw new NotFoundException("LDAP connection not found");
+    if (!conn) throw new ApiException("RESOURCE_NOT_FOUND", { detail: "LDAP connection not found" });
     return conn;
   }
 
@@ -136,7 +132,7 @@ export class LdapService {
 
   async syncNow(tenantId: string, id: string): Promise<LdapSyncResult> {
     const conn = await this.findOne(tenantId, id);
-    if (!conn.active) throw new BadRequestException("LDAP connection is inactive");
+    if (!conn.active) throw new ApiException("BAD_REQUEST", { detail: "LDAP connection is inactive" });
 
     const password = this.decryptPassword(conn.bindPasswordEncrypted);
     const result: LdapSyncResult = { usersCreated: 0, usersUpdated: 0, errors: [] };
@@ -193,7 +189,8 @@ export class LdapService {
         lastSyncAt: new Date(),
         lastSyncStatus: "failed",
       });
-      throw new InternalServerErrorException(`LDAP sync failed: ${message}`);
+      logger.error({ connectionId: id, tenantId, err: message }, "LDAP sync failed");
+      throw new ApiException("INTERNAL_ERROR", { detail: "LDAP sync failed" });
     } finally {
       client?.destroy();
     }

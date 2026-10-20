@@ -7,6 +7,7 @@ import { Button } from "@repo/ui"
 import { UniversalAuthLayout } from "@/components/layouts/universal-auth-layout"
 import { useAuth } from "@scrolloop/sdk"
 import { ShieldCheck, AlertCircle } from "lucide-react"
+import { getErrorMessage } from "@/lib/api-error";
 
 export default function MFAPage() {
   const router = useRouter()
@@ -55,7 +56,7 @@ export default function MFAPage() {
       sessionStorage.removeItem("_sentry_mfa_temp_token")
       router.push("/dashboard")
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Invalid code. Please try again.")
+      setError(getErrorMessage(err, "Invalid code. Please try again."))
       setDigits(["", "", "", "", "", ""])
       inputRefs.current[0]?.focus()
     } finally {

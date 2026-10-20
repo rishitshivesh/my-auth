@@ -14,7 +14,7 @@
 // export * from '@scrolloop/types';
 
 // Core exports
-export { SentryClient, AuthError } from "./core";
+export { SentryClient, AuthError, SentryApiError, isSentryApiError } from "./core";
 export type {
   SentryConfig,
   LoginCredentials,
