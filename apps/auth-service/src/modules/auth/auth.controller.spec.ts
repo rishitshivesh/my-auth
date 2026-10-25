@@ -237,7 +237,7 @@ describe("AuthController", () => {
       const { ctl, svc } = build();
       const r = res();
       await ctl.verifyMagicLink(asReq(), asRes(r), { token: "tok" } as never, "ip", "");
-      expect(svc.verifyMagicLink).toHaveBeenCalledWith("t1", "tok", "ip", "unknown");
+      expect(svc.verifyMagicLink).toHaveBeenCalledWith("t1", "tok", "ip", "unknown", undefined);
       expect(cookieNames(r)).toEqual(["accessToken", "refreshToken"]);
       expect(r.json).toHaveBeenCalledWith({ tenantSlug: "acme", session, expiresIn: TTL });
     });

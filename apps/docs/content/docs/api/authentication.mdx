@@ -219,14 +219,26 @@ be an exact redirect URI of one of the workspace's OAuth clients or a URL on the
 origin; otherwise `422` (checked before the account is looked up). It is stored with the token and
 returned by `magic-link/verify`, `reset-password/validate`, `reset-password` and `verify-email`.
 
-## Cross-device magic link
+## Cross-device magic link (number matching)
 
 `POST /api/auth/magic-link/send { email, poll: true }` returns
-`{ message, expiresInSeconds, pollingNonce }` (a nonce is returned even for unknown emails). The
-nonce is never in the email. The requesting device calls `POST /api/auth/magic-link/poll
-{ pollingNonce }`: `{ "status": "pending" }` until the link was verified on any device, then once
-the same response as `magic-link/verify` (cookies, MFA challenge or enrollment) for the polling
-device; a second redemption answers `409 LINK_ALREADY_USED`. Tenant-bound, 10 minute lifetime.
+`{ message, expiresInSeconds, pollingNonce, matchCode }`. Both values are returned for unknown emails
+too and only to the requesting device; neither is in the email. Show `matchCode` (6 digits) on that
+device.
+
+- `GET /api/auth/magic-link/preview?token=` (non-consuming): `{ requestedFrom: { userAgent, ip } | null,
+  requiresMatchCode }`. `userAgent` is coarse ("Chrome on macOS"). Use it on the confirmation screen
+  ("Sign-in requested from ... "). Errors: `410 LINK_EXPIRED`, `409 LINK_ALREADY_USED`, `401`.
+- `POST /api/auth/magic-link/verify { token, matchCode? }`
+  - **without** `matchCode` (ordinary click): signs in the clicking device as before AND voids the
+    pending cross-device request, so a poll can never complete from a plain click.
+  - **with** the correct `matchCode`: the link is spent, the confirming device gets **no session**
+    (`{ "status": "confirmed-on-other-device" }`) and the polling device may now complete.
+  - wrong code: `401 AUTH_OTP_INVALID`, the link is not spent; after 5 wrong codes the request is void.
+- `POST /api/auth/magic-link/poll { pollingNonce }`: `{ "status": "pending" }` until confirmed, then once
+  the same response as verify (cookies / MFA challenge / enrollment); again: `409 LINK_ALREADY_USED`.
+
+Tenant-bound, 10 minute lifetime, codes and nonces stored hashed, constant-time comparison.
 
 ## Invitations
 

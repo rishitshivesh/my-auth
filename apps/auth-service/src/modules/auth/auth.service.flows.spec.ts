@@ -1,3 +1,4 @@
+import { coarseUserAgent } from "./auth.service";
 import { LinkTokenService } from "@/common/service/link-token.service";
 import * as crypto from "crypto";
 import { createHash } from "crypto";
@@ -54,7 +55,7 @@ const baseUser = (o: Record<string, unknown> = {}) => ({
   ...o,
 });
 
-function build(user: Record<string, unknown> | null = baseUser()) {
+function build(user: Record<string, unknown> | null = baseUser(), redisImpl?: Record<string, unknown>) {
   const builder = qb(user);
   const userRepo = {
     createQueryBuilder: jest.fn(() => builder),
@@ -141,7 +142,7 @@ function build(user: Record<string, unknown> | null = baseUser()) {
       return true;
     }),
   };
-  const linkTokens = new LinkTokenService(linkRedis as never);
+  const linkTokens = new LinkTokenService((redisImpl ?? linkRedis) as never);
 
   const service = new AuthService(
     userRepo as never,
@@ -163,7 +164,7 @@ function build(user: Record<string, unknown> | null = baseUser()) {
     oauthRefresh as never,
     events as never,
     jwks as never,
-    redis as never,
+    (redisImpl ?? redis) as never,
     throttle as never,
     domainEvents as never,
     effects as never,
@@ -1211,6 +1212,133 @@ describe("AuthService flows", () => {
       await h.service.acceptInvite({ token: "tok-123456789", name: "Cher", password: STRONG, ip: "ip", userAgent: "ua" });
       expect(h.userRepo.create.mock.calls[0]![0]).toMatchObject({ firstName: "Cher", lastName: undefined });
       expect(h.userRoleRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  // ----------------------------------------------------------- magic link match code
+  describe("magic link number matching", () => {
+    function memoryRedis() {
+      const m = new Map<string, unknown>();
+      const k = (...p: string[]) => p.join("|");
+      return {
+        set: async (t: string, r: string, i: string, v: unknown) => { m.set(k(t, r, i), v); },
+        get: async (t: string, r: string, i: string) => m.get(k(t, r, i)) ?? null,
+        delete: async (t: string, r: string, i: string) => { m.delete(k(t, r, i)); },
+        setIfAbsent: async (t: string, r: string, i: string, v: unknown) => (m.has(k(t, r, i)) ? false : (m.set(k(t, r, i), v), true)),
+        incr: async (t: string, r: string, i: string) => { const n = ((m.get(k(t, r, i)) as number) ?? 0) + 1; m.set(k(t, r, i), n); return n; },
+        extendTTL: async () => undefined,
+      };
+    }
+    async function start() {
+      const h = build(baseUser({ magicLinkExpiresAt: new Date(NOW.getTime() + 60_000) }), memoryRedis());
+      const sent = await h.service.sendMagicLink(T, "ann@example.com", { poll: true, ip: "6.6.6.6", userAgent: "Mozilla/5.0 (Windows NT 10.0) Chrome/120 Safari/537" });
+      const raw = h.email.sendMagicLinkEmail.mock.calls[0]![1] as string;
+      return { h, sent, raw };
+    }
+
+    it("returns a 6-digit matchCode with the nonce, only in the response, and the preview names the requester", async () => {
+      const { h, sent, raw } = await start();
+      expect(sent.matchCode).toMatch(/^\d{6}$/);
+      expect(JSON.stringify(h.email.sendMagicLinkEmail.mock.calls)).not.toContain(sent.matchCode!);
+      await expect(h.service.previewMagicLink(T, raw)).resolves.toEqual({
+        requestedFrom: { userAgent: "Chrome on Windows", ip: "6.6.6.6" },
+        requiresMatchCode: true,
+      });
+    });
+
+    it("a plain click signs in the clicker and voids the poll: the nonce never yields a session", async () => {
+      const { h, sent, raw } = await start();
+      const out = await h.service.verifyMagicLink(T, raw, "ip", "ua");
+      expect(out).toMatchObject({ accessToken: "signed" });
+      await expect(h.service.pollMagicLink(T, sent.pollingNonce!, "6.6.6.6", "ua")).resolves.toEqual({ status: "pending" });
+    });
+
+    it("the correct matchCode completes only the poller; the confirming device gets no session", async () => {
+      const { h, sent, raw } = await start();
+      const out = await h.service.verifyMagicLink(T, raw, "ip", "ua", sent.matchCode);
+      expect(out).toEqual({ status: "confirmed-on-other-device" });
+      expect(h.sessionService.createSession).not.toHaveBeenCalled();
+      await expect(h.service.pollMagicLink(T, sent.pollingNonce!, "6.6.6.6", "ua")).resolves.toMatchObject({ accessToken: "signed" });
+      await expect(h.service.pollMagicLink(T, sent.pollingNonce!, "6.6.6.6", "ua")).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
+    });
+
+    it("wrong codes are rejected without spending the link and void the request after 5 attempts", async () => {
+      const { h, sent, raw } = await start();
+      const wrong = sent.matchCode === "000000" ? "111111" : "000000";
+      for (let i = 0; i < 5; i++) {
+        await expect(h.service.verifyMagicLink(T, raw, "ip", "ua", wrong)).rejects.toMatchObject({ code: "AUTH_OTP_INVALID" });
+      }
+      await expect(h.service.verifyMagicLink(T, raw, "ip", "ua", sent.matchCode)).rejects.toMatchObject({ code: "AUTH_OTP_INVALID" });
+      await expect(h.service.pollMagicLink(T, sent.pollingNonce!, "6.6.6.6", "ua")).resolves.toEqual({ status: "pending" });
+    });
+
+    it("a code on a link without a pending request is rejected", async () => {
+      const h = build(baseUser({ magicLinkExpiresAt: new Date(NOW.getTime() + 60_000) }), memoryRedis());
+      await h.service.sendMagicLink(T, "ann@example.com", {});
+      const raw = h.email.sendMagicLinkEmail.mock.calls[0]![1] as string;
+      await expect(h.service.verifyMagicLink(T, raw, "ip", "ua", "123456")).rejects.toMatchObject({ code: "AUTH_OTP_INVALID" });
+    });
+  });
+
+  describe("coarseUserAgent", () => {
+    it.each([
+      ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Version/17 Safari/605", "Safari on macOS"],
+      ["Mozilla/5.0 (iPhone; CPU iPhone OS 17) Safari/604", "Safari on iOS"],
+      ["Mozilla/5.0 (X11; Linux) Firefox/121.0", "Firefox on Linux"],
+      [undefined, "Unknown browser on unknown OS"],
+    ])("%s", (ua, expected) => expect(coarseUserAgent(ua as string | undefined)).toBe(expected));
+  });
+
+  // ------------------------------------------------------------------- step-up
+  describe("reauthenticate", () => {
+    const withUser = (mfaEnabled: boolean) => {
+      const h = build(baseUser({ passwordHash: "stored" }));
+      h.mfa.getMfaStatus.mockResolvedValue({ enabled: mfaEnabled, methods: mfaEnabled ? ["totp"] : [] });
+      h.sessionRepo.findOne.mockResolvedValue({ id: "s1", amr: "pwd otp totp mfa", revokedAt: null } as never);
+      verify.mockResolvedValue(true);
+      return h;
+    };
+    const claims = (h: ReturnType<typeof withUser>) => h.jwt.sign.mock.calls.at(-1)![0] as { amr: string[]; authTime: number };
+
+    it("password alone is enough for an account without MFA, and amr is only pwd", async () => {
+      const h = withUser(false);
+      await h.service.reauthenticate(T, "u1", "s1", { method: "password", password: "pw" });
+      expect(claims(h).amr).toEqual(["pwd"]);
+      expect(h.redis.set).toHaveBeenCalledWith(T, "reauth-at", "s1", expect.objectContaining({ amr: ["pwd"] }), expect.any(Number));
+    });
+
+    it("with MFA enrolled, password alone is refused and authTime is not refreshed", async () => {
+      const h = withUser(true);
+      await expect(h.service.reauthenticate(T, "u1", "s1", { method: "password", password: "pw" })).rejects.toMatchObject({ code: "AUTH_MFA_REQUIRED" });
+      expect(h.redis.set).not.toHaveBeenCalled();
+      expect(verify).not.toHaveBeenCalled();
+    });
+
+    it("password + TOTP in one request proves both; amr lists exactly those and is not merged with the session's", async () => {
+      const h = withUser(true);
+      await h.service.reauthenticate(T, "u1", "s1", { method: "password", password: "pw", code: "123456" });
+      expect(claims(h).amr).toEqual(["pwd", "otp", "totp", "mfa"]);
+      expect(h.mfa.verifyTotp).toHaveBeenCalledWith("u1", T, "123456", "reauth:s1");
+    });
+
+    it("TOTP alone proves only totp (no pwd, no mfa)", async () => {
+      const h = withUser(true);
+      await h.service.reauthenticate(T, "u1", "s1", { method: "totp", code: "123456" });
+      expect(claims(h).amr).toEqual(["otp", "totp"]);
+    });
+
+    it("a wrong or replayed code is refused and nothing is refreshed", async () => {
+      const h = withUser(true);
+      h.mfa.verifyTotp.mockResolvedValue(false);
+      await expect(h.service.reauthenticate(T, "u1", "s1", { method: "totp", code: "123456" })).rejects.toMatchObject({ code: "AUTH_MFA_INVALID" });
+      await expect(h.service.reauthenticate(T, "u1", "s1", { method: "password", password: "pw", code: "123456" })).rejects.toMatchObject({ code: "AUTH_MFA_INVALID" });
+      expect(h.redis.set).not.toHaveBeenCalled();
+    });
+
+    it("password guesses are throttled like login", async () => {
+      const h = withUser(false);
+      h.throttle.charge.mockResolvedValue({ blocked: true });
+      await expect(h.service.reauthenticate(T, "u1", "s1", { method: "password", password: "pw" }, { ip: "1.1.1.1", userAgent: "ua" })).rejects.toMatchObject({ code: "RATE_LIMITED" });
     });
   });
 });

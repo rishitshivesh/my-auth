@@ -181,6 +181,49 @@ describe("pre-session MFA enrollment, second-factor methods and step-up", () => 
       expect((await guarded(after)).body.code).not.toBe("ACCESS_RECENT_AUTH_REQUIRED");
     });
 
+    it("MFA users cannot step up with the password alone; password + TOTP works; replay is blocked; amr is only what was proven", async () => {
+      const u = await registerAndVerifyUser(t, tenant);
+      const s = await loginUser(t, tenant, u.email, u.password);
+      const http = t.http({ tenant: tenant.slug, cookies: s.cookies });
+      const secret: string = (await http.post("/mfa/setup/totp")).body.data.secret;
+      expect((await http.post("/mfa/verify/totp").send({ token: totp(secret) })).status).toBe(200);
+
+      const pwOnly = await http.post("/auth/reauth").send({ method: "password", password: u.password });
+      expect(pwOnly.status).toBe(401);
+      expect(pwOnly.body.code).toBe("AUTH_MFA_REQUIRED");
+      expect(pwOnly.body.detail).toMatch(/authenticator|passkey/i);
+      expect(cookieValue(cookiesOf(pwOnly), "accessToken")).toBe("");
+
+      const wrongPw = await http.post("/auth/reauth").send({ method: "password", password: "not-the-password-1", code: totp(secret, 1) });
+      expect(wrongPw.status).toBe(401);
+
+      const code = totp(secret, 1);
+      const ok = await http.post("/auth/reauth").send({ method: "password", password: u.password, code });
+      expect({ s: ok.status, b: ok.body }).toMatchObject({ s: 200 });
+      const access = cookieValue(cookiesOf(ok), "accessToken");
+      expect(amrOf(access)).toEqual(["pwd", "otp", "totp", "mfa"]);
+
+      // the same time step cannot be used again, by either method
+      expect((await http.post("/auth/reauth").send({ method: "totp", code })).status).toBe(401);
+      expect((await http.post("/auth/reauth").send({ method: "password", password: u.password, code })).status).toBe(401);
+
+      // TOTP alone proves only totp, and the session's earlier amr is not merged in
+      const only = await http.post("/auth/reauth").send({ method: "totp", code: totp(secret, -1) });
+      expect(only.status).toBe(200);
+      expect(amrOf(cookieValue(cookiesOf(only), "accessToken"))).toEqual(["otp", "totp"]);
+    });
+
+    it("a refresh after a step-up keeps only the step-up's amr", async () => {
+      const u = await registerAndVerifyUser(t, tenant);
+      const s = await loginUser(t, tenant, u.email, u.password);
+      const ok = await t.http({ tenant: tenant.slug, cookies: s.cookies }).post("/auth/reauth").send({ method: "password", password: u.password });
+      expect(ok.status).toBe(200);
+      const cookies = [...s.cookies.filter((c) => !c.startsWith("accessToken=")), ...cookiesOf(ok).filter((c) => c.startsWith("accessToken="))];
+      const refreshed = await t.http({ tenant: tenant.slug, cookies }).post("/auth/refresh");
+      expect(refreshed.status).toBe(200);
+      expect(amrOf(cookieValue(cookiesOf(refreshed), "accessToken"))).toEqual(["pwd"]);
+    });
+
     it("reauth with TOTP works and requires authentication", async () => {
       const u = await registerAndVerifyUser(t, tenant);
       const s = await loginUser(t, tenant, u.email, u.password);
@@ -191,7 +234,7 @@ describe("pre-session MFA enrollment, second-factor methods and step-up", () => 
       expect((await http.post("/auth/reauth").send({ method: "totp", code: "000000" })).status).toBe(401);
       const ok = await http.post("/auth/reauth").send({ method: "totp", code: next });
       expect(ok.status).toBe(200);
-      expect(amrOf(cookieValue(cookiesOf(ok), "accessToken"))).toEqual(expect.arrayContaining(["pwd", "totp"]));
+      expect(amrOf(cookieValue(cookiesOf(ok), "accessToken"))).toEqual(["otp", "totp"]);
       expect((await anon().post("/auth/reauth").send({ method: "password", password: "x" })).status).toBe(401);
       expect((await http.post("/auth/reauth").send({ method: "password" })).status).toBe(422);
     });

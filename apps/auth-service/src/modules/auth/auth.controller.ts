@@ -633,7 +633,7 @@ export class AuthController {
         method: dto.method,
         password: dto.password,
         code: dto.code,
-        webauthn: dto.method === "webauthn" ? { response: dto.webauthnResponse as never, sessionNonce: dto.sessionNonce ?? "" } : undefined,
+        webauthn: dto.webauthnResponse ? { response: dto.webauthnResponse as never, sessionNonce: dto.sessionNonce ?? "" } : undefined,
       },
       { ip, userAgent: userAgent || "unknown" },
     );
@@ -850,17 +850,32 @@ export class AuthController {
   async sendMagicLink(
     @Req() req: Request,
     @Body() dto: SendMagicLinkDto,
+    @Ip() ip?: string,
+    @Headers("user-agent") userAgent?: string,
   ) {
     const tenantId = req.tenantId!;
-    const { pollingNonce, expiresInSeconds } = await this.authService.sendMagicLink(tenantId, dto.email, {
+    const { pollingNonce, matchCode, expiresInSeconds } = await this.authService.sendMagicLink(tenantId, dto.email, {
       redirectUri: dto.redirectUri,
       poll: dto.poll,
+      ip,
+      userAgent,
     });
     return {
       message: "If an account exists, a magic link has been sent.",
       expiresInSeconds,
-      ...(pollingNonce ? { pollingNonce } : {}),
+      ...(pollingNonce ? { pollingNonce, matchCode } : {}),
     };
+  }
+
+  /**
+   * Describe a magic link for the confirmation screen (where it was requested from, whether a
+   * match code is needed). Never consumes the link, so scanners and page loads are harmless.
+   */
+  @Get("magic-link/preview")
+  @RateLimit({ max: 30, windowMs: 900000, keyBy: "ip" })
+  @ApiOperation({ summary: "Preview a magic link without consuming it" })
+  async previewMagicLink(@Req() req: Request, @Query() query: ValidateResetLinkQueryDto) {
+    return this.authService.previewMagicLink(req.tenantId!, query.token);
   }
 
   /**
@@ -883,6 +898,7 @@ export class AuthController {
       dto.token,
       ip,
       userAgent || "unknown",
+      dto.matchCode,
     );
 
     return this.respondMagicLink(res, result);
@@ -896,6 +912,9 @@ export class AuthController {
     if ('mfaRequired' in result) {
       const { redirectUri: _r, ...rest } = result;
       return res.json({ ...rest, ...redirect });
+    }
+    if ('status' in result && result.status === 'confirmed-on-other-device') {
+      return res.json({ status: result.status, ...redirect });
     }
     if ('status' in result) {
       setMfaEnrollmentCookie(res, result.enrollmentToken);

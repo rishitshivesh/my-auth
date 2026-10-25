@@ -77,6 +77,9 @@ const PASSWORD_RESET_LINK_PURPOSE = "password-reset";
 const MAGIC_LINK_TTL_SECONDS = 10 * 60;
 const MAGIC_POLL_RESOURCE = "magic-poll";
 const MAGIC_POLL_USED_RESOURCE = "magic-poll-used";
+const MAGIC_POLL_ATTEMPTS_RESOURCE = "magic-poll-attempts";
+const MAGIC_MATCH_MAX_ATTEMPTS = 5;
+const MATCH_CODE_LENGTH = 6;
 const INVITE_RENEW_RESOURCE = "invite-renew";
 const INVITE_RENEW_COOLDOWN_SECONDS = 10 * 60;
 const INVITE_RENEW_DAYS = 7;
@@ -88,9 +91,30 @@ const MFA_ENROLL_TTL_SECONDS = 15 * 60;
 const MFA_ENROLL_MAX_ATTEMPTS = 5;
 const PASSWORD_RESET_LINK_TTL_SECONDS = 60 * 60;
 
+interface MagicLinkMeta {
+  redirectUri?: string;
+  pollHash?: string;
+  requestedFrom?: { userAgent: string; ip: string };
+}
+
+interface MagicPollRecord {
+  state: "pending" | "complete";
+  userId: string;
+  codeHash: string;
+}
+
+/** "Chrome on macOS" style summary; never the raw header. */
+export function coarseUserAgent(raw: string | undefined): string {
+  const ua = raw ?? "";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Unknown browser";
+  const os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad|iOS/.test(ua) ? "iOS" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "unknown OS";
+  return `${browser} on ${os}`;
+}
+
 export type MagicLinkOutcome =
   | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }
   | { status: 'mfa_enrollment_required'; enrollmentToken: string }
+  | { status: 'confirmed-on-other-device' }
   | { mfaRequired: true; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string };
 
 @Injectable()
@@ -655,12 +679,17 @@ export class AuthService {
   async sendMagicLink(
     tenantId: string,
     email: string,
-    opts: { redirectUri?: string; poll?: boolean } = {},
-  ): Promise<{ pollingNonce?: string; expiresInSeconds: number }> {
+    opts: { redirectUri?: string; poll?: boolean; ip?: string; userAgent?: string } = {},
+  ): Promise<{ pollingNonce?: string; matchCode?: string; expiresInSeconds: number }> {
     const redirect = await this.checkedRedirect(tenantId, opts.redirectUri);
     // Issued for every request (known or not) so the response never reveals whether the account exists.
+    // matchCode goes ONLY to this (requesting) device, never into the email.
     const pollingNonce = opts.poll ? crypto.randomBytes(32).toString("hex") : undefined;
-    const result = { ...(pollingNonce ? { pollingNonce } : {}), expiresInSeconds: MAGIC_LINK_TTL_SECONDS };
+    const matchCode = opts.poll ? crypto.randomInt(0, 10 ** MATCH_CODE_LENGTH).toString().padStart(MATCH_CODE_LENGTH, "0") : undefined;
+    const result = {
+      ...(pollingNonce ? { pollingNonce, matchCode } : {}),
+      expiresInSeconds: MAGIC_LINK_TTL_SECONDS,
+    };
 
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     // Both layers must match for a query to succeed
@@ -681,11 +710,15 @@ export class AuthService {
     );
 
     const pollHash = pollingNonce ? hashToken(pollingNonce) : undefined;
-    if (redirect || pollHash) {
-      await this.links.setMeta(tenantId, "magic-link", rawToken, { ...(redirect ? { redirectUri: redirect } : {}), ...(pollHash ? { pollHash } : {}) }, MAGIC_LINK_TTL_SECONDS);
-    }
-    if (pollHash) {
-      await this.redisService.set(tenantId, MAGIC_POLL_RESOURCE, pollHash, { state: "pending", userId: user.id }, MAGIC_LINK_TTL_SECONDS);
+    const meta: MagicLinkMeta = {
+      ...(redirect ? { redirectUri: redirect } : {}),
+      ...(pollHash ? { pollHash } : {}),
+      requestedFrom: { userAgent: coarseUserAgent(opts.userAgent), ip: opts.ip ?? "unknown" },
+    };
+    await this.links.setMeta(tenantId, "magic-link", rawToken, meta as Record<string, unknown>, MAGIC_LINK_TTL_SECONDS);
+    if (pollHash && matchCode) {
+      const record: MagicPollRecord = { state: "pending", userId: user.id, codeHash: AuthService.matchCodeHash(pollHash, matchCode) };
+      await this.redisService.set(tenantId, MAGIC_POLL_RESOURCE, pollHash, record, MAGIC_LINK_TTL_SECONDS);
     }
 
     await this.emailService.sendMagicLinkEmail(user, rawToken);
@@ -702,6 +735,7 @@ export class AuthService {
     rawToken: string,
     ip: string,
     userAgent: string,
+    matchCode?: string,
   ): Promise<MagicLinkOutcome & { redirectUri?: string }> {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
@@ -722,12 +756,38 @@ export class AuthService {
         .getOne();
       throw await this.links.failureFor(tenantId, "magic-link", rawToken, !!stale);
     }
-    await this.linkTokenService?.noteSpent(tenantId, "magic-link", rawToken);
-    const linkMeta = await this.linkTokenService?.getMeta<{ redirectUri?: string; pollHash?: string }>(tenantId, "magic-link", rawToken);
+    const linkMeta = await this.linkTokenService?.getMeta<MagicLinkMeta>(tenantId, "magic-link", rawToken);
 
+    if (matchCode !== undefined) {
+      // Cross-device confirmation: the code shown on the REQUESTING device proves the person
+      // confirming is looking at it. Checked before the link is spent so a typo does not burn it.
+      await this.assertMatchCode(tenantId, linkMeta?.pollHash, matchCode);
+      await this.spendMagicLink(user.id, tenantId, rawToken);
+      await this.redisService.set(
+        tenantId,
+        MAGIC_POLL_RESOURCE,
+        linkMeta!.pollHash!,
+        { ...(await this.redisService.get<MagicPollRecord>(tenantId, MAGIC_POLL_RESOURCE, linkMeta!.pollHash!)), state: "complete", userId: user.id },
+        MAGIC_LINK_TTL_SECONDS,
+      );
+      return { status: "confirmed-on-other-device", ...(linkMeta?.redirectUri ? { redirectUri: linkMeta.redirectUri } : {}) };
+    }
+
+    await this.spendMagicLink(user.id, tenantId, rawToken);
+    // An ordinary click signs in the clicking device AND voids any pending cross-device request:
+    // a poll can never complete from a plain click (device-code phishing).
+    if (linkMeta?.pollHash) {
+      await this.redisService.delete(tenantId, MAGIC_POLL_RESOURCE, linkMeta.pollHash);
+    }
+    const outcome = await this.finishMagicLinkLogin(user, tenantId, ip, userAgent);
+    return linkMeta?.redirectUri ? { ...outcome, redirectUri: linkMeta.redirectUri } : outcome;
+  }
+
+  private async spendMagicLink(userId: string, tenantId: string, rawToken: string): Promise<void> {
+    await this.linkTokenService?.noteSpent(tenantId, "magic-link", rawToken);
     // Clear the token (one-time use) and mark email as verified
     await this.userRepository.update(
-      { id: user.id, tenantId },
+      { id: userId, tenantId },
       {
         // `undefined` is skipped by TypeORM's update(); null actually clears the
         // columns so the link cannot be replayed.
@@ -736,13 +796,49 @@ export class AuthService {
         emailVerified: true,
       },
     );
+  }
 
-    // Another device may be waiting for this link (POST /auth/magic-link/poll).
-    if (linkMeta?.pollHash) {
-      await this.redisService.set(tenantId, MAGIC_POLL_RESOURCE, linkMeta.pollHash, { state: "complete", userId: user.id }, MAGIC_LINK_TTL_SECONDS);
+  private static matchCodeHash(pollHash: string, code: string): string {
+    return hashToken(`${pollHash}:${code}`);
+  }
+
+  /** Validates the number-matching code; wrong guesses are counted and void the request after 5. */
+  private async assertMatchCode(tenantId: string, pollHash: string | undefined, code: string): Promise<void> {
+    const invalid = () => new ApiException("AUTH_OTP_INVALID");
+    if (!pollHash) throw invalid();
+    const record = await this.redisService.get<MagicPollRecord>(tenantId, MAGIC_POLL_RESOURCE, pollHash);
+    if (!record || record.state !== "pending") throw invalid();
+    const attempts = await this.redisService.incr(tenantId, MAGIC_POLL_ATTEMPTS_RESOURCE, pollHash);
+    if (attempts === 1) await this.redisService.extendTTL(tenantId, MAGIC_POLL_ATTEMPTS_RESOURCE, pollHash, MAGIC_LINK_TTL_SECONDS);
+    if (attempts > MAGIC_MATCH_MAX_ATTEMPTS) {
+      await this.redisService.delete(tenantId, MAGIC_POLL_RESOURCE, pollHash);
+      throw invalid();
     }
-    const outcome = await this.finishMagicLinkLogin(user, tenantId, ip, userAgent);
-    return linkMeta?.redirectUri ? { ...outcome, redirectUri: linkMeta.redirectUri } : outcome;
+    const given = Buffer.from(AuthService.matchCodeHash(pollHash, code), "hex");
+    const expected = Buffer.from(record.codeHash, "hex");
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) throw invalid();
+  }
+
+  /**
+   * Non-consuming description of a magic link for the confirmation screen: where the sign-in was
+   * requested from and whether a match code must be entered. Never spends the link.
+   */
+  async previewMagicLink(tenantId: string, rawToken: string): Promise<{ requestedFrom: { userAgent: string; ip: string } | null; requiresMatchCode: boolean }> {
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.magicLinkToken")
+      .where("user.magicLinkToken = :tokenHash", { tokenHash })
+      .andWhere("user.tenantId = :tenantId", { tenantId })
+      .getOne();
+    if (!user || !user.magicLinkExpiresAt || user.magicLinkExpiresAt <= new Date()) {
+      throw await this.links.failureFor(tenantId, "magic-link", rawToken, !!user);
+    }
+    const meta = await this.links.getMeta<MagicLinkMeta>(tenantId, "magic-link", rawToken);
+    const pending = meta?.pollHash
+      ? (await this.redisService.get<MagicPollRecord>(tenantId, MAGIC_POLL_RESOURCE, meta.pollHash))?.state === "pending"
+      : false;
+    return { requestedFrom: meta?.requestedFrom ?? null, requiresMatchCode: pending };
   }
 
   /**
@@ -1163,6 +1259,8 @@ export class AuthService {
       select: { id: true, createdAt: true, amr: true },
     });
 
+    const loginAt = loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0;
+    const stepUp = await this.redisService.get<{ at: number; amr: string[] }>(tenantId, REAUTH_RESOURCE, accessTokenPayload.sessionId as string);
     // Enrich payload with groups and tenantSlug
     const enrichedPayload = await this.buildAccessTokenPayload(
       accessTokenPayload.sub as string,
@@ -1170,13 +1268,12 @@ export class AuthService {
       accessTokenPayload.tenantId as string,
       accessTokenPayload.sessionId as string,
       undefined,
-      Math.max(
-        loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0,
-        // A step-up (POST /auth/reauth) survives refresh.
-        (await this.redisService.get<number>(tenantId, REAUTH_RESOURCE, accessTokenPayload.sessionId as string)) ?? 0,
-      ),
-      // Refreshing keeps the methods of the original login; legacy sessions without any count as password.
-      parseAmr(loginSession?.amr).length > 0 ? parseAmr(loginSession?.amr) : AMR_PASSWORD,
+      Math.max(loginAt, stepUp?.at ?? 0),
+      // Refreshing keeps the methods of whichever authentication is the latest: the sign-in, or a
+      // step-up (then ONLY what that step-up proved). Legacy sessions without any count as password.
+      stepUp && stepUp.at >= loginAt
+        ? stepUp.amr
+        : parseAmr(loginSession?.amr).length > 0 ? parseAmr(loginSession?.amr) : AMR_PASSWORD,
     );
     // Generate new access token
     const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
@@ -1509,24 +1606,43 @@ export class AuthService {
       .getOne();
     if (!user || user.isActive === false) throw new ApiException("AUTH_TOKEN_INVALID");
 
-    let factorAmr: string[];
+    // Step-up must prove at least as much as sign-in does for this account: a user with any enrolled
+    // second factor cannot refresh authTime with the password alone.
+    const mfaStatus = await this.mfaService.getMfaStatus(userId, tenantId);
+    const hasSecondFactorInput = !!input.code || !!input.webauthn;
+    if (mfaStatus.enabled && input.method === "password" && !hasSecondFactorInput) {
+      throw new ApiException("AUTH_MFA_REQUIRED", {
+        detail: "Two-step verification is on for this account. Confirm with your authenticator app or passkey (method totp / webauthn, or password together with code / webauthnResponse).",
+      });
+    }
+
+    // Same attempt protections as sign-in: throttle password guesses, per-session challenge for codes.
+    const challengeId = `reauth:${sessionId}`;
+    const proven: string[] = [];
     if (input.method === "password") {
+      if ((await this.loginThrottle.charge(tenantId, user.email, ctx.ip)).blocked) {
+        throw new ApiException("RATE_LIMITED", { retryAfterSeconds: 60 });
+      }
       const ok = user.passwordHash && input.password
         ? await verifyPassword(user.passwordHash, input.password)
         : (await verifyAgainstDummy(input.password ?? ""), false);
       if (!ok) throw new ApiException("AUTH_INVALID_CREDENTIALS");
-      factorAmr = [...AMR_PASSWORD];
-    } else if (input.method === "totp") {
-      if (!input.code || !(await this.mfaService.verifyTotp(userId, tenantId, input.code))) {
+      await this.loginThrottle.refund(tenantId, user.email);
+      proven.push(...AMR_PASSWORD);
+    }
+    if (input.method === "totp" || (input.method === "password" && input.code)) {
+      if (!input.code || !(await this.mfaService.verifyTotp(userId, tenantId, input.code, challengeId))) {
         throw new ApiException("AUTH_MFA_INVALID");
       }
-      factorAmr = ["otp", "totp", "mfa"];
-    } else {
+      proven.push("otp", "totp");
+    } else if (input.method === "webauthn" || (input.method === "password" && input.webauthn)) {
       if (!input.webauthn || !(await this.webauthnService.finishAuthentication(userId, tenantId, input.webauthn.response, input.webauthn.sessionNonce))) {
         throw new ApiException("PASSKEY_INVALID");
       }
-      factorAmr = ["hwk", "webauthn"];
+      proven.push("hwk", "webauthn");
     }
+    // Two distinct factors proven in this request => "mfa". A single factor is just that factor.
+    const factorAmr = proven.length > 2 ? [...proven, "mfa"] : proven;
 
     const session = await this.sessionRepository.findOne({
       where: { id: sessionId, tenantId, userId },
@@ -1535,8 +1651,10 @@ export class AuthService {
     if (!session || session.revokedAt) throw new ApiException("AUTH_SESSION_REVOKED");
 
     const now = Math.floor(Date.now() / 1000);
-    await this.redisService.set(tenantId, REAUTH_RESOURCE, sessionId, now, REAUTH_TTL_SECONDS);
-    const amr = [...new Set([...parseAmr(session.amr), ...factorAmr])];
+    // Only what THIS step-up proved: never merged with the original sign-in's amr, so the token cannot
+    // claim a stronger or fresher assurance than was actually demonstrated.
+    const amr = [...new Set(factorAmr)];
+    await this.redisService.set(tenantId, REAUTH_RESOURCE, sessionId, { at: now, amr }, REAUTH_TTL_SECONDS);
     const payload = await this.buildAccessTokenPayload(userId, user.email, tenantId, sessionId, undefined, now, amr);
     const accessToken = await this.signToken(payload, "15m", tenantId);
 

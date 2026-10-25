@@ -86,17 +86,23 @@ bound to the tenant and user, single use, and burned after 5 wrong codes. Pass i
 ## Step-up: POST /api/auth/reauth
 
 Authenticated. Re-prove the account and refresh `authTime` of the SAME session so
-`ACCESS_RECENT_AUTH_REQUIRED` endpoints pass again; the access-token cookie is reissued and the
-step-up survives token refresh.
+`ACCESS_RECENT_AUTH_REQUIRED` endpoints pass again. The new access-token cookie and every later
+refresh carry **only the factors proven in this step-up** in `amr`; the sign-in's `amr` is never
+merged in.
 
 ```http
 POST /api/auth/reauth
-{ "method": "password", "password": "..." }
-{ "method": "totp", "code": "123456" }
+{ "method": "password", "password": "..." }                      // accounts WITHOUT MFA; amr ["pwd"]
+{ "method": "password", "password": "...", "code": "123456" }    // password + TOTP; amr ["pwd","otp","totp","mfa"]
+{ "method": "password", "password": "...", "webauthnResponse": { }, "sessionNonce": "..." }
+{ "method": "totp", "code": "123456" }                           // amr ["otp","totp"]
 { "method": "webauthn", "webauthnResponse": { }, "sessionNonce": "..." }   // options: POST /api/auth/reauth/webauthn/start
 ```
 
-**Response `200`:** `{ session, expiresIn }`. Wrong credentials answer `401`.
+An account with any enrolled second factor cannot step up with the password alone:
+`401 AUTH_MFA_REQUIRED` (nothing is refreshed). Password guesses use the sign-in throttle, TOTP
+codes are single-use per time step with a per-session attempt cap. **Response `200`:**
+`{ session, expiresIn }`.
 
 ---
 

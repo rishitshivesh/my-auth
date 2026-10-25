@@ -315,6 +315,11 @@ export class VerifyMagicLinkDto {
   @ApiProperty({ description: 'Raw magic link token from email URL' })
   @IsString()
   token!: string;
+
+  @ApiPropertyOptional({ description: "Cross-device confirmation: the 6-digit matchCode shown on the device that requested the link. Without it the clicking device signs in normally." })
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: "matchCode must be 6 digits" })
+  matchCode?: string;
 }
 
 /**
@@ -448,18 +453,18 @@ export class ReauthDto {
   password?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((o: ReauthDto) => o.method === "totp")
+  @ValidateIf((o: ReauthDto) => o.method === "totp" || o.code !== undefined)
   @IsString()
   @Matches(/^\d{6}$/, { message: "code must be a 6-digit code" })
   code?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((o: ReauthDto) => o.method === "webauthn")
+  @ValidateIf((o: ReauthDto) => o.method === "webauthn" || o.webauthnResponse !== undefined)
   @IsObject()
   webauthnResponse?: Record<string, unknown>;
 
   @ApiPropertyOptional()
-  @ValidateIf((o: ReauthDto) => o.method === "webauthn")
+  @ValidateIf((o: ReauthDto) => o.method === "webauthn" || o.webauthnResponse !== undefined)
   @IsString()
   sessionNonce?: string;
 }
