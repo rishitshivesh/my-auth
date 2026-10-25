@@ -19,10 +19,15 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { type Request, type Response } from "express";
 import * as crypto from "crypto";
 import type { StringValue } from "ms";
+import { consumeSocialState, issueSocialState } from "./social-state";
+import { isAllowedReturnOrigin } from "@/common/security/return-origin";
 import { ApiException } from "@/common/http";
 import { SocialAuthService, SocialProfile } from "./social-auth.service";
 import { Protected } from "../../common/decorators/protected.decorator";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
+import { TenantJobRunner } from "@/core/database/tenant-job-runner.service";
+import { TenantService } from "@/modules/tenant/tenant.service";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import {
   setAccessTokenCookie,
   setMfaEnrollmentCookie,
@@ -56,7 +61,24 @@ export class SocialAuthController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly jwksService: JwksService,
+    private readonly tenantJobRunner: TenantJobRunner,
+    private readonly tenantService: TenantService,
+    private readonly securityEvents: SecurityEventService,
   ) {}
+
+  /**
+   * The provider redirects to one shared callback host, so the request is resolved to that
+   * host's tenant. The account must be read/written in the tenant named by the signed state.
+   */
+  private async inStateTenant<T>(tenantId: string, work: () => Promise<T>): Promise<T> {
+    const tenant = await this.tenantService.findById(tenantId);
+    if (!tenant) throw new ApiException("TENANT_NOT_FOUND");
+    return this.tenantJobRunner.runInTenant(tenant.slug, async () => {
+      const result = await work();
+      await this.securityEvents.drain();
+      return result;
+    });
+  }
 
   /** A provider with no client id/callback configured is simply not offered to this deployment. */
   private providerConfig(key: string): string {
@@ -94,7 +116,7 @@ export class SocialAuthController {
   googleLogin(@Req() req: Request, @Res() res: Response) {
     const tenantId = (req.query.tenant_id as string) || req.tenantId!;
     const returnUrl = (req.query.return_url as string) || "";
-    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+    const state = issueSocialState(res, { tenantId, returnUrl });
 
     const params = new URLSearchParams({
       client_id: this.providerConfig("INTERNAL_GOOGLE_CLIENT_ID"),
@@ -133,7 +155,7 @@ export class SocialAuthController {
   githubLogin(@Req() req: Request, @Res() res: Response) {
     const tenantId = (req.query.tenant_id as string) || req.tenantId!;
     const returnUrl = (req.query.return_url as string) || "";
-    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+    const state = issueSocialState(res, { tenantId, returnUrl });
 
     const params = new URLSearchParams({
       client_id: this.providerConfig("INTERNAL_GITHUB_CLIENT_ID"),
@@ -168,7 +190,7 @@ export class SocialAuthController {
   microsoftLogin(@Req() req: Request, @Res() res: Response) {
     const tenantId = (req.query.tenant_id as string) || req.tenantId!;
     const returnUrl = (req.query.return_url as string) || "";
-    const state = Buffer.from(JSON.stringify({ tenantId, returnUrl })).toString("base64url");
+    const state = issueSocialState(res, { tenantId, returnUrl });
 
     const params = new URLSearchParams({
       client_id: this.providerConfig("INTERNAL_MICROSOFT_CLIENT_ID"),
@@ -204,19 +226,29 @@ export class SocialAuthController {
     const profile: SocialProfile = req.user;
     const strategy = profile.provider;
 
-    // Detect link mode (authenticated user linking a social account)
-    const rawState = req.query.state as string | undefined;
-    if (rawState) {
-      let parsedState: Record<string, unknown> = {};
-      try {
-        parsedState = JSON.parse(Buffer.from(rawState, "base64url").toString());
-      } catch {
-        // Not our state format — fall through to normal flow
-      }
+    // Signature, expiry and browser binding are verified before anything in the
+    // state is trusted (login CSRF defence); the nonce cookie is single-use.
+    const parsedState = consumeSocialState(req as unknown as Request, res, req.query.state);
+    if (!parsedState) {
+      return res.redirect("/error?message=Invalid+state+parameter");
+    }
 
-      if (parsedState.mode === "link" && parsedState.userId) {
+    // Detect link mode (authenticated user linking a social account)
+    {
+      if (parsedState["mode"] === "link" && parsedState["userId"]) {
+        // The state is client-controlled: only a link token we signed for this
+        // exact user/tenant may authorise attaching an identity to an account.
+        const linkClaims = await this.socialAuthService.verifyLinkToken(
+          String(parsedState.lt ?? ""),
+        );
+        if (
+          linkClaims.userId !== parsedState.userId ||
+          linkClaims.tenantId !== parsedState.tenantId
+        ) {
+          throw new ApiException("AUTH_TOKEN_INVALID");
+        }
         const rawProfile = req.user as unknown as Record<string, unknown> & { emails?: Array<{ value: string }>; photos?: Array<{ value: string }> };
-        await this.socialAuthService.handleLinkCallback({
+        await this.inStateTenant(parsedState.tenantId as string, () => this.socialAuthService.handleLinkCallback({
           userId: parsedState.userId as string,
           tenantId: parsedState.tenantId as string,
           profile: {
@@ -236,7 +268,7 @@ export class SocialAuthController {
               rawProfile.picture) as string | undefined,
             accessToken: (rawProfile.accessToken as string) || "",
           },
-        });
+        }));
         const adminPortalUrl = this.configService.get<string>(
           "ADMIN_PORTAL_URL",
           "http://localhost:3000",
@@ -247,17 +279,8 @@ export class SocialAuthController {
       }
     }
 
-    // Decode our base64url state from query param
-    let tenantId: string;
-    let returnUrl: string;
-    try {
-      const stateRaw = req.query.state as string;
-      const stateObj = JSON.parse(Buffer.from(stateRaw, "base64url").toString());
-      tenantId = stateObj.tenantId;
-      returnUrl = stateObj.returnUrl || "";
-    } catch {
-      return res.redirect("/error?message=Invalid+state+parameter");
-    }
+    const tenantId = parsedState["tenantId"];
+    const returnUrl = parsedState["returnUrl"] || "";
 
     if (!tenantId) {
       return res.redirect("/error?message=Missing+tenant+ID");
@@ -265,17 +288,29 @@ export class SocialAuthController {
 
     // Validate returnUrl to prevent open redirect
     const portalUrl = this.configService.get("PORTAL_URL") || "http://localhost:3000";
-    const allowedOrigins = [portalUrl, "http://localhost:3000", "http://localhost:3001"];
-    const isSafeReturn = !returnUrl || allowedOrigins.some((o) => returnUrl.startsWith(o));
-    const safeReturnUrl = isSafeReturn ? returnUrl : portalUrl;
+    // Exact origin comparison: a prefix match (startsWith) lets
+    // "https://portal.example.com.evil.test" or "...@evil.test" through, and
+    // the redirect carries the session completion token (ASVS 5.1.5).
+    const allowedOrigins = new Set<string>();
+    try {
+      allowedOrigins.add(new URL(portalUrl).origin);
+    } catch {
+      // misconfigured PORTAL_URL: only the fallback below applies
+    }
+    if (process.env["NODE_ENV"] !== "production") {
+      allowedOrigins.add("http://localhost:3000");
+      allowedOrigins.add("http://localhost:3001");
+    }
+    const isSafeReturn = !returnUrl || isAllowedReturnOrigin(returnUrl, allowedOrigins);
+    const safeReturnUrl = isSafeReturn ? returnUrl.replace(/\/+$/, "") : portalUrl;
 
     try {
-      const result = await this.socialAuthService.handleCallback({
+      const result = await this.inStateTenant(tenantId, () => this.socialAuthService.handleCallback({
         tenantId,
         profile,
         ipAddress: req.ip ?? '0.0.0.0',
         userAgent: req.headers["user-agent"] || "unknown",
-      });
+      }));
 
       if (result.type === "link_required") {
         return res.redirect(
@@ -399,13 +434,13 @@ export class SocialAuthController {
     @Res() res: Response,
   ) {
     const payload = this.socialAuthService.verifyLinkToken(linkToken);
-    const state = Buffer.from(
-      JSON.stringify({
-        mode: "link",
-        userId: (await payload).userId,
-        tenantId: (await payload).tenantId,
-      }),
-    ).toString("base64url");
+    const claims = await payload;
+    const state = issueSocialState(res, {
+      mode: "link",
+      userId: claims.userId,
+      tenantId: claims.tenantId,
+      lt: linkToken,
+    });
     const params = new URLSearchParams({
       client_id: this.providerConfig("INTERNAL_GOOGLE_CLIENT_ID"),
       redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/google/callback`,
@@ -424,13 +459,13 @@ export class SocialAuthController {
     @Res() res: Response,
   ) {
     const payload = this.socialAuthService.verifyLinkToken(linkToken);
-    const state = Buffer.from(
-      JSON.stringify({
-        mode: "link",
-        userId: (await payload).userId,
-        tenantId: (await payload).tenantId,
-      }),
-    ).toString("base64url");
+    const claims = await payload;
+    const state = issueSocialState(res, {
+      mode: "link",
+      userId: claims.userId,
+      tenantId: claims.tenantId,
+      lt: linkToken,
+    });
     const params = new URLSearchParams({
       client_id: this.providerConfig("INTERNAL_GITHUB_CLIENT_ID"),
       redirect_uri: `${this.configService.get<string>("AUTH_SERVICE_URL", "http://localhost:3001")}/auth/social/github/callback`,
@@ -449,13 +484,13 @@ export class SocialAuthController {
     @Res() res: Response,
   ) {
     const payload = this.socialAuthService.verifyLinkToken(linkToken);
-    const state = Buffer.from(
-      JSON.stringify({
-        mode: "link",
-        userId: (await payload).userId,
-        tenantId: (await payload).tenantId,
-      }),
-    ).toString("base64url");
+    const claims = await payload;
+    const state = issueSocialState(res, {
+      mode: "link",
+      userId: claims.userId,
+      tenantId: claims.tenantId,
+      lt: linkToken,
+    });
     const msTenant = this.configService.get<string>(
       "MICROSOFT_TENANT_ID",
       "common",

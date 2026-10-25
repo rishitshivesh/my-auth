@@ -118,6 +118,34 @@ export class OAuthAuthorizationCode extends BaseEntity {
   nonce?: string;
 
   // ============================================================
+  // AUTHENTICATION CONTEXT (OIDC sid / auth_time / amr)
+  // ============================================================
+
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "session_id",
+    comment: "Browser session that authorised this code (ID token sid)",
+  })
+  sessionId?: string;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "auth_time",
+    comment: "When the session's user last authenticated (ID token auth_time)",
+  })
+  authTime?: Date;
+
+  @Column({
+    type: "varchar",
+    length: 255,
+    nullable: true,
+    comment: "Space-separated authentication methods (ID token amr)",
+  })
+  amr?: string;
+
+  // ============================================================
   // USAGE TRACKING
   // ============================================================
 

@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ApiException } from "../../common/http";
+import { AMR_PASSWORD } from "@/modules/auth/auth-methods";
 import { assertPasswordPolicy } from "../auth/password-policy";
 import { hashPassword } from "../auth/password-hashing";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
@@ -24,6 +25,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { logger } from "@/common/logger";
+import { isReservedSlug } from "@/modules/tenant/reserved-slugs";
+import { TenantService } from "@/modules/tenant/tenant.service";
 import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
 import type { CreateFirstAdminDto } from "./dto/create-first-admin.dto";
 
@@ -131,6 +134,7 @@ export class AdminService implements OnModuleInit {
     private readonly oauthRefreshTokenService: OAuthRefreshTokenService,
     private readonly jwtService: JwtService,
     private readonly tenantSchemaService: TenantSchemaService,
+    private readonly tenantService: TenantService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -141,9 +145,9 @@ export class AdminService implements OnModuleInit {
     const initialized = await this.isInitialized();
     if (!initialized) {
       this.setupToken = randomBytes(32).toString("hex");
-      logger.info(`=== FIRST RUN SETUP TOKEN: ${this.setupToken} ===`);
+      // The token is secret: it is written only to the setup file, never to the app logger.
       logger.info(
-        "Use this token in the X-Setup-Token header when calling POST /superadmin/create-first-admin",
+        "First-run setup token generated; use it in the X-Setup-Token header when calling POST /superadmin/create-first-admin",
       );
 
       try {
@@ -158,7 +162,7 @@ export class AdminService implements OnModuleInit {
           { flag: "a" },
         );
         this.setupLogPath = logPath;
-        logger.info({ logPath }, "Setup token written to file");
+        logger.info({ logPath }, "Setup token written to file (read it on the server host)");
       } catch (err) {
         logger.warn({ err }, "Could not write setup token to file — check SENTRY_SETUP_LOG_DIR");
       }
@@ -257,7 +261,7 @@ export class AdminService implements OnModuleInit {
       qb.andWhere("t.active = :active", { active: status === "active" });
     }
     if (plan) {
-      qb.andWhere("t.plan = :plan", { plan });
+      qb.andWhere("t.settings ->> 'plan' = :plan", { plan });
     }
 
     qb.orderBy("t.createdAt", "DESC")
@@ -288,7 +292,7 @@ export class AdminService implements OnModuleInit {
         id: t.id,
         slug: t.slug,
         name: t.name,
-        plan: (t as unknown as Record<string, unknown>).plan as string ?? "free",
+        plan: t.settings?.plan ?? "free",
         status: t.active ? "active" : "suspended",
         userCount: userCounts[t.id] ?? 0,
         createdAt: t.createdAt,
@@ -322,7 +326,7 @@ export class AdminService implements OnModuleInit {
       id: tenant.id,
       slug: tenant.slug,
       name: tenant.name,
-      plan: (tenant as unknown as Record<string, unknown>).plan as string ?? "free",
+      plan: tenant.settings?.plan ?? "free",
       status: tenant.active ? "active" : "suspended",
       userCount,
       createdAt: tenant.createdAt,
@@ -357,6 +361,10 @@ export class AdminService implements OnModuleInit {
       throw new ApiException("BAD_REQUEST", { detail: "Slug must be 4–63 characters, lowercase letters/numbers/hyphens, and cannot start or end with a hyphen" });
     }
 
+    if (isReservedSlug(dto.slug)) {
+      throw new ApiException("BAD_REQUEST", { detail: "This slug is reserved" });
+    }
+
     const existing = await this.tenantRepository.findOne({
       where: { slug: dto.slug },
     });
@@ -372,8 +380,8 @@ export class AdminService implements OnModuleInit {
         passwordlessEnabled: true,
         socialProvidersEnabled: true,
       },
+      settings: dto.plan ? { plan: dto.plan } : undefined,
     } as Partial<Tenant>);
-    if (dto.plan) (tenant as unknown as Record<string, unknown>).plan = dto.plan;
 
     const saved = await this.tenantRepository.save(tenant);
     await this.jwksService.ensureTenantKeyExists(saved.id);
@@ -481,40 +489,28 @@ export class AdminService implements OnModuleInit {
     const updates: Partial<Tenant> = {};
     if (dto.name) updates.name = dto.name;
     if (dto.status) updates.active = dto.status === "active";
-    if (dto.plan) (updates as unknown as Record<string, unknown>).plan = dto.plan;
+    if (dto.plan) updates.settings = { ...(tenant.settings ?? {}), plan: dto.plan };
 
     await this.tenantRepository.update({ id }, updates);
+    // Resolution caches (slug/id/domain) would otherwise keep serving a suspended tenant.
+    await this.tenantService.invalidateCache(id);
     return this.getTenantById(id);
   }
 
   async deleteTenant(id: string): Promise<void> {
     const tenant = await this.tenantRepository.findOne({ where: { id } });
     if (!tenant) throw new ApiException("TENANT_NOT_FOUND");
+    await this.tenantService.invalidateCache(id);
+    // Drop the schema explicitly (one DDL) instead of relying on per-table FK cascades into
+    // public.tenants, which exhaust shared lock memory with many tenant schemas (ADR 0005).
+    await this.tenantSchemaService.dropSchema(tenant.slug);
+    await this.jwksService.deleteTenantKeys(id);
     await this.tenantRepository.delete({ id });
   }
 
   async checkSlugAvailability(
     slug: string,
   ): Promise<{ available: boolean; reason?: string }> {
-    const RESERVED = [
-      "admin",
-      "api",
-      "auth",
-      "www",
-      "mail",
-      "smtp",
-      "sentry",
-      "support",
-      "help",
-      "status",
-      "billing",
-      "dashboard",
-      "login",
-      "logout",
-      "signup",
-      "register",
-    ];
-
     if (slug.length < 4)
       return { available: false, reason: "Slug must be at least 4 characters" };
     if (slug.length > 63)
@@ -529,7 +525,7 @@ export class AdminService implements OnModuleInit {
         available: false,
         reason: "Slug cannot start or end with a hyphen",
       };
-    if (RESERVED.includes(slug))
+    if (isReservedSlug(slug))
       return { available: false, reason: "This slug is reserved" };
 
     // Check Redis reservation
@@ -927,6 +923,7 @@ export class AdminService implements OnModuleInit {
       email: savedUser.email,
       ipAddress,
       userAgent,
+      amr: AMR_PASSWORD,
     });
 
     const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({

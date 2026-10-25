@@ -185,6 +185,39 @@ Content-Type: application/json
 }
 ```
 
-**Response `201`:** `{ "inviteToken": "...", "expiresAt": "..." }`
+**Response `201`:** `{ "message": "Invitation sent" }`
 
 The invited user clicks the link in the email → lands on `/invite/{token}` to complete registration.
+The token only travels in that link; the server stores a hash of it.
+
+---
+
+### GET /api/users/invites
+
+List pending invitations (not accepted, not expired). Requires `users:read`. The token is never returned.
+
+**Response `200`:**
+
+```json
+[
+  {
+    "id": "invite-uuid",
+    "email": "newuser@example.com",
+    "roleIds": ["role-uuid"],
+    "invitedBy": "user-uuid",
+    "expiresAt": "2026-10-28T10:00:00.000Z",
+    "createdAt": "2026-10-21T10:00:00.000Z"
+  }
+]
+```
+
+---
+
+### DELETE /api/users/invites/{id}
+
+Revoke a pending invitation. Requires `users:write`. The emailed link stops working immediately and
+the address can be invited again. The action is audited as `user.invite_revoked`.
+
+**Response `204`:** Invitation revoked.
+**Response `404`:** No such invitation in this tenant.
+**Response `409`:** The invitation was already accepted.

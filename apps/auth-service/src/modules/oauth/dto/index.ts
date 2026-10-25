@@ -540,6 +540,12 @@ export class OpenIDConfigurationDto {
   })
   introspection_endpoint?: string;
 
+  @ApiPropertyOptional({
+    description: "RP-Initiated Logout endpoint",
+    example: "https://sentry.scrolloop.com/oauth/end_session",
+  })
+  end_session_endpoint?: string;
+
   @ApiProperty({
     description: "Supported response types",
     example: ["code"],
@@ -603,6 +609,12 @@ export class OpenIDConfigurationDto {
     isArray: true,
   })
   claims_supported!: string[];
+
+  @ApiPropertyOptional({ description: "Supported prompt values", isArray: true })
+  prompt_values_supported?: string[];
+
+  @ApiPropertyOptional({ description: "Supported claim types", isArray: true })
+  claim_types_supported?: string[];
 }
 
 // ============================================================

@@ -4,6 +4,7 @@ import { DataSource } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import type { Cache } from "cache-manager";
 import { Session, Tenant } from "@repo/database";
+import { tenantStorage } from "@/core/database/tenant-context.service";
 import { RedisService } from "./redis.service";
 import { ConfigService } from "@nestjs/config";
 import { logger } from "@/common/logger";
@@ -19,6 +20,8 @@ export interface SessionData {
   deviceId?: string;
   createdAt: Date;
   expiresAt: Date;
+  /** Authentication methods the login completed with (OIDC amr). */
+  amr?: string[];
 }
 
 /** Matches no session row; lets "all sessions" and "all but one" share one query. */
@@ -68,6 +71,8 @@ export class SessionService {
     ipAddress?: string;
     userAgent?: string;
     deviceId?: string;
+    /** Methods the login completed with; persisted so refresh and /oauth/authorize report them. */
+    amr?: readonly string[];
   }): Promise<Session> {
     const schemaName = await this.getSchemaName(data.tenantId);
     const expiresAt = new Date(Date.now() + this.sessionTTL * 1000);
@@ -77,11 +82,15 @@ export class SessionService {
     const query = `
       INSERT INTO "${schemaName}"."sessions" (
         "user_id", "tenant_id", "refresh_token_family_id", "refresh_token_hash",
-        "ip_address", "user_agent", "device_id", "last_activity", "expires_at"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        "ip_address", "user_agent", "device_id", "last_activity", "expires_at", "amr"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
-    const rows = await this.dataSource.manager.query(query, [
+    // Inside an open tenant transaction (e.g. self-service tenant registration)
+    // the insert must share that connection, or the FK to the not-yet-committed
+    // user row fails.
+    const manager = tenantStorage.getStore()?.queryRunner?.manager ?? this.dataSource.manager;
+    const rows = await manager.query(query, [
       data.userId,
       data.tenantId,
       data.refreshTokenFamilyId || null,
@@ -91,6 +100,7 @@ export class SessionService {
       data.deviceId || null,
       lastActivity,
       expiresAt,
+      data.amr && data.amr.length > 0 ? data.amr.join(" ") : null,
     ]);
     const rawSession = rows[0];
     const session = {
@@ -119,6 +129,7 @@ export class SessionService {
       deviceId: session.deviceId,
       createdAt: session.createdAt,
       expiresAt: session.expiresAt!,
+      amr: data.amr ? [...data.amr] : undefined,
     };
 
     await this.redisService.set(
@@ -212,6 +223,7 @@ export class SessionService {
       deviceId: session.deviceId ?? undefined,
       createdAt: session.createdAt ?? new Date(),
       expiresAt: session.expiresAt!,
+      amr: typeof rawSession.amr === "string" && rawSession.amr ? rawSession.amr.split(" ") : undefined,
     };
 
     // Cache it
@@ -342,8 +354,8 @@ export class SessionService {
     // 2. Revoke in PostgreSQL
     await this.dataSource.manager.query(
       `UPDATE "${schemaName}"."sessions"
-       SET revoked_at = $1, revoked_reason = $2
-       WHERE refresh_token_family_id = $3 AND tenant_id = $4`,
+       SET revoked_at = $1, revoked_reason = $2, refresh_token_hash = NULL
+       WHERE refresh_token_family_id = $3 AND tenant_id = $4 AND revoked_at IS NULL`,
       [new Date(), "token_reuse_detected", familyId, tenantId]
     );
 

@@ -50,6 +50,7 @@ export * from "./src/entities/user-invite.entity";
 
 // MFA Policy
 export * from "./src/entities/tenant-mfa-policy.entity";
+export * from "./src/entities/tenant-password-policy.entity";
 
 // Sprint 4 — Webhooks
 export * from "./src/entities/webhook-endpoint.entity";

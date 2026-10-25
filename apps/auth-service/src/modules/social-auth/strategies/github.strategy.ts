@@ -14,19 +14,21 @@ import { SocialProfile } from "../social-auth.service";
  *
  * Note: GitHub doesn't use OIDC, just OAuth 2.0
  */
+/**
+ * A provider that is not configured is simply not offered (login routes answer SOCIAL_PROVIDER_DISABLED);
+ * the strategy must still construct so the app boots without social credentials.
+ */
+const UNCONFIGURED = "provider-not-configured";
+
 @Injectable()
 export class GitHubStrategy extends PassportStrategy(Strategy, "github") {
   private readonly logger = new Logger(GitHubStrategy.name);
 
   constructor(private configService: ConfigService) {
     super({
-      clientID: configService.getOrThrow<string>("INTERNAL_GITHUB_CLIENT_ID"),
-      clientSecret: configService.getOrThrow<string>(
-        "INTERNAL_GITHUB_CLIENT_SECRET",
-      ),
-      callbackURL: configService.getOrThrow<string>(
-        "INTERNAL_GITHUB_CALLBACK_URL",
-      ),
+      clientID: (configService.get<string>("INTERNAL_GITHUB_CLIENT_ID") || UNCONFIGURED),
+      clientSecret: (configService.get<string>("INTERNAL_GITHUB_CLIENT_SECRET") || UNCONFIGURED),
+      callbackURL: (configService.get<string>("INTERNAL_GITHUB_CALLBACK_URL") || UNCONFIGURED),
       scope: ["user:email"],
       passReqToCallback: true,
     });

@@ -10,30 +10,11 @@ import * as dns from "dns/promises";
 import type { LookupOptions, LookupAddress } from "dns";
 import * as net from "net";
 import { WebhookEndpoint, WebhookDelivery } from "@repo/database";
-import { WEBHOOK_QUEUE, WebhookEvent } from "./webhook.service";
+import { WEBHOOK_QUEUE, RETRY_DELAYS, WebhookEvent, buildWebhookEnvelope } from "./webhook.service";
 import { logger } from "@/common/logger";
-
-const PRIVATE_RANGES = [
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^::1$/,
-  /^fc00:/i,
-  /^fd[0-9a-f]{2}:/i,
-  /^fe80:/i,
-  /^0\.0\.0\.0$/,
-];
-
-function normalizeIp(address: string): string {
-  const v4mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
-  return v4mapped?.[1] ?? address;
-}
-
-function isPrivateIp(address: string): boolean {
-  return PRIVATE_RANGES.some((r) => r.test(normalizeIp(address)));
-}
+import { tenantSchemaName } from "@/core/tenant/tenant-schema-name";
+import { isPrivateIp } from "@/common/security/private-ip";
+import { isBlockedWebhookAddress } from "@/common/security/webhook-loopback";
 
 /**
  * Validates the URL against SSRF rules and returns the first validated IP so
@@ -50,7 +31,7 @@ async function assertNotSsrf(url: string): Promise<string | null> {
   const hostname = parsed.hostname;
 
   if (net.isIP(hostname)) {
-    if (isPrivateIp(hostname)) {
+    if (isBlockedWebhookAddress(hostname, isPrivateIp)) {
       throw new Error("Webhook URL resolves to a private/reserved IP — SSRF blocked");
     }
     return null; // already an IP literal — no rebinding risk
@@ -61,7 +42,7 @@ async function assertNotSsrf(url: string): Promise<string | null> {
     throw new Error("Webhook hostname could not be resolved — delivery blocked");
   });
   for (const { address } of addrs) {
-    if (isPrivateIp(address)) {
+    if (isBlockedWebhookAddress(address, isPrivateIp)) {
       throw new Error("Webhook URL resolves to a private/reserved IP — SSRF blocked");
     }
   }
@@ -71,7 +52,18 @@ async function assertNotSsrf(url: string): Promise<string | null> {
   return addrs[0]?.address ?? null;
 }
 
-@Processor(WEBHOOK_QUEUE)
+/** Receivers sometimes echo request headers/bodies; never persist the signing secret or signature. */
+function redactSecrets(text: string, secrets: string[]): string {
+  return secrets.reduce((acc, secret) => (secret ? acc.split(secret).join("[REDACTED]") : acc), text);
+}
+
+/** Backoff for jobs queued with `backoff: { type: "custom" }`; without it BullMQ cannot reschedule retries. */
+export function webhookBackoffMs(attemptsMade: number): number {
+  const idx = Math.max(0, attemptsMade - 1);
+  return (RETRY_DELAYS[idx] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]!) * 1000;
+}
+
+@Processor(WEBHOOK_QUEUE, { settings: { backoffStrategy: webhookBackoffMs } })
 export class WebhookProcessor extends WorkerHost {
   constructor(
     @InjectDataSource()
@@ -81,7 +73,7 @@ export class WebhookProcessor extends WorkerHost {
   }
 
   async process(job: Job<WebhookEvent>): Promise<void> {
-    const { endpointId, tenantId, eventType, payload, deliveryId } = job.data;
+    const { endpointId, tenantId, eventType, deliveryId } = job.data;
 
     // BullMQ jobs run outside TenantSchemaMiddleware/AsyncLocalStorage. We must
     // manually set the correct search_path for this connection so TypeORM reads
@@ -105,7 +97,7 @@ export class WebhookProcessor extends WorkerHost {
         return;
       }
 
-      await qr.query(`SET search_path TO "fk_${slug}", public`);
+      await qr.query(`SET search_path TO "${tenantSchemaName(slug)}", public`);
 
       const endpointRepo = qr.manager.getRepository(WebhookEndpoint);
       const deliveryRepo = qr.manager.getRepository(WebhookDelivery);
@@ -120,12 +112,7 @@ export class WebhookProcessor extends WorkerHost {
         return;
       }
 
-      const body = JSON.stringify({
-        id: deliveryId,
-        type: eventType,
-        data: payload,
-        timestamp: new Date().toISOString(),
-      });
+      const body = JSON.stringify(buildWebhookEnvelope(job.data));
 
       const signature = this.buildSignatureHeader(endpoint.secret, body);
       const start = Date.now();
@@ -143,7 +130,7 @@ export class WebhookProcessor extends WorkerHost {
               _hostname: string,
               _opts: LookupOptions,
               callback: (err: NodeJS.ErrnoException | null, addr: string | LookupAddress[], family: number | undefined) => void,
-            ) => callback(null, pinnedIp, 4)
+            ) => callback(null, pinnedIp, net.isIP(pinnedIp) === 6 ? 6 : 4)
           : undefined;
 
         const httpAgent = new http.Agent({ lookup });
@@ -171,7 +158,7 @@ export class WebhookProcessor extends WorkerHost {
           await deliveryRepo.update(deliveryId, {
             status: "success",
             responseStatus: response.status,
-            responseBody: String(response.data ?? "").slice(0, 1000),
+            responseBody: redactSecrets(String(response.data ?? ""), [endpoint.secret, signature]).slice(0, 1000),
             durationMs,
             attempts: job.attemptsMade + 1,
           });

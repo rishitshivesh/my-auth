@@ -224,7 +224,7 @@ export class PermissionService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot delete system permission" });
     }
 
-    await this.permissionRepository.remove(permission);
+    await this.permissionRepository.delete({ id: permission.id });
 
     logger.info({ permissionName: permission.name }, "Deleted permission");
   }
@@ -319,6 +319,7 @@ export class PermissionService {
       // API permissions
       { resource: "api", action: "read", description: "Read API resources" },
       { resource: "api", action: "write", description: "Write API resources" },
+      { resource: "api", action: "*", description: "All API permissions" },
 
       // Profile permissions
       { resource: "profile", action: "read", description: "View own profile" },
@@ -327,6 +328,7 @@ export class PermissionService {
         action: "write",
         description: "Update own profile",
       },
+      { resource: "profile", action: "*", description: "All profile permissions" },
 
       // Super admin wildcard
       {

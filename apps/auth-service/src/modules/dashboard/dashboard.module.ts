@@ -11,6 +11,7 @@ import {
 } from "@repo/database";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardService } from "./dashboard.service";
+import { TokenEncryptionService } from "@/modules/auth/oauth-token-encryption.service";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 import { RedisService } from "@/common/service/redis.service";
 import { DatabaseModule } from "@/core/database/database.module";
@@ -30,6 +31,6 @@ import { DatabaseModule } from "@/core/database/database.module";
     MfaModule,
   ],
   controllers: [DashboardController],
-  providers: [DashboardService],
+  providers: [DashboardService, TokenEncryptionService],
 })
 export class DashboardModule {}

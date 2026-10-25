@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
 } from "@nestjs/common";
+import { AMR_SOCIAL } from "@/modules/auth/auth-methods";
 import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -201,6 +202,13 @@ export class SocialAuthService {
   > {
     const user = connection.user;
 
+    // A suspended / deactivated account must not obtain a session, and its
+    // provider tokens must not be refreshed.
+    if (user.isActive === false || (user.status !== undefined && user.status !== "active")) {
+      this.logger.warn("Social login refused for inactive user", { userId: user.id });
+      throw new ApiException("USER_SUSPENDED");
+    }
+
     this.logger.log("Logging in user with social connection", {
       userId: user.id,
       provider: profile.provider,
@@ -226,22 +234,8 @@ export class SocialAuthService {
     });
 
     // MFA enforcement: check before issuing session
-    const socialMfaStatus = await this.mfaService.getMfaStatus(user.id, connection.tenantId);
-    if (!socialMfaStatus.enabled) {
-      const mfaPolicy = await this.mfaPolicyService.getForTenant(connection.tenantId);
-      const needsEnrollment =
-        mfaPolicy.enforceForAllUsers ||
-        (mfaPolicy.enforceForAdmins &&
-          (await this.userRoleRepository.find({ where: { userId: user.id, tenantId: connection.tenantId }, relations: ['role'] }))
-            .some((ur) => ['owner', 'admin'].includes(ur.role?.name?.toLowerCase() ?? '')));
-
-      if (needsEnrollment) {
-        return {
-          type: 'mfa_enrollment_required' as const,
-          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, connection.tenantId),
-        };
-      }
-    }
+    const enrollment = await this.enforceMfaEnrollment(user.id, connection.tenantId);
+    if (enrollment) return enrollment;
 
     // Create session
     const session = await this.sessionService.createSession({
@@ -250,6 +244,7 @@ export class SocialAuthService {
       email: user.email,
       ipAddress,
       userAgent,
+      amr: AMR_SOCIAL,
     });
 
     // Create refresh token
@@ -269,6 +264,8 @@ export class SocialAuthService {
         email: user.email,
         tenantId: connection.tenantId,
         sessionId: session.id,
+        authTime: Math.floor(Date.now() / 1000),
+        amr: [...AMR_SOCIAL],
       },
       "15m",
       connection.tenantId,
@@ -319,6 +316,31 @@ export class SocialAuthService {
   }
 
   /**
+   * Tenant MFA policy: returns an enrollment challenge when the user has no
+   * MFA yet but the tenant (or the user's admin role) requires it.
+   */
+  private async enforceMfaEnrollment(
+    userId: string,
+    tenantId: string,
+  ): Promise<{ type: "mfa_enrollment_required"; enrollmentToken: string } | null> {
+    const mfaStatus = await this.mfaService.getMfaStatus(userId, tenantId);
+    if (mfaStatus.enabled) return null;
+
+    const mfaPolicy = await this.mfaPolicyService.getForTenant(tenantId);
+    const needsEnrollment =
+      mfaPolicy.enforceForAllUsers ||
+      (mfaPolicy.enforceForAdmins &&
+        (await this.userRoleRepository.find({ where: { userId, tenantId }, relations: ["role"] }))
+          .some((ur) => ["owner", "admin"].includes(ur.role?.name?.toLowerCase() ?? "")));
+
+    if (!needsEnrollment) return null;
+    return {
+      type: "mfa_enrollment_required",
+      enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(userId, tenantId),
+    };
+  }
+
+  /**
    * Create new user with social connection
    */
   private async createUserWithSocialConnection(
@@ -326,23 +348,33 @@ export class SocialAuthService {
     profile: SocialProfile,
     ipAddress: string,
     userAgent: string,
-  ): Promise<{
-    type: "success";
-    accessToken: string;
-    refreshToken: string;
-    user: { id: string; email: string; firstName?: string; lastName?: string; displayName?: string; avatarUrl?: string; emailVerified: boolean };
-  }> {
+  ): Promise<
+    | {
+        type: "success";
+        accessToken: string;
+        refreshToken: string;
+        user: { id: string; email: string; firstName?: string; lastName?: string; displayName?: string; avatarUrl?: string; emailVerified: boolean };
+      }
+    | { type: "mfa_enrollment_required"; enrollmentToken: string }
+  > {
     this.logger.log("Creating new user with social connection", {
       tenantId,
       provider: profile.provider,
       email: profile.email,
     });
 
+    // An address the provider has not verified proves nothing about the mailbox owner.
+    if (profile.emailVerified === false) {
+      throw new ApiException("SOCIAL_PROVIDER_ERROR", {
+        detail: "The sign-in provider has not verified this email address.",
+      });
+    }
+
     // Create user
     const user = await this.userRepository.save({
       tenantId,
       email: profile.email,
-      emailVerified: profile.emailVerified ?? true, // Trust provider verification
+      emailVerified: true, // Trust provider verification
       firstName: profile.firstName || profile.displayName?.split(" ")[0],
       lastName:
         profile.lastName || profile.displayName?.split(" ").slice(1).join(" "),
@@ -379,6 +411,10 @@ export class SocialAuthService {
       lastUsedAt: new Date(),
     });
 
+    // Fresh social users are subject to the same tenant MFA policy.
+    const enrollment = await this.enforceMfaEnrollment(user.id, tenantId);
+    if (enrollment) return enrollment;
+
     // Create session
     const session = await this.sessionService.createSession({
       userId: user.id,
@@ -386,6 +422,7 @@ export class SocialAuthService {
       email: user.email,
       ipAddress,
       userAgent,
+      amr: AMR_SOCIAL,
     });
 
     // Create refresh token
@@ -405,6 +442,8 @@ export class SocialAuthService {
         email: user.email,
         tenantId,
         sessionId: session.id,
+        authTime: Math.floor(Date.now() / 1000),
+        amr: [...AMR_SOCIAL],
       },
       "15m",
       tenantId,
@@ -714,10 +753,14 @@ export class SocialAuthService {
   async verifyLinkToken(token: string): Promise<{ userId: string; tenantId: string }> {
     try {
       const publicKey = await this.jwksService.getPublicKeyForToken(token);
-      return this.jwtService.verify(token, {
+      const payload = this.jwtService.verify(token, {
         publicKey: publicKey as any,
         algorithms: ["RS256"],
-      }) as { userId: string; tenantId: string };
+      }) as { userId?: string; tenantId?: string; mode?: string };
+      if (payload.mode !== "link" || !payload.userId || !payload.tenantId) {
+        throw new Error("Not a link token");
+      }
+      return { userId: payload.userId, tenantId: payload.tenantId };
     } catch {
       throw new ApiException("AUTH_TOKEN_INVALID");
     }
@@ -734,16 +777,21 @@ export class SocialAuthService {
   }): Promise<{ provider: string }> {
     const { userId, tenantId, profile } = params;
 
-    // Idempotent — if already linked, succeed silently
+    // A provider identity binds to exactly one user per tenant.
     const existing = await this.socialConnectionRepository.findOne({
       where: {
-        userId,
         tenantId,
         provider: profile.provider,
         providerId: profile.providerId,
       },
     });
     if (existing) {
+      if (existing.userId !== userId) {
+        throw new ApiException("RESOURCE_CONFLICT", {
+          detail: "This provider account is already linked to a different user.",
+        });
+      }
+      // Idempotent — already linked to this user
       return { provider: profile.provider };
     }
 

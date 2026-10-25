@@ -66,30 +66,6 @@ export class SessionController {
   }
 
   /**
-   * Revoke a specific session
-   */
-  @Delete(":sessionId")
-  @Protected()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary: "Revoke a session",
-    description: "Logout from a specific device/session",
-  })
-  async revokeSession(@Param("sessionId") sessionId: string, @Req() req: AuthenticatedRequest) {
-    const userId = req.user.sub;
-    const tenantId = req.tenantId;
-
-    await this.sessionManagementService.revokeSession(
-      sessionId,
-      userId,
-      tenantId,
-      "user_revoked_via_api",
-    );
-
-    return { message: "Session revoked successfully" };
-  }
-
-  /**
    * Revoke all other sessions (logout all devices except current)
    */
   @Delete("all/other")
@@ -142,5 +118,30 @@ export class SessionController {
       message: "All sessions revoked",
       revokedCount,
     };
+  }
+
+  // Declared last: `:sessionId` would otherwise swallow DELETE /sessions/all.
+  /**
+   * Revoke a specific session
+   */
+  @Delete(":sessionId")
+  @Protected()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: "Revoke a session",
+    description: "Logout from a specific device/session",
+  })
+  async revokeSession(@Param("sessionId") sessionId: string, @Req() req: AuthenticatedRequest) {
+    const userId = req.user.sub;
+    const tenantId = req.tenantId;
+
+    await this.sessionManagementService.revokeSession(
+      sessionId,
+      userId,
+      tenantId,
+      "user_revoked_via_api",
+    );
+
+    return { message: "Session revoked successfully" };
   }
 }

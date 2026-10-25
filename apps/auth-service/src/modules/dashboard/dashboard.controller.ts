@@ -1,8 +1,10 @@
 import { Controller, Get, Patch, Param, Body, Request, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull } from "typeorm";
-import { User, Tenant, TenantSocialProvider } from "@repo/database";
+import { Repository, IsNull, MoreThan } from "typeorm";
+import { User, Tenant, TenantSocialProvider, SecurityEventType } from "@repo/database";
+import { ApiException } from "@/common/http";
+import { SecurityEventService } from "@/common/service/security-event.service";
 import { SessionRepository } from "@/core/database/session.repository";
 import { type SocialProvider } from "@repo/database";
 import { Protected } from "@/common/decorators/protected.decorator";
@@ -12,15 +14,19 @@ import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 import { UpdateTenantSettingsDto } from "./dto/update-tenant-settings.dto";
+import { TokenEncryptionService } from "@/modules/auth/oauth-token-encryption.service";
 import { UpdateSocialProviderDto } from "./dto/update-social-provider.dto";
 
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean };
   ip?: string;
+  requestId?: string;
   route?: { path: string };
   params?: Record<string, string>;
 }
+
+const SOCIAL_PROVIDERS = new Set<string>(["google", "github", "microsoft", "apple", "linkedin"]);
 
 @ApiTags("Dashboard")
 @Controller("dashboard")
@@ -36,7 +42,25 @@ export class DashboardController {
     private readonly tenantSocialProviderRepository: Repository<TenantSocialProvider>,
     private readonly mfaService: MfaService,
     private readonly dashboardService: DashboardService,
+    private readonly securityEvents: SecurityEventService,
+    private readonly tokenEncryption: TokenEncryptionService,
   ) {}
+
+  private auditSettings(req: AuthenticatedRequest, metadata: Record<string, unknown>): void {
+    this.securityEvents.log({
+      tenantId: req.tenantId,
+      userId: req.user.sub,
+      actorEmail: req.user.email,
+      eventType: SecurityEventType.TENANT_SETTINGS_UPDATED,
+      severity: "info",
+      ipAddress: req.ip ?? "0.0.0.0",
+      userAgent: "dashboard",
+      requestId: req.requestId,
+      resourceType: "tenant_settings",
+      resourceId: req.tenantId,
+      metadata,
+    });
+  }
 
   @Get()
   @ApiOperation({ summary: "Get dashboard overview for current user" })
@@ -48,7 +72,7 @@ export class DashboardController {
       this.userRepository.findOne({ where: { id: userId, tenantId } }),
       this.mfaService.getMfaStatus(userId, tenantId),
       this.sessionRepository.count({
-        where: { userId, tenantId, revokedAt: IsNull() },
+        where: { userId, tenantId, revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
       }),
     ]);
 
@@ -74,6 +98,11 @@ export class DashboardController {
     };
   }
 
+  /** Empty/absent means "leave unchanged"; anything else is stored encrypted. */
+  private encryptOptionalSecret(secret: string | undefined): string | undefined {
+    return secret ? this.tokenEncryption.encryptSecret(secret) : undefined;
+  }
+
   @Get("tenant-settings")
   @ApiOperation({ summary: "Get tenant login method settings" })
   async getTenantSettings(@Request() req: AuthenticatedRequest) {
@@ -81,7 +110,12 @@ export class DashboardController {
 
     const [tenant, socialProviders] = await Promise.all([
       this.tenantRepository.findOne({ where: { id: tenantId } }),
-      this.tenantSocialProviderRepository.find({ where: { tenantId } }),
+      // client_secret is select:false; fetch it only to report presence, never to return it.
+      this.tenantSocialProviderRepository
+        .createQueryBuilder("sp")
+        .addSelect("sp.clientSecret")
+        .where("sp.tenantId = :tenantId", { tenantId })
+        .getMany(),
     ]);
 
     return {
@@ -90,7 +124,7 @@ export class DashboardController {
         provider: sp.provider,
         enabled: sp.enabled,
         clientId: sp.clientId || null,
-        hasSecret: !!sp.clientSecret,
+        hasClientSecret: !!sp.clientSecret,
       })),
     };
   }
@@ -105,13 +139,14 @@ export class DashboardController {
   ) {
     const tenantId = req.tenantId!;
     const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
-    if (!tenant) throw new Error("Tenant not found");
+    if (!tenant) throw new ApiException("RESOURCE_NOT_FOUND");
 
     await this.tenantRepository.update(
       { id: tenantId },
       { featureFlags: { ...(tenant.featureFlags || {}), ...body.featureFlags } },
     );
 
+    this.auditSettings(req, { flags: Object.keys(body.featureFlags) });
     return { message: "Settings updated" };
   }
 
@@ -158,6 +193,9 @@ export class DashboardController {
     @Body() body: UpdateSocialProviderDto,
   ) {
     const tenantId = req.tenantId!;
+    if (!SOCIAL_PROVIDERS.has(provider)) {
+      throw new ApiException("BAD_REQUEST", { detail: `Unsupported social provider "${provider}"` });
+    }
 
     const existing = await this.tenantSocialProviderRepository.findOne({
       where: { tenantId, provider: provider as SocialProvider },
@@ -167,7 +205,7 @@ export class DashboardController {
       await this.tenantSocialProviderRepository.update(existing.id, {
         enabled: body.enabled,
         ...(body.clientId !== undefined && { clientId: body.clientId }),
-        ...(body.clientSecret !== undefined && { clientSecret: body.clientSecret }),
+        ...(body.clientSecret !== undefined && { clientSecret: this.encryptOptionalSecret(body.clientSecret) }),
       });
     } else {
       await this.tenantSocialProviderRepository.save({
@@ -175,11 +213,12 @@ export class DashboardController {
         provider: provider as SocialProvider,
         enabled: body.enabled,
         clientId: body.clientId,
-        clientSecret: body.clientSecret,
+        clientSecret: this.encryptOptionalSecret(body.clientSecret),
         useSharedApp: !body.clientId,
       });
     }
 
+    this.auditSettings(req, { provider, enabled: body.enabled, credentialsChanged: body.clientId !== undefined || body.clientSecret !== undefined });
     return { message: "Social provider updated" };
   }
 }

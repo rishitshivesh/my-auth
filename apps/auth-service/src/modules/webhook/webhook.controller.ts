@@ -7,13 +7,13 @@ import {
   Body,
   Param,
   Query,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
   Request,
   UseGuards,
-  DefaultValuePipe,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
+import { ApiException } from "@/common/http";
 import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
@@ -21,13 +21,22 @@ import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 import { WebhookService } from "./webhook.service";
 import { CreateWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 
+const DEFAULT_DELIVERY_LIMIT = 50;
+const MAX_DELIVERY_LIMIT = 200;
+
+/** The signing secret is revealed only on create/rotate, never on read. */
+function withoutSecret<T extends { secret?: string }>(endpoint: T): Omit<T, "secret"> {
+  const { secret: _secret, ...rest } = endpoint;
+  return rest;
+}
+
 interface AuthenticatedRequest {
   tenantId?: string;
   user: { sub: string; tid: string };
 }
 
 @Controller("webhooks")
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
 export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
@@ -40,24 +49,24 @@ export class WebhookController {
 
   @Get()
   @RequirePermissions(Permissions.WEBHOOKS_READ)
-  list(@Request() req: AuthenticatedRequest) {
-    return this.webhookService.list(req.tenantId!);
+  async list(@Request() req: AuthenticatedRequest) {
+    return (await this.webhookService.list(req.tenantId!)).map(withoutSecret);
   }
 
   @Get(":id")
   @RequirePermissions(Permissions.WEBHOOKS_READ)
-  findOne(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
-    return this.webhookService.findOne(req.tenantId!, id);
+  async findOne(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    return withoutSecret(await this.webhookService.findOne(req.tenantId!, id));
   }
 
   @Patch(":id")
   @RequirePermissions(Permissions.WEBHOOKS_WRITE)
-  update(
+  async update(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdateWebhookDto,
   ) {
-    return this.webhookService.update(req.tenantId!, id, dto);
+    return withoutSecret(await this.webhookService.update(req.tenantId!, id, dto));
   }
 
   @Post(":id/rotate-secret")
@@ -78,9 +87,15 @@ export class WebhookController {
   getDeliveries(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
-    @Query("limit", new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query("limit") rawLimit?: string,
   ) {
-    return this.webhookService.getDeliveries(req.tenantId!, id, limit);
+    const limit = rawLimit === undefined ? DEFAULT_DELIVERY_LIMIT : Number(rawLimit);
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw new ApiException("VALIDATION_FAILED", {
+        errors: [{ field: "limit", message: "limit must be a positive integer" }],
+      });
+    }
+    return this.webhookService.getDeliveries(req.tenantId!, id, Math.min(limit, MAX_DELIVERY_LIMIT));
   }
 
   @Post(":id/deliveries/:deliveryId/redeliver")

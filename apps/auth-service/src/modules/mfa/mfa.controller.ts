@@ -10,6 +10,7 @@ import {
   HttpStatus,
   Param,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
 import {
   ApiTags,
   ApiOperation,
@@ -29,7 +30,7 @@ import {
   VerifyEmailOtpDto,
 } from "./dto/mfa.dto";
 import { FinishWebAuthnRegistrationDto } from "./dto/finish-webauthn-registration.dto";
-import { JwtAuthGuard } from "@/common/guards";
+import { JwtAuthGuard, RequireRecentAuth } from "@/common/guards";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
@@ -46,7 +47,7 @@ interface AuthenticatedRequest {
 
 @ApiTags("MFA")
 @Controller("mfa")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SessionGuard)
 @ApiBearerAuth()
 export class MfaController {
   constructor(
@@ -123,6 +124,7 @@ export class MfaController {
    * Disable TOTP MFA
    */
   @Delete("totp")
+  @RequireRecentAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Disable TOTP MFA",
@@ -236,6 +238,7 @@ export class MfaController {
    * Disable all MFA methods
    */
   @Delete("all")
+  @RequireRecentAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Disable all MFA",

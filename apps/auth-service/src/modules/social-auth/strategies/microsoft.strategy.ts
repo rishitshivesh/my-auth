@@ -14,21 +14,21 @@ import { SocialProfile } from "../social-auth.service";
  * - email: Get user's email
  * - profile: Get user's profile
  */
+/**
+ * A provider that is not configured is simply not offered (login routes answer SOCIAL_PROVIDER_DISABLED);
+ * the strategy must still construct so the app boots without social credentials.
+ */
+const UNCONFIGURED = "provider-not-configured";
+
 @Injectable()
 export class MicrosoftStrategy extends PassportStrategy(Strategy, "microsoft") {
   private readonly logger = new Logger(MicrosoftStrategy.name);
 
   constructor(private configService: ConfigService) {
     super({
-      clientID: configService.getOrThrow<string>(
-        "INTERNAL_MICROSOFT_CLIENT_ID",
-      ),
-      clientSecret: configService.getOrThrow<string>(
-        "INTERNAL_MICROSOFT_CLIENT_SECRET",
-      ),
-      callbackURL: configService.getOrThrow<string>(
-        "INTERNAL_MICROSOFT_CALLBACK_URL",
-      ),
+      clientID: (configService.get<string>("INTERNAL_MICROSOFT_CLIENT_ID") || UNCONFIGURED),
+      clientSecret: (configService.get<string>("INTERNAL_MICROSOFT_CLIENT_SECRET") || UNCONFIGURED),
+      callbackURL: (configService.get<string>("INTERNAL_MICROSOFT_CALLBACK_URL") || UNCONFIGURED),
       scope: ["openid", "email", "profile"],
       tenant: "common", // Support personal + work accounts
       passReqToCallback: true,
@@ -36,6 +36,16 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, "microsoft") {
     });
 
     this.logger.log("MicrosoftStrategy initialized");
+  }
+
+  /**
+   * Entra/MSA email claims are mutable and not verified by default (nOAuth), so
+   * only trust an explicit verification claim from the provider.
+   */
+  private static isEmailVerified(claims: unknown): boolean {
+    if (typeof claims !== "object" || claims === null) return false;
+    const { verified_email: verifiedEmail, xms_edov: edov } = claims as Record<string, unknown>;
+    return [verifiedEmail, edov].some((v) => v === true || v === 1 || v === "1" || v === "true");
   }
 
   async validate(
@@ -62,7 +72,7 @@ export class MicrosoftStrategy extends PassportStrategy(Strategy, "microsoft") {
         provider: "microsoft",
         providerId: profile.id,
         email,
-        emailVerified: true, // Microsoft verifies emails
+        emailVerified: MicrosoftStrategy.isEmailVerified(profile._json),
         displayName: profile.displayName,
         firstName: profile.name?.givenName,
         lastName: profile.name?.familyName,

@@ -11,6 +11,7 @@ export const ERROR_TITLES: Readonly<Record<ErrorCode, string>> = {
   AUTH_SESSION_REVOKED: "Session ended",
   AUTH_REFRESH_REUSED: "Session ended for your safety",
   AUTH_ACCOUNT_LOCKED: "Account temporarily locked",
+  AUTH_PASSWORD_EXPIRED: "Password expired",
   ACCESS_FORBIDDEN: "Access denied",
   ACCESS_RECENT_AUTH_REQUIRED: "Please confirm it is you",
   HIERARCHY_VIOLATION: "Action not allowed for this role",

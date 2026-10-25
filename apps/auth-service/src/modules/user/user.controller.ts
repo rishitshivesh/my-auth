@@ -40,6 +40,17 @@ import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Protected } from "@/common/decorators/protected.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
 
+const DEFAULT_EVENT_LIMIT = 50;
+const MIN_EVENT_LIMIT = 1;
+const MAX_EVENT_LIMIT = 100;
+
+/** Parse a ?limit= value; non-numeric falls back to the default, others are clamped to 1..100. */
+function clampLimit(raw: string): number {
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed)) return DEFAULT_EVENT_LIMIT;
+  return Math.min(MAX_EVENT_LIMIT, Math.max(MIN_EVENT_LIMIT, parsed));
+}
+
 interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; email?: string; mfaVerified?: boolean; sessionId?: string };
@@ -165,7 +176,11 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Sessions revoked" })
   async revokeAllSessions(@Request() req: AuthenticatedRequest) {
     const tenantId = req.tenantId!;
-    await this.userService.revokeAllSessions(tenantId, req.user.sub);
+    await this.userService.revokeAllSessions(
+      tenantId,
+      req.user.sub,
+      req.user.sessionId,
+    );
     return { message: "All other sessions revoked successfully" };
   }
 
@@ -184,7 +199,7 @@ export class UserController {
     return this.userService.getSecurityEvents(
       tenantId,
       req.user.sub,
-      parseInt(limit, 10),
+      clampLimit(limit),
     );
   }
 
@@ -325,6 +340,36 @@ export class UserController {
       updated: result.updated,
     };
   }
+  // ------------------------------------------------------------
+  // Invitations. Declared before the ":id" routes so "invites" is not read as a user id.
+  // ------------------------------------------------------------
+
+  @Get("invites")
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_READ)
+  @ApiOperation({ summary: "List pending invitations" })
+  @ApiResponse({ status: 200, description: "Pending invitations (tokens are never returned)" })
+  async listInvites(@Request() req: AuthenticatedRequest) {
+    return this.userService.listPendingInvites(req.tenantId!);
+  }
+
+  @Delete("invites/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.USERS_WRITE)
+  @ApiOperation({ summary: "Revoke a pending invitation" })
+  @ApiResponse({ status: 204, description: "Invitation revoked" })
+  @ApiResponse({ status: 404, description: "Invitation not found" })
+  @ApiResponse({ status: 409, description: "Invitation already accepted" })
+  async revokeInvite(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
+    await this.userService.revokeInvite(req.tenantId!, id, {
+      userId: req.user.sub,
+      email: req.user.email,
+      ip: req.ip,
+      requestId: req.requestId,
+    });
+  }
+
   /**
    * Get user by ID (Admin only)
    * Requires: users:read permission
@@ -358,7 +403,7 @@ export class UserController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     const tenantId = req.tenantId!;
-    await this.userService.update(tenantId, id, updateUserDto);
+    await this.userService.adminUpdate(tenantId, id, req.user.sub, updateUserDto);
     return { message: "User updated successfully" };
   }
 
@@ -501,6 +546,6 @@ export class UserController {
     @Query("limit") limit: string = "50",
   ) {
     const tenantId = req.tenantId!;
-    return this.userService.getSecurityEvents(tenantId, id, parseInt(limit, 10));
+    return this.userService.getSecurityEvents(tenantId, id, clampLimit(limit));
   }
 }

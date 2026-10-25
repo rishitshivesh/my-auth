@@ -8,6 +8,7 @@
  */
 
 import { Injectable } from "@nestjs/common";
+import { ApiException } from "@/common/http";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -62,7 +63,12 @@ export class EmailService {
   ) {}
 
   private frontendUrl(path: string, token: string): string {
-    const base = this.configService.get<string>("FRONTEND_URL");
+    const base = this.configService.get<string>("FRONTEND_URL")?.trim().replace(/\/+$/, "");
+    if (!base || !/^https?:\/\/[^\s/]/i.test(base)) {
+      // Never emit "undefined/..." links; env.validation.ts rejects this at boot.
+      logger.error("FRONTEND_URL is missing or not an http(s) URL; refusing to build email link");
+      throw new ApiException("INTERNAL_ERROR", { detail: "Email links are not configured" });
+    }
     return `${base}${path}?token=${encodeURIComponent(token)}`;
   }
 

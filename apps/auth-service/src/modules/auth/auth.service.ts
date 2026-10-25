@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
+import { hashToken } from "@/common/security/token-hash";
 import type { StringValue } from 'ms';
-import { HttpException, Injectable } from "@nestjs/common";
+import { HttpException, Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, IsNull, In } from "typeorm";
 import { SessionRepository } from "@/core/database/session.repository";
@@ -40,7 +41,8 @@ import {
 } from "@/common/service/domain-events.service";
 import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 import { LoginThrottleService } from "./login-throttle.service";
-import { assertPasswordPolicy } from "./password-policy";
+import { AMR_MAGIC_LINK, AMR_PASSKEY, AMR_PASSWORD, AMR_PASSWORD_BACKUP_CODE, AMR_PASSWORD_TOTP, parseAmr } from "./auth-methods";
+import { assertTenantPasswordPolicy, passwordExpired, TenantPasswordPolicyService } from "@/modules/password-policy/tenant-password-policy.service";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password-hashing";
 /**
  * Authentication Service (Updated for Multi-Tenant)
@@ -102,6 +104,7 @@ export class AuthService {
     private readonly loginThrottle: LoginThrottleService,
     private readonly domainEvents: DomainEventsService,
     private readonly passwordEffects: PasswordChangeEffectsService,
+    @Optional() private readonly passwordPolicy?: TenantPasswordPolicyService,
   ) {}
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
@@ -138,6 +141,7 @@ export class AuthService {
     sessionId: string,
     tenant?: Tenant,
     authTime: number = Math.floor(Date.now() / 1000),
+    amr: readonly string[] = AMR_PASSWORD,
   ): Promise<Record<string, unknown>> {
     const [groups, resolvedTenant] = await Promise.all([
       this.getUserGroups(userId, tenantId),
@@ -155,6 +159,8 @@ export class AuthService {
       // Epoch seconds of the login this session started with; RecentAuthGuard
       // compares it to RECENT_AUTH_WINDOW_SECONDS for sensitive actions.
       authTime,
+      // Authentication methods of that login (OIDC amr); also stored on the session.
+      amr: [...amr],
     };
   }
 
@@ -194,7 +200,7 @@ export class AuthService {
       throw new ApiException("TENANT_NOT_FOUND");
     }
 
-    assertPasswordPolicy(data.password, { email: data.email });
+    await assertTenantPasswordPolicy(this.passwordPolicy, data.tenantId, data.password, { email: data.email });
 
     // Hash before looking the email up so a taken email costs the same time
     // as a free one.
@@ -243,7 +249,7 @@ export class AuthService {
       passwordHash,
       firstName: data.firstName,
       lastName: data.lastName,
-      emailVerificationToken,
+      emailVerificationToken: hashToken(emailVerificationToken), // raw token only travels in the email
       emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
@@ -318,6 +324,20 @@ export class AuthService {
 
     // Only someone who knows the password learns the account is locked.
     await this.bruteForceService.checkAccountLock(user);
+    // Suspended accounts must not obtain a session (ASVS 2.1.x / 3.3). Checked
+    // after the password so only someone who knows it learns the state.
+    if (user.isActive === false) {
+      throw new ApiException("USER_SUSPENDED");
+    }
+    // Tenant password-age policy: expired passwords must be reset before a session is issued.
+    if (this.passwordPolicy) {
+      const policy = await this.passwordPolicy.get(tenantId);
+      if (passwordExpired(policy, user.passwordChangedAt ?? user.createdAt)) {
+        throw new ApiException("AUTH_PASSWORD_EXPIRED", {
+          detail: "Your password has expired. Reset it to continue.",
+        });
+      }
+    }
     await this.loginThrottle.refund(tenantId, email);
     await this.bruteForceService.resetFailedAttempts(user);
 
@@ -395,6 +415,7 @@ export class AuthService {
       ipAddress: data.ip,
       userAgent: data.userAgent,
       deviceId: data.deviceId,
+      amr: AMR_PASSWORD,
     });
 
     logger.info({ sessionId: session.id }, "Session created");
@@ -421,6 +442,8 @@ export class AuthService {
       data.tenantId,
       session.id,
       user.tenant,
+      undefined,
+      AMR_PASSWORD,
     );
 
     const accessToken = await this.signToken(
@@ -622,6 +645,7 @@ export class AuthService {
   ): Promise<
     | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }
     | { status: 'mfa_enrollment_required'; enrollmentToken: string }
+    | { mfaRequired: true; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string }
   > {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
@@ -640,11 +664,42 @@ export class AuthService {
     // Clear the token (one-time use) and mark email as verified
     await this.userRepository.update(
       { id: user.id, tenantId },
-      { magicLinkToken: undefined, magicLinkExpiresAt: undefined, emailVerified: true },
+      {
+        // `undefined` is skipped by TypeORM's update(); null actually clears the
+        // columns so the link cannot be replayed.
+        magicLinkToken: null as unknown as string,
+        magicLinkExpiresAt: null as unknown as Date,
+        emailVerified: true,
+      },
     );
 
     // MFA enrollment enforcement: check policy AFTER credential verification but BEFORE session
+    if (user.isActive === false) {
+      throw new ApiException("USER_SUSPENDED");
+    }
     const magicLinkMfaStatus = await this.mfaService.getMfaStatus(user.id, tenantId);
+    if (magicLinkMfaStatus.enabled) {
+      // A magic link is a single factor, same as a password: an enrolled second
+      // factor must still be satisfied (ASVS 2.8 / 6.x MFA bypass).
+      const tempToken = await this.signToken(
+        {
+          sub: user.id,
+          email: user.email,
+          tenantId,
+          type: "mfa_pending",
+          jti: randomUUID(),
+        },
+        "5m",
+        tenantId,
+      );
+      return {
+        mfaRequired: true,
+        tempToken,
+        availableMethods: magicLinkMfaStatus.methods,
+        preferredMethod: magicLinkMfaStatus.preferredMethod || "totp",
+        message: "MFA verification required",
+      };
+    }
     if (!magicLinkMfaStatus.enabled) {
       const mfaPolicy = await this.mfaPolicyService.getForTenant(tenantId);
       const needsEnrollment =
@@ -667,6 +722,7 @@ export class AuthService {
       email: user.email,
       ipAddress: ip,
       userAgent,
+      amr: AMR_MAGIC_LINK,
     });
 
     const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
@@ -679,7 +735,7 @@ export class AuthService {
       expiresInDays: 30,
     });
 
-    const magicLinkPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
+    const magicLinkPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id, undefined, undefined, AMR_MAGIC_LINK);
     const accessToken = await this.signToken(
       magicLinkPayload,
       "15m",
@@ -781,11 +837,13 @@ export class AuthService {
       throw invalid();
     }
 
-    assertPasswordPolicy(newPassword, { email: user.email });
+    await assertTenantPasswordPolicy(this.passwordPolicy, tenantId, newPassword, { email: user.email });
 
-    // Check password history
+    // Check password history (depth is per tenant)
+    const policy = await this.passwordPolicy?.get(tenantId);
+    const historyCount = policy?.historyCount ?? 5;
     const passwordHistory = user.passwordHistory || [];
-    for (const oldHash of passwordHistory) {
+    for (const oldHash of passwordHistory.slice(0, historyCount)) {
       const isReused = await verifyPassword(oldHash, newPassword);
       if (isReused) {
         throw new ApiException("PASSWORD_POLICY", {
@@ -805,13 +863,14 @@ export class AuthService {
     const updatedHistory = [
       ...(user.passwordHash ? [user.passwordHash] : []),
       ...passwordHistory,
-    ].slice(0, 5);
+    ].slice(0, historyCount);
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
       {
         passwordHash: newPasswordHash,
         passwordHistory: updatedHistory,
+        passwordChangedAt: new Date(),
         // `undefined` is skipped by TypeORM's update(); null actually clears
         // the columns so the code cannot be replayed.
         passwordResetToken: null as unknown as string,
@@ -839,7 +898,7 @@ export class AuthService {
     const user = await this.userRepository.findOne({
       where: {
         tenantId, // ← Tenant filter
-        emailVerificationToken: token,
+        emailVerificationToken: hashToken(token),
         emailVerificationExpiresAt: MoreThan(new Date()),
       },
     });
@@ -852,8 +911,9 @@ export class AuthService {
       { id: user.id, tenantId }, // ← Tenant-scoped update
       {
         emailVerified: true,
-        emailVerificationToken: undefined,
-        emailVerificationExpiresAt: undefined,
+        // null (not undefined) so the token is really cleared and single-use.
+        emailVerificationToken: null as unknown as string,
+        emailVerificationExpiresAt: null as unknown as Date,
       },
     );
 
@@ -895,7 +955,7 @@ export class AuthService {
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
       {
-        emailVerificationToken,
+        emailVerificationToken: hashToken(emailVerificationToken),
         emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     );
@@ -948,7 +1008,7 @@ export class AuthService {
     // Refreshing is not re-authenticating: keep the original login time.
     const loginSession = await this.sessionRepository.findOne({
       where: { id: accessTokenPayload.sessionId as string, tenantId },
-      select: { id: true, createdAt: true },
+      select: { id: true, createdAt: true, amr: true },
     });
 
     // Enrich payload with groups and tenantSlug
@@ -959,6 +1019,8 @@ export class AuthService {
       accessTokenPayload.sessionId as string,
       undefined,
       loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0,
+      // Refreshing keeps the methods of the original login; legacy sessions without any count as password.
+      parseAmr(loginSession?.amr).length > 0 ? parseAmr(loginSession?.amr) : AMR_PASSWORD,
     );
     // Generate new access token
     const accessToken = await this.signToken(enrichedPayload, "15m", tenantId);
@@ -1180,24 +1242,27 @@ export class AuthService {
     }
 
     // Step 3: Generate real session and tokens
-    const familyId = uuidv4();
-    const refreshToken = crypto.randomBytes(32).toString("hex");
-    const refreshTokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
     const session = await this.sessionService.createSession({
       userId: payload.sub as string,
       tenantId,
       email: payload.email as string,
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
+      amr: AMR_PASSWORD_TOTP,
     });
 
-    const mfaPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
+    // Same refresh-token path as password login so /refresh can rotate it.
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId,
+      userId: payload.sub as string,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+      expiresInDays: 30,
+    });
+
+    const mfaPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id, undefined, undefined, AMR_PASSWORD_TOTP);
     const accessToken = await this.signToken(mfaPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "MFA verified successfully");
@@ -1238,24 +1303,27 @@ export class AuthService {
     }
 
     // Step 3: Generate real session and tokens
-    const familyId = uuidv4();
-    const refreshToken = crypto.randomBytes(32).toString("hex");
-    const refreshTokenHash = crypto
-      .createHash("sha256")
-      .update(refreshToken)
-      .digest("hex");
-
     const session = await this.sessionService.createSession({
       userId: payload.sub as string,
       tenantId,
       email: payload.email as string,
-      refreshTokenFamilyId: familyId,
-      refreshTokenHash,
       ipAddress: ip,
       userAgent: userAgent || "unknown",
+      amr: AMR_PASSWORD_BACKUP_CODE,
     });
 
-    const backupPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id);
+    // Same refresh-token path as password login so /refresh can rotate it.
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId,
+      userId: payload.sub as string,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress: ip,
+      userAgent: userAgent || "unknown",
+      expiresInDays: 30,
+    });
+
+    const backupPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id, undefined, undefined, AMR_PASSWORD_BACKUP_CODE);
     const accessToken = await this.signToken(backupPayload, "15m", tenantId);
 
     logger.info({ userId: payload.sub }, "Backup code verified");
@@ -1401,6 +1469,7 @@ export class AuthService {
       ipAddress: ip,
       userAgent,
       deviceId,
+      amr: AMR_PASSKEY,
     });
 
     const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
@@ -1414,7 +1483,7 @@ export class AuthService {
       expiresInDays: 30,
     });
 
-    const passkeyPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id);
+    const passkeyPayload = await this.buildAccessTokenPayload(user.id, user.email, tenantId, session.id, undefined, undefined, AMR_PASSKEY);
     const accessToken = await this.signToken(passkeyPayload, "15m", tenantId);
 
     // Log successful passkey login
@@ -1713,7 +1782,7 @@ export class AuthService {
     tenantSlug: string;
   }> {
     const invite = await this.userInviteRepository.findOne({
-      where: { token },
+      where: { token: hashToken(token) },
       relations: ['tenant'],
     });
 
@@ -1746,7 +1815,7 @@ export class AuthService {
     userAgent: string;
   }): Promise<{ message: string }> {
     const invite = await this.userInviteRepository.findOne({
-      where: { token: data.token },
+      where: { token: hashToken(data.token) },
       relations: ['tenant'],
     });
 
@@ -1772,7 +1841,7 @@ export class AuthService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "An account with this email already exists in this workspace." });
     }
 
-    assertPasswordPolicy(data.password, { email: invite.email });
+    await assertTenantPasswordPolicy(this.passwordPolicy, tenant.id, data.password, { email: invite.email });
 
     const [firstName, ...rest] = data.name.trim().split(' ');
     const lastName = rest.join(' ') || undefined;
@@ -1815,7 +1884,7 @@ export class AuthService {
       severity: "info",
       ipAddress: data.ip,
       userAgent: data.userAgent,
-      metadata: { via: "invite", inviteToken: data.token.slice(0, 8) + '...' },
+      metadata: { via: "invite" },
     });
 
     return { message: "Account created successfully" };

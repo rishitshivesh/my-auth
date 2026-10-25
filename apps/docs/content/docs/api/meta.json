@@ -1,4 +1,4 @@
 {
   "title": "API Reference",
-  "pages": ["index", "authentication", "mfa", "oauth", "users", "tenants", "rbac", "audit"]
+  "pages": ["index", "authentication", "mfa", "oauth", "users", "tenants", "rbac", "audit", "webhooks", "ldap"]
 }

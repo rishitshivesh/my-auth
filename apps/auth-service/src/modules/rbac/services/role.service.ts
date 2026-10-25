@@ -7,6 +7,8 @@ import { Repository, In } from "typeorm";
 import { Role, RolePermission, Permission } from "@repo/database";
 import { logger } from "@/common/logger";
 
+const RESERVED_ROLE_NAMES = new Set(["super_admin", "sentry-internal"]);
+
 export interface CreateRoleDto {
   tenantId: string;
   name: string;
@@ -45,6 +47,11 @@ export class RoleService {
    * Create a new role
    */
   async createRole(data: CreateRoleDto): Promise<Role> {
+    // Role names become JWT `groups`; platform-operator names would grant superadmin.
+    if (RESERVED_ROLE_NAMES.has(data.name.trim().toLowerCase()) || /-internal$/i.test(data.name.trim())) {
+      throw new ApiException("VALIDATION_FAILED", { detail: `Role name "${data.name}" is reserved` });
+    }
+
     // Check if role already exists
     const existing = await this.roleRepository.findOne({
       where: {
@@ -73,7 +80,9 @@ export class RoleService {
 
     // Assign permissions if provided
     if (data.permissionNames && data.permissionNames.length > 0) {
-      await this.assignPermissionsToRole(
+      // Internal path: the role was just created, so the system-role guard
+      // in assignPermissionsToRole() (which protects existing roles) must not apply.
+      await this.attachPermissions(
         role.id,
         data.tenantId,
         data.permissionNames,
@@ -218,7 +227,7 @@ export class RoleService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot delete default role" });
     }
 
-    await this.roleRepository.remove(role);
+    await this.roleRepository.delete({ id: role.id });
 
     logger.info({ roleName: role.name }, "Deleted role");
   }
@@ -238,21 +247,43 @@ export class RoleService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot modify system role permissions" });
     }
 
-    // Get permissions by names
+    await this.attachPermissions(roleId, tenantId, permissionNames, assignedBy, role.name);
+  }
+
+  /**
+   * Resolve permission names to entities; throws BAD_REQUEST listing unknown names.
+   */
+  private async resolvePermissions(
+    tenantId: string,
+    permissionNames: string[],
+  ): Promise<Permission[]> {
+    const uniqueNames = [...new Set(permissionNames)];
     const permissions = await this.permissionRepository.find({
       where: {
         tenantId,
-        name: In(permissionNames),
+        name: In(uniqueNames),
       },
     });
 
-    if (permissions.length !== permissionNames.length) {
-      const foundNames = permissions.map((p) => p.name);
-      const missing = permissionNames.filter(
-        (name) => !foundNames.includes(name),
-      );
+    if (permissions.length !== uniqueNames.length) {
+      const foundNames = new Set(permissions.map((p) => p.name));
+      const missing = uniqueNames.filter((name) => !foundNames.has(name));
       throw new ApiException("BAD_REQUEST", { detail: `Permissions not found: ${missing.join(", ")}` });
     }
+    return permissions;
+  }
+
+  /**
+   * Add permissions to a role without the system-role guard (callers enforce it).
+   */
+  private async attachPermissions(
+    roleId: string,
+    tenantId: string,
+    permissionNames: string[],
+    assignedBy?: string,
+    roleName?: string,
+  ): Promise<void> {
+    const permissions = await this.resolvePermissions(tenantId, permissionNames);
 
     // Get existing role permissions
     const existing = await this.rolePermissionRepository.find({
@@ -277,7 +308,7 @@ export class RoleService {
 
       await this.rolePermissionRepository.save(rolePermissions);
 
-      logger.info({ count: toAdd.length, roleName: role.name }, "Assigned permissions to role");
+      logger.info({ count: toAdd.length, roleName }, "Assigned permissions to role");
     }
   }
 
@@ -330,21 +361,28 @@ export class RoleService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "Cannot modify system role permissions" });
     }
 
-    // Remove all existing permissions
-    await this.rolePermissionRepository.delete({
-      roleId,
-      tenantId,
-    });
+    // Validate every name BEFORE touching existing grants, then swap the set
+    // in one transaction so a failure can never leave the role stripped.
+    const permissions =
+      permissionNames.length > 0
+        ? await this.resolvePermissions(tenantId, permissionNames)
+        : [];
 
-    // Add new permissions
-    if (permissionNames.length > 0) {
-      await this.assignPermissionsToRole(
-        roleId,
-        tenantId,
-        permissionNames,
-        assignedBy,
-      );
-    }
+    await this.rolePermissionRepository.manager.transaction(async (manager) => {
+      const rpRepo = manager.getRepository(RolePermission);
+      await rpRepo.delete({ roleId, tenantId });
+      if (permissions.length > 0) {
+        await rpRepo.save(
+          permissions.map((permission) => ({
+            tenantId,
+            roleId,
+            permissionId: permission.id,
+            assignedBy,
+            assignedAt: new Date(),
+          })),
+        );
+      }
+    });
 
     logger.info({ count: permissionNames.length, roleName: role.name }, "Set permissions for role");
   }
@@ -372,14 +410,6 @@ export class RoleService {
     createdBy?: string,
   ): Promise<Role[]> {
     const roles = [
-      {
-        name: "super_admin",
-        displayName: "Super Admin",
-        description: "Platform administrator with full access",
-        priority: 1000,
-        isSystem: true,
-        permissionNames: ["*:*"],
-      },
       {
         name: "admin",
         displayName: "Admin",

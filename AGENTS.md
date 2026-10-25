@@ -74,6 +74,31 @@ changes (module boundaries, schema strategy, public API shape).
   spacing or font sizes. Follow `docs/ui-process.md`.
 - Keep UI-only changes and backend changes in separate commits.
 
+**Modern, complete user journeys**
+- Prefer low-friction, intent-driven flows: clickable email links for email verification,
+  invitations and password recovery; offer passkeys and passwordless sign-in where supported.
+  Manual email OTP entry is a fallback, not the default verification experience. Keep TOTP,
+  recovery codes and other required MFA challenges when they serve a distinct security purpose.
+- Email actions must take people to the relevant continuation, retain the intended tenant and
+  validated destination, explain what happened, and provide a clear next step. Cover expired,
+  already-used, invalid and wrong-account links, resend cooldowns, alternate-device completion,
+  cancellation and accessible code fallback. Never silently sign in an unintended account.
+- Design links as short-lived, single-use, purpose-bound actions. Email scanners/prefetch must
+  not consume a credential or complete a sensitive mutation on GET; use an intentional
+  confirmation where required. Do not weaken tenant isolation, authorization or recent-auth
+  requirements to make a flow feel simpler.
+- Apply progressive disclosure, useful defaults, inline validation, accessible keyboard/focus
+  behavior and truthful pending/success/error states. Explain the effect of destructive or
+  access-changing actions before confirmation; never imply success before the server confirms.
+- Cover the complete lifecycle, not just list pages: user creation/invitation and acceptance,
+  verification, role/group/policy assignment and revocation, permission visibility, sessions,
+  recovery, suspension/reactivation and deletion. Include loading, empty/no-results, denied,
+  conflict, retry, responsive and theme states, with success/failure/cancel prototype exits.
+- Track screen, prototype, API mapping and frontend implementation separately in
+  `apps/docs/content/docs/dev/screen-ux-checklist/index.mdx`. Figma frames and prototype links
+  do not count as implemented or tested application flows. Design proposed missing features
+  with explicit handoff requirements; never invent backend support or ship fake success.
+
 ## 5. Configuration
 
 - Every environment variable is declared in `apps/auth-service/src/config/env.validation.ts`

@@ -16,6 +16,9 @@ import {
 } from "@repo/database";
 import { PasswordService } from "@repo/security";
 import { OAuthController } from "./oauth.controller";
+import { OAuthAuthorizeController } from "./oauth-authorize.controller";
+import { OAuthBrowserSessionService } from "./services/oauth-browser-session.service";
+import { OAuthConsentTransactionService } from "./services/oauth-consent-transaction.service";
 import { OAuthClientService } from "./services/oauth-client.service";
 import { OAuthTokenService } from "./services/oauth-token.service";
 import { OAuthConsentService } from "./services/oauth-consent.service";
@@ -41,11 +44,13 @@ import { RbacModule } from "@/modules/rbac/rbac.module";
     JwtModule.register({}), // Config provided in service
     RbacModule,
   ],
-  controllers: [OAuthController, WellKnownController],
+  controllers: [OAuthController, OAuthAuthorizeController, WellKnownController],
   providers: [
     OAuthClientService,
     OAuthTokenService,
     OAuthConsentService,
+    OAuthBrowserSessionService,
+    OAuthConsentTransactionService,
     PasswordService,
     KeyRotationService,
   ],

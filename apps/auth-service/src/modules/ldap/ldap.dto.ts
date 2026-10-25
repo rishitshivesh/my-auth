@@ -9,6 +9,9 @@ import {
   Matches,
 } from "class-validator";
 
+// eslint-disable-next-line no-control-regex
+const NO_CONTROL_CHARS = /^[^\u0000-\u001f\u007f]*$/;
+
 export class CreateLdapConnectionDto {
   @IsString()
   @MaxLength(255)
@@ -35,10 +38,14 @@ export class CreateLdapConnectionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1024)
+  @Matches(NO_CONTROL_CHARS, { message: "must not contain control characters" })
   userFilter?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1024)
+  @Matches(NO_CONTROL_CHARS, { message: "must not contain control characters" })
   groupFilter?: string;
 
   @IsOptional()
@@ -88,10 +95,14 @@ export class UpdateLdapConnectionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1024)
+  @Matches(NO_CONTROL_CHARS, { message: "must not contain control characters" })
   userFilter?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1024)
+  @Matches(NO_CONTROL_CHARS, { message: "must not contain control characters" })
   groupFilter?: string;
 
   @IsOptional()

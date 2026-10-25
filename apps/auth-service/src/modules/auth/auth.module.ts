@@ -36,8 +36,10 @@ import { GuardsModule } from "@/common/guards/guards.module";
 import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { MfaModule } from "@/modules/mfa/mfa.module";
+import { AdminCleanupController } from "@/modules/admin/admin-cleanup.controller";
 import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 import { SessionModule } from "@/modules/session/session.module";
+import { PasswordPolicyModule } from "@/modules/password-policy/password-policy.module";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 
 @Module({
@@ -63,11 +65,12 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     GuardsModule,
     SessionModule,
     OAuthModule,
+    PasswordPolicyModule,
     MfaModule,
     PassportModule.register(JwtStrategy),
     JwtModule.register({}),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AdminCleanupController],
   providers: [
     AuthService,
     PasswordService,

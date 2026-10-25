@@ -67,6 +67,8 @@ export class Tenant extends BaseEntity {
     requireEmailVerification?: boolean;
     sessionTimeout?: number;
     mfaRequired?: boolean;
+    /** Commercial plan label (there is no dedicated column). */
+    plan?: string;
   };
 
   @Column({

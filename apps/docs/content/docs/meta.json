@@ -1,3 +1,3 @@
 {
-  "pages": ["index", "setup", "architecture", "auth-flows", "rbac", "api", "sdks"]
+  "pages": ["index", "setup", "architecture", "auth-flows", "rbac", "api", "sdks", "dev"]
 }

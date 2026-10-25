@@ -175,7 +175,7 @@ export class RbacService {
       await this.assertOtherOwnerRemains(userId, tenantId, []);
     }
 
-    await this.userRoleRepository.remove(userRole);
+    await this.userRoleRepository.delete({ id: userRole.id });
 
     logger.info({ userId }, "Removed role assignment for user");
   }
@@ -208,6 +208,11 @@ export class RbacService {
     assignedBy?: string,
   ): Promise<UserRole[]> {
     const roles = await this.roleService.listRoles(tenantId);
+    // Validate every name up front so a typo can never strip existing roles.
+    const known = new Set(roles.map((r) => r.name));
+    if (roleNames.some((name) => !known.has(name))) {
+      throw new ApiException("RESOURCE_NOT_FOUND");
+    }
     const requested = roles.filter((r) => roleNames.includes(r.name));
     const current = await this.getUserRoles(userId, tenantId);
     const affected = [...requested, ...current].map((r) => r.priority);
@@ -221,26 +226,32 @@ export class RbacService {
       requested.map((r) => r.priority),
     );
 
-    // Remove all existing roles
-    await this.userRoleRepository.delete({
-      userId,
-      tenantId,
-    });
+    // Replace in one transaction: a failure part-way must not leave the user role-less.
+    return this.userRoleRepository.manager.transaction(async () => {
+      await this.userRoleRepository.delete({
+        userId,
+        tenantId,
+      });
 
-    // Assign new roles
-    if (roleNames.length > 0) {
+      if (roleNames.length === 0) return [];
       return this.assignRolesByNames({
         userId,
         roleNames,
         tenantId,
         assignedBy,
       });
-    }
-
-    return [];
+    });
   }
 
   /** Highest priority among a user's active roles (0 when none). */
+  /** Throws HIERARCHY_VIOLATION unless the actor outranks a role priority they want to set. */
+  async assertCanSetRolePriority(actorId: string, tenantId: string, priority: number): Promise<void> {
+    const actor = await this.getMaxPriority(actorId, tenantId);
+    if (!canManage(actor, priority)) {
+      throw new ApiException("HIERARCHY_VIOLATION");
+    }
+  }
+
   private async getMaxPriority(userId: string, tenantId: string): Promise<number> {
     const roles = await this.getUserRoles(userId, tenantId);
     return maxPriority(roles.map((r) => r.priority));
@@ -329,6 +340,9 @@ export class RbacService {
 
     // Filter out expired role assignments
     user.userRoles = user.userRoles.filter((ur) => !ur.isExpired);
+    // `roles` has no join table (assignments live in UserRole), so derive it here;
+    // User.hasRole / hasPermission / isAdmin all read from it.
+    user.roles = user.userRoles.map((ur) => ur.role).filter((r): r is NonNullable<typeof r> => !!r);
 
     return user;
   }
@@ -480,7 +494,7 @@ export class RbacService {
       .getMany();
 
     if (expiredAssignments.length > 0) {
-      await this.userRoleRepository.remove(expiredAssignments);
+      await this.userRoleRepository.delete(expiredAssignments.map((ur) => ur.id));
       logger.info({ count: expiredAssignments.length }, "Removed expired role assignments");
     }
 

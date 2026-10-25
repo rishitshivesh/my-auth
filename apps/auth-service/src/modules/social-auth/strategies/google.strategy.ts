@@ -14,19 +14,21 @@ import { SocialProfile } from "../social-auth.service";
  * - email: Get user's email
  * - profile: Get user's profile (name, picture)
  */
+/**
+ * A provider that is not configured is simply not offered (login routes answer SOCIAL_PROVIDER_DISABLED);
+ * the strategy must still construct so the app boots without social credentials.
+ */
+const UNCONFIGURED = "provider-not-configured";
+
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
   private readonly logger = new Logger(GoogleStrategy.name);
 
   constructor(private configService: ConfigService) {
     super({
-      clientID: configService.getOrThrow<string>("INTERNAL_GOOGLE_CLIENT_ID"),
-      clientSecret: configService.getOrThrow<string>(
-        "INTERNAL_GOOGLE_CLIENT_SECRET",
-      ),
-      callbackURL: configService.getOrThrow<string>(
-        "INTERNAL_GOOGLE_CALLBACK_URL",
-      ),
+      clientID: (configService.get<string>("INTERNAL_GOOGLE_CLIENT_ID") || UNCONFIGURED),
+      clientSecret: (configService.get<string>("INTERNAL_GOOGLE_CLIENT_SECRET") || UNCONFIGURED),
+      callbackURL: (configService.get<string>("INTERNAL_GOOGLE_CALLBACK_URL") || UNCONFIGURED),
       scope: ["openid", "email", "profile"],
       passReqToCallback: true,
       state: false, // We manage state ourselves (base64url JSON)

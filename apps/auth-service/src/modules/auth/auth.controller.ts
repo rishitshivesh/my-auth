@@ -739,6 +739,9 @@ export class AuthController {
       userAgent || "unknown",
     );
 
+    if ('mfaRequired' in result) {
+      return res.json(result);
+    }
     if ('status' in result) {
       setMfaEnrollmentCookie(res, result.enrollmentToken);
       return res.json({ status: result.status });

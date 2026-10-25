@@ -13,6 +13,7 @@ import {
   UseGuards,
   Res,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
 import type { Response } from "express";
 import { ApiException } from "@/common/http";
 import { samlError } from "./saml-errors";
@@ -20,6 +21,7 @@ import { JwtAuthGuard, RequestUserGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { RawResponse } from "@/common/decorators/raw-response.decorator";
 import { SamlService, SamlPostBinding } from "./saml.service";
 import {
   setSamlSsoNonceCookie,
@@ -40,6 +42,7 @@ export class SamlController {
 
   // ── Public IdP metadata ──────────────────────────────────────────────────────
 
+  @RawResponse()
   @Get("metadata/:tenantSlug")
   @Header("Content-Type", "application/xml")
   getMetadata(@Param("tenantSlug") tenantSlug: string) {
@@ -170,14 +173,14 @@ export class SamlController {
 
   // ── SP Management (authenticated) ────────────────────────────────────────────
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Get("sps")
   @RequirePermissions(Permissions.SAML_READ)
   listSPs(@Request() req: AuthenticatedRequest) {
     return this.samlService.listSPs(this.requireTenantId(req));
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Post("sps")
   @RequirePermissions(Permissions.SAML_WRITE)
   @HttpCode(HttpStatus.CREATED)
@@ -185,7 +188,7 @@ export class SamlController {
     return this.samlService.registerSP(this.requireTenantId(req), dto);
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Patch("sps/:id")
   @RequirePermissions(Permissions.SAML_WRITE)
   updateSP(
@@ -196,7 +199,7 @@ export class SamlController {
     return this.samlService.updateSP(this.requireTenantId(req), id, dto);
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Delete("sps/:id")
   @RequirePermissions(Permissions.SAML_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)

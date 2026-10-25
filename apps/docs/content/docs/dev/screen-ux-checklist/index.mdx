@@ -1,0 +1,1437 @@
+---
+title: Screen and UX completion checklist
+description: Product design coverage, modern identity journeys and implementation tracking
+---
+
+# Product screens and UX completion checklist
+
+This is the temporary delivery checklist requested by the project owner. Delete it only after the entire design and flow coverage is finished. It is deliberately kept in the docs app.
+
+## Working agreement
+
+- Assume the backend is working. Focus this work on screen design, UX and integration flows; backend repairs are outside this design task.
+- Every implemented API must map to a human-facing screen/action, an external protocol step, or an operational output. Do not force machine endpoints into individual pages.
+- Missing product features are included in design scope, labelled **Proposed capability** in handoff annotations. Missing APIs do not stop their screen design and do not appear as technical blockers in the product UI.
+- Track screen design, prototype coverage, API mapping and frontend implementation separately. A checked screen does not mean an implemented or tested application flow; state, responsive, prototype and implementation checks remain independent.
+- Destination: [Scrolloop Sentry — Product Design](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb), Rishit Shivesh’s Team.
+
+## Visual direction
+
+A modern identity workspace: quiet warm-neutral canvas, precise typography, mint used intentionally, strong contextual navigation, spacious content, compact readable tables, restrained borders/shadows and purposeful motion. Preserve Montserrat / DM Sans / JetBrains Mono; use editorial display sparingly and clear sentence-case labels. Prioritize progressive disclosure, useful defaults, search/filter affordances, inline validation, clear next steps and reversible drafts. Keep personal security separate from organization policy and platform operations.
+
+## Foundation and global UX
+
+- [x] Create fresh Figma Design file in the selected team.
+- [x] Create token-bound light/dark foundations and typography styles.
+- [ ] Create reusable button/input/badge/navigation/table/dialog patterns.
+- [ ] Design tenant console, platform console and identity/account shells.
+- [ ] Design global search/command affordance, workspace selection and account menus.
+- [ ] Design initial loading, empty, filtered empty, error, denied, not found and service-unavailable states.
+- [ ] Specify keyboard focus, dialog focus return, contrast, screen-reader announcements and reduced motion.
+- [ ] Produce mobile identity/account layouts and narrow-console behavior.
+
+## Coverage and implementation status
+
+- **222 editable screen frames** now cover all **61 inventoried families** (47 existing-capability families and 14 proposed-feature families).
+- **1,529 prototype connections** include contextual navigation; this count is not a count of distinct tested journeys.
+- All **212 API entries** below have a UX or protocol-reference mapping. Checked API entries mean traceability only, never implemented integration.
+- Link-first verification, invitation and recovery designs are the default. Email code entry and passwords are explicit fallbacks; MFA challenges remain where required.
+- User creation/invitation, access review, role assignment/revocation, effective permissions, groups, policies and administrative lifecycle actions have dedicated screens.
+- **Frontend implementation is not complete.** This design work has not wired these new screens to APIs, implemented link-token contracts, or run application end-to-end tests.
+- **Design completion is also not claimed:** every family has frames, but the remaining dialog details, error branches, input interactions, mobile/theme adaptations and accessibility QA still need their independent checks below. Proposed capabilities remain proposals until implemented.
+- Structural inspection found no content outside screen bounds. Representative identity, mobile, platform, access, policy and integration screens were visually reviewed; that is not a visual review of every frame.
+- Foundations include 54 variables, light/dark semantic aliases, 7 typography styles and 35 initial component variants. Table/dialog/card interaction families still need further component work.
+
+### Modern-flow completion requirements
+
+- [x] Prefer email links over manual codes in the initial verification experience.
+- [x] Add email previews and purposeful continuation screens for verification, recovery, invitation and ownership transfer.
+- [x] Design invalid/expired/used links, wrong account, alternate device, resend context and manual-code fallback.
+- [x] Prefer passwordless email sign-in at entry; offer passkey and password fallback explicitly.
+- [x] Design person creation without handing an administrator another person’s password.
+- [x] Design role selection → access review → assignment confirmation → effective-access view.
+- [ ] Finish all applicable state and cancellation branches, including disabled/pending resend controls, every input interaction and preservation of drafts.
+- [ ] Finish all mobile/account/console and theme variants; validate each resulting frame.
+- [ ] Implement and test the actual application journeys separately from Figma.
+
+### Capability handoff notes
+
+- Email verification links correspond to the verification-token contract; OTP is only an alternate UI when an appropriate fallback contract exists.
+- Reset-link redemption, passwordless account creation, invitation activation/session completion and cross-device completion may require contract extensions. Their screens describe the target experience, not evidence that these extensions exist.
+- Email-link landing pages preserve purpose, tenant and validated destination. An intentional continuation avoids consuming a credential through a mail scanner’s GET/prefetch.
+- Never use a sign-in link as a verification, password-reset or invitation token interchangeably. Do not silently change the active account.
+- Shared failure/denied/conflict/unsaved/loading screens are reference patterns. Their presence does not check off each feature’s concrete state behavior.
+
+## Complete screen families
+
+For each row, complete these four independent checkboxes: Screens / States / Responsive / Prototype. “Screens” includes every step/dialog in the description. Retain API references for engineering handoff, not as interface copy.
+
+### H01 — `/u/login`
+
+Base design available: [H01 / u/login / email / email](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) · [H01 / u/login / password / password](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-37) · [H01 / u/login / invalid-credentials](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-414) · [H01 / u/login / email / email-mobile](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-446). Family has **8 frame(s)**; this does not complete the state or implementation checks.
+
+Tenant resolution; email; permitted method chooser; password; password visibility; invalid credentials; lockout; disabled provider; sign-in progress; authenticated destination.
+
+Integration reference: `/auth/providers`, `/auth/login-intent`, `/auth/login`; FE-01/05. Do not expose account-existence details beyond the agreed API policy.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H02 — `/u/signup`
+
+Base design available: [H02 / u/signup / register](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-318). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Registration enabled/disabled; name/email first; verification link; passkey or other permitted sign-in method; password as fallback; duplicate-account safe response; continuation.
+
+Integration reference: POST `/auth/register`; tenant signup flags.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H03 — `/u/verify-email`
+
+Base design available: [H03 / u/verify-email / verify](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-354) · [Verification email](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-134) · [Confirm verification link](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-174) · [Email verified](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-216). Family has **12 frame(s)**; this does not complete the state or implementation checks.
+
+Link-first email verification: sent → email CTA → intentional verification → confirmed → validated original destination. Include resend cooldown, expired/used/invalid links, wrong account, alternate device and optional manual-code fallback.
+
+Integration reference: `/auth/verify-email`, `/auth/resend-verification`.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H04 — `/u/reset-password`
+
+Base design available: [H04 / u/reset-password / request](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-169) · [H04 / u/reset-password / new-password](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-198) · [H04 / u/reset-password / complete](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-230) · [Recovery email sent](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-460). Family has **9 frame(s)**; this does not complete the state or implementation checks.
+
+Link-first recovery: request → account-safe email acknowledgement → reset email link → new password → completion → fresh sign-in. Include expired/used/invalid links, password-policy/reuse errors, cancellation and optional manual-code fallback.
+
+Integration reference: `/auth/forgot-password`, `/auth/reset-password`. Link-token recovery is the target UX; preserve the existing email-bound code as a fallback. Record any link-token contract additions in handoff without treating them as implemented.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H05 — `/u/magic-link` and login step
+
+Base design available: [H05 / u/magic-link / sent](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-140) · [Magic sign-in email](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-631) · [Sign-in link confirmation](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-671) · [Magic link expired](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-508). Family has **4 frame(s)**; this does not complete the state or implementation checks.
+
+Request/sent/resend; checking link; expired/used/malformed; MFA challenge; required enrollment; successful continuation.
+
+Integration reference: `/auth/magic-link/send`, `/auth/magic-link/verify`; SDK must preserve all result branches.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H06 — `/u/mfa` and embedded challenge
+
+Base design available: [H06 / u/mfa / authenticator / mfa](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-69) · [H06 / u/mfa / recovery-code](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-108) · [H06 / u/mfa / authenticator / mfa-mobile](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-495) · [Choose verification method](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1083). Family has **6 frame(s)**; this does not complete the state or implementation checks.
+
+Supported method chooser; TOTP; backup-code recovery; email OTP only where supported by login contract; remaining attempts; challenge expiry; restart.
+
+Integration reference: `/auth/mfa/verify`, `/auth/mfa/verify-backup`; distinguish authenticated `/mfa/*` management from login challenges. No SMS promise.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H07 — `/mfa/enroll`
+
+Base design available: [Required enrollment](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-836) · [Authenticator setup](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-878) · [Save recovery codes](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-922) · [Enrollment complete](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-962). Family has **6 frame(s)**; this does not complete the state or implementation checks.
+
+Required-policy explanation; supported enrollment method; QR/manual key; verification; backup-code save; finish; expired enrollment token; restart sign-in.
+
+Integration reference: Backend issues enrollment token; establish an explicit pre-session enrollment/complete contract before implementation. Existing protected setup endpoints are not enough by themselves.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H08 — Social + passkey sign-in
+
+Base design available: [Passkey prompt](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) · [Passkey cancelled](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-755) · [Social callback](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-794). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+Provider redirect; cancel/error; callback; linking confirmation; unsupported browser; OS prompt in progress; cancelled/expired passkey; MFA/enrollment branch and continuation.
+
+Integration reference: `/auth/social/*`, `/auth/webauthn/login/{start,finish}`; FE-05/07. OS biometric UI is external, not recreated as app UI.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H09 — `/invite/[token]`
+
+Base design available: [H09 / invite/token / accept / invite](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-256) · [H09 / invite/token / expired](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-292) · [H09 / invite/token / accept / invite-mobile](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-525) · [H09 / invite/token / accepted](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-495). Family has **8 frame(s)**; this does not complete the state or implementation checks.
+
+Validate invitation link; organization and invited email/role; existing-account join or new identity activation; choose permitted sign-in method without sharing temporary passwords; expired/used/invalid links; decline/cancel; acceptance and continuation into the invited tenant.
+
+Integration reference: GET `/auth/invite/validate/:token`, POST `/auth/invite/accept`; invitation acceptance must not imply auto-login unless cookies are actually established. Reissue/revoke invitations needs separate backend assessment.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### H10 — OAuth/SAML continuation
+
+Base design available: [H10 / oauth / consent](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384) · [SAML continuation](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-228) · [Federation request expired](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-270) · [Authorization declined](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-309). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+Application identity/scopes; approve/deny; invalid client/redirect; sign-in required; request expired; same-browser SAML resume; return to relying party; account/tenant mismatch.
+
+Integration reference: OAuth authorize/consent FE-08; SAML `/saml/sso/:tenantSlug` + `/saml/sso/continue/:nonce`. Keep SAML's browser-bound nonce.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A01 — Existing profile/account settings
+
+Base design available: [Mobile profile](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-938) · [My profile](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-625) · [Profile saved](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1529). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+Profile view/edit; server-supported fields; validation; pending; saved; failed; unsaved changes.
+
+Integration reference: GET/PUT `/users/me`; no speculative avatar-upload API.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A02 — Existing account/security pages
+
+Base design available: [Change password](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-699). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Change password; current-password error; rules/reuse; recent-sign-in requirement; completion and session consequences.
+
+Integration reference: POST `/users/me/change-password`, RecentAuthGuard.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A03 — Social connections
+
+Base design available: [Connected sign-in accounts](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) · [Link account review](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-836). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Real linked providers; link handshake/confirmation; cancelled/expired linking; unlink confirmation; last-sign-in-method protection.
+
+Integration reference: `/auth/social/connections`, `/auth/social/link/*`; repair SDK paths.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A04 — `/t/[slug]/security/devices`, account security
+
+Base design available: [Mobile security](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) · [Account security](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-712) · [Passkeys](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-885). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+One TOTP enrollment; email OTP status matching server model; real passkey list/add/remove; local nickname clearly labelled; disable-all confirmation; recovery codes reveal/regenerate/save.
+
+Integration reference: `/mfa/status`, `/mfa/setup/totp`, `/mfa/verify/totp`, `/mfa/webauthn/*`, `/mfa/totp`, `/mfa/all`, `/mfa/backup-codes/regenerate`; FE-06.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A05 — Active sessions
+
+Base design available: [My sessions](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Current/other sessions; device/IP/time; revoke one; revoke others/all; confirmation; current-session logout; expired/unknown location fallback.
+
+Integration reference: `/sessions/active`, DELETE `/sessions/:sessionId`, `/sessions/all/other`, `/sessions/all`; or supported `/users/me/sessions` family. Choose one adapter consistently.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A06 — Personal activity
+
+Base design available: [My activity](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1009). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Security event list; details; date/filter UI only for supported query fields; loading/no activity/failed.
+
+Integration reference: GET `/users/me/security-events`.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### A07 — Account deletion + recent sign-in
+
+Base design available: [Recent authentication](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-632) · [Delete my account](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1076). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Consequences; credential/recent-auth check; explicit confirmation; cancel; success; session ended; cannot-complete response.
+
+Integration reference: DELETE `/users/me`; do not conflate with tenant deletion or promise GDPR export/erasure features absent from remediation.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T01 — `/t/[slug]/dashboard`
+
+Base design available: [Overview](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Context and permission-aware metrics; trends; activity; no activity; partial service failure; initial configuration guidance using actual integrations.
+
+Integration reference: `/dashboard/tenant-metrics`, `/tenant-activity`, `/api-call-trend`, `/auth-breakdown` under `/dashboard`.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T02 — `/t/[slug]/users`
+
+Base design available: [People](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) · [Invite people](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-180) · [Review invitations](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-249) · [Invitations sent](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-314). Family has **6 frame(s)**; this does not complete the state or implementation checks.
+
+Search/status/verification filters supported by DTO; page-based table; invite; export; supported bulk status change; partial failure and destructive confirmation.
+
+Integration reference: GET `/users`, `/users/export`, POST `/users/invite`, `/users/bulk/update-status`.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T03 — `/t/[slug]/users/[id]`
+
+Base design available: [Person detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) · [Assign roles](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-493) · [Review access changes](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-557) · [Access updated](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-622). Family has **15 frame(s)**; this does not complete the state or implementation checks.
+
+Profile edit; account state; lock/unlock; force reset; role assignment/revocation; effective permissions; sessions/revoke; activity; delete.
+
+Integration reference: `/users/:id`, `/lock`, `/unlock`, `/force-password-reset`, `/sessions`, `/security-events`; `/rbac/users/:userId/*`. No arbitrary email action.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T04 — Workspace selection and `/onboarding`
+
+Base design available: [Workspace chooser](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1115) · [Create workspace](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1174). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Organization list; current membership; target-tenant sign-in; suspended/revoked/no membership; new-workspace details/owner; slug checking/conflict; idempotent submit; verification/sign-in completion.
+
+Integration reference: `/users/orgs`, `/tenants/slug-check`, `/tenants/register`; FE-02. Country persistence is not a supported standalone flow.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T05 — `/t/[slug]/roles`
+
+Base design available: [Roles](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) · [Create role](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1309) · [Role detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1374) · [Edit role permissions](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1083). Family has **6 frame(s)**; this does not complete the state or implementation checks.
+
+List/detail; create/edit/delete; protected system role; permission add/remove; policy attach/detach; role assignment expiry/reason where supported.
+
+Integration reference: `/rbac/roles/*`, `/rbac/users/:userId/roles`; role names versus IDs follow each DTO.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T06 — Permission catalog
+
+Base design available: [Permission catalog](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) · [Create permission](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1505) · [Edit permission](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1200). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+Browse/search; resource/action; custom permission create/edit/delete; in-use/system restrictions as returned by API.
+
+Integration reference: `/rbac/permissions/*`; distinguish API supported fields from UI grouping labels.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T07 — `/t/[slug]/policies`
+
+Base design available: [Policies](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) · [Policy editor](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1632) · [Attach policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1693) · [Delete policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1261). Family has **4 frame(s)**; this does not complete the state or implementation checks.
+
+List/detail; managed/inline choice where supported; JSON editor with field validation; save/delete; attach/detach; explicit deny explanation.
+
+Integration reference: `/rbac/policies/*`, role/group policy attachment endpoints. No policy-version history promise.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T08 — Group management
+
+Base design available: [Groups](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) · [Create group](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1824) · [Group detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1885) · [Add group members](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1952). Family has **6 frame(s)**; this does not complete the state or implementation checks.
+
+List/create/edit/delete; hierarchy display; parent choice at creation; member add/remove; policy attach/detach; cycle/conflict/denied states.
+
+Integration reference: `/rbac/groups/*`; update DTO currently has name/description only, so reparenting an existing group is blocked.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T09 — Policy simulation
+
+Base design available: [Policy simulator](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-2011) · [Simulation result](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-2076) · [Simulation denied](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-2021). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+Principal/action/resource/context input; allow/deny; matched policies/trace only where returned; invalid JSON/context; no applicable policy.
+
+Integration reference: POST `/rbac/policies/simulate`; render the real result shape rather than the admin client's assumed shape.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T10 — Applications/clients
+
+Base design available: [Applications](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-302) · [Create application](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-378) · [Create confidential application](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-147). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+One inventory; application type; create; client ID; one-time confidential secret; public-client PKCE guidance; cancel; no applications.
+
+Integration reference: `/oauth/clients`; current list returns active clients. Inactive-client browsing requires contract review.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T11 — Application detail
+
+Base design available: [Application settings](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-495) · [Confidential application settings](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-206) · [Delete application](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1419). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+General settings; redirect/logout URIs; allowed origins; grant types/lifetimes supported by DTO; edit; invalid/duplicate URI; delete confirmation.
+
+Integration reference: GET/PUT/DELETE `/oauth/clients/:clientId`; no generic API-key screens.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T12 — Application credentials/integration
+
+Base design available: [Credentials](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-437) · [Rotate client secret](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1131). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Copy ID; rotate secret confirmation; one-time reveal/acknowledge; SDK integration guidance; issuer/discovery endpoints.
+
+Integration reference: POST `/oauth/clients/:clientId/rotate-secret`; JWKS/discovery are protocol outputs, not editable credentials. SDK snippets need tested contracts.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T13 — `/connections` and social config
+
+Base design available: [Integrations](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-565) · [Configure social provider](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1190). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Real integration catalog; configured/unconfigured/disabled; provider credentials form where supported; enable/disable; connect/configure links.
+
+Integration reference: `/dashboard/tenant-settings`, PATCH `/dashboard/tenant-settings/social/:provider`; use server redaction behavior for secrets.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T14 — `/connections/saml`
+
+Base design available: [SAML service providers](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) · [Configure SAML](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1324). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Service-provider list/add/edit/delete; metadata or manual fields actually supported; entity ID/ACS/SLO/certificate validation; Sentry IdP metadata guidance.
+
+Integration reference: `/saml/sps`, PATCH/DELETE `/saml/sps/:id`, public metadata. Do not portray this as an inbound enterprise IdP connector.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T15 — `/connections/scim`
+
+Base design available: [SCIM provisioning](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1401) · [Create SCIM token](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1468) · [SCIM token created](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1527) · [Revoke SCIM token](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1471). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+Provisioning endpoint; token list/create/expiry; one-time token reveal; revoke; expired token; setup guidance.
+
+Integration reference: `/scim/tokens`; `/scim/v2/*` is a machine provisioning protocol. No sync-run history/connector scheduler without new APIs.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T16 — `/connections/ldap`
+
+Base design available: [LDAP directories](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) · [Configure LDAP](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1639) · [LDAP test result](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1713) · [LDAP sync result](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1772). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+List/add/edit/delete; bind secret handling; field mapping supported by DTO; test pending/success/fail; sync pending/result/fail.
+
+Integration reference: `/ldap/connections`, PATCH/DELETE `/:id`, POST `/:id/test`, `/:id/sync`; no persistent job history assumed.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T17 — `/webhooks`
+
+Base design available: [Webhooks](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) · [Configure webhook](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1831) · [Webhook secret](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1899) · [Rotate webhook secret](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1573). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+List/add/edit/delete; subscribed event picker; enabled state; test; rotate signing secret; one-time secret; validation and failure.
+
+Integration reference: `/webhooks`, PATCH/DELETE `/:id`, POST `/:id/test`, `/:id/rotate-secret`; source event names from actual webhook contract, not a separate invented taxonomy.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T18 — Webhook delivery diagnostics
+
+Base design available: [Delivery details](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1951) · [Redeliver confirmation](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2013) · [Redelivery succeeded](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2062) · [Delivery failed](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1668). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+Deliveries list/detail; status/attempt/error/time fields actually returned; redeliver confirmation/pending/result/failure; pagination where supported.
+
+Integration reference: GET `/webhooks/:id/deliveries`, POST `/:id/deliveries/:deliveryId/redeliver`; do not display unreturned payload/response bodies.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T19 — `/audit`
+
+Base design available: [Audit log](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2111) · [Audit event detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2178) · [Audit filters](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1717) · [Export audit](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1782). Family has **4 frame(s)**; this does not complete the state or implementation checks.
+
+Cursor-based events; supported filters; details; sanitized metadata; export; no results; denied; export/network failure.
+
+Integration reference: GET `/audit`, `/audit/export`; separate from platform activity and personal security activity.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T20 — General settings
+
+Base design available: [Organization settings](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2243). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Name/context readout; supported feature flags and allowed provider controls; save/cancel; unsupported fields read-only.
+
+Integration reference: GET `/tenants/current`, GET/PATCH `/dashboard/tenant-settings`; no generic tenant update implied.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T21 — `/branding`
+
+Base design available: [Branding](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2308) · [Branding preview](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1962). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Primary color, approved font/weight/background; logo upload; hosted login preview; light/dark contrast; invalid file/size/upload fail; save/reset draft.
+
+Integration reference: `/tenants/current/branding` + `/logo`; reset draft is local, not an assumed server reset endpoint.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T22 — Domains
+
+Base design available: [Custom domain](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2385) · [Domain verified](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1913). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Domain status/instructions; conflict/error; operator-controlled configure/verify; role-appropriate read-only view.
+
+Integration reference: Existing `/tenants/:id/custom-domain` and `/verify-domain` assert superadmin. Review actual DNS verification before a verified badge; tenant self-service requires authorization work.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### T23 — Authentication policy / organization danger
+
+Base design available: [Password and session policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2446). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Current configuration; MFA grace/policy explanation; password rules readout; proposed enforce/exempt/grace editors; proposed delete-organization journey.
+
+Integration reference: Policy CRUD and tenant self-delete absent. Do not imply featureFlags are a general policy editor. Platform tenant deletion is P03, not tenant-admin self-delete.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P01 — `/setup`
+
+Base design available: [First-run setup](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Setup token; initial admin fields; validation; pending; already initialized; invalid token; unavailable; success/sign-in.
+
+Integration reference: `/superadmin/platform-info`, `/initialized`, `/create-first-admin`. Do not place real setup secrets in Figma.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P02 — `/dashboard`
+
+Base design available: [Platform overview](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Tenant/user/session metrics; platform activity; no tenants; denied; API unavailable.
+
+Integration reference: GET `/admin/dashboard`, `/admin/activity`.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P03 — `/tenants`, `/tenants/new`, `/tenants/[tenantId]`
+
+Base design available: [Organizations](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) · [Provision organization](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-175) · [Organization detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-249) · [Suspend organization](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-314). Family has **5 frame(s)**; this does not complete the state or implementation checks.
+
+Search/filter/page; create/owner/slug; provision outcome; supported detail/settings; suspend/restore; flags/plan metadata if supported; delete confirmation.
+
+Integration reference: `/admin/tenants/*`; plan metadata is not subscription billing. Separate ordinary update failures from provisioning failures.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P04 — `/settings` team section
+
+Base design available: [Platform team](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-424) · [Add operator](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-486). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Platform team list/add/remove; unknown email; denied; remove confirmation.
+
+Integration reference: `/admin/team`; verify existing-user semantics before wording action as an email invitation.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P05 — `/settings`
+
+Base design available: [Platform settings](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-541). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Platform name/support/signup/maintenance settings supported by DTO; saved/failed; SMTP configuration status readout.
+
+Integration reference: GET/PATCH `/admin/settings`; do not add SMTP secret editing or branding upload absent APIs.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P06 — `/audit-logs`
+
+Base design available: [Platform activity](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-609). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Platform activity list/detail and supported limit/filter behavior; tenant context; denied/unavailable.
+
+Integration reference: GET `/admin/activity`; full cross-tenant search/export is not assumed.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+### P07 — Maintenance and cross-tenant people
+
+Base design available: [Maintenance](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676) · [Cleanup confirmation](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-735). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Operator token-cleanup confirmation/result; cleanup statistics; proposed global-user directory clearly marked blocked.
+
+Integration reference: `/admin/cleanup/tokens`, `/admin/cleanup/stats`; no global-user-list controller found.
+
+- [ ] Screens and dialogs
+- [ ] Applicable states and permissions
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and exit paths
+- [ ] Frontend API integration and end-to-end verification
+
+## Missing features included in the design scope
+
+These are proposed capabilities, not assertions that endpoints exist. Design their useful end-to-end UX; record contract needs in handoff without delaying screen work.
+
+### N01 — Workspace authentication policies
+
+Base design available: [Password policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1844) · [Session policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1909) · [Authentication policy](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-2). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+MFA requirements, method allow-list, grace/exemptions, password strength/history, session policy; preview user impact.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N02 — OAuth consent and connected applications
+
+Base design available: [Connected applications](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-784) · [Revoke application grant](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-846). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Consent approve/deny, scope explanations, prior grants and revoke access.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N03 — Domain and email setup
+
+Base design available: [Sender domain setup](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-895). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+DNS verification, custom login domain, email sender verification, SMTP setup/test, failure/retry.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N04 — Organization ownership and deletion
+
+Base design available: [Ownership transfer email](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-348) · [Accept ownership](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-388) · [Ownership accepted](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-430) · [Transfer ownership](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-963). Family has **7 frame(s)**; this does not complete the state or implementation checks.
+
+Transfer owner, recipient acceptance, cancel, recent sign-in, schedule deletion, restore/cancel window.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N05 — Billing and usage
+
+Base design available: [Compare plans](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1974) · [Invoice detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2041) · [Payment method](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2100) · [Billing and usage](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-155). Family has **4 frame(s)**; this does not complete the state or implementation checks.
+
+Plan comparison, usage/limits, upgrade, payment method, invoices, failed payment; product proposal.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N06 — Service credentials
+
+Base design available: [Revoke service credential](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2149) · [Service credentials](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1198) · [Create service credential](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1260) · [One-time service secret](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1325). Family has **4 frame(s)**; this does not complete the state or implementation checks.
+
+API keys and machine credentials, scopes, expiry, rotate/revoke, show once; separate from OAuth public clients.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N07 — Platform people and support
+
+Base design available: [Cross-tenant people](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1381). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Cross-tenant people search/detail, scoped support actions, explicit context and audit trail.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N08 — Privacy and audit governance
+
+Base design available: [Audit retention](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2202) · [Privacy requests](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1450) · [Create privacy request](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1516). Family has **3 frame(s)**; this does not complete the state or implementation checks.
+
+Subject export/erasure request, retention settings, evidence/export history, irreversible-action confirmation.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N09 — Provisioning operations
+
+Base design available: [Provisioning runs](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) · [Provisioning conflicts](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1646). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Durable sync runs, progress, partial failures, retry, mapping preview and conflict resolution.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N10 — Invitation lifecycle
+
+Base design available: [Invitation lifecycle](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-363). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Pending invitations, resend/revoke/expiry, existing-account join and membership role choice.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N11 — Factor lifecycle and recovery
+
+Base design available: [Remove sign-in method](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1708) · [Regenerate recovery codes](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1767). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Per-factor email removal, server-side device names, lost-device recovery and last-method protection.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N12 — Permission boundaries and policy diagnostics
+
+Base design available: [Permission boundaries](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1816). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Boundary attachment/effective-access explanation, expiry, hierarchy, policy version comparison if introduced.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N13 — Notifications and communication
+
+Base design available: [Notification preferences](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1880) · [Email delivery detail](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1945). Family has **2 frame(s)**; this does not complete the state or implementation checks.
+
+Notification preferences, delivery status, security notice previews; admin custom email as a separately scoped proposal.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+### N14 — Developer integration workspace
+
+Base design available: [Integration quickstart](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83). Family has **1 frame(s)**; this does not complete the state or implementation checks.
+
+Framework quickstarts, copied configuration, test identity, OAuth/PKCE handoff, SAML/SCIM setup checklists and logout validation.
+
+- [ ] Screens and dialogs
+- [ ] States, permissions and recovery
+- [ ] Responsive and theme coverage
+- [ ] Connected prototype and proposed integration contract
+
+## End-to-end journey coverage
+
+- [ ] **J01 First run** — Uninitialized platform → setup token/admin → initialized result → real session or sign-in → permitted console; invalid token, race, service unavailable.
+- [ ] **J02 New organization** — Workspace/owner details → slug check → registration → verification/sign-in as required → correct tenant; slug taken, rate limit, retry same idempotency key.
+- [ ] **J03 Password login** — Tenant resolve → email/method → password → verified/no-MFA destination; wrong password, locked account, disabled tenant, unverified email.
+- [ ] **J04 MFA login** — Password → actual supported challenge → success; backup code, invalid code, exhaustion, expired temp token, restart without a false session.
+- [ ] **J05 Enforced enrollment** — Password/magic link/passkey result → required enrollment → verify → save recovery → completed session or fresh login; token expires, cancel, policy mismatch.
+- [ ] **J06 Passwordless** — Magic-link request → email → verification → MFA/enrollment if required → original destination; used/expired link and resend.
+- [ ] **J07 Passkey** — Start → external browser prompt → assertion → server result → correct next branch; unsupported browser, cancel, expiry/replay rejection.
+- [ ] **J08 Social login/link** — Provider → callback claim → real session claims → MFA/verification/destination; cancellation, provider disabled, link confirmation expiry, existing account.
+- [ ] **J09 Password recovery** — Request → generic acknowledgement → email-bound code/new password → success → fresh login; wrong code, exhausted attempts, reuse/policy failure.
+- [ ] **J10 Invitation** — Admin invite → email → validate → accept → sign-in/verification → invited tenant; existing account, used/expired link, wrong active tenant.
+- [ ] **J11 Workspace change** — Open organization menu → target → target tenant sign-in → confirmed session → fresh scoped data; denied/revoked membership, cancel back to source.
+- [ ] **J12 Personal security** — Add authenticator/passkey → verify → recovery; regenerate codes invalidates old codes; remove factor/disable all → recent sign-in if required → explicit reconfirmation.
+- [ ] **J13 Sessions/account** — View sessions → revoke another/others/all → truthful result; edit profile; change password; delete account → recent sign-in → confirm → session ended.
+- [ ] **J14 People operations** — Filter/page → invite/detail → supported edit/status/lock/reset/delete → success/error → refreshed list; denied and missing user; partial bulk outcome.
+- [ ] **J15 Role/permission** — Create role → add permission → assign with names/expiry/reason → effective permissions → revoke; system role, invalid permission, denied.
+- [ ] **J16 Group/policy** — Create group → add members → attach policy → simulate allow/deny → detach/delete; JSON error, hierarchy constraint, explicit-deny result.
+- [ ] **J17 Application integration** — Create public/confidential client → credentials acknowledgement → URI/origin configuration → integration guidance → rotate/delete; public client has no client secret.
+- [ ] **J18 OAuth/SAML** — App → authorize/SSO → tenant sign-in → consent where supported → validated return; deny, expired request, wrong tenant/browser. Include the complete consent UX.
+- [ ] **J19 Provisioning** — SCIM create/copy/revoke token; LDAP create/edit → test → sync → result; failed bind, expired token, failed sync. No fabricated job monitor.
+- [ ] **J20 Webhooks** — Endpoint create/edit → test → delivery inspect → redeliver → outcome → rotate secret; failure/retry/denied/deletion.
+- [ ] **J21 Branding/settings** — Edit draft → preview → validate → save → reload; upload failure, poor contrast guidance, unsaved navigation, unsupported policy action.
+- [ ] **J22 Audit investigation** — Tenant event filter → detail → export → file; no results, forbidden, server/export error; platform activity stays separately scoped.
+- [ ] **J23 Platform operations** — Tenant create → inspect → update/suspend/restore/delete; team add/remove; maintenance/settings; deny non-operators and prevent UI-only privilege assumptions.
+- [ ] **J24 Context and outage** — Unknown/custom/subdomain tenant; session restored/expired/revoked; 403 direct link; backend unavailable/partial outage; return-to login then original safe destination.
+
+- [ ] Proposed capabilities N01–N14 each have entry, validation, completion, cancellation and recovery paths.
+
+## API-to-UX coverage
+
+Source inventory below is taken from active HTTP controller decorators. It is an integration checklist, not a backend test report. Protocol endpoints belong to the integration journey rather than a separate admin page. Every entry now has a UX/protocol reference. A checked entry means traceability only; concrete payloads, action coverage and implementation still need verification.
+
+### health-check.controller
+
+- [x] `GET /health` — [source](../../../../../../apps/auth-service/src/core/modules/health-check/health-check.controller.ts#L21); [P02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43) — Operational health/metrics output; not a user-editable action. Mapping only; implementation unverified.
+- [x] `GET /health/ready` — [source](../../../../../../apps/auth-service/src/core/modules/health-check/health-check.controller.ts#L28); [P02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43) — Operational health/metrics output; not a user-editable action. Mapping only; implementation unverified.
+
+### stats.controller
+
+- [x] `GET /stats/system` — [source](../../../../../../apps/auth-service/src/core/modules/stats/stats.controller.ts#L8); [P02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43) — Operational health/metrics output; not a user-editable action. Mapping only; implementation unverified.
+
+### admin-cleanup.controller
+
+- [x] `POST /admin/cleanup/tokens` — [source](../../../../../../apps/auth-service/src/modules/admin/admin-cleanup.controller.ts#L27); [P07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676) — Authorized operational action/output. Mapping only; implementation unverified.
+- [x] `GET /admin/cleanup/stats` — [source](../../../../../../apps/auth-service/src/modules/admin/admin-cleanup.controller.ts#L50); [P07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676) — Authorized operational action/output. Mapping only; implementation unverified.
+
+### admin.controller
+
+- [x] `GET /admin/dashboard` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L33); [P02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43) — Platform overview. Mapping only; implementation unverified.
+- [x] `GET /admin/tenants` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L41); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `GET /admin/tenants/check-slug` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L59); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `GET /admin/tenants/:id` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L65); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `POST /admin/tenants` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L71); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `PATCH /admin/tenants/:id` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L83); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `DELETE /admin/tenants/:id` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L92); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization lifecycle operation. Mapping only; implementation unverified.
+- [x] `GET /admin/activity` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L101); [P06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-609) — Platform activity. Mapping only; implementation unverified.
+- [x] `GET /admin/team` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L110); [P04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-424) — Platform team operation. Mapping only; implementation unverified.
+- [x] `POST /admin/team` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L116); [P04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-424) — Platform team operation. Mapping only; implementation unverified.
+- [x] `DELETE /admin/team/:userId` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L122); [P04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-424) — Platform team operation. Mapping only; implementation unverified.
+- [x] `GET /admin/settings` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L131); [P05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-541) — Platform settings. Mapping only; implementation unverified.
+- [x] `PATCH /admin/settings` — [source](../../../../../../apps/auth-service/src/modules/admin/admin.controller.ts#L137); [P05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-541) — Platform settings. Mapping only; implementation unverified.
+
+### superadmin-setup.controller
+
+- [x] `GET /superadmin/platform-info` — [source](../../../../../../apps/auth-service/src/modules/admin/superadmin-setup.controller.ts#L38); [P01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173) — Platform bootstrap/state output. Mapping only; implementation unverified.
+- [x] `GET /superadmin/initialized` — [source](../../../../../../apps/auth-service/src/modules/admin/superadmin-setup.controller.ts#L54); [P01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173) — Platform bootstrap/state output. Mapping only; implementation unverified.
+- [x] `GET /superadmin/setup-log-hint` — [source](../../../../../../apps/auth-service/src/modules/admin/superadmin-setup.controller.ts#L72); [P01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173) — Platform bootstrap/state output. Mapping only; implementation unverified.
+- [x] `POST /superadmin/create-first-admin` — [source](../../../../../../apps/auth-service/src/modules/admin/superadmin-setup.controller.ts#L92); [P01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173) — Platform bootstrap/state output. Mapping only; implementation unverified.
+
+### audit.controller
+
+- [x] `GET /audit` — [source](../../../../../../apps/auth-service/src/modules/audit/audit.controller.ts#L29); [T19 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2111) — Filtered investigation/export. Mapping only; implementation unverified.
+- [x] `GET /audit/export` — [source](../../../../../../apps/auth-service/src/modules/audit/audit.controller.ts#L40); [T19 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2111) — Filtered investigation/export. Mapping only; implementation unverified.
+
+### auth.controller
+
+- [x] `POST /auth/register` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L81); [H02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-318) — Account creation; link-first target design. Mapping only; implementation unverified.
+- [x] `POST /auth/login` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L106); [H01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) — Sign-in context and method resolution. Mapping only; implementation unverified.
+- [x] `POST /auth/logout` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L149); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session runtime action; not an editable token page. Mapping only; implementation unverified.
+- [x] `POST /auth/forgot-password` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L173); [H04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-169) — Account recovery step. Mapping only; implementation unverified.
+- [x] `POST /auth/reset-password` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L199); [H04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-169) — Account recovery step. Mapping only; implementation unverified.
+- [x] `POST /auth/verify-email` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L227); [H03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-354) — Verification link continuation/resend. Mapping only; implementation unverified.
+- [x] `POST /auth/resend-verification` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L242); [H03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-354) — Verification link continuation/resend. Mapping only; implementation unverified.
+- [x] `POST /auth/refresh` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L256); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session runtime action; not an editable token page. Mapping only; implementation unverified.
+- [x] `GET /auth/me` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L305); [H01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) — Sign-in context and method resolution. Mapping only; implementation unverified.
+- [x] `POST /auth/mfa/verify` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L427); [H06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-69) — Login challenge; distinct from factor management. Mapping only; implementation unverified.
+- [x] `POST /auth/mfa/verify-backup` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L508); [H06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-69) — Login challenge; distinct from factor management. Mapping only; implementation unverified.
+- [x] `POST /auth/webauthn/login/start` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L594); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — Browser/device passkey step. Mapping only; implementation unverified.
+- [x] `POST /auth/webauthn/login/finish` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L629); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — Browser/device passkey step. Mapping only; implementation unverified.
+- [x] `POST /auth/magic-link/send` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L706); [H05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-140) — Passwordless email-link sign-in. Mapping only; implementation unverified.
+- [x] `POST /auth/magic-link/verify` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L723); [H05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-140) — Passwordless email-link sign-in. Mapping only; implementation unverified.
+- [x] `GET /auth/providers` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L765); [H01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) — Sign-in context and method resolution. Mapping only; implementation unverified.
+- [x] `POST /auth/login-intent` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L798); [H01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) — Sign-in context and method resolution. Mapping only; implementation unverified.
+- [x] `GET /auth/invite/validate/:token` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L941); [H09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-256) — Invitation link/activation step. Mapping only; implementation unverified.
+- [x] `POST /auth/invite/accept` — [source](../../../../../../apps/auth-service/src/modules/auth/auth.controller.ts#L953); [H09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-256) — Invitation link/activation step. Mapping only; implementation unverified.
+
+### dashboard.controller
+
+- [x] `GET /dashboard` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L41); [T01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2) — Organization metrics/activity output. Mapping only; implementation unverified.
+- [x] `GET /dashboard/tenant-settings` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L77); [T20 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2243) — Organization configuration. Mapping only; implementation unverified.
+- [x] `PATCH /dashboard/tenant-settings` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L98); [T20 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2243) — Organization configuration. Mapping only; implementation unverified.
+- [x] `GET /dashboard/tenant-metrics` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L118); [T01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2) — Organization metrics/activity output. Mapping only; implementation unverified.
+- [x] `GET /dashboard/tenant-activity` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L124); [T01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2) — Organization metrics/activity output. Mapping only; implementation unverified.
+- [x] `GET /dashboard/api-call-trend` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L134); [T01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2) — Organization metrics/activity output. Mapping only; implementation unverified.
+- [x] `GET /dashboard/auth-breakdown` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L145); [T01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2) — Organization metrics/activity output. Mapping only; implementation unverified.
+- [x] `PATCH /dashboard/tenant-settings/social/:provider` — [source](../../../../../../apps/auth-service/src/modules/dashboard/dashboard.controller.ts#L151); [T13 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-565) — Organization configuration. Mapping only; implementation unverified.
+
+### email.controller
+
+- [x] `GET /email/test` — [source](../../../../../../apps/auth-service/src/modules/email/email.controller.ts#L26); [P05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-541) — Operator/development diagnostic; no end-user email-test button assumed. Mapping only; implementation unverified.
+
+### ldap.controller
+
+- [x] `POST /ldap/connections` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L40); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+- [x] `GET /ldap/connections` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L47); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+- [x] `PATCH /ldap/connections/:id` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L53); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+- [x] `DELETE /ldap/connections/:id` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L63); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+- [x] `POST /ldap/connections/:id/test` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L70); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+- [x] `POST /ldap/connections/:id/sync` — [source](../../../../../../apps/auth-service/src/modules/ldap/ldap.controller.ts#L76); [T16 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) — Directory configuration, test or synchronization. Mapping only; implementation unverified.
+
+### mfa.controller
+
+- [x] `POST /mfa/setup/totp` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L66); [H07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-836) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/verify/totp` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L86); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `DELETE /mfa/totp` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L126); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/backup-codes/regenerate` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L150); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/verify/backup-code` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L182); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `GET /mfa/status` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L217); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `DELETE /mfa/all` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L240); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/request-email-otp` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L260); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/verify-email-otp` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L283); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/webauthn/register/start` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L310); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `POST /mfa/webauthn/register/finish` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L328); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `GET /mfa/webauthn/credentials` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L356); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+- [x] `DELETE /mfa/webauthn/credentials/:credentialId` — [source](../../../../../../apps/auth-service/src/modules/mfa/mfa.controller.ts#L374); [A04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976) — Factor enrollment/management; preserve server-supported distinctions. Mapping only; implementation unverified.
+
+### oauth.controller
+
+- [x] `GET /oauth/authorize` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L102); [H10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384) — OAuth consent/authorization continuation. Mapping only; implementation unverified.
+- [x] `POST /oauth/token` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L238); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `GET /oauth/userinfo` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L486); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `POST /oauth/revoke` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L522); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `POST /oauth/introspect` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L563); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `GET /oauth/.well-known/openid-configuration` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L593); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `GET /oauth/jwks` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L608); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `POST /oauth/clients` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L707); [T10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-302) — Application/credential management. Mapping only; implementation unverified.
+- [x] `GET /oauth/clients` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L745); [T10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-302) — Application/credential management. Mapping only; implementation unverified.
+- [x] `GET /oauth/clients/:clientId` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L773); [T11 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-495) — Application/credential management. Mapping only; implementation unverified.
+- [x] `PUT /oauth/clients/:clientId` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L795); [T11 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-495) — Application/credential management. Mapping only; implementation unverified.
+- [x] `DELETE /oauth/clients/:clientId` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L818); [T11 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-495) — Application/credential management. Mapping only; implementation unverified.
+- [x] `POST /oauth/clients/:clientId/rotate-secret` — [source](../../../../../../apps/auth-service/src/modules/oauth/oauth.controller.ts#L838); [T12 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-437) — Application/credential management. Mapping only; implementation unverified.
+
+### well-known.controller
+
+- [x] `GET /.well-known/jwks.json` — [source](../../../../../../apps/auth-service/src/modules/oauth/well-known.controller.ts#L26); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+- [x] `GET /.well-known/openid-configuration` — [source](../../../../../../apps/auth-service/src/modules/oauth/well-known.controller.ts#L35); [N14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83) — Protocol/machine output consumed by an integration, not a token editor. Mapping only; implementation unverified.
+
+### rbac.controller
+
+- [x] `GET /rbac/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L77); [T06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) — Permission catalog and lifecycle. Mapping only; implementation unverified.
+- [x] `POST /rbac/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L87); [T06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) — Permission catalog and lifecycle. Mapping only; implementation unverified.
+- [x] `GET /rbac/permissions/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L103); [T06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) — Permission catalog and lifecycle. Mapping only; implementation unverified.
+- [x] `PUT /rbac/permissions/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L112); [T06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) — Permission catalog and lifecycle. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/permissions/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L125); [T06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) — Permission catalog and lifecycle. Mapping only; implementation unverified.
+- [x] `GET /rbac/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L139); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `POST /rbac/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L153); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `GET /rbac/roles/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L167); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `PUT /rbac/roles/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L180); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/roles/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L193); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `POST /rbac/roles/:id/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L207); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/roles/:id/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L227); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `GET /rbac/roles/:id/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L246); [T05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) — Role and permission management. Mapping only; implementation unverified.
+- [x] `GET /rbac/roles/:roleId/policies` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L255); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `GET /rbac/users/:userId/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L267); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `POST /rbac/users/:userId/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L276); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `PUT /rbac/users/:userId/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L300); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/users/:userId/roles/:roleName` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L321); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `GET /rbac/users/:userId/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L341); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `POST /rbac/users/:userId/check-permission` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L357); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `POST /rbac/users/:userId/check-role` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L376); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `GET /rbac/me/roles` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L399); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `GET /rbac/me/permissions` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L407); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `POST /rbac/me/check-permission` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L415); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — Assigned and effective access. Mapping only; implementation unverified.
+- [x] `POST /rbac/initialize` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L436); [P07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676) — Tenant-scoped maintenance operation; no separate page required. Mapping only; implementation unverified.
+- [x] `POST /rbac/cleanup-expired` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L449); [P07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676) — Tenant-scoped maintenance operation; no separate page required. Mapping only; implementation unverified.
+- [x] `POST /rbac/policies` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L463); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `GET /rbac/policies` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L472); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `GET /rbac/policies/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L486); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `PUT /rbac/policies/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L494); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/policies/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L506); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `POST /rbac/policies/simulate` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L515); [T09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-2011) — Policy simulation action. Mapping only; implementation unverified.
+- [x] `POST /rbac/roles/:roleId/policies/:policyId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L533); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/roles/:roleId/policies/:policyId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L546); [T07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) — Policy lifecycle or attachment. Mapping only; implementation unverified.
+- [x] `POST /rbac/groups` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L564); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `GET /rbac/groups` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L573); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `GET /rbac/groups/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L581); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `PUT /rbac/groups/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L589); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/groups/:id` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L601); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `POST /rbac/groups/:id/members/:userId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L610); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/groups/:id/members/:userId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L623); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `POST /rbac/groups/:id/policies/:policyId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L637); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+- [x] `DELETE /rbac/groups/:id/policies/:policyId` — [source](../../../../../../apps/auth-service/src/modules/rbac/rbac.controller.ts#L650); [T08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) — Group lifecycle, members or policies. Mapping only; implementation unverified.
+
+### saml.controller
+
+- [x] `GET /saml/metadata/:tenantSlug` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L46); [H10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384) — SAML metadata or browser-bound protocol continuation. Mapping only; implementation unverified.
+- [x] `POST /saml/sso/:tenantSlug` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L61); [H10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384) — SAML metadata or browser-bound protocol continuation. Mapping only; implementation unverified.
+- [x] `GET /saml/sso/continue/:nonce` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L119); [H10 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384) — SAML metadata or browser-bound protocol continuation. Mapping only; implementation unverified.
+- [x] `GET /saml/sps` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L177); [T14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) — Sentry-as-IdP service-provider configuration. Mapping only; implementation unverified.
+- [x] `POST /saml/sps` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L184); [T14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) — Sentry-as-IdP service-provider configuration. Mapping only; implementation unverified.
+- [x] `PATCH /saml/sps/:id` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L192); [T14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) — Sentry-as-IdP service-provider configuration. Mapping only; implementation unverified.
+- [x] `DELETE /saml/sps/:id` — [source](../../../../../../apps/auth-service/src/modules/saml/saml.controller.ts#L203); [T14 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) — Sentry-as-IdP service-provider configuration. Mapping only; implementation unverified.
+
+### scim.controller
+
+- [x] `POST /scim/tokens` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L53); [T15 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1401) — Dedicated provisioning credentials. Mapping only; implementation unverified.
+- [x] `GET /scim/tokens` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L61); [T15 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1401) — Dedicated provisioning credentials. Mapping only; implementation unverified.
+- [x] `DELETE /scim/tokens/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L68); [T15 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1401) — Dedicated provisioning credentials. Mapping only; implementation unverified.
+- [x] `GET /scim/v2/Users` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L79); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `GET /scim/v2/Users/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L99); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `POST /scim/v2/Users` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L111); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `PUT /scim/v2/Users/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L124); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `PATCH /scim/v2/Users/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L137); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `DELETE /scim/v2/Users/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L150); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `GET /scim/v2/Groups` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L163); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `GET /scim/v2/Groups/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L181); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `POST /scim/v2/Groups` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L193); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `PATCH /scim/v2/Groups/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L206); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `DELETE /scim/v2/Groups/:id` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L219); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+- [x] `GET /scim/v2/ServiceProviderConfig` — [source](../../../../../../apps/auth-service/src/modules/scim/scim.controller.ts#L232); [N09 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) — Machine provisioning protocol; reflected in lifecycle/sync UX. Mapping only; implementation unverified.
+
+### session.controller
+
+- [x] `GET /sessions/active` — [source](../../../../../../apps/auth-service/src/modules/session/session.controller.ts#L33); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session management or analytics output. Mapping only; implementation unverified.
+- [x] `GET /sessions/analytics` — [source](../../../../../../apps/auth-service/src/modules/session/session.controller.ts#L58); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session management or analytics output. Mapping only; implementation unverified.
+- [x] `DELETE /sessions/:sessionId` — [source](../../../../../../apps/auth-service/src/modules/session/session.controller.ts#L71); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session management or analytics output. Mapping only; implementation unverified.
+- [x] `DELETE /sessions/all/other` — [source](../../../../../../apps/auth-service/src/modules/session/session.controller.ts#L95); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session management or analytics output. Mapping only; implementation unverified.
+- [x] `DELETE /sessions/all` — [source](../../../../../../apps/auth-service/src/modules/session/session.controller.ts#L123); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Session management or analytics output. Mapping only; implementation unverified.
+
+### social-auth.controller
+
+- [x] `GET /auth/social/google/login` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L91); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/google/callback` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L116); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/github/login` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L130); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/github/callback` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L151); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/microsoft/login` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L165); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/microsoft/callback` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L190); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `POST /auth/social/claim-session` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L342); [H08 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/link/confirm` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L382); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `POST /auth/social/link/token` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L407); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/link/google` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L420); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/link/github` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L446); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/link/microsoft` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L472); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `GET /auth/social/connections` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L511); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+- [x] `DELETE /auth/social/connections/:provider` — [source](../../../../../../apps/auth-service/src/modules/social-auth/social-auth.controller.ts#L530); [A03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763) — External identity handshake or linked-account action. Mapping only; implementation unverified.
+
+### tenant-branding.controller
+
+- [x] `GET /tenants/current/branding` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-branding.controller.ts#L46); [T21 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2308) — Hosted identity branding or organization preview. Mapping only; implementation unverified.
+- [x] `PUT /tenants/current/branding` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-branding.controller.ts#L53); [T21 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2308) — Hosted identity branding or organization preview. Mapping only; implementation unverified.
+- [x] `POST /tenants/current/branding/logo` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-branding.controller.ts#L87); [T21 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2308) — Hosted identity branding or organization preview. Mapping only; implementation unverified.
+- [x] `GET /tenants/:slug/branding/public` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-branding.controller.ts#L153); [H01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2) — Hosted identity branding or organization preview. Mapping only; implementation unverified.
+
+### tenant-registration.controller
+
+- [x] `GET /tenants/slug-check` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-registration.controller.ts#L35); [T04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1115) — Workspace creation and slug feedback. Mapping only; implementation unverified.
+- [x] `POST /tenants/register` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant-registration.controller.ts#L56); [T04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1115) — Workspace creation and slug feedback. Mapping only; implementation unverified.
+
+### tenant.controller
+
+- [x] `GET /tenants/current` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant.controller.ts#L81); [T20 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2243) — Organization context or provisioning. Mapping only; implementation unverified.
+- [x] `POST /tenants` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant.controller.ts#L89); [P03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102) — Organization context or provisioning. Mapping only; implementation unverified.
+- [x] `PATCH /tenants/:id/custom-domain` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant.controller.ts#L98); [T22 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2385) — Domain verification/configuration; operator permissions apply. Mapping only; implementation unverified.
+- [x] `POST /tenants/:id/verify-domain` — [source](../../../../../../apps/auth-service/src/modules/tenant/tenant.controller.ts#L111); [T22 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2385) — Domain verification/configuration; operator permissions apply. Mapping only; implementation unverified.
+
+### user.controller
+
+- [x] `GET /users/me` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L70); [A01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-938) — Personal identity lifecycle. Mapping only; implementation unverified.
+- [x] `PUT /users/me` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L82); [A01 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-938) — Personal identity lifecycle. Mapping only; implementation unverified.
+- [x] `POST /users/me/change-password` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L99); [A02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-699) — Sensitive password change. Mapping only; implementation unverified.
+- [x] `GET /users/me/sessions` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L132); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Personal session lifecycle. Mapping only; implementation unverified.
+- [x] `DELETE /users/me/sessions/:sessionId` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L144); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Personal session lifecycle. Mapping only; implementation unverified.
+- [x] `DELETE /users/me/sessions` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L162); [A05 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947) — Personal session lifecycle. Mapping only; implementation unverified.
+- [x] `GET /users/me/security-events` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L176); [A06 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1009) — Personal security activity. Mapping only; implementation unverified.
+- [x] `GET /users/orgs` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L195); [T04 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1115) — Membership/context selection. Mapping only; implementation unverified.
+- [x] `DELETE /users/me` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L206); [A07 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-632) — Personal identity lifecycle. Mapping only; implementation unverified.
+- [x] `GET /users` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L230); [T02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `GET /users/stats` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L253); [T02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `GET /users/export` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L274); [T02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `POST /users/bulk/update-status` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L302); [T02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `GET /users/:id` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L332); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `PUT /users/:id` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L348); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `DELETE /users/:id` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L369); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `POST /users/:id/force-password-reset` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L391); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `POST /users/:id/lock` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L408); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `POST /users/:id/unlock` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L421); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `POST /users/invite` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L438); [T02 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `GET /users/:id/sessions` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L457); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `DELETE /users/:id/sessions/:sessionId` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L474); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+- [x] `GET /users/:id/security-events` — [source](../../../../../../apps/auth-service/src/modules/user/user.controller.ts#L493); [T03 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224) — People/access lifecycle action. Mapping only; implementation unverified.
+
+### webhook.controller
+
+- [x] `POST /webhooks` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L41); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `GET /webhooks` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L48); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `GET /webhooks/:id` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L54); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `PATCH /webhooks/:id` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L60); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `POST /webhooks/:id/rotate-secret` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L70); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `DELETE /webhooks/:id` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L76); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `GET /webhooks/:id/deliveries` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L83); [T18 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1951) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `POST /webhooks/:id/deliveries/:deliveryId/redeliver` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L93); [T18 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1951) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+- [x] `POST /webhooks/:id/test` — [source](../../../../../../apps/auth-service/src/modules/webhook/webhook.controller.ts#L104); [T17 UX/protocol reference](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636) — Webhook setup or delivery operation. Mapping only; implementation unverified.
+
+Inventory: **212 active HTTP route decorators**, **47 existing-capability screen families**, **14 proposed-capability families**, plus shared states and connected journeys.
+
+## Delivery batches
+
+- [ ] Batch 1: foundations; polished sign-in/MFA/recovery; organization overview/users; application integration; first connected prototypes.
+- [ ] Batch 2: full hosted identity/account/onboarding/invites and state/mobile/theme variants.
+- [ ] Batch 3: people/access/groups/permissions/policies/simulation and all application configuration.
+- [ ] Batch 4: social/SAML/SCIM/LDAP/webhooks/audit/branding/domains/settings.
+- [ ] Batch 5: platform operations and proposed missing features N01–N14.
+- [ ] Final: verify every API mapping, all journey branches, accessibility, responsive/theme coverage and visual polish; replace pending mappings with real frame links.
+
+## Full Figma frame index
+
+Each row is a native editable screen/step or a shared reference state. This index does not mark a family complete.
+
+| Screen / state                              | Frame                                                                             |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| H01 / u/login / email / email               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-2)     |
+| H01 / u/login / password / password         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-37)    |
+| H06 / u/mfa / authenticator / mfa           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-69)    |
+| H06 / u/mfa / recovery-code                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-108)   |
+| H05 / u/magic-link / sent                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-140)   |
+| H04 / u/reset-password / request            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-169)   |
+| H04 / u/reset-password / new-password       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-198)   |
+| H04 / u/reset-password / complete           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-230)   |
+| H09 / invite/token / accept / invite        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-256)   |
+| H09 / invite/token / expired                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-292)   |
+| H02 / u/signup / register                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-318)   |
+| H03 / u/verify-email / verify               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-354)   |
+| H10 / oauth / consent                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-384)   |
+| H01 / u/login / invalid-credentials         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-414)   |
+| H01 / u/login / email / email-mobile        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-446)   |
+| H01 / u/login / password / password-mobile  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-472)   |
+| H06 / u/mfa / authenticator / mfa-mobile    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-495)   |
+| H09 / invite/token / accept / invite-mobile | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-525)   |
+| H01 / u/login / password / password-dark    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=3-552)   |
+| J03 · Successful sign-in destination        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-377)  |
+| H09 / invite/token / accepted               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-495)  |
+| H03 · Verification email                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-134)  |
+| H03 · Confirm verification link             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-174)  |
+| H03 · Email verified                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-216)  |
+| H03 · Link expired                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-255)  |
+| H03 · Already verified                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-294)  |
+| H03 · Wrong account                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-333)  |
+| H03 · Alternate device                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-375)  |
+| H03 · Code fallback                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-417)  |
+| H04 · Recovery email sent                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-460)  |
+| H04 · Password recovery email               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-502)  |
+| H04 · Reset link confirmed                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-542)  |
+| H04 · Reset link expired                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-592)  |
+| H05 · Magic sign-in email                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-631)  |
+| H05 · Sign-in link confirmation             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-671)  |
+| H08 · Passkey prompt                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-713)  |
+| H08 · Passkey cancelled                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-755)  |
+| H08 · Social callback                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-794)  |
+| H07 · Required enrollment                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-836)  |
+| H07 · Authenticator setup                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-878)  |
+| H07 · Save recovery codes                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-922)  |
+| H07 · Enrollment complete                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-962)  |
+| H09 · Invitation email                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1001) |
+| H09 · Existing account join                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1041) |
+| H06 · Choose verification method            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1083) |
+| H06 · Challenge expired                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1123) |
+| H01 · Workspace unavailable                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1162) |
+| H01 · Sign-in limited                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=17-1201) |
+| P01 · First-run setup                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-173)  |
+| H10 · SAML continuation                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-228)  |
+| H10 · Federation request expired            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-270)  |
+| H10 · Authorization declined                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-309)  |
+| N04 · Ownership transfer email              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-348)  |
+| N04 · Accept ownership                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-388)  |
+| N04 · Ownership accepted                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-430)  |
+| H03 · Invalid verification link             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-469)  |
+| H05 · Magic link expired                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-508)  |
+| H06 · Invalid verification code             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-547)  |
+| H07 · Enrollment expired                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-593)  |
+| A07 · Recent authentication                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-632)  |
+| H09 · Invitation declined                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-674)  |
+| H03 · Mobile inbox verification             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-713)  |
+| H03 · Mobile verification landing           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-743)  |
+| H04 · Mobile recovery request               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-773)  |
+| H04 · Mobile new password                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-807)  |
+| H07 · Mobile required enrollment            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-845)  |
+| H09 · Mobile invitation email               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-875)  |
+| H10 · Mobile app consent                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-905)  |
+| A01 · Mobile profile                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-938)  |
+| A04 · Mobile security                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=21-976)  |
+| T01 · Overview                              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-2)     |
+| T02 · People                                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-117)   |
+| T03 · Person detail                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-224)   |
+| T10 · Applications                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-302)   |
+| T10 · Create application                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-378)   |
+| T12 · Credentials                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-437)   |
+| T11 · Application settings                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-495)   |
+| T13 · Integrations                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-565)   |
+| T17 · Webhooks                              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-636)   |
+| A04 · Account security                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=8-712)   |
+| T10 · Create confidential application       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-147)  |
+| T11 · Confidential application settings     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=11-206)  |
+| T02 · Invite people                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-180)  |
+| T02 · Review invitations                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-249)  |
+| T02 · Invitations sent                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-314)  |
+| N10 · Invitation lifecycle                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-363)  |
+| T02 · Create user                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-425)  |
+| T03 · Assign roles                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-493)  |
+| T03 · Review access changes                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-557)  |
+| T03 · Access updated                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-622)  |
+| T03 · Effective access                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-671)  |
+| T03 · Revoke role confirmation              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-743)  |
+| T03 · Suspend person                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-802)  |
+| T03 · Delete person                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-857)  |
+| T03 · Edit person                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-912)  |
+| T03 · Person sessions                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-986)  |
+| T03 · Person activity                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1048) |
+| T04 · Workspace chooser                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1115) |
+| T04 · Create workspace                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1174) |
+| T05 · Roles                                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1242) |
+| T05 · Create role                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1309) |
+| T05 · Role detail                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1374) |
+| T06 · Permission catalog                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1433) |
+| T06 · Create permission                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1505) |
+| T07 · Policies                              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1570) |
+| T07 · Policy editor                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1632) |
+| T07 · Attach policy                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1693) |
+| T08 · Groups                                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1757) |
+| T08 · Create group                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1824) |
+| T08 · Group detail                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1885) |
+| T08 · Add group members                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-1952) |
+| T09 · Policy simulator                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-2011) |
+| T09 · Simulation result                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=18-2076) |
+| A01 · My profile                            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-625)  |
+| A02 · Change password                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-699)  |
+| A03 · Connected sign-in accounts            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-763)  |
+| A03 · Link account review                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-836)  |
+| A04 · Passkeys                              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-885)  |
+| A05 · My sessions                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-947)  |
+| A06 · My activity                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1009) |
+| A07 · Delete my account                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1076) |
+| T12 · Rotate client secret                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1131) |
+| T13 · Configure social provider             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1190) |
+| T14 · SAML service providers                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1258) |
+| T14 · Configure SAML                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1324) |
+| T15 · SCIM provisioning                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1401) |
+| T15 · Create SCIM token                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1468) |
+| T15 · SCIM token created                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1527) |
+| T16 · LDAP directories                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1582) |
+| T16 · Configure LDAP                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1639) |
+| T16 · LDAP test result                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1713) |
+| T16 · LDAP sync result                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1772) |
+| T17 · Configure webhook                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1831) |
+| T17 · Webhook secret                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1899) |
+| T18 · Delivery details                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-1951) |
+| T18 · Redeliver confirmation                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2013) |
+| T18 · Redelivery succeeded                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2062) |
+| T19 · Audit log                             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2111) |
+| T19 · Audit event detail                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2178) |
+| T20 · Organization settings                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2243) |
+| T21 · Branding                              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2308) |
+| T22 · Custom domain                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2385) |
+| T23 · Password and session policy           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=19-2446) |
+| T05 · Edit role permissions                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1083) |
+| T05 · Delete role                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1151) |
+| T06 · Edit permission                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1200) |
+| T07 · Delete policy                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1261) |
+| T08 · Remove member                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1314) |
+| T08 · Delete group                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1363) |
+| T11 · Delete application                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1419) |
+| T15 · Revoke SCIM token                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1471) |
+| T16 · LDAP connection failed                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1524) |
+| T17 · Rotate webhook secret                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1573) |
+| T17 · Delete endpoint                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1622) |
+| T18 · Delivery failed                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1668) |
+| T19 · Audit filters                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1717) |
+| T19 · Export audit                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1782) |
+| N01 · Password policy                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1844) |
+| N01 · Session policy                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1909) |
+| N05 · Compare plans                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-1974) |
+| N05 · Invoice detail                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2041) |
+| N05 · Payment method                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2100) |
+| N06 · Revoke service credential             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2149) |
+| N08 · Audit retention                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2202) |
+| Shared · Empty workspace                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2266) |
+| Shared · No search results                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2315) |
+| Shared · API error                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2361) |
+| Shared · Access denied                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2410) |
+| Shared · Resource missing                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2459) |
+| Shared · Conflict                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2505) |
+| Shared · Unsaved changes                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2554) |
+| Shared · Mutation pending                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2600) |
+| Shared · Rate limited                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2645) |
+| Shared · Signed out                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2694) |
+| Shared · Service unavailable                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=23-2740) |
+| T02 · User created pending activation       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1470) |
+| A01 · Profile saved                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1529) |
+| T03 · Person suspended                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1575) |
+| T03 · Restore person                        | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1631) |
+| T03 · Request password reset                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1680) |
+| T03 · Password reset requested              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1729) |
+| T05 · Role saved                            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1775) |
+| T15 · Provisioning token revoked            | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1821) |
+| T18 · Webhook test sent                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1867) |
+| T22 · Domain verified                       | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1913) |
+| T21 · Branding preview                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-1962) |
+| T09 · Simulation denied                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=25-2021) |
+| N01 · Authentication policy                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-2)     |
+| N14 · Integration quickstart                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-83)    |
+| N05 · Billing and usage                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=9-155)   |
+| P02 · Platform overview                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-43)   |
+| P03 · Organizations                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-102)  |
+| P03 · Provision organization                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-175)  |
+| P03 · Organization detail                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-249)  |
+| P03 · Suspend organization                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-314)  |
+| P03 · Delete organization                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-369)  |
+| P04 · Platform team                         | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-424)  |
+| P04 · Add operator                          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-486)  |
+| P05 · Platform settings                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-541)  |
+| P06 · Platform activity                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-609)  |
+| P07 · Maintenance                           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-676)  |
+| P07 · Cleanup confirmation                  | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-735)  |
+| N02 · Connected applications                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-784)  |
+| N02 · Revoke application grant              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-846)  |
+| N03 · Sender domain setup                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-895)  |
+| N04 · Transfer ownership                    | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-963)  |
+| N04 · Ownership pending                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1027) |
+| N04 · Schedule workspace deletion           | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1083) |
+| N04 · Workspace deletion scheduled          | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1142) |
+| N06 · Service credentials                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1198) |
+| N06 · Create service credential             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1260) |
+| N06 · One-time service secret               | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1325) |
+| N07 · Cross-tenant people                   | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1381) |
+| N08 · Privacy requests                      | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1450) |
+| N08 · Create privacy request                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1516) |
+| N09 · Provisioning runs                     | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1584) |
+| N09 · Provisioning conflicts                | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1646) |
+| N11 · Remove sign-in method                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1708) |
+| N11 · Regenerate recovery codes             | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1767) |
+| N12 · Permission boundaries                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1816) |
+| N13 · Notification preferences              | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1880) |
+| N13 · Email delivery detail                 | [Open frame](https://www.figma.com/design/fRxM0xxiZ0VN7JQdISP2kb?node-id=20-1945) |

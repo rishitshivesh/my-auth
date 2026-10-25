@@ -108,6 +108,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Delete a key and report whether this call removed it. DEL is atomic, so
+   * exactly one concurrent caller gets `true` (one-time-use tokens).
+   */
+  async consumeOnce(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+  ): Promise<boolean> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    return (await this.client.del(key)) === 1;
+  }
+
+  /**
    * Delete multiple keys by pattern
    */
   async deletePattern(tenantId: string, pattern: string): Promise<number> {

@@ -7,7 +7,9 @@ import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import * as samlify from "samlify";
 import { X509CertificateGenerator } from "@peculiar/x509";
+import { EncryptionService } from "@repo/security";
 import { SamlServiceProvider, KeyPair, User, Tenant } from "@repo/database";
+import { registerSamlSchemaValidator } from "./saml-schema-validator";
 import { RegisterSPDto, UpdateSPDto } from "./saml.dto";
 import { logger } from "@/common/logger";
 import { TenantService } from "@/modules/tenant/tenant.service";
@@ -26,6 +28,30 @@ function xmlEsc(s: string): string {
 function validateSlug(slug: string): void {
   if (!/^[a-z0-9-]{1,64}$/.test(slug)) {
     throw samlError(400, "Invalid tenant slug format");
+  }
+}
+
+/**
+ * User fields a tenant admin may map into a signed assertion. Everything else
+ * (passwordHash, tokens, MFA material, lockout state, ...) is never emitted.
+ */
+export const MAPPABLE_USER_FIELDS: ReadonlySet<string> = new Set([
+  "id",
+  "email",
+  "firstName",
+  "lastName",
+  "displayName",
+  "phone",
+  "avatarUrl",
+  "timezone",
+]);
+
+function assertMappableAttributes(mapping: Record<string, string> | undefined): void {
+  const bad = Object.values(mapping ?? {}).filter((f) => !MAPPABLE_USER_FIELDS.has(f));
+  if (bad.length > 0) {
+    throw new ApiException("BAD_REQUEST", {
+      detail: `attributeMapping may only reference: ${[...MAPPABLE_USER_FIELDS].join(", ")}`,
+    });
   }
 }
 
@@ -67,6 +93,8 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
+registerSamlSchemaValidator();
+
 @Injectable()
 export class SamlService {
   /** In-memory cache: KeyPair.id → self-signed cert PEM wrapping that key. */
@@ -89,16 +117,12 @@ export class SamlService {
     return this.config.get<string>("ISSUER_BASE_URL", "http://localhost:4000");
   }
 
-  private decryptPrivateKey(keyPair: KeyPair): string {
-    const masterKey = this.config.getOrThrow<string>("KEYRING_MASTER_KEY");
-    const key = Buffer.from(masterKey.padEnd(32, "0").slice(0, 32));
-    const iv = Buffer.from(keyPair.iv, "hex");
-    const authTag = Buffer.from(keyPair.authTag, "hex");
-    const encrypted = Buffer.from(keyPair.encryptedPrivateKey, "hex");
-
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
-    return decipher.update(encrypted).toString("utf8") + decipher.final("utf8");
+  private async decryptPrivateKey(keyPair: KeyPair): Promise<string> {
+    // Same envelope JwksService writes (scrypt-derived key, base64 parts).
+    return EncryptionService.decrypt(
+      { encrypted: keyPair.encryptedPrivateKey, iv: keyPair.iv, authTag: keyPair.authTag },
+      this.config.getOrThrow<string>("KEYRING_MASTER_KEY"),
+    );
   }
 
   /**
@@ -167,7 +191,7 @@ export class SamlService {
 
     if (!keyPair) throw samlError(400, "No active signing key found");
 
-    const privateKeyPem = this.decryptPrivateKey(keyPair);
+    const privateKeyPem = await this.decryptPrivateKey(keyPair);
 
     let signingCertPem = this.signingCertCache.get(keyPair.id);
     if (!signingCertPem) {
@@ -215,6 +239,7 @@ export class SamlService {
   }
 
   async registerSP(tenantId: string, dto: RegisterSPDto): Promise<SamlServiceProvider> {
+    assertMappableAttributes(dto.attributeMapping);
     const existing = await this.spRepo.findOne({
       where: { tenantId, entityId: dto.entityId },
     });
@@ -246,6 +271,7 @@ export class SamlService {
   }
 
   async updateSP(tenantId: string, id: string, dto: UpdateSPDto): Promise<SamlServiceProvider> {
+    assertMappableAttributes(dto.attributeMapping);
     const sp = await this.findSP(tenantId, id);
     Object.assign(sp, dto);
     return this.spRepo.save(sp);
@@ -355,13 +381,28 @@ export class SamlService {
       throw samlError(400, "Malformed SAMLRequest");
     }
 
-    const peek = samlify.Extractor.extract(decodedXml, samlify.Extractor.loginRequestFields);
+    if (/<!DOCTYPE|<!ENTITY/i.test(decodedXml)) {
+      throw samlError(400, "DTD declarations are not allowed");
+    }
+    let peek: ReturnType<typeof samlify.Extractor.extract>;
+    try {
+      peek = samlify.Extractor.extract(decodedXml, samlify.Extractor.loginRequestFields);
+    } catch {
+      throw samlError(400, "Malformed SAMLRequest");
+    }
     const issuer = Array.isArray(peek.issuer) ? peek.issuer[0] : peek.issuer;
+    // eslint-disable-next-line no-control-regex
+    if (typeof issuer === "string" && /[\u0000-\u001f]/.test(issuer)) {
+      throw samlError(400, "Invalid Issuer");
+    }
     if (!issuer) {
       throw samlError(400, "AuthnRequest is missing an Issuer");
     }
 
-    const sp = await this.spRepo.findOne({ where: { tenantId, entityId: issuer, active: true } });
+    // SSO is reached without tenant middleware, so scope the lookup to the tenant schema.
+    const sp = await this.tenantJobRunner.runInTenant(tenantSlug, () =>
+      this.spRepo.findOne({ where: { tenantId, entityId: issuer, active: true } }),
+    );
     if (!sp) {
       throw samlError(400, "Unknown or inactive service provider");
     }
@@ -413,6 +454,8 @@ export class SamlService {
 
     const attributes = Object.entries(sp.attributeMapping)
       .map(([samlAttr, userField]) => {
+        // Fail closed for rows stored before the allow-list existed.
+        if (!MAPPABLE_USER_FIELDS.has(userField)) return "";
         const val = (user as unknown as Record<string, unknown>)[userField];
         if (!val) return "";
         return `<saml:Attribute Name="${xmlEsc(samlAttr)}"><saml:AttributeValue>${xmlEsc(String(val))}</saml:AttributeValue></saml:Attribute>`;

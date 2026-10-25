@@ -1,466 +1,118 @@
-# Admin Portal Frontend Audit
-
-**Date:** 2026-03-18
-**Scope:** `apps/admin-portal`
-**Auditor:** Claude Code
-
----
-
-## 1. Routing Structure
-
-### Root-level Routes (`app/`)
-
-| Route | Component Type | API Calls | Notes |
-|---|---|---|---|
-| `/` | Client | None | Landing page, static marketing content |
-| `/u/login` | Client | `authClient.request()` for login | Step-based auth flow |
-| `/u/signup` | Client | None (stub) | Name, email, password fields |
-| `/u/mfa` | Client | `verifyMfaLogin()` | Reads `_fk_mfa_temp_token` from sessionStorage |
-| `/u/magic-link` | Client | `verifyMagicLink()` | Redirects to `/dashboard` on success |
-| `/u/reset-password` | Client | None (stub) | Password reset form |
-| `/u/auth/callback` | — | — | Empty file |
-| `/auth/callback` | — | — | Empty file |
-| `/onboarding/create-tenant` | Client | None (stub) | Tenant creation form |
-| `/onboarding/country` | — | — | Empty file |
-
-### Dashboard Routes (`app/dashboard/`)
-
-**Layout:** `app/dashboard/layout.tsx` — Client Component with auth guard. Redirects to `/u/login` if `!user`.
-
-| Route | Component Type | API Calls |
-|---|---|---|
-| `/dashboard` | Client | `useDashboard()` |
-| `/dashboard/applications` | Client | None (empty state placeholder) |
-| `/dashboard/profile` | Client | `useAuth()` for user data |
-| `/dashboard/security` | Client | None (mock data only) |
-| `/dashboard/settings` | Client | None (stub) |
-| `/dashboard/settings/security` | Client | `useMfaStatus()`, `useListPasskeys()`, `useDeletePasskey()` |
-
-### Tenant Portal Routes (`app/t/[slug]/`)
-
-**⚠ CRITICAL:** No `layout.tsx` exists at this route segment — zero layout-level tenant isolation.
-
-| Route | Component Type | API Calls |
-|---|---|---|
-| `/t/[slug]/dashboard` | Client | `useTenantMetrics()`, `useTenantActivity()`, `useApiCallTrend()` |
-| `/t/[slug]/applications` | Client | None (mock data) |
-| `/t/[slug]/connections` | Client | None (mock data) |
-| `/t/[slug]/branding` | Client | `useBranding()`, `useUpdateBranding()`, `useUploadLogo()` |
-| `/t/[slug]/security` | Client | None (mock data) |
-| `/t/[slug]/settings` | Client | None (stub) |
-
----
-
-## 2. Component Inventory
-
-### `components/auth/`
-
-| Component | Purpose | Data Source |
-|---|---|---|
-| `step-based-auth-flow.tsx` | Multi-step auth dispatcher | Props |
-| `email-step.tsx` | Email input step | Props |
-| `credentials-step.tsx` | Email + password entry | Props |
-| `method-selection-step.tsx` | Choose auth method | Props |
-| `mfa-challenge.tsx` | MFA code input | Props |
-| `mfa-method-selector.tsx` | Select MFA method | Props |
-| `advanced-mfa-challenge.tsx` | Advanced MFA UI | Props |
-| `totp-setup.tsx` | TOTP QR code setup | Props |
-| `magic-link-form.tsx` | Magic link request | Props |
-| `reset-password-form.tsx` | Password reset | Props |
-| `verify-email-form.tsx` | Email verification | Props |
-| `passkey-login-button.tsx` | Passkey login trigger | Props + SDK |
-| `passkey-register-modal.tsx` | Passkey registration | Props + SDK |
-| `multi-option-login.tsx` | Dispatcher for login methods | Props |
-| `enhanced-password-input.tsx` | Password field with strength meter | Props |
-| `login-form.tsx` | Email/password + social | Props |
-| `signup-form.tsx` | Full registration form | Props |
-
-### `components/portal/`
-
-| Component | Purpose | Data Source |
-|---|---|---|
-| `sidebar.tsx` | Collapsible nav sidebar | Props: items, currentPath, collapsed, logoUrl, tenantName |
-| `topbar.tsx` | Header with title and actions | Props |
-| `applications-table.tsx` | Paginated app list | **Hardcoded mock data** |
-| `connections-list.tsx` | OAuth/SAML connections | **Hardcoded mock data** |
-| `mfa-settings.tsx` | MFA method toggles | Props |
-| `audit-log-list.tsx` | Audit event display | Props |
-| `active-sessions.tsx` | Session management | Props |
-| `trusted-device-card.tsx` | Device trust card | Props |
-| `user-menu.tsx` | User dropdown | Props + `useAuth()` |
-| `tenant-switcher.tsx` | Tenant selection | Props |
-| `status-badge.tsx` | Status indicator | Props |
-
-### `components/layouts/`
-
-| Component | Purpose | Notes |
-|---|---|---|
-| `portal-layout.tsx` | Tenant portal wrapper | **BUG: Uses mock tenant state; no tenant validation** |
-| `universal-auth-layout.tsx` | Auth pages wrapper | Props: logoUrl, primaryColor, etc. |
-| `onboarding-layout.tsx` | Onboarding wrapper | Props |
-| `public-layout.tsx` | Public pages wrapper | Props |
-
-### `components/branding/`, `components/inputs/`, `components/onboarding/`, `components/dashboard/`
-
-Standard presentational components. All Client Components. Props-driven.
-
----
-
-## 3. Data Fetching Patterns
-
-**Library:** React Query v5 (TanStack Query)
-
-**Config** (`app/layout.tsx`):
-```typescript
-new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } } })
-```
-
-**All query/mutation hooks** are centralized in `src/lib/queries.ts`:
-
-| Hook | Endpoint | HTTP |
-|---|---|---|
-| `useDashboard()` | `/dashboard` | GET |
-| `useMfaStatus()` | `/mfa/status` | GET |
-| `useSetupTotp()` | `/mfa/setup/totp` | POST |
-| `useVerifyTotp()` | `/mfa/verify/totp` | POST |
-| `useDisableTotp()` | `/mfa/totp` | DELETE |
-| `useTenantSettings()` | `/dashboard/tenant-settings` | GET |
-| `useUpdateTenantSettings()` | `/dashboard/tenant-settings` | PATCH |
-| `useUpdateSocialProvider()` | `/dashboard/tenant-settings/social/:provider` | PATCH |
-| `useListPasskeys()` | SDK: `authClient.listPasskeys()` | — |
-| `useDeletePasskey()` | SDK: `authClient.deletePasskey()` | — |
-| `useSocialConnections()` | SDK: `authClient.getSocialConnections()` | — |
-| `useUnlinkSocialAccount()` | SDK: `authClient.unlinkSocialAccount()` | — |
-| `useTenantMetrics()` | `/dashboard/tenant-metrics` | GET |
-| `useTenantActivity()` | `/dashboard/tenant-activity?limit=N` | GET |
-| `useApiCallTrend()` | `/dashboard/api-call-trend?days=N` | GET |
-| `useAuthBreakdown()` | `/dashboard/auth-breakdown` | GET |
-| `useBranding()` | `/tenants/current/branding` | GET |
-| `useUpdateBranding()` | `/tenants/current/branding` | PUT |
-| `useUploadLogo()` | `/tenants/current/branding/logo` | POST (raw fetch + FormData) |
-
-All authenticated calls go through `authClient.request()` which injects auth headers and manages token refresh. The logo upload is the only raw `fetch()` call outside the SDK.
-
----
-
-## 4. State Management
-
-**No global state library.** Pattern is:
-
-- **React Query** — server/async state (data, loading, errors)
-- **`useState`** — local UI state (forms, modals, toggles)
-- **`useAuth()` from `@fortknox/sdk`** — session state (user, isLoading, client methods)
-- **`sessionStorage`** — MFA temp token (`_fk_mfa_temp_token`)
-
-No Zustand, Jotai, Redux, or React Context found.
-
----
-
-## 5. Form Handling
-
-**Pattern:** Manual `useState` + `onChange` handlers. No form library.
-
-**Example** (`/t/[slug]/branding/page.tsx`):
-```typescript
-const [form, setForm] = useState<Partial<BrandingConfig>>({})
-<Input
-  value={form.logoUrl ?? ""}
-  onChange={(e) => setForm((p) => ({ ...p, logoUrl: e.target.value }))}
-/>
-async function handleSave() {
-  await updateBranding.mutateAsync(form)
-}
-```
-
-No react-hook-form, Formik, or zod validation integration.
-
----
-
-## 6. Toast / Notification System
-
-**Pattern:** **Custom inline `Toast` component** — not sonner, react-hot-toast, or shadcn/ui toast.
-
-Implementation is duplicated per page:
-```typescript
-function Toast({ message, kind }: { message: string; kind: "success" | "error" }) {
-  return (
-    <div role="alert" className={`fixed bottom-6 right-6 z-50 ...`}>
-      {kind === "success" ? "✓" : "✕"} {message}
-    </div>
-  )
-}
-```
-
-3-second auto-dismiss via `setTimeout` + useState. No global toast registry.
-
----
-
-## 7. Modal Pattern
-
-**Pattern:** Custom inline overlay div. No Dialog from shadcn/ui.
-
-```typescript
-{showNameModal && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div className="w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-      ...
-    </div>
-  </div>
-)}
-```
-
-State toggle via `useState(false)`. No React Portal. Rendered inline in JSX tree.
-
----
-
-## 8. Navigation / Layout
-
-**Root Layout** (`app/layout.tsx`) — Client Component:
-- Initializes `FortKnoxClient` (SDK)
-- Wraps with `QueryClientProvider`, `FortKnoxProvider`, `ThemeProvider`
-
-**Dashboard Layout** (`app/dashboard/layout.tsx`):
-- Auth guard: `if (!user) router.push('/u/login')`
-- Skeleton loading while `isLoading`
-
-**Portal Layout** (`components/layouts/portal-layout.tsx`):
-- Wraps `/t/[slug]/*` pages via import (NOT a file-based `layout.tsx`)
-- Provides sidebar + topbar
-- **⚠ Does NOT validate `tenantSlug` prop against authenticated user's tenantId**
-
-**⚠ No file-based `app/t/[slug]/layout.tsx` exists.**
-
----
-
-## 9. Design Tokens
-
-- **Tailwind CSS** via `@repo/ui` shared package
-- **CSS custom properties** set at runtime for tenant branding:
-  ```typescript
-  root.style.setProperty("--brand-primary", branding.primaryColor)
-  root.style.setProperty("--brand-font", branding.fontFamily)
-  ```
-- **Semantic tokens:** `bg-background`, `text-foreground`, `border-border`, `bg-card`, `text-muted-foreground`, `bg-primary`
-- **Dark mode:** Class-based (`dark:` prefix used throughout)
-- No `tailwind.config.ts` in `admin-portal` itself; config lives in `@repo/ui`
-
----
-
-## 10. Missing Pages
-
-| Route | Exists? | Status |
-|---|---|---|
-| `/t/[slug]/dashboard` | ✅ | Implemented |
-| `/t/[slug]/users` | ❌ | **MISSING** |
-| `/t/[slug]/providers` | ❌ | **MISSING** |
-| `/t/[slug]/audit-logs` | ❌ | **MISSING** |
-| `/t/[slug]/billing` | ❌ | **MISSING** |
-| `/t/[slug]/team` | ❌ | **MISSING** |
-| `/t/[slug]/branding` | ✅ | Implemented |
-| `/t/[slug]/api-keys` | ❌ | **MISSING** |
-| `/t/[slug]/applications` | ✅ | Implemented (mock data) |
-| `/t/[slug]/applications/new` | ❌ | **MISSING** |
-| `/login` | ❌ | Exists as `/u/login` |
-| `/login/mfa` | ❌ | Exists as `/u/mfa` |
-| `/login/magic-link-sent` | ❌ | **MISSING** |
-
-**9 of 13 expected routes are missing.**
-
----
-
-## 11. Tenant Isolation Audit
-
-### a) JWT / Session Claim
-
-**Claim field:** `tenantId`
-
-**Set in:** `apps/auth-service/src/modules/auth/auth.service.ts`
-```typescript
-const accessToken = this.jwtService.sign({
-  sub: user.id,
-  email: user.email,
-  tenantId: data.tenantId,   // ← present in every access token
-  sessionId: session.id,
-}, { secret: ..., expiresIn: "15m" })
-```
-
-**Validated by:** `JwtStrategy` — throws `UnauthorizedException` if `tenantId` is absent from payload.
-
-**Status:** ✅ tenantId is always present and validated on every authenticated request.
-
----
-
-### b) Layout-Level Guard
-
-**File:** `apps/admin-portal/src/app/t/[slug]/layout.tsx`
-
-**Status:** ❌ **FILE DOES NOT EXIST**
-
-No code compares `params.slug` against the authenticated user's `tenantId` claim at the layout level. A user can navigate to any `/t/<any-slug>/` path and the page will render and begin making API calls.
-
----
-
-### c) Middleware Guard
-
-**File:** `apps/admin-portal/middleware.ts`
-
-**Status:** ❌ **FILE DOES NOT EXIST**
-
-No Next.js middleware intercepts requests to `/t/[slug]/*`. There is zero frontend request-level validation.
-
----
-
-### d) API-Level Guard
-
-**Guard file:** `apps/auth-service/src/common/guards/tenant-binding.guard.ts`
-
-`TenantBindingGuard` enforces tenant isolation on all protected API routes:
-```typescript
-if (tokenTenantId !== requestTenantId) {
-  this.logger.warn("Tenant binding violation detected", {
-    userId: user.sub,
-    tokenTenant: tokenTenantId,
-    requestTenant: requestTenantId,
-    ip: request.ip,
-    path: request.path,
-  });
-  throw new ForbiddenException("Token is not valid for this tenant");
-}
-```
-
-Applied via `@UseGuards(JwtAuthGuard, TenantBindingGuard)` on protected controllers.
-
-**Status:** ✅ API-level protection is present and enforced.
-
----
-
-### e) Cross-Tenant URL Test
-
-**Scenario:** User A (tenant: `acme-corp`) navigates to `/t/stark-ind/dashboard`
-
-| Layer | Protection | Result |
-|---|---|---|
-| Frontend layout | ❌ NONE | Page renders and starts loading |
-| Next.js middleware | ❌ NONE | Request passes through |
-| API call | ✅ TenantBindingGuard | 403 Forbidden on data fetch |
-
-**Verdict:** ⚠ **INSUFFICIENT** — Frontend-only protection is absent. API will reject the data request, but the UI renders a loading state for an unauthorized route before the 403 returns. Backend guard is necessary but not sufficient for a secure UX.
-
----
-
-### f) Multi-Application Access
-
-**Route:** `/t/[slug]/applications/[appId]`
-
-**Status:** Route does not exist. `ApplicationsTable` uses hardcoded mock data with no real loading. Application ownership validation cannot be assessed — no implementation exists yet.
-
-**When implemented:** The backend must validate that the `appId` belongs to the tenant in the JWT before returning any data. This check must live in the OAuth client controller, not in the frontend.
-
----
-
-### g) Super-Admin vs Tenant-Admin
-
-**JWT payload:** Contains `sub`, `email`, `tenantId`, `sessionId`. **No `role` claim.**
-
-**Frontend:** No role checks in any component or page.
-
-**Backend:** `TenantBindingGuard` exists but no `SuperAdminGuard` or equivalent found.
-
-**Status:** ❌ **NO ROLE DISTINCTION IMPLEMENTED.** There is currently no mechanism to distinguish a Fort Knox super-admin (who can view all tenants) from a tenant-admin. This must be addressed before any admin-only routes are exposed.
-
----
-
-### h) Session Scope
-
-**JWT:** Contains a single `tenantId` — session is scoped to one tenant at a time.
-
-**SDK initialization** (`app/layout.tsx`):
-```typescript
-export const authClient = createWebClient({
-  baseURL: "http://localhost:4000",
-  tenant: "220bea14-69ca-420f-a8a2-d017e600ea4b",  // ⚠ HARDCODED UUID
-  debug: true,
-})
-```
-
-**Tenant switching:** `PortalLayout` has a mock `setCurrentTenant()` state call that changes the displayed tenant name but does **not** re-initialize the SDK client, does **not** re-authenticate, and does **not** re-issue a token for the new tenant.
-
-**Status:** ⚠ **Session is single-tenant. Tenant switching UI is a stub that does nothing meaningful.** Proper switching would require logout → re-auth with new tenant context, or issuance of a new tenant-scoped token.
-
----
-
-## 12. Token Storage and Transmission
-
-**Storage:**
-- Access token: `httpOnly` cookie (auto-sent by browser)
-- MFA temp token: `sessionStorage` key `_fk_mfa_temp_token`
-
-**Transmission:**
-- SDK transport uses `fetch` with `credentials: 'include'` — cookies sent automatically
-- Authorization header also supported (Bearer scheme)
-
-**tenantId transmission:**
-- Encoded in JWT claim — **not** sent in request body or query params
-- `TenantResolverMiddleware` on the auth-service extracts tenantId from `X-Tenant-ID` header or subdomain, then cross-verifies against JWT in `TenantBindingGuard`
-
-**Security assessment:**
-- ✅ tenantId is not trusted from client request body
-- ✅ Token is httpOnly (not accessible from JS)
-- ⚠ Logo upload uses raw `fetch()` instead of SDK — verify it sends credentials correctly
-- ⚠ SDK initialized with a hardcoded tenant UUID — multi-tenant deployment will break
-
----
-
-## 13. SDK Usage
-
-**Pattern:** ✅ Consistent SDK usage for all authenticated calls via `authClient.request()`.
-
-**Exceptions:**
-1. `useUploadLogo()` — raw `fetch()` with `credentials: 'include'`. Should use SDK transport.
-2. Login page branding fetch — raw `fetch()` with `cache: 'no-store'`. Acceptable (public, unauthenticated).
-
-**Critical bug:** SDK is initialized with a hardcoded tenant UUID. Should be dynamic (resolved from session, subdomain, or environment variable per deployment).
-
----
-
-## 14. Code Modularity
-
-**Rule for all future code:** Pages must import logic from components, hooks, or SDK. No inline business logic, state machines, or data processing in page files.
-
-**Current violations:**
-- `/t/[slug]/branding/page.tsx` — 250 lines with form state, file upload, toast, and preview all inline. Should be `<BrandingForm>` + `useBrandingForm()` hook.
-- `/dashboard/page.tsx` — 175 lines with stats arrays and color utility functions inline.
-- `/dashboard/settings/security/page.tsx` — 270 lines with passkey registration state machine inline.
-- `applications-table.tsx` and `connections-list.tsx` — hardcoded mock arrays should be in `/lib/mocks/` or removed.
-- `portal-layout.tsx` — hardcoded mock tenant list in component state.
-
-**Required pattern for all new pages:**
-```
-page.tsx → imports <FeatureView> from components/feature/
-         → imports useFeatureData() from lib/queries.ts
-         → imports useFeatureForm() from lib/hooks/ (if form)
-         → page file is ≤ 40 lines
-```
-
----
-
-## Summary
-
-### Security Issues (Ordered by Severity)
-
-| # | Issue | Severity | Fix Required |
-|---|---|---|---|
-| 1 | No `app/t/[slug]/layout.tsx` tenant guard | HIGH | Add layout with slug ↔ JWT comparison |
-| 2 | No `middleware.ts` tenant check | HIGH | Add Next.js middleware for `/t/*` routes |
-| 3 | SDK initialized with hardcoded tenant UUID | HIGH | Resolve tenant dynamically |
-| 4 | No role distinction (super-admin vs tenant-admin) | HIGH | Add role claim to JWT + guards |
-| 5 | Tenant switcher UI is non-functional | MEDIUM | Implement proper re-auth or remove |
-| 6 | Logo upload bypasses SDK transport | LOW | Use `authClient.request()` for multipart |
-
-### Functional Gaps
-
-- 9 of 13 expected pages are missing
-- All existing tenant portal pages use mock/stub data
-- No form validation library (react-hook-form recommended)
-- Toast system is duplicated per page (consolidate into shared hook)
-- Modal system is ad-hoc (adopt shadcn/ui Dialog)
+# Frontend and package parity audit
+
+Date: 2026-10-20. Scope: `apps/admin-portal`, `packages/sdk-typescript`,
+`admin-client`, `sentry-config`, `sentry-types`, `ui`, and their contracts with
+`apps/auth-service`. This replaces the 2026-03-18 audit, whose missing-page,
+mock-data, middleware, guard, and SDK-name claims no longer describe the tree.
+
+Companion: [Figma screen and flow plan](../frontend-design-plan.md).
+
+## Assessment and limits
+
+The frontend has substantial implementation, but route presence and successful
+TypeScript compilation overstate product completeness. The largest gaps are tenant
+context, conflicting API clients, incomplete authentication state handling, and
+inconsistent feature discoverability. Reskinning current pages alone would preserve
+these problems.
+
+This is a source and local-check audit, not a browser usability, accessibility,
+production security, or live API certification. Endpoint presence below means a
+controller and implementation exist; it does not certify the whole journey works.
+No application code or backend contracts were changed during this audit.
+
+## Findings
+
+Priorities here describe the frontend delivery order; they do not reassign existing
+P0/P1 remediation IDs.
+
+| ID    | Priority | Finding and consequence                                                                                                                                                                                                                                                                                                   | Source evidence                                                                                                                                                      | Required response                                                                                                                                                                                                                                                     |
+| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FE-01 | P0       | The auth client and AdminProvider use an environment/default tenant. `/u/login` derives a hostname tenant but discards `tenantSlug` in `LoginForm`. Most tenant queries have no slug in their cache keys. A page URL therefore does not reliably select the request tenant, and cached data can survive a context change. | `apps/admin-portal/lib/auth-client.ts`; `components/providers/Providers.tsx`; `app/u/login/login-form.tsx`; `lib/queries.ts`                                         | Define one verified tenant/session context; scope clients and query keys to it. Cancel requests and clear the departing tenant's cache on logout/switch. Design resolving, mismatch, denied and reauthentication states. Backend authorization remains authoritative. |
+| FE-02 | P0       | TenantSwitcher changes the URL only; the SDK tenant and tenant-scoped session stay unchanged. Middleware can send the user back to the old tenant.                                                                                                                                                                        | `components/portal/tenant-switcher.tsx`; `middleware.ts`; SDK `core/client.ts#withTenantHeaders`                                                                     | Use the target tenant's sign-in flow until a real switch-session contract is approved. Never show a switch as complete after navigation alone.                                                                                                                        |
+| FE-03 | P0       | `admin-client` uses `/api/admin/users`, `/api/rbac/*`, `/api/tenant`, `/api/user/workspaces` and other routes absent from this backend. The service has no global `/api` prefix. Removing `/api` alone cannot fix the resource paths, methods, or payloads.                                                               | `packages/admin-client/src/client.ts`; `packages/sentry-config/src/transport.ts`; backend controllers and `core/configure-app.ts`                                    | Reconcile each method against real controller DTOs, permissions and response shapes. Prefer adapting clients to existing contracts over changing the public API.                                                                                                      |
+| FE-04 | P0       | Portal-local user actions also target absent `/admin/users/:id/{suspend,restore,send-email,force-password-reset}` and DELETE `/admin/users/:id`. The actual controller exposes `/users/:id`, lock/unlock, force reset and bulk status update. There is no arbitrary admin send-email endpoint.                            | `lib/queries.ts` around `useSuspendUser`–`useSendEmailToUser`; `modules/user/user.controller.ts`                                                                     | Specify suspend/restore through the supported status operation; use real delete/reset routes. Hide arbitrary email sending until a backend capability is approved.                                                                                                    |
+| FE-05 | P0       | SDK login models success and `mfaRequired`, but not backend `status: mfa_enrollment_required`. Magic-link and passkey methods also need branch-by-branch checks. The main login UI sends non-TOTP challenges to an `sms` branch; SDK types list SMS despite no SMS controller.                                            | SDK `core/client.ts#login`, `#verifyMagicLink`, `#finishPasskeyLogin`; `core/types.ts#MfaChallenge`; backend `auth.service.ts`; `components/auth/SentryAuthFlow.tsx` | Introduce a discriminated auth result and enumerate supported challenges explicitly. No success route before a full session exists. Design required enrollment, expired challenge, backup recovery and policy blocks. Do not promise SMS.                             |
+| FE-06 | P0       | The device page removes email OTP by calling DELETE `/mfa/all`, which disables every MFA method. It represents multiple TOTP devices using browser-local labels although the backend holds one TOTP secret.                                                                                                               | `app/t/[slug]/security/devices/page.tsx#handleConfirmDelete`; `lib/mfa-device-store.ts`; backend `mfa.controller.ts`                                                 | Design one authenticator enrollment, real server credentials, and honestly labelled local nicknames. Remove the individual-email removal affordance or show an explicit disable-all operation. Per-factor removal needs backend work.                                 |
+| FE-07 | P1       | SDK social connection/link calls use `/social/*`; controller mounts `/auth/social/*`. Both callback routes expect a returned tenant slug from `claimSocialSession`, which returns void, then fall back to `/t/sentry/dashboard`.                                                                                          | SDK `core/client.ts#getSocialConnections`, `#unlinkSocialAccount`, `#initiateSocialLinking`, `#claimSocialSession`; both callback pages                              | Correct paths; read established session claims and preserve a validated continuation through callback, MFA and verification. Consolidate callback behavior.                                                                                                           |
+| FE-08 | P1       | OAuth authorization redirects to `/auth/login?return_url=…`, while hosted login is `/u/login`. Authorization contains an unfinished user-resolution path and auto-grants consent under a TODO.                                                                                                                            | backend `modules/oauth/oauth.controller.ts#authorize`                                                                                                                | Treat consent and end-to-end OAuth authorization as backend-dependent. Design approve/deny/scopes and return paths, but do not label consent ready to implement on current APIs.                                                                                      |
+| FE-09 | P1       | Two refresh implementations are mounted: SentryClient and SentryAxiosTransport each have their own refresh lock, and the latter uses `/api/auth/refresh`. Separate locks cannot coordinate rotating cookie refreshes.                                                                                                     | `components/providers/Providers.tsx`; SDK `core/client.ts#refresh`; `packages/sentry-config/src/transport.ts#executeRefresh`                                         | Agree on one session-refresh owner before migrating portal calls. Add a concurrent-401 regression check. The race risk is inferred from source; not reproduced live.                                                                                                  |
+| FE-10 | P1       | Applications and clients expose overlapping OAuth-client tasks; the tenant sidebar calls clients “API Keys.” Policies, webhooks and protocol subpages exist but are absent from that sidebar. The Connections landing renders default mock providers and inactive Configure buttons.                                      | `components/layouts/portal-layout.tsx`; `app/t/[slug]/{applications,clients,connections}/page.tsx`; `components/portal/connections-list.tsx`                         | One application inventory, explicit client types, real connection catalog and reachable Access/Integrations navigation. No generic API-key product unless a supported contract exists.                                                                                |
+| FE-11 | P1       | Package models differ from backend wire contracts: cursor `items` users versus page-based `{users,pagination}`; PATCH versus PUT updates; role ID versus roleNames assignment; body versus path group membership. Generic types conceal these errors.                                                                     | admin client `client.ts`, `types.ts`; backend `user.dto.ts`, `user.service.ts#listUsers`, `rbac.controller.ts`, `oauth.controller.ts`                                | Maintain a method/DTO/response matrix and contract fixtures. Keep genuine audit cursor pagination separate from user page pagination.                                                                                                                                 |
+| FE-12 | P1       | Branding has a third API definition: `portal-queries.ts` calls `/dashboard/branding` or `/tenants/:id/branding`; real API is `/tenants/current/branding`. SDK transport JSON-stringifies all bodies; upload must not pass FormData through that JSON path.                                                                | `lib/portal-queries.ts`; `lib/queries.ts#useUploadLogo`; SDK `core/transport.ts`; backend `tenant-branding.controller.ts`                                            | One branding model, multipart upload support, precise server-approved font/weight/background fields and error previews.                                                                                                                                               |
+| FE-13 | P1       | Tenant MFA/password policy methods in admin-client have no matching endpoints. Dashboard settings accepts `featureFlags`; it is not a general password-policy API. Recent-auth-required operations currently offer a login redirect without a specified return-and-resume journey.                                        | admin client `tenant` methods; backend `dashboard/dto/update-tenant-settings.dto.ts`; `common/guards/recent-auth.guard.ts`; portal `lib/with-error-handler.ts`       | Mark policy editors blocked until read/write contracts exist. Specify recent sign-in, cancellation and return to the pending action without automatically repeating destructive mutations.                                                                            |
+| FE-14 | P2       | Styling and shell duplication remain: hardcoded colors/sizes in auth, dialogs and pages coexist with shared Sentry primitives; several feature pages contain hundreds of lines of UI and behavior. Error/empty/denied states are not consistently explicit.                                                               | `app/u/login/login-form.tsx`; `app/u/mfa/page.tsx`; `app/t/[slug]/{roles,policies,clients}/page.tsx`; `packages/ui/src/globals.css`                                  | Establish Figma variables and shared patterns from current tokens, then implement feature views incrementally. Validate accessibility visually and in browser; static source is insufficient.                                                                         |
+| FE-15 | P2       | SDK peer ranges exclude the portal's React 19 / Next 16. Public `./node` advertises client credentials but adds Basic auth to generic requests rather than implementing token acquisition. Next adapter forwards inbound cookies but provides no outbound Set-Cookie integration.                                         | SDK `package.json`; `src/node/index.ts`; `src/next/index.ts`                                                                                                         | Test and document supported adapters/runtimes; implement or narrow claims. Cookie-only browser auth and OAuth machine tokens are distinct contracts.                                                                                                                  |
+| FE-16 | P2       | No portal, admin-client or sentry-config test files were found. SDK tests cover state and errors, not full transports/auth branches. Existing engineering/security docs still contradict some completed remediation items.                                                                                                | workspace scripts; SDK `state.spec.ts`, `errors.spec.ts`; `docs/{architecture,security,REMEDIATION_PLAN}.md`                                                         | Add meaningful journey/contract tests per delivery slice and reconcile documentation against source. Do not use old audits as the product specification.                                                                                                              |
+
+Paths under portal are relative to `apps/admin-portal`; backend paths are relative
+to `apps/auth-service/src`. Findings identify code behavior, not verified exploits.
+For example, middleware navigation checks are UX controls; API guards must enforce
+access independently.
+
+## Current route inventory
+
+45 `page.tsx` routes exist. “Wired” means calls are present, not that their complete
+runtime behavior was verified. State variants and dialogs are additional design work.
+
+| Surface                        | Existing routes                                                                                                               | Current parity / design implication                                                                                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public entry                   | `/`, `/error`                                                                                                                 | Existing landing and service-unavailable surface; specify tenant-not-found and invalid-link behavior.                                                                                     |
+| Bootstrap                      | `/setup`                                                                                                                      | First-admin flow exists; design token validation, initialized race, service failure and successful sign-in transition.                                                                    |
+| Hosted identity                | `/u/login`, `/u/signup`, `/u/reset-password`, `/u/verify-email`, `/u/mfa`, `/u/magic-link`                                    | Implemented forms/steps, with incomplete common result/continuation handling. One coherent family needed.                                                                                 |
+| Social callbacks               | `/u/auth/callback`, `/auth/callback`                                                                                          | Both implemented; duplicate behavior and hardcoded fallback (FE-07).                                                                                                                      |
+| Required MFA                   | `/mfa/enroll`                                                                                                                 | Enrollment UI exists; pre-session token handoff and session completion must be reconciled.                                                                                                |
+| Invitation                     | `/invite/[token]`                                                                                                             | Validate/accept hooks exist; design expired/used/existing-account and post-accept sign-in explicitly.                                                                                     |
+| Workspace onboarding           | `/onboarding`, `/onboarding/create-tenant`, `/onboarding/country`                                                             | Main registration exists; create-tenant redirects to it; country is local selection with a TODO, not a completed persistence flow.                                                        |
+| Tenant overview                | `/t/[slug]/dashboard`                                                                                                         | Metrics/activity hooks exist. Needs tenant-scoped loading, denied and no-activity states.                                                                                                 |
+| Tenant people                  | `/t/[slug]/users`, `/t/[slug]/users/[id]`                                                                                     | List/detail implemented; some mutations use absent endpoints. Detail sessions, audit and role hooks exist.                                                                                |
+| Tenant access                  | `/t/[slug]/roles`, `/t/[slug]/policies`                                                                                       | Substantial CRUD/assignment/simulation UI. No standalone group or permission management screens. Policies not linked in primary tenant navigation.                                        |
+| Tenant applications            | `/t/[slug]/applications`, `/t/[slug]/clients`                                                                                 | Two entry points for OAuth clients. Merge their product meaning in design before choosing route migration.                                                                                |
+| Tenant connections             | `/t/[slug]/connections`, plus `/saml`, `/scim`, `/ldap`                                                                       | Landing is mock-backed; protocol subpages have hooks for real CRUD/token/test/sync operations. Need correct direction labels: Sentry acts as SAML IdP for configured service providers.   |
+| Tenant operations              | `/t/[slug]/webhooks`, `/t/[slug]/audit`                                                                                       | Real hooks exist. Webhook UI lacks delivery redelivery despite backend endpoint; audit needs failure/no-results and scoped export behavior.                                               |
+| Tenant settings                | `/t/[slug]/branding`, `/t/[slug]/settings`                                                                                    | Branding + tenant flags/provider controls exist; not every visible policy control has a supported persistence contract. Delete-workspace action is disabled.                              |
+| Tenant personal security       | `/t/[slug]/security`, `/t/[slug]/security/devices`                                                                            | Existing account/MFA/session surfaces mixed into tenant administration; correct MFA model first.                                                                                          |
+| Platform overview              | `/dashboard`                                                                                                                  | Platform metrics/activity wired. This route family also contains personal account screens, making shell semantics inconsistent.                                                           |
+| Platform tenants               | `/tenants`, `/tenants/new`, `/tenants/[tenantId]`                                                                             | Real list/create/update/delete hooks; tenant detail still has coming-soon tabs. Design supported tabs separately from proposed ones.                                                      |
+| Platform people/audit/settings | `/users`, `/audit-logs`, `/settings`                                                                                          | Cross-tenant users is explicitly coming soon; audit uses platform activity; settings contains real platform settings/team plus incomplete controls. Do not invent a global-users backend. |
+| Additional dashboard routes    | `/dashboard/applications`, `/dashboard/profile`, `/dashboard/security`, `/dashboard/settings`, `/dashboard/settings/security` | Overlap tenant applications and personal settings/security. Review useful components, then alias or retire duplicated entry points in a separate approved routing change.                 |
+
+## Representative contract reconciliation
+
+| Consumer assumption                                              | Actual backend contract / limitation                                                                  |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `/api/admin/users`, cursor + `items`                             | GET `/users`, page/limit + `{users,pagination}`                                                       |
+| PATCH user/role/policy/client                                    | PUT `/users/:id`, `/rbac/roles/:id`, `/rbac/policies/:id`, `/oauth/clients/:clientId`                 |
+| Assign `{roleId}`; delete assignment by role UUID                | POST `/rbac/users/:userId/roles` with `roleNames`; DELETE assignment by `:roleName`                   |
+| POST role policy with `{policyId}` body                          | POST `/rbac/roles/:roleId/policies/:policyId`                                                         |
+| POST group members with `{userId}` body                          | POST `/rbac/groups/:id/members/:userId`                                                               |
+| `/api/mfa/totp/setup`, generic factors CRUD                      | POST `/mfa/setup/totp`, GET `/mfa/status`, explicit method/passkey routes                             |
+| `/social/connections`                                            | GET `/auth/social/connections`; analogous correction for unlink/link-token                            |
+| `/api/tenant/branding`, `/dashboard/branding`                    | GET/PUT `/tenants/current/branding`; POST multipart `/logo` under that prefix                         |
+| `/api/user/workspaces`                                           | GET `/users/orgs`; navigating is not a session switch                                                 |
+| General tenant password/MFA policy CRUD                          | No equivalent controller routes found; settings PATCH accepts `featureFlags` only                     |
+| OAuth consent approve/deny                                       | Current authorize auto-grants; decision/continuation contract required                                |
+| Webhook redelivery absent from UI                                | POST `/webhooks/:id/deliveries/:deliveryId/redeliver` exists                                          |
+| Self-service domain management                                   | Current custom-domain/verify routes assert superadmin; DNS verification semantics require review      |
+| Billing, ownership transfer, global API keys, tenant self-delete | Types/email templates/navigation wishes are not implementation evidence; defer unsupported operations |
+
+## Verification baseline
+
+- PASS: `yarn workspace admin-portal exec tsc --noEmit`.
+- PASS: `yarn workspace @scrolloop/admin-client typecheck`.
+- PASS: `yarn workspace @scrolloop/sdk typecheck`.
+- PASS: `yarn workspace @scrolloop/sdk test --run` — 14 tests, 2 files.
+- FAIL: `yarn workspace auth-service typecheck` — existing strict typing errors in
+  spec files, including cors-refresh, audit, auth flows, email OTP, JWKS, RBAC and webhooks.
+- FAIL: `yarn workspace auth-service test --runInBand` — rerun outside the sandbox:
+  117 suites passed, 6 failed; 1,641 tests passed, 6 failed. Failures cover OAuth token
+  signing expectations, suspended-user login expectations, OAuth grant errors,
+  email-OTP crypto mocking, permission resource expectations, and an empty
+  `ebauthn.service.extra.spec.ts` suite. These require triage; this audit does not
+  assume whether each failure is a stale test or an implementation defect.
+  The system-metrics test failed with sandbox EPERM on the first run and passed
+  outside the sandbox; it is excluded from the six remaining failed suites.
+- Smoke and browser end-to-end tests were not run: this change is documentation-only,
+  and no live database/browser journey was set up for this audit.
+
+These checks do not establish feature parity. Add contract checks and browser
+journeys before using any screen as a release-readiness signal.

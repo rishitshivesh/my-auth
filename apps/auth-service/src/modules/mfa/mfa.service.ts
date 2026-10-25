@@ -113,6 +113,12 @@ export class MfaService {
       throw new ApiException("RESOURCE_NOT_FOUND", { detail: "User not found" });
     }
 
+    const existing = await this.mfaRepository.findOne({ where: { userId, tenantId } });
+    if (existing?.totpEnabled) {
+      // Re-running setup must not silently swap the secret of an enrolled factor.
+      throw new ApiException("MFA_ALREADY_ENABLED");
+    }
+
     // Generate secret
     const secret = speakeasy.generateSecret({
       name: `Scrolloop Sentry (${user.email})`,
@@ -132,15 +138,19 @@ export class MfaService {
       });
     }
 
+    // Generate backup codes and persist only their hashes (single-use, see
+    // verifyBackupCode) so the codes handed to the user actually work.
+    const backupCodes = this.generateBackupCodes();
+
     // Store secret (not yet verified)
     mfaSettings.totpSecret = secret.base32;
+    mfaSettings.backupCodes = await Promise.all(
+      backupCodes.map((code) => this.hashBackupCode(code)),
+    );
     await this.mfaRepository.save(mfaSettings);
 
     // Generate QR code
     const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
-
-    // Generate backup codes
-    const backupCodes = this.generateBackupCodes();
 
     return {
       secret: secret.base32,
@@ -444,7 +454,13 @@ export class MfaService {
    */
   async getMfaStatus(userId: string, tenantId: string) {
     const [mfaSettings, user, tenant] = await Promise.all([
-      this.mfaRepository.findOne({ where: { userId, tenantId } }),
+      // backupCodes is a select:false column, so it must be requested explicitly or the count is always 0.
+      this.mfaRepository
+        .createQueryBuilder("mfa")
+        .addSelect("mfa.backupCodes")
+        .where("mfa.userId = :userId", { userId })
+        .andWhere("mfa.tenantId = :tenantId", { tenantId })
+        .getOne(),
       this.userRepository.findOne({ where: { id: userId, tenantId } }),
       this.tenantRepository.findOne({ where: { id: tenantId }, select: ["id", "featureFlags"] }),
     ]);

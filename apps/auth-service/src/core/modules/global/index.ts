@@ -36,7 +36,8 @@ import { DatabaseModule } from "@/core/database/database.module";
         store: redisStore,
         host: configService.get("REDIS_HOST", "localhost"),
         port: configService.get("REDIS_PORT", 6379),
-        password: configService.get("REDIS_PASSWORD"),
+        password: configService.get("REDIS_PASSWORD") || undefined,
+        db: configService.get<number>("REDIS_DB", 0),
         ttl: 300, // 5 minutes default
       }),
     }),

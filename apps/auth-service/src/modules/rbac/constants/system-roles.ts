@@ -4,7 +4,7 @@ export const SystemRoles = {
     slug: 'owner',
     description: 'Full control over the workspace. Cannot be removed by other roles.',
     isSystem: true,
-    priority: 100,
+    priority: 1000,
     policy: {
       Version: '2024-01-01',
       Statement: [
@@ -23,7 +23,7 @@ export const SystemRoles = {
     slug: 'admin',
     description: 'Full access except billing and tenant deletion.',
     isSystem: true,
-    priority: 80,
+    priority: 900,
     policy: {
       Version: '2024-01-01',
       Statement: [

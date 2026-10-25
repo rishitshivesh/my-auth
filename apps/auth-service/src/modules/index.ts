@@ -12,9 +12,11 @@ import { WebhookModule } from "@/modules/webhook/webhook.module";
 import { SamlModule } from "@/modules/saml/saml.module";
 import { ScimModule } from "@/modules/scim/scim.module";
 import { LdapModule } from "@/modules/ldap/ldap.module";
+import { SocialAuthModule } from "@/modules/social-auth/social-auth.module";
 import { AuditModule } from "@/modules/audit/audit.module";
 import { SecurityNotifierModule } from "@/modules/notifier/security-notifier.module";
 import { DomainEventsModule } from "@/common/service/domain-events.module";
+import { PasswordPolicyModule } from "@/modules/password-policy/password-policy.module";
 import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
@@ -33,6 +35,8 @@ import { ScheduleModule } from "@nestjs/schedule";
     ScimModule,
     LdapModule,
     AuditModule,
+    PasswordPolicyModule,
+    SocialAuthModule,
     DomainEventsModule,
     SecurityNotifierModule,
     ScheduleModule.forRoot(),

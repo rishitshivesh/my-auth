@@ -66,13 +66,13 @@ describe("RbacService hierarchy and last-owner guards", () => {
     await expect(service.removeRoleByName("solo", "admin", "t1")).rejects.toMatchObject({
       code: "LAST_OWNER",
     });
-    expect(userRoleRepo.remove).not.toHaveBeenCalled();
+    expect(userRoleRepo.delete).not.toHaveBeenCalled();
   });
 
   it("allows removing an admin role when another admin exists", async () => {
     const { service, userRoleRepo } = build({ rolesByUser: { a: [ADMIN], b: [ADMIN] } });
     await service.removeRoleByName("a", "admin", "t1");
-    expect(userRoleRepo.remove).toHaveBeenCalled();
+    expect(userRoleRepo.delete).toHaveBeenCalled();
   });
 
   it("refuses setUserRoles that demotes the last admin", async () => {

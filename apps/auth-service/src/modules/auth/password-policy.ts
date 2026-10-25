@@ -35,6 +35,13 @@ export interface PasswordPolicyContext {
   email?: string;
 }
 
+/** Per-tenant tightening of the platform policy. Length can never go below PASSWORD_MIN_LENGTH. */
+export interface PasswordPolicyOptions {
+  minLength?: number;
+  /** false skips the deny-list check. Defaults to true. */
+  commonPasswordCheck?: boolean;
+}
+
 /**
  * Length, a deny list and two cheap guards against trivially guessable
  * choices. No forced symbols and no periodic rotation.
@@ -43,15 +50,17 @@ export function checkPasswordPolicy(
   password: string,
   deny: ReadonlySet<string>,
   context: PasswordPolicyContext = {},
+  options: PasswordPolicyOptions = {},
 ): PasswordViolation | null {
   const normalized = normalizePassword(password);
   const characters = Array.from(normalized);
+  const minLength = Math.max(PASSWORD_MIN_LENGTH, options.minLength ?? PASSWORD_MIN_LENGTH);
 
-  if (characters.length < PASSWORD_MIN_LENGTH) return "too_short";
+  if (characters.length < minLength) return "too_short";
   if (characters.length > PASSWORD_MAX_LENGTH) return "too_long";
 
   const lowered = normalized.toLowerCase();
-  if (deny.has(lowered)) return "too_common";
+  if (options.commonPasswordCheck !== false && deny.has(lowered)) return "too_common";
   if (new Set(characters).size <= MAX_REPETITIVE_DISTINCT_CHARS) {
     return "too_repetitive";
   }
@@ -75,10 +84,15 @@ export function checkPasswordPolicy(
 export function assertPasswordPolicy(
   password: string,
   context: PasswordPolicyContext = {},
+  options: PasswordPolicyOptions = {},
 ): void {
-  const violation = checkPasswordPolicy(password, COMMON_PASSWORDS, context);
+  const violation = checkPasswordPolicy(password, COMMON_PASSWORDS, context, options);
   if (!violation) return;
+  const message =
+    violation === "too_short"
+      ? `Password must be at least ${Math.max(PASSWORD_MIN_LENGTH, options.minLength ?? PASSWORD_MIN_LENGTH)} characters.`
+      : PASSWORD_VIOLATION_MESSAGES[violation];
   throw new ApiException("PASSWORD_POLICY", {
-    errors: [{ field: "password", message: PASSWORD_VIOLATION_MESSAGES[violation] }],
+    errors: [{ field: "password", message }],
   });
 }

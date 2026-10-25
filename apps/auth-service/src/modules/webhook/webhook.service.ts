@@ -10,30 +10,8 @@ import * as net from "net";
 import { WebhookEndpoint, WebhookDelivery } from "@repo/database";
 import { CreateWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 import { logger } from "@/common/logger";
-
-const PRIVATE_RANGES = [
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^::1$/,
-  /^fc00:/i,
-  /^fd[0-9a-f]{2}:/i,
-  /^fe80:/i,
-  /^0\.0\.0\.0$/,
-];
-
-// Strip IPv4-mapped IPv6 prefix (::ffff:192.168.1.1 → 192.168.1.1) before range check
-// to prevent bypasses via IPv4-mapped notation
-function normalizeIp(address: string): string {
-  const v4mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
-  return v4mapped?.[1] ?? address;
-}
-
-function isPrivateIp(address: string): boolean {
-  return PRIVATE_RANGES.some((r) => r.test(normalizeIp(address)));
-}
+import { isPrivateIp } from "@/common/security/private-ip";
+import { isBlockedWebhookAddress } from "@/common/security/webhook-loopback";
 
 function urlError(message: string): ApiException {
   return new ApiException("VALIDATION_FAILED", {
@@ -55,7 +33,7 @@ async function validateWebhookUrl(url: string): Promise<void> {
 
   const hostname = parsed.hostname;
   if (net.isIP(hostname)) {
-    if (isPrivateIp(hostname)) {
+    if (isBlockedWebhookAddress(hostname, isPrivateIp)) {
       throw urlError("Webhook URL must not point to a private or reserved IP address");
     }
     return;
@@ -67,7 +45,7 @@ async function validateWebhookUrl(url: string): Promise<void> {
     throw urlError("Webhook URL hostname could not be resolved");
   });
   for (const { address } of addrs) {
-    if (isPrivateIp(address)) {
+    if (isBlockedWebhookAddress(address, isPrivateIp)) {
       throw urlError("Webhook URL resolves to a private or reserved IP address");
     }
   }
@@ -81,10 +59,44 @@ export interface WebhookEvent {
   eventType: string;
   payload: Record<string, unknown>;
   deliveryId: string;
+  /** When the underlying event happened (ISO 8601); defaults to enqueue time. */
+  createdAt?: string;
+}
+
+/**
+ * Stable body POSTed to subscribers. `id` is the delivery id: identical across
+ * retries and manual redeliveries, so receivers can dedupe on it.
+ */
+export interface WebhookEnvelope {
+  id: string;
+  type: string;
+  createdAt: string;
+  tenantId: string;
+  data: Record<string, unknown>;
+}
+
+export function buildWebhookEnvelope(event: WebhookEvent): WebhookEnvelope {
+  return {
+    id: event.deliveryId,
+    type: event.eventType,
+    createdAt: event.createdAt ?? new Date().toISOString(),
+    tenantId: event.tenantId,
+    data: event.payload,
+  };
+}
+
+/** Lets the originating request finish committing before subscribers hear about it. */
+export const EVENT_DISPATCH_DELAY_MS = 500;
+
+export interface EmitOptions {
+  /** Event time; defaults to now. */
+  occurredAt?: Date;
+  /** BullMQ delay before the first delivery attempt. */
+  delayMs?: number;
 }
 
 // Retry schedule in seconds: 60s, 5min, 30min, 2h, 8h
-const RETRY_DELAYS = [60, 300, 1800, 7200, 28800];
+export const RETRY_DELAYS = [60, 300, 1800, 7200, 28800];
 
 @Injectable()
 export class WebhookService {
@@ -152,7 +164,12 @@ export class WebhookService {
     });
   }
 
-  async emit(tenantId: string, eventType: string, payload: Record<string, unknown>): Promise<void> {
+  async emit(
+    tenantId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+    options: EmitOptions = {},
+  ): Promise<void> {
     const endpoints = await this.endpointRepo.find({
       where: { tenantId, active: true },
     });
@@ -162,27 +179,45 @@ export class WebhookService {
     );
 
     for (const endpoint of matchingEndpoints) {
-      const delivery = this.deliveryRepo.create({
+      await this.enqueueDelivery(tenantId, endpoint, eventType, payload, options);
+    }
+  }
+
+  private async enqueueDelivery(
+    tenantId: string,
+    endpoint: WebhookEndpoint,
+    eventType: string,
+    payload: Record<string, unknown>,
+    options: EmitOptions = {},
+  ): Promise<void> {
+    const createdAt = (options.occurredAt ?? new Date()).toISOString();
+    const delivery = this.deliveryRepo.create({
+      endpointId: endpoint.id,
+      eventType,
+      payload,
+      status: "pending",
+      attempts: 0,
+    });
+    const saved = await this.deliveryRepo.save(delivery);
+
+    await this.queue.add(
+      "deliver",
+      {
         endpointId: endpoint.id,
+        tenantId,
         eventType,
         payload,
-        status: "pending",
-        attempts: 0,
-      });
-      const saved = await this.deliveryRepo.save(delivery);
-
-      await this.queue.add(
-        "deliver",
-        {
-          endpointId: endpoint.id,
-          tenantId,
-          eventType,
-          payload,
-          deliveryId: saved.id,
-        },
-        { attempts: RETRY_DELAYS.length, backoff: { type: "custom" } },
-      );
-    }
+        deliveryId: saved.id,
+        createdAt,
+      },
+      {
+        attempts: RETRY_DELAYS.length,
+        backoff: { type: "custom" },
+        // One job per delivery: a duplicate enqueue of the same delivery is a no-op.
+        jobId: saved.id,
+        ...(options.delayMs ? { delay: options.delayMs } : {}),
+      },
+    );
   }
 
   async redeliver(tenantId: string, endpointId: string, deliveryId: string): Promise<void> {
@@ -202,11 +237,17 @@ export class WebhookService {
       eventType: delivery.eventType,
       payload: delivery.payload,
       deliveryId: delivery.id,
+      createdAt: delivery.createdAt?.toISOString(),
     });
   }
 
+  /** Sends a ping to this endpoint only (regardless of its event subscriptions). */
   async sendTestEvent(tenantId: string, endpointId: string): Promise<void> {
-    await this.emit(tenantId, "test.ping", {
+    const endpoint = await this.findOne(tenantId, endpointId);
+    if (!endpoint.active) {
+      throw new ApiException("BAD_REQUEST", { detail: "Webhook endpoint is inactive" });
+    }
+    await this.enqueueDelivery(tenantId, endpoint, "test.ping", {
       message: "This is a test delivery from Scrolloop Sentry",
       timestamp: new Date().toISOString(),
     });

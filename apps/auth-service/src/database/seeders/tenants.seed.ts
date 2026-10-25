@@ -69,6 +69,7 @@ export async function seed(existingDataSource?: DataSource): Promise<void> {
       "scim_tokens",
       "ldap_connections",
       "tenant_mfa_policy",
+      "tenant_password_policy",
     ];
 
     for (const table of tables) {

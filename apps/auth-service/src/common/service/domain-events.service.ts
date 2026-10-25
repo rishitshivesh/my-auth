@@ -8,6 +8,8 @@ export const DomainEventName = {
   PASSWORD_CHANGED: "password.changed",
   ACCOUNT_LOCKED: "account.locked",
   OWNERSHIP_TRANSFERRED: "tenant.ownership_transferred",
+  /** Published once a security/audit event row is written; carries `securityEventType`. */
+  SECURITY_EVENT: "security.event",
 } as const;
 
 export type DomainEventName =
@@ -30,6 +32,14 @@ export interface DomainEventPayload {
   tenantName?: string;
   /** Account lock duration, for the account-locked notification. */
   unlockMinutes?: number;
+  /** SECURITY_EVENT only: the persisted audit row and its SecurityEventType. */
+  securityEventId?: string;
+  securityEventType?: string;
+  resourceId?: string;
+  resourceType?: string;
+  outcome?: "success" | "failure";
+  /** SECURITY_EVENT only: already-redacted audit metadata. */
+  metadata?: Record<string, unknown>;
 }
 
 export interface DomainEvent {

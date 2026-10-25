@@ -123,7 +123,7 @@ export class EncryptionService {
     const key = await this.deriveKey(masterKey, salt);
 
     // Create decipher
-    const decipher = createDecipheriv(this.ALGORITHM, key, iv);
+    const decipher = createDecipheriv(this.ALGORITHM, key, iv, { authTagLength: this.AUTH_TAG_LENGTH });
 
     // Set authentication tag
     if (typeof encryptedData !== "string" && authTag!) {

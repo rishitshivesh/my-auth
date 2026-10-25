@@ -95,6 +95,13 @@ export class GroupService {
     if (dto.description !== undefined) group.description = dto.description ?? null;
 
     if (dto.name !== undefined && dto.name !== group.name) {
+      const sibling = await this.groupRepo.findOne({
+        where: { tenantId, name: dto.name },
+      });
+      if (sibling && sibling.id !== id) {
+        throw new ApiException("RESOURCE_CONFLICT", { detail: `Group "${dto.name}" already exists` });
+      }
+
       const oldPath = group.path;
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf(group.name + '/'));
       const newPath = `${parentPath}${dto.name}/`;
@@ -146,7 +153,7 @@ export class GroupService {
       throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete group with child groups. Remove children first.' });
     }
 
-    await this.groupRepo.remove(group);
+    await this.groupRepo.delete({ id: group.id });
     await this.cacheService.invalidateTenant(tenantId);
     logger.info({ groupId: id }, 'Group deleted');
   }
@@ -181,7 +188,7 @@ export class GroupService {
       throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
-    await this.userGroupRepo.remove(ug);
+    await this.userGroupRepo.delete({ id: ug.id });
     await this.cacheService.invalidateUser(userId, tenantId);
     logger.info({ groupId, userId }, 'User removed from group');
   }
@@ -214,7 +221,7 @@ export class GroupService {
       throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
-    await this.groupPolicyRepo.remove(gp);
+    await this.groupPolicyRepo.delete({ id: gp.id });
     await this.cacheService.invalidateTenant(tenantId);
     logger.info({ groupId, policyId }, 'Policy detached from group');
   }

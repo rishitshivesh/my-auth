@@ -7,6 +7,18 @@ import { EvaluationContext } from '../types/policy.types';
 
 export const PERMISSIONS_KEY = 'permissions';
 
+/**
+ * Resource type segment of an ARN-style resource (`sentry:tenant:<tid>:<type>:<id>`),
+ * derived from the permission's namespace ("users:read" -> "user"). System-role
+ * policies target resources in this shape (e.g. `sentry:tenant:*:*`).
+ */
+function resourceTypeOf(permission: string): string {
+  const namespace = permission.split(':')[0] ?? '*';
+  if (namespace.endsWith('ies')) return `${namespace.slice(0, -3)}y`;
+  if (namespace.endsWith('s')) return namespace.slice(0, -1);
+  return namespace;
+}
+
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
@@ -51,12 +63,11 @@ export class PermissionsGuard implements CanActivate {
         mfaVerified: !!user.mfaVerified,
       };
 
-      const rawPath: string = request.route?.path ?? request.path;
-      const controllerPath = rawPath.replace(/^\/+/, '');
-      const resourceId = request.params?.id;
+      const params = (request.params ?? {}) as Record<string, string | undefined>;
+      const resourceId = params.id ?? params.userId ?? params.roleId ?? params.clientId ?? "*";
 
       for (const permission of requiredPermissions) {
-        const resource = `sentry:tenant:${tenantId}/${controllerPath}${resourceId ? `/${resourceId}` : ''}`;
+        const resource = `sentry:tenant:${tenantId}:${resourceTypeOf(permission)}:${resourceId}`;
 
         const result = await this.policyEvaluationService.evaluate({
           userId: user.sub,

@@ -39,11 +39,14 @@ expect "jwks"                    "$(req GET /.well-known/jwks.json)" 200
 grep -q '"keys":\[{' "$BODY" || { echo "FAIL  jwks body is not a raw JWKS"; fail=$((fail + 1)); }
 expect "oidc discovery"          "$(req GET /.well-known/openid-configuration)" 200
 
-expect "first-admin validation"  "$(req POST /superadmin/create-first-admin '{"email":"x"}' -H "x-setup-token: $SETUP_TOKEN")" 400
-expect "first-admin create"      "$(req POST /superadmin/create-first-admin "{\"name\":\"Smoke Admin\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" -H "x-setup-token: $SETUP_TOKEN")" 201
+expect "first-admin validation"  "$(req POST /superadmin/create-first-admin '{"email":"x"}' -H "x-setup-token: $SETUP_TOKEN")" 422
+# Bodies are built here, not inside $(...): bash 3.2 (macOS) mis-parses escaped quotes in a command substitution.
+ADMIN_BODY="{\"name\":\"Smoke Admin\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}"
+LOGIN_BODY="{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}"
+expect "first-admin create"      "$(req POST /superadmin/create-first-admin "$ADMIN_BODY" -H "x-setup-token: $SETUP_TOKEN")" 201
 rm -f "$JAR"; JAR="$(mktemp)"
 
-expect "login"                   "$(req POST /auth/login "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")" 200
+expect "login"                   "$(req POST /auth/login "$LOGIN_BODY")" 200
 ACCESS_TOKEN="$(awk '$6=="accessToken"{print $7}' "$JAR")"
 [[ -n "$ACCESS_TOKEN" ]] || { echo "FAIL  login did not set accessToken cookie"; fail=$((fail + 1)); }
 
@@ -54,7 +57,7 @@ expect "refresh"                 "$(req POST /auth/refresh)" 200
 expect "logout"                  "$(req POST /auth/logout)" 200
 expect "revoked token rejected"  "$(curl -s -o "$BODY" -w "%{http_code}" "$BASE_URL/auth/me" -H "x-tenant-slug: $TENANT" -H "authorization: Bearer $ACCESS_TOKEN")" 401
 
-expect "reset requires email"    "$(req POST /auth/reset-password '{"otp":"123456","password":"N3w!Passw0rd#2026"}')" 400
+expect "reset requires email"    "$(req POST /auth/reset-password '{"otp":"123456","password":"N3w!Passw0rd#2026"}')" 422
 
 echo "──────── passed=$pass failed=$fail"
 [[ $fail -eq 0 ]]

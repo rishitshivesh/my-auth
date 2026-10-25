@@ -139,9 +139,54 @@ portal, 4 `console.*` outside seeders/CLI. The root `package.json` declares app 
 
 ## P2 — product completeness
 
-- **P2-17** Superadmin console UI; verify the invite-accept page; webhook redeliver UI.
+- **P2-17** Complete existing platform console and invite-accept journeys; add webhook
+  redelivery UI. Platform routes and invite forms already exist; see the current
+  [frontend audit](audits/admin-portal.md) instead of treating them as wholly missing.
 - **P2-18** Observability: request IDs, OpenTelemetry traces, Prometheus metrics.
 - **P2-19** Admin-portal tests (Playwright: login, MFA, reset, invite); SDK unit tests.
 - **P2-20** Release engineering: Dockerfiles (non-root, healthcheck), Helm chart, SDK publishing
   via changesets, Renovate.
 - **P2-21** Unit tests for `AuthService.resetPassword` (currently covered live + by smoke).
+
+## Frontend parity and design work (2026-10-20)
+
+The current [frontend/package audit](audits/admin-portal.md) supersedes the March
+frontend audit. The [Figma delivery plan](frontend-design-plan.md) inventories 47
+design families and 24 journeys. These are planned designs, not completed screens.
+
+- **P1-22 — Frontend/SDK contract correctness.** Resolve FE-01–FE-09 and FE-11–FE-13:
+  verified tenant context and scoped cache keys; real tenant reauthentication;
+  supported API paths/methods/DTOs; one refresh owner; explicit MFA/enrollment result
+  branches; truthful factor removal; social continuation; OAuth consent dependencies;
+  multipart/branding support. Adapt clients to existing contracts first. _AC:_ contract
+  fixtures and browser journeys cover tenant mismatch, concurrent refresh, login/MFA,
+  reset/invite and supported user mutations; no absent endpoints behind active actions.
+- **P2-23 — Complete Figma screen/flow coverage.** Execute the design plan in order:
+  contract baseline → foundations/IA → identity/account → tenant operations/access/apps
+  → integrations/settings → platform/handoff. Use a fresh native editable Figma Design
+  file, existing tokens, all applicable states, light/dark and mobile identity flows.
+  _AC:_ every supported family/action has a frame link, permission/API mapping and
+  connected success/failure/cancel journey; missing backend capabilities are explicitly
+  blocked. Follow the updated [UI process](ui-process.md).
+- **P2-24 — Package and navigation consolidation.** Resolve FE-10 and FE-14–FE-16:
+  application/client naming and discovery, shared UI patterns, SDK runtime/peer-range
+  validation, typed wire models, transport/error contracts and meaningful package/portal
+  tests. _AC:_ supported React/Next/Node adapters are tested and documented, duplicate
+  routes have a reviewed alias/retirement map, and completed slices pass visual and
+  accessibility QA. Do not introduce unsupported billing/API-key/ownership screens.
+
+The audit baseline also found backend typecheck and unit-test failures in the current
+working tree. See the audit verification section; restore those checks before claiming
+the definition of done. No backend runtime changes were made by this documentation work.
+
+## Security audit follow-ups needing a decision (2026-10-20)
+
+See "Audit findings and controls" in [security.md](security.md).
+
+- **P1-SEC-2 (decision)** Global CORS allow-list: any OAuth-client admin can add an https origin
+  accepted for every tenant. _Recommended default:_ scope origins per tenant (match the request's
+  resolved tenant), keep `CORS_ORIGINS` as the platform-wide static list, and require https.
+- **P2-SEC-4 (decision)** LDAP egress: loopback/link-local/metadata are blocked; RFC1918 is allowed
+  because on-prem directories need it. _Recommended default:_ keep private ranges allowed, add an
+  optional `LDAP_ALLOWED_HOSTS` allow-list for SaaS deployments.
+- **P2-SEC-5** Upgrade `next` and other packages flagged by `yarn npm audit`.

@@ -65,7 +65,7 @@ const mockCredentialRepo = {
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
-  remove: jest.fn(),
+  delete: jest.fn(),
   count: jest.fn(),
 };
 
@@ -93,7 +93,7 @@ const mockSecurityEventService = {
 const mockDomainEvents = { publish: jest.fn() };
 
 const mockConfigService = {
-  get: jest.fn((key: string, def?: any) => {
+  get: jest.fn((key: string, def?: unknown) => {
     if (key === "WEBAUTHN_RP_ID") return "localhost";
     if (key === "WEBAUTHN_ORIGIN") return "http://localhost:3000";
     return def ?? null;
@@ -158,7 +158,7 @@ describe("WebAuthnService", () => {
       // The challenge key is consumed (GET + DELETE) even on success
       expect(mockRedisService.delete).not.toHaveBeenCalled();
       await expect(
-        service.finishRegistration("user-1", "tenant-1", {} as any),
+        service.finishRegistration("user-1", "tenant-1", {} as never),
       ).rejects.toThrow(); // verifyRegistrationResponse will throw in unit test env — that's OK
 
       // delete MUST have been called regardless
@@ -175,7 +175,7 @@ describe("WebAuthnService", () => {
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.finishRegistration("user-1", "tenant-1", {} as any),
+        service.finishRegistration("user-1", "tenant-1", {} as never),
       ).rejects.toBeInstanceOf(ApiException);
 
       expect(mockRedisService.delete).toHaveBeenCalledTimes(1);
@@ -195,7 +195,7 @@ describe("WebAuthnService", () => {
         service.finishAuthentication("user-1", "tenant-1", {
           rawId: "cred-id-base64url",
           id: "cred-id-base64url",
-        } as any, sessionNonce),
+        } as never, sessionNonce),
       ).rejects.toThrow();
 
       // Challenge must still have been consumed (keyed by nonce, not userId)
@@ -215,7 +215,7 @@ describe("WebAuthnService", () => {
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.finishRegistration("user-1", "tenant-1", {} as any),
+        service.finishRegistration("user-1", "tenant-1", {} as never),
       ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
     });
 
@@ -224,7 +224,7 @@ describe("WebAuthnService", () => {
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.finishAuthentication("user-1", "tenant-1", {} as any, "some-nonce"),
+        service.finishAuthentication("user-1", "tenant-1", {} as never, "some-nonce"),
       ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
     });
 
@@ -234,9 +234,9 @@ describe("WebAuthnService", () => {
 
       let caughtStatus: number | undefined;
       try {
-        await service.finishRegistration("user-1", "tenant-1", {} as any);
-      } catch (err: any) {
-        caughtStatus = err?.status ?? err?.getStatus?.();
+        await service.finishRegistration("user-1", "tenant-1", {} as never);
+      } catch (err: unknown) {
+        caughtStatus = (err as { status?: number; getStatus?: () => number }).status ?? (err as { getStatus?: () => number }).getStatus?.();
       }
 
       expect(caughtStatus).toBe(401);
@@ -256,7 +256,7 @@ describe("WebAuthnService", () => {
       // Stub verifyAuthenticationResponse to return a lower counter (replay)
       const { verifyAuthenticationResponse } = jest.requireActual(
         "@simplewebauthn/server",
-      ) as any;
+      ) as { verifyAuthenticationResponse: unknown };
 
       // Patch the module-level function via the service's internal call
       // Since we can't easily override @simplewebauthn/server in unit tests,
@@ -294,7 +294,7 @@ describe("WebAuthnService", () => {
       // Verify that 0-affected triggers WEBAUTHN_REPLAY_DETECTED
       // by calling finishAuthentication and catching the error
       await expect(
-        service.finishAuthentication("user-1", "tenant-1", fakeResponse as any, "some-nonce"),
+        service.finishAuthentication("user-1", "tenant-1", fakeResponse as never, "some-nonce"),
       ).rejects.toBeInstanceOf(ApiException);
     });
   });
@@ -311,15 +311,15 @@ describe("WebAuthnService", () => {
       mockRedisService.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.finishRegistration("user-1", "tenant-1", {} as any),
+        service.finishRegistration("user-1", "tenant-1", {} as never),
       ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
 
       // Status must be 400
       let status: number | undefined;
       try {
-        await service.finishRegistration("user-1", "tenant-1", {} as any);
-      } catch (err: any) {
-        status = err?.status ?? err?.getStatus?.();
+        await service.finishRegistration("user-1", "tenant-1", {} as never);
+      } catch (err: unknown) {
+        status = (err as { status?: number; getStatus?: () => number }).status ?? (err as { getStatus?: () => number }).getStatus?.();
       }
       expect(status).toBe(401);
     });
@@ -335,7 +335,7 @@ describe("WebAuthnService", () => {
       mockRedisService.get.mockResolvedValueOnce("valid-challenge");
       mockRedisService.delete.mockResolvedValue(undefined);
       mockCredentialRepo.findOne.mockResolvedValueOnce(makeCredential({ counter: 9 }));
-      mockCredentialRepo.remove.mockResolvedValue(undefined);
+      mockCredentialRepo.delete.mockResolvedValue(undefined);
       mockCredentialRepo.count.mockResolvedValue(0);
       mockUserRepo.findOne.mockResolvedValue(makeUser());
       (simplewebauthn.verifyAuthenticationResponse as jest.Mock).mockRejectedValueOnce(
@@ -348,7 +348,7 @@ describe("WebAuthnService", () => {
         service.finishAuthentication("user-1", "tenant-1", fakeResponse as never, "nonce", ctx),
       ).rejects.toMatchObject({ code: "PASSKEY_INVALID" });
 
-      expect(mockCredentialRepo.remove).toHaveBeenCalledTimes(1);
+      expect(mockCredentialRepo.delete).toHaveBeenCalledTimes(1);
       expect(mockMfaRepo.update).toHaveBeenCalledWith(
         { userId: "user-1", tenantId: "tenant-1" },
         { webauthnEnabled: false },

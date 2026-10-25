@@ -10,15 +10,19 @@ import {
   Query,
   Request,
   UseGuards,
+  UseFilters,
   HttpCode,
   HttpStatus,
   Header,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
 import type { Request as ExpressRequest } from "express";
 import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
 import { Permissions } from "@/modules/rbac/constants/permissions.catalog";
+import { RawResponse } from "@/common/decorators/raw-response.decorator";
+import { ScimExceptionFilter } from "./scim-exception.filter";
 import { ScimService } from "./scim.service";
 
 interface AuthenticatedRequest {
@@ -38,6 +42,7 @@ class CreateScimTokenDto {
   @IsOptional() @IsNumber() expiresInDays?: number;
 }
 
+@UseFilters(ScimExceptionFilter)
 @Controller("scim")
 export class ScimController {
   constructor(
@@ -47,7 +52,7 @@ export class ScimController {
 
   // ── Token management (JWT auth) ────────────────────────────────────────────
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Post("tokens")
   @RequirePermissions(Permissions.SCIM_WRITE)
   @HttpCode(HttpStatus.CREATED)
@@ -55,14 +60,14 @@ export class ScimController {
     return this.scimTokenService.createToken(req.tenantId!, dto.name, dto.expiresInDays);
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Get("tokens")
   @RequirePermissions(Permissions.SCIM_READ)
   listTokens(@Request() req: AuthenticatedRequest) {
     return this.scimTokenService.listTokens(req.tenantId!);
   }
 
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @Delete("tokens/:id")
   @RequirePermissions(Permissions.SCIM_WRITE)
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -72,6 +77,7 @@ export class ScimController {
 
   // ── SCIM v2 Users (SCIM Bearer token auth) ────────────────────────────────
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Get("v2/Users")
   @Header("Content-Type", "application/scim+json")
@@ -91,6 +97,7 @@ export class ScimController {
     );
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Get("v2/Users/:id")
   @Header("Content-Type", "application/scim+json")
@@ -102,6 +109,7 @@ export class ScimController {
     return this.scimService.getUser(req.scimTenantId, id, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Post("v2/Users")
   @Header("Content-Type", "application/scim+json")
@@ -114,6 +122,7 @@ export class ScimController {
     return this.scimService.createUser(req.scimTenantId, body, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Put("v2/Users/:id")
   @Header("Content-Type", "application/scim+json")
@@ -126,6 +135,7 @@ export class ScimController {
     return this.scimService.replaceUser(req.scimTenantId, id, body, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Patch("v2/Users/:id")
   @Header("Content-Type", "application/scim+json")
@@ -138,6 +148,7 @@ export class ScimController {
     return this.scimService.patchUser(req.scimTenantId, id, body.Operations, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Delete("v2/Users/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -150,6 +161,7 @@ export class ScimController {
 
   // ── SCIM v2 Groups ────────────────────────────────────────────────────────
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Get("v2/Groups")
   @Header("Content-Type", "application/scim+json")
@@ -167,6 +179,7 @@ export class ScimController {
     );
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Get("v2/Groups/:id")
   @Header("Content-Type", "application/scim+json")
@@ -178,6 +191,7 @@ export class ScimController {
     return this.scimService.getGroup(req.scimTenantId, id, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Post("v2/Groups")
   @Header("Content-Type", "application/scim+json")
@@ -190,6 +204,7 @@ export class ScimController {
     return this.scimService.createGroup(req.scimTenantId, body, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Patch("v2/Groups/:id")
   @Header("Content-Type", "application/scim+json")
@@ -202,6 +217,7 @@ export class ScimController {
     return this.scimService.patchGroup(req.scimTenantId, id, body.Operations, baseUrl);
   }
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Delete("v2/Groups/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -214,6 +230,7 @@ export class ScimController {
 
   // ── SCIM ServiceProviderConfig ────────────────────────────────────────────
 
+  @RawResponse()
   @UseGuards(ScimAuthGuard)
   @Get("v2/ServiceProviderConfig")
   @Header("Content-Type", "application/scim+json")

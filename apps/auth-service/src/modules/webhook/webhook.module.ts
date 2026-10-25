@@ -5,6 +5,7 @@ import { WebhookEndpoint, WebhookDelivery } from "@repo/database";
 import { WebhookService, WEBHOOK_QUEUE } from "./webhook.service";
 import { WebhookController } from "./webhook.controller";
 import { WebhookProcessor } from "./webhook.processor";
+import { WebhookEventDispatcher } from "./webhook-event.dispatcher";
 import { GuardsModule } from "@/common/guards/guards.module";
 
 @Module({
@@ -18,7 +19,7 @@ import { GuardsModule } from "@/common/guards/guards.module";
   // WebhookProcessor uses DataSource directly (globally provided by TypeOrmModule.forRoot)
   // to set the correct tenant search_path for BullMQ jobs, which run outside
   // the TenantSchemaMiddleware/AsyncLocalStorage request context.
-  providers: [WebhookService, WebhookProcessor],
+  providers: [WebhookService, WebhookProcessor, WebhookEventDispatcher],
   exports: [WebhookService],
 })
 export class WebhookModule {}

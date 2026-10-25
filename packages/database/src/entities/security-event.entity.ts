@@ -38,6 +38,7 @@ export const SecurityEventType = {
   USER_LOCKED: "user.locked",
   USER_DELETED: "user.deleted",
   USER_DELETION_FAILED: "user.deletion_failed",
+  USER_INVITE_REVOKED: "user.invite_revoked",
   // Sessions
   SESSION_REVOKED: "session.revoked",
   ALL_SESSIONS_REVOKED: "session.all_revoked",
@@ -64,6 +65,15 @@ export const SecurityEventType = {
   BRUTE_FORCE_THRESHOLD: "security.brute_force_threshold",
   // Email
   EMAIL_SENT: "email.sent",
+  // RBAC
+  ROLE_CREATED: "rbac.role_created",
+  ROLE_DELETED: "rbac.role_deleted",
+  ROLE_ASSIGNED: "rbac.role_assigned",
+  ROLE_REMOVED: "rbac.role_removed",
+  // LDAP directory sync
+  LDAP_USER_DEACTIVATED: "ldap.user_deactivated",
+  LDAP_USER_REACTIVATED: "ldap.user_reactivated",
+  LDAP_SYNC_ABORTED: "ldap.sync_aborted",
   // Branding / settings
   BRANDING_UPDATED: "branding.updated",
   TENANT_SETTINGS_UPDATED: "tenant.settings_updated",

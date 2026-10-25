@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { TenantAwareRepository } from '@/core/database/tenant-aware.repository';
 import { TenantContextService } from '@/core/database/tenant-context.service';
-import { User, UserRole, Tenant } from '@repo/database';
+import { User, UserRole, Tenant, Role } from '@repo/database';
 import { isOwnerLevel, maxPriority } from '../rbac/role-hierarchy';
 
 export interface OrgMembership {
@@ -49,6 +49,16 @@ export class UserRepository extends TenantAwareRepository<User> {
     return maxPriority(
       userRoles.filter((ur) => !ur.isExpired).map((ur) => ur.role?.priority ?? 0),
     );
+  }
+
+  /**
+   * Priorities of the given roles, or null when any id is not a role of this
+   * tenant (so foreign / unknown role ids can never be granted).
+   */
+  async getRolePriorities(tenantId: string, roleIds: string[]): Promise<number[] | null> {
+    const unique = [...new Set(roleIds)];
+    const roles = await this.manager.find(Role, { where: { id: In(unique), tenantId } });
+    return roles.length === unique.length ? roles.map((r) => r.priority) : null;
   }
 
   /** True when no other user in the tenant holds an owner-level role. */

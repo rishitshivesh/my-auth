@@ -1,0 +1,45 @@
+---
+title: Webhooks
+description: Event catalog, payload envelope and signature verification.
+---
+
+# Webhooks
+
+Register endpoints with `POST /webhooks` (`url`, `events`; `["*"]` subscribes to everything). The
+signing secret is returned once. Deliveries are tenant-scoped: an endpoint only receives its own
+tenant's events. Private, loopback and metadata addresses are rejected.
+
+## Event catalog
+
+`user.created`, `user.updated`, `user.deleted`, `user.login`, `login.failed`, `password.changed`,
+`mfa.enabled`, `mfa.disabled`, `session.revoked`, `role.assigned`, `role.removed`, `tenant.updated`,
+plus `test.ping` from `POST /webhooks/{id}/test`.
+
+## Envelope
+
+```json
+{
+  "id": "delivery-uuid",
+  "type": "user.login",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "tenantId": "tenant-uuid",
+  "data": { "userId": "...", "email": "...", "resourceId": "...", "resourceType": "session",
+            "outcome": "success", "requestId": null, "metadata": { "authMethod": "password" } }
+}
+```
+
+`data` holds ids, the email already on the event and a short allow-list of metadata. `id` is the
+idempotency key: it is identical across retries and manual redeliveries, so dedupe on it.
+Events are sent about 500 ms after they happen so the originating request has committed.
+
+## Headers and verification
+
+`X-Sentry-Signature: sha256=<hex>`, `X-Sentry-Event`, `X-Sentry-Delivery` (same as `id`).
+The signature is HMAC-SHA256 of the **raw request body** with your secret.
+
+```ts
+const expected = 'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
+const ok = timingSafeEqual(Buffer.from(expected), Buffer.from(header));
+```
+
+Respond `2xx` quickly. Failures retry after 1 min, 5 min, 30 min, 2 h and 8 h.

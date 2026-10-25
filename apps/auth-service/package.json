@@ -31,7 +31,8 @@
     "db:seed": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/run-seeds.ts",
     "db:seed:demo": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/seeders/demo.seed.ts",
     "db:reset": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/database/db-reset.ts",
-    "setup": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/cli/setup.ts"
+    "setup": "dotenv -e .env -- ts-node -r tsconfig-paths/register src/cli/setup.ts",
+    "test:all": "yarn test && yarn test:e2e"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.696.0",
@@ -127,9 +128,69 @@
       "^@scrolloop/types$": "<rootDir>/../../../packages/sentry-types/src/index.ts"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.ts",
+      "!**/*.spec.ts",
+      "!**/*.module.ts",
+      "!**/*.dto.ts",
+      "!**/dto/**",
+      "!**/index.ts",
+      "!**/database/seeders/**",
+      "!**/cli/**",
+      "!main.ts",
+      "!**/database/db-reset.ts",
+      "!**/*.entity.ts",
+      "!**/entities/**",
+      "!**/migrations/**"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": {
+        "statements": 88,
+        "branches": 70,
+        "functions": 90,
+        "lines": 90
+      },
+      "./src/modules/auth/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/modules/mfa/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/modules/oauth/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/modules/rbac/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/modules/session/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/common/guards/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/common/midllewares/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      },
+      "./src/common/security/": {
+        "lines": 90,
+        "statements": 85,
+        "branches": 60
+      }
+    }
   }
 }

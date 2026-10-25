@@ -129,6 +129,11 @@ export class TenantService {
     name: string;
     environment?: string;
   }): Promise<Tenant> {
+    if (!/^[a-z0-9][a-z0-9-]{2,62}$/.test(data.slug.toLowerCase())) {
+      throw new ApiException("VALIDATION_FAILED", {
+        errors: [{ field: "slug", message: "Slug must match /^[a-z0-9][a-z0-9-]{2,62}$/" }],
+      });
+    }
     const tenant = this.tenantRepository.create({
       slug: data.slug.toLowerCase(),
       name: data.name,
@@ -168,6 +173,13 @@ export class TenantService {
       throw new ApiException("TENANT_NOT_FOUND");
     }
 
+    domain = domain.toLowerCase();
+    const platformDomain = process.env["SENTRY_PLATFORM_DOMAIN"]?.toLowerCase();
+    if (platformDomain && (domain === platformDomain || domain.endsWith(`.${platformDomain}`))) {
+      throw new ApiException("VALIDATION_FAILED", {
+        errors: [{ field: "domain", message: "Custom domain cannot be on the platform domain" }],
+      });
+    }
     tenant.customDomain = domain;
     tenant.customDomainVerified = false; // Require verification
 
@@ -216,7 +228,7 @@ export class TenantService {
     const tenant = await this.getTenantById(tenantId);
 
     if (!tenant) {
-      throw new Error('Tenant not found');
+      throw new ApiException('TENANT_NOT_FOUND');
     }
 
     // Merge with existing branding

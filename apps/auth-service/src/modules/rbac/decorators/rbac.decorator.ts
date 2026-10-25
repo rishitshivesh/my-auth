@@ -35,4 +35,4 @@ export const RequireRoles = (...roles: string[]) =>
  * async deleteAll() { ... }
  */
 export const RequireAdmin = () =>
-  SetMetadata(ROLES_KEY, ["admin", "super_admin"]);
+  SetMetadata(ROLES_KEY, ["owner", "admin", "super_admin"]);

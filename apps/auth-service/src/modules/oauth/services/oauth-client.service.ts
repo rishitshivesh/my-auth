@@ -55,6 +55,39 @@ export interface UpdateClientDto {
   metadata?: Record<string, any>;
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Registration-time redirect URI policy: absolute https, or http on loopback
+ * (dev). No other schemes (javascript:, data:, file:, ftp:), no fragments
+ * (RFC 6749 3.1.2) and no userinfo.
+ */
+function assertValidRedirectUri(uri: string): void {
+  const fail = (message: string): never => {
+    throw new ApiException("VALIDATION_FAILED", {
+      errors: [{ field: "redirectUris", message }],
+    });
+  };
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    return fail(`Invalid redirect URI: ${uri}`);
+  }
+  const isHttps = url.protocol === "https:";
+  const isLoopbackHttp =
+    url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+  if (!isHttps && !isLoopbackHttp) {
+    return fail(`Redirect URI must use HTTPS: ${uri}`);
+  }
+  if (url.hash || uri.includes("#")) {
+    return fail(`Redirect URI must not contain a fragment: ${uri}`);
+  }
+  if (url.username || url.password) {
+    return fail(`Redirect URI must not contain credentials: ${uri}`);
+  }
+}
+
 @Injectable()
 export class OAuthClientService {
   constructor(
@@ -98,25 +131,7 @@ export class OAuthClientService {
 
       // Validate URIs
       for (const uri of data.redirectUris) {
-        try {
-          const url = new URL(uri);
-          // Allow localhost for development
-          const isLocalhost =
-            url.hostname === "localhost" || url.hostname === "127.0.0.1";
-          const isHttps = url.protocol === "https:";
-
-          if (!isHttps && !isLocalhost) {
-            throw new ApiException("VALIDATION_FAILED", {
-              errors: [{ field: "redirectUris", message: `Redirect URI must use HTTPS: ${uri}` }],
-            });
-          }
-        } catch (error) {
-          throw error instanceof ApiException
-            ? error
-            : new ApiException("VALIDATION_FAILED", {
-                errors: [{ field: "redirectUris", message: `Invalid redirect URI: ${uri}` }],
-              });
-        }
+        assertValidRedirectUri(uri);
       }
     }
 
@@ -188,6 +203,26 @@ export class OAuthClientService {
 
     if (!client) {
       throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Client not found" });
+    }
+
+    return client;
+  }
+
+  /**
+   * Get a client that belongs to the given tenant. Admin operations use this so
+   * a clientId from another tenant is indistinguishable from a missing one.
+   * Defense-in-depth: tenant_id filter retained alongside schema-level isolation.
+   */
+  async getClientForTenant(
+    clientId: string,
+    tenantId: string,
+  ): Promise<OAuthClient> {
+    const client = await this.clientRepository.findOne({
+      where: { clientId, tenantId, isActive: true },
+    });
+
+    if (!client) {
+      throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
     return client;
@@ -319,31 +354,15 @@ export class OAuthClientService {
    */
   async updateClient(
     clientId: string,
+    tenantId: string,
     data: UpdateClientDto,
   ): Promise<OAuthClient> {
-    const client = await this.getClient(clientId);
+    const client = await this.getClientForTenant(clientId, tenantId);
 
     // Validate redirect URIs if updated
     if (data.redirectUris) {
       for (const uri of data.redirectUris) {
-        try {
-          const url = new URL(uri);
-          const isLocalhost =
-            url.hostname === "localhost" || url.hostname === "127.0.0.1";
-          const isHttps = url.protocol === "https:";
-
-          if (!isHttps && !isLocalhost) {
-            throw new ApiException("VALIDATION_FAILED", {
-              errors: [{ field: "redirectUris", message: `Redirect URI must use HTTPS: ${uri}` }],
-            });
-          }
-        } catch (error) {
-          throw error instanceof ApiException
-            ? error
-            : new ApiException("VALIDATION_FAILED", {
-                errors: [{ field: "redirectUris", message: `Invalid redirect URI: ${uri}` }],
-              });
-        }
+        assertValidRedirectUri(uri);
       }
     }
 
@@ -360,11 +379,14 @@ export class OAuthClientService {
   /**
    * Rotate client secret
    */
-  async rotateClientSecret(clientId: string): Promise<{
+  async rotateClientSecret(
+    clientId: string,
+    tenantId: string,
+  ): Promise<{
     client: OAuthClient;
     clientSecret: string;
   }> {
-    const client = await this.getClient(clientId);
+    const client = await this.getClientForTenant(clientId, tenantId);
 
     if (client.clientType !== "confidential") {
       throw new ApiException("BAD_REQUEST", { detail: "Only confidential clients have secrets" });
@@ -389,8 +411,8 @@ export class OAuthClientService {
   /**
    * Delete client
    */
-  async deleteClient(clientId: string): Promise<void> {
-    const client = await this.getClient(clientId);
+  async deleteClient(clientId: string, tenantId: string): Promise<void> {
+    const client = await this.getClientForTenant(clientId, tenantId);
 
     // Soft delete by marking inactive
     client.isActive = false;

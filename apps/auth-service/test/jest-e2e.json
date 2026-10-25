@@ -2,8 +2,19 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
+  "testRegex": ".*\\.e2e-spec\\.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  }
+    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "<rootDir>/../tsconfig.json", "diagnostics": false, "isolatedModules": true }]
+  },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@scrolloop/types$": "<rootDir>/../../../packages/sentry-types/src/index.ts"
+  },
+  "setupFiles": ["<rootDir>/e2e/setup-env.ts"],
+  "globalSetup": "<rootDir>/e2e/global-setup.ts",
+  "globalTeardown": "<rootDir>/e2e/global-teardown.ts",
+  "testTimeout": 30000,
+  "maxWorkers": 1,
+  "forceExit": true,
+  "silent": true
 }

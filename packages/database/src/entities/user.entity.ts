@@ -260,6 +260,22 @@ export class User extends BaseEntity {
   })
   isActive!: boolean;
 
+  @Column({
+    type: "uuid",
+    nullable: true,
+    name: "ldap_connection_id",
+    comment: "LDAP connection that provisioned this user (null = not LDAP-provisioned)",
+  })
+  ldapConnectionId?: string | null;
+
+  @Column({
+    type: "timestamp with time zone",
+    nullable: true,
+    name: "ldap_deactivated_at",
+    comment: "Set when an LDAP sync deactivated the user because they left the directory",
+  })
+  ldapDeactivatedAt?: Date | null;
+
   // Relationships
   @OneToOne(() => MfaSettings, (mfa) => mfa.user, { cascade: true })
   mfaSettings?: MfaSettings;

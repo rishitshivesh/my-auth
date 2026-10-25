@@ -50,6 +50,16 @@ export const validationSchema = Joi.object({
   SENTRY_PLATFORM_DOMAIN: Joi.string().hostname().optional(),
   ALLOW_TENANT_ID_HEADER: boolString,
   COOKIE_DOMAIN: Joi.string().optional(),
+  // LDAP sync aborts (deactivating nobody) when more than this share of a connection's
+  // provisioned users would be deactivated at once, e.g. after a broken filter.
+  LDAP_MAX_DEACTIVATE_PERCENT: Joi.number().min(0).max(100).default(20),
+  // Test-only: lets e2e webhook deliveries reach 127.0.0.1. Rejected (must be
+  // "false") whenever NODE_ENV is not "test", so it cannot be enabled in production.
+  WEBHOOK_ALLOW_LOOPBACK: Joi.when("NODE_ENV", {
+    is: "test",
+    then: boolString,
+    otherwise: Joi.string().valid("false").default("false"),
+  }),
 
   // ── Tokens & keys ─────────────────────────────────────────────
   JWT_ISSUER: httpUrl.default("https://sentry.scrolloop.com"),

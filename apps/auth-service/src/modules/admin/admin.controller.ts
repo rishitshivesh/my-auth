@@ -12,7 +12,11 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
-import { Protected } from "@/common/decorators/protected.decorator";
+import { UseGuards } from "@nestjs/common";
+import { SuperAdminGuard } from "@/common/guards/super-admin.guard";
+import { JwtAuthGuard } from "@/common/guards";
+import { TenantBindingGuard } from "@/common/guards/tenant-binding.guard";
+import { SessionGuard } from "@/common/guards/session.guard";
 import { AdminService } from "./admin.service";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { UpdateTenantDto } from "./dto/update-tenant.dto";
@@ -21,7 +25,7 @@ import { UpdatePlatformSettingsDto } from "./dto/update-platform-settings.dto";
 
 @ApiTags("Admin - Platform")
 @Controller("admin")
-@Protected()
+@UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard, SuperAdminGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

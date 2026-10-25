@@ -129,7 +129,7 @@ describe('TenantBrandingController – logo upload guards', () => {
       size: 100 * 1024,
     } as Express.Multer.File;
 
-    const result = await controller.uploadLogo(mockReq as any, file);
+    const result = await controller.uploadLogo(mockReq as never, file);
     expect(result.logoUrl).toBe('http://localhost:4000/uploads/logo.png');
   });
 
@@ -140,11 +140,11 @@ describe('TenantBrandingController – logo upload guards', () => {
       size: 501 * 1024,
     } as Express.Multer.File;
 
-    await expect(controller.uploadLogo(mockReq as any, file)).rejects.toMatchObject({ code: 'UPLOAD_TOO_LARGE' });
+    await expect(controller.uploadLogo(mockReq as never, file)).rejects.toMatchObject({ code: 'UPLOAD_TOO_LARGE' });
   });
 
   it('throws BadRequestException when no file is provided', async () => {
-    await expect(controller.uploadLogo(mockReq as any, undefined)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(controller.uploadLogo(mockReq as never, undefined)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('returns correct logoUrl on success', async () => {
@@ -157,7 +157,7 @@ describe('TenantBrandingController – logo upload guards', () => {
       size: 1024,
     } as Express.Multer.File;
 
-    const { logoUrl } = await controller.uploadLogo(mockReq as any, file);
+    const { logoUrl } = await controller.uploadLogo(mockReq as never, file);
     expect(logoUrl).toBe('https://cdn.example.com/logo-abc.png');
   });
 });
@@ -206,21 +206,21 @@ describe('TenantBrandingController – save round-trip', () => {
   });
 
   it('GET returns current branding', async () => {
-    const result = await controller.getBranding(mockReq as any);
+    const result = await controller.getBranding(mockReq as never);
     expect(result.primaryColor).toBe('#123456');
     expect(result.fontFamily).toBe('Poppins');
   });
 
   it('PUT saves branding and returns updated config', async () => {
     const dto = { primaryColor: '#123456', fontFamily: 'Poppins' };
-    const result = await controller.updateBranding(mockReq as any, dto as any);
+    const result = await controller.updateBranding(mockReq as never, dto as never);
     expect(mockBrandingService.upsertBranding).toHaveBeenCalledWith('tenant-uuid', dto);
     expect(result.primaryColor).toBe('#123456');
   });
 
   it('PUT writes a branding.updated audit event', async () => {
     const dto = { primaryColor: '#abcdef' };
-    await controller.updateBranding(mockReq as any, dto as any);
+    await controller.updateBranding(mockReq as never, dto as never);
     expect(mockSecurityEvents.log).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'branding.updated' }),
     );

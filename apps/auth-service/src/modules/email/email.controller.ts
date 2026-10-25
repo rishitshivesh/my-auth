@@ -10,6 +10,7 @@ import { ApiException } from "@/common/http";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags, ApiOperation, ApiQuery } from "@nestjs/swagger";
 import { User } from "@repo/database";
+import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import { EmailService } from "./email.service";
 
 @ApiTags("Email (Development)")
@@ -24,6 +25,7 @@ export class EmailController {
    * Test email sending (development only)
    */
   @Get("test")
+  @RateLimit({ max: 5, windowMs: 60000, keyBy: "ip" })
   @ApiOperation({ summary: "Test email sending (development only)" })
   @ApiQuery({ name: "type", required: true, description: "Email type to test" })
   @ApiQuery({ name: "to", required: true, description: "Recipient email" })
@@ -33,9 +35,9 @@ export class EmailController {
   ): Promise<{ success: boolean; type: string; recipient: string; message: string }> {
     // Only allow in development
     const nodeEnv = this.configService.get<string>("NODE_ENV");
-    if (nodeEnv === "production") {
+    if (nodeEnv !== "development") {
       throw new ApiException("ACCESS_FORBIDDEN", {
-        detail: "Email testing is not available in production",
+        detail: "Email testing is only available when NODE_ENV=development",
       });
     }
 

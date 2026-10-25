@@ -1,5 +1,7 @@
 import { Injectable } from "@nestjs/common";
+import { IsEmail, IsString, MaxLength, MinLength } from "class-validator";
 import { ApiException } from "../../common/http";
+import { AMR_PASSWORD } from "@/modules/auth/auth-methods";
 import { assertPasswordPolicy } from "../auth/password-policy";
 import { hashPassword } from "../auth/password-hashing";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
@@ -24,13 +26,34 @@ import { logger } from "@/common/logger";
 import { SystemRoles } from "@/modules/rbac/constants/system-roles";
 import { TenantSchemaService } from "@/core/tenant/tenant-schema.service";
 import { TenantContextService } from "@/core/database/tenant-context.service";
+import { isReservedSlug } from "./reserved-slugs";
 
 export class RegisterTenantDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
   workspaceName!: string;
+
+  @IsString()
+  @MaxLength(63)
   slug!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
   adminName!: string;
+
+  @IsEmail()
+  @MaxLength(320)
   adminEmail!: string;
+
+  @IsString()
+  @MaxLength(128)
   adminPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
   idempotencyKey!: string;
 }
 
@@ -40,13 +63,6 @@ export interface TenantRegistrationResult {
   tenantSlug: string;
   user: { id: string; email: string; name: string };
 }
-
-const RESERVED_SLUGS = new Set([
-  "admin", "api", "auth", "www", "mail", "smtp", "sentry",
-  "support", "help", "status", "billing", "dashboard",
-  "login", "logout", "signup", "register", "setup", "onboarding",
-  "app", "console", "manage", "portal",
-]);
 
 @Injectable()
 export class TenantRegistrationService {
@@ -77,7 +93,9 @@ export class TenantRegistrationService {
 
   async checkSlugAvailability(
     slug: string,
+    options: { reserve?: boolean } = {},
   ): Promise<{ available: boolean; reason?: string }> {
+    const { reserve = true } = options;
     if (slug.length < 4)
       return { available: false, reason: "Slug must be at least 4 characters" };
     if (slug.length > 63)
@@ -86,23 +104,30 @@ export class TenantRegistrationService {
       return { available: false, reason: "Only lowercase letters, numbers, and hyphens allowed" };
     if (slug.startsWith("-") || slug.endsWith("-"))
       return { available: false, reason: "Slug cannot start or end with a hyphen" };
-    if (RESERVED_SLUGS.has(slug))
+    if (isReservedSlug(slug))
       return { available: false, reason: "This slug is reserved" };
 
     const reservationKey = `common:slug:reservation:${slug}`;
-    const reserved = await this.redisService
-      .get("", "", reservationKey)
-      .catch(() => null);
-    if (reserved)
-      return { available: false, reason: "This slug is being claimed by another user" };
+    // Registration itself must not trip over the reservation made by the
+    // wizard's own slug-check; the DB unique check + advisory lock in
+    // registerTenant() are the authoritative guards.
+    if (reserve) {
+      const reserved = await this.redisService
+        .get("", "", reservationKey)
+        .catch(() => null);
+      if (reserved)
+        return { available: false, reason: "This slug is being claimed by another user" };
+    }
 
     const existing = await this.tenantRepository.findOne({ where: { slug } });
     if (existing)
       return { available: false, reason: "This slug is already taken" };
 
-    await this.redisService
-      .set("", "", reservationKey, "pending", 300)
-      .catch(() => {});
+    if (reserve) {
+      await this.redisService
+        .set("", "", reservationKey, "pending", 300)
+        .catch(() => {});
+    }
 
     return { available: true };
   }
@@ -113,7 +138,9 @@ export class TenantRegistrationService {
     userAgent: string,
   ): Promise<TenantRegistrationResult> {
     // Validate slug
-    const slugCheck = await this.checkSlugAvailability(dto.slug);
+    const slugCheck = await this.checkSlugAvailability(dto.slug, {
+      reserve: false,
+    });
     if (!slugCheck.available) {
       throw new ApiException("RESOURCE_CONFLICT", {
         detail: slugCheck.reason ?? "Slug is not available",
@@ -160,7 +187,7 @@ export class TenantRegistrationService {
       transactionStarted = true;
       await qr.query(`SET search_path TO "${schemaName}", public, extensions`);
 
-      const result = await this.tenantContext.run(
+      const created = await this.tenantContext.run(
         { queryRunner: qr, schemaName },
         async () => {
           const passwordHash = await hashPassword(dto.adminPassword);
@@ -237,63 +264,69 @@ export class TenantRegistrationService {
             );
           }
 
-          const session = await this.sessionService.createSession({
-            userId: user.id,
-            tenantId: tenant!.id,
-            email: user.email,
-            ipAddress,
-            userAgent,
-          });
-
-          const { token: refreshToken } =
-            await this.oauthRefreshTokenService.createRefreshToken({
-              tenantId: tenant!.id,
-              userId: user.id,
-              sessionId: session.id,
-              clientId: undefined,
-              ipAddress,
-              userAgent,
-              expiresInDays: 30,
-            });
-
-          const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(
-            tenant!.id,
-          );
-          const privateKeyPem = privateKey.export({
-            type: "pkcs8",
-            format: "pem",
-          }) as string;
-
-          const groups = ownerRole ? [ownerRole.name] : [];
-
-          const accessToken = this.jwtService.sign(
-            {
-              sub: user.id,
-              email: user.email,
-              tenantId: tenant!.id,
-              tenantSlug: tenant!.slug,
-              groups,
-              sessionId: session.id,
-            },
-            {
-              privateKey: privateKeyPem,
-              algorithm: "RS256",
-              header: { alg: "RS256", kid },
-              expiresIn: "15m",
-            },
-          );
-
-          return {
-            accessToken,
-            refreshToken,
-            tenantSlug: tenant!.slug,
-            user: { id: user.id, email: user.email, name: dto.adminName },
-          };
+          return { user, ownerRole };
         },
       );
 
       await qr.commitTransaction();
       transactionStarted = false;
+
+      // Sessions and tokens use their own connections, so they must run after
+      // the tenant data above is committed (sessions reference users by FK).
+      const { user, ownerRole } = created;
+      const session = await this.sessionService.createSession({
+        userId: user.id,
+        tenantId: tenant.id,
+        email: user.email,
+        ipAddress,
+        userAgent,
+        amr: AMR_PASSWORD,
+      });
+
+      const { token: refreshToken } =
+        await this.oauthRefreshTokenService.createRefreshToken({
+          tenantId: tenant.id,
+          userId: user.id,
+          sessionId: session.id,
+          clientId: undefined,
+          ipAddress,
+          userAgent,
+          expiresInDays: 30,
+        });
+
+      const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(
+        tenant.id,
+      );
+      const privateKeyPem = privateKey.export({
+        type: "pkcs8",
+        format: "pem",
+      }) as string;
+
+      const groups = ownerRole ? [ownerRole.name] : [];
+
+      const accessToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          tenantId: tenant.id,
+          tenantSlug: tenant.slug,
+          groups,
+          sessionId: session.id,
+        },
+        {
+          privateKey: privateKeyPem,
+          algorithm: "RS256",
+          header: { alg: "RS256", kid },
+          expiresIn: "15m",
+        },
+      );
+
+      const result: TenantRegistrationResult = {
+        accessToken,
+        refreshToken,
+        tenantSlug: tenant.slug,
+        user: { id: user.id, email: user.email, name: dto.adminName },
+      };
 
       logger.info(
         { tenantId: tenant.id, slug: tenant.slug },

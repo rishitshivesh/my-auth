@@ -52,4 +52,17 @@ describe("BruteForceService", () => {
     const { service } = build();
     expect(service.isLocked(user({ lockedUntil: new Date(Date.now() - 1) }))).toBe(false);
   });
+
+  it("uses the tenant's lockout threshold and duration when a policy exists", async () => {
+    const userRepository = { save: jest.fn(async (u: User) => u) } as unknown as Repository<User>;
+    const email = { sendAccountLockedEmail: jest.fn() } as unknown as EmailService;
+    const policy = { get: jest.fn().mockResolvedValue({ lockoutThreshold: 3, lockoutDurationMinutes: 30 }) };
+    const service = new BruteForceService(userRepository, { log: jest.fn() } as unknown as SecurityEventService, email, policy as never);
+    const u = user({ failedLoginAttempts: 2 });
+    const before = Date.now();
+    await expect(service.recordFailedAttempt(u, "t1")).rejects.toBeDefined();
+    expect(policy.get).toHaveBeenCalledWith("t1");
+    expect(u.lockedUntil!.getTime() - before).toBeGreaterThanOrEqual(30 * 60 * 1000 - 50);
+    expect(email.sendAccountLockedEmail).toHaveBeenCalledWith(u, 30, expect.anything());
+  });
 });

@@ -8,6 +8,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { ApiException } from '../../common/http';
 
 @Injectable()
 export class FileStorageService {
@@ -41,13 +42,27 @@ export class FileStorageService {
     prefix = 'uploads',
   ): Promise<string> {
     const ext = this.extensionFor(mimeType);
-    const filename = `${prefix}-${crypto.randomUUID()}${ext}`;
-    const filePath = path.join(this.uploadDir, filename);
+    const safePrefix = this.sanitizePrefix(prefix);
+    const filename = `${safePrefix}-${crypto.randomUUID()}${ext}`;
+    const base = path.resolve(this.uploadDir);
+    const filePath = path.resolve(base, filename);
+    if (path.dirname(filePath) !== base) {
+      throw new ApiException('BAD_REQUEST', { detail: 'Invalid storage prefix' });
+    }
 
     await fs.promises.writeFile(filePath, buffer);
     this.logger.debug(`Stored file: ${filePath}`);
 
     return `${this.publicBaseUrl}/uploads/${filename}`;
+  }
+
+  /**
+   * Neutralise path separators, traversal, absolute paths and null bytes by
+   * collapsing everything outside [A-Za-z0-9_-] (so the prefix is a flat name).
+   */
+  private sanitizePrefix(prefix: string): string {
+    const cleaned = prefix.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
+    return cleaned.length > 0 ? cleaned : 'uploads';
   }
 
   private extensionFor(mimeType: string): string {

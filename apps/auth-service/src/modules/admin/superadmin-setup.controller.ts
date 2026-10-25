@@ -75,12 +75,10 @@ export class SuperadminSetupController {
   @ApiOperation({ summary: "Get the setup log file path" })
   @ApiResponse({ status: 200, description: "File path hint" })
   getSetupLogHint(): { path: string | null; hint: string } {
-    const filePath = this.adminService.getSetupLogPath();
+    // Never disclose the server filesystem path of the secret token file to unauthenticated callers.
     return {
-      path: filePath,
-      hint: filePath
-        ? `cat "${filePath}"`
-        : "Check SENTRY_SETUP_LOG_DIR env var or run: docker logs auth-service | grep 'SETUP TOKEN'",
+      path: null,
+      hint: "The setup token is stored in setup.log on the server host (directory set by SENTRY_SETUP_LOG_DIR, default ~/.sentry).",
     };
   }
 

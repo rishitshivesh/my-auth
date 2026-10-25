@@ -71,4 +71,18 @@ describe("assertPasswordPolicy", () => {
   it("accepts a long unique passphrase", () => {
     expect(() => assertPasswordPolicy("correct horse battery staple")).not.toThrow();
   });
+
+  describe("per-tenant options", () => {
+    const deny = new Set(["password1234"]);
+    it("honours a longer minimum but never goes below the platform minimum", () => {
+      expect(checkPasswordPolicy("a-fifteen-chars!", deny, {}, { minLength: 20 })).toBe("too_short");
+      expect(checkPasswordPolicy("a-twelve-char", deny, {}, { minLength: 6 })).toBeNull();
+      expect(checkPasswordPolicy("short-eleven", deny, {}, { minLength: 4 })).toBeNull();
+      expect(checkPasswordPolicy("elevenchars", deny, {}, { minLength: 4 })).toBe("too_short");
+    });
+    it("can disable the common-password check", () => {
+      expect(checkPasswordPolicy("password1234", deny)).toBe("too_common");
+      expect(checkPasswordPolicy("password1234", deny, {}, { commonPasswordCheck: false })).toBeNull();
+    });
+  });
 });

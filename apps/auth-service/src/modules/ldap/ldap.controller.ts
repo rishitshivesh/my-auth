@@ -11,6 +11,7 @@ import {
   Request,
   UseGuards,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
 import { JwtAuthGuard } from "@/common/guards";
 import { PermissionsGuard } from "@/modules/rbac/guards/permissions.guard";
 import { RequirePermissions } from "@/modules/rbac/decorators/rbac.decorator";
@@ -23,32 +24,40 @@ interface AuthenticatedRequest {
   user: { sub: string; tid: string };
 }
 
+/** The encrypted bind password must never leave the server (ASVS 8.3.4). */
+function withoutBindPassword<T extends { bindPasswordEncrypted?: string }>(
+  conn: T,
+): Omit<T, "bindPasswordEncrypted"> {
+  const { bindPasswordEncrypted: _omit, ...rest } = conn;
+  return rest;
+}
+
 @Controller("ldap")
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
 export class LdapController {
   constructor(private readonly ldapService: LdapService) {}
 
   @Post("connections")
   @RequirePermissions(Permissions.LDAP_WRITE)
   @HttpCode(HttpStatus.CREATED)
-  create(@Request() req: AuthenticatedRequest, @Body() dto: CreateLdapConnectionDto) {
-    return this.ldapService.create(req.tenantId!, dto);
+  async create(@Request() req: AuthenticatedRequest, @Body() dto: CreateLdapConnectionDto) {
+    return withoutBindPassword(await this.ldapService.create(req.tenantId!, dto));
   }
 
   @Get("connections")
   @RequirePermissions(Permissions.LDAP_READ)
-  list(@Request() req: AuthenticatedRequest) {
-    return this.ldapService.list(req.tenantId!);
+  async list(@Request() req: AuthenticatedRequest) {
+    return (await this.ldapService.list(req.tenantId!)).map(withoutBindPassword);
   }
 
   @Patch("connections/:id")
   @RequirePermissions(Permissions.LDAP_WRITE)
-  update(
+  async update(
     @Request() req: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdateLdapConnectionDto,
   ) {
-    return this.ldapService.update(req.tenantId!, id, dto);
+    return withoutBindPassword(await this.ldapService.update(req.tenantId!, id, dto));
   }
 
   @Delete("connections/:id")

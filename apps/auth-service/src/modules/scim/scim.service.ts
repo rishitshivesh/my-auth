@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { scimError } from "./scim-errors";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, FindOptionsWhere } from "typeorm";
+import { Repository, FindOptionsWhere, In } from "typeorm";
 import { User, Group, UserGroup } from "@repo/database";
 import {
   ScimUser,
@@ -13,6 +13,21 @@ import {
   SCIM_SCHEMA_LIST,
 } from "./scim.types";
 import { logger } from "@/common/logger";
+
+const SCIM_MAX_PAGE = 200;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Malformed ids can never match a resource: answer 404 instead of a database cast error. */
+function assertKnownIdShape(id: string, what: string): void {
+  if (!UUID.test(id)) throw scimError(404, `${what} not found`);
+}
+const USER_NAME_FILTER = /^\s*userName\s+eq\s+"([^"]*)"\s*$/i;
+
+function pageWindow(startIndex: number, count: number): { startIndex: number; count: number } {
+  const start = Number.isFinite(startIndex) && startIndex >= 1 ? Math.floor(startIndex) : 1;
+  const size = Number.isFinite(count) && count >= 0 ? Math.min(Math.floor(count), SCIM_MAX_PAGE) : SCIM_MAX_PAGE;
+  return { startIndex: start, count: size };
+}
 
 @Injectable()
 export class ScimService {
@@ -53,10 +68,14 @@ export class ScimService {
     count = 100,
     filter?: string,
   ): Promise<ScimListResponse<ScimUser>> {
+    ({ startIndex, count } = pageWindow(startIndex, count));
     const where: FindOptionsWhere<User> = { tenantId };
     if (filter) {
-      const emailMatch = filter.match(/userName eq "([^"]+)"/i);
-      if (emailMatch?.[1]) where.email = emailMatch[1];
+      // Only `userName eq "<value>"` is supported; anything else must fail
+      // loudly rather than silently return every user.
+      const match = USER_NAME_FILTER.exec(filter);
+      if (!match) throw scimError(400, "Unsupported or malformed filter", "invalidFilter");
+      where.email = match[1] ?? "";
     }
 
     const [users, total] = await this.userRepo.findAndCount({
@@ -76,6 +95,7 @@ export class ScimService {
   }
 
   async getUser(tenantId: string, userId: string, baseUrl: string): Promise<ScimUser> {
+    assertKnownIdShape(userId, "User");
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
     if (!user) throw scimError(404, "User not found");
     return this.userToScim(user, baseUrl);
@@ -100,6 +120,7 @@ export class ScimService {
   }
 
   async replaceUser(tenantId: string, userId: string, scimUser: ScimUser, baseUrl: string): Promise<ScimUser> {
+    assertKnownIdShape(userId, "User");
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
     if (!user) throw scimError(404, "User not found");
 
@@ -113,6 +134,7 @@ export class ScimService {
   }
 
   async patchUser(tenantId: string, userId: string, ops: ScimPatchOp[], baseUrl: string): Promise<ScimUser> {
+    assertKnownIdShape(userId, "User");
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
     if (!user) throw scimError(404, "User not found");
 
@@ -136,6 +158,7 @@ export class ScimService {
   }
 
   async deleteUser(tenantId: string, userId: string): Promise<void> {
+    assertKnownIdShape(userId, "User");
     const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
     if (!user) throw scimError(404, "User not found");
     await this.userRepo.softDelete(userId);
@@ -165,6 +188,7 @@ export class ScimService {
     startIndex = 1,
     count = 100,
   ): Promise<ScimListResponse<ScimGroup>> {
+    ({ startIndex, count } = pageWindow(startIndex, count));
     const [groups, total] = await this.groupRepo.findAndCount({
       where: { tenantId },
       skip: startIndex - 1,
@@ -176,12 +200,22 @@ export class ScimService {
   }
 
   async getGroup(tenantId: string, groupId: string, baseUrl: string): Promise<ScimGroup> {
+    assertKnownIdShape(groupId, "Group");
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
     if (!group) throw scimError(404, "Group not found");
     return this.groupToScim(group, baseUrl);
   }
 
+  /** Members must be existing users of this tenant (also avoids FK errors surfacing as 500s). */
+  private async assertMembersExist(tenantId: string, userIds: string[]): Promise<void> {
+    const unique = [...new Set(userIds)];
+    if (unique.length === 0) return;
+    const found = await this.userRepo.count({ where: { tenantId, id: In(unique) } });
+    if (found !== unique.length) throw scimError(400, "One or more members are not users of this tenant", "invalidValue");
+  }
+
   async createGroup(tenantId: string, scimGroup: ScimGroup, baseUrl: string): Promise<ScimGroup> {
+    await this.assertMembersExist(tenantId, (scimGroup.members ?? []).map((m) => m.value));
     const group = this.groupRepo.create({ tenantId, name: scimGroup.displayName });
     await this.groupRepo.save(group);
 
@@ -196,10 +230,14 @@ export class ScimService {
   }
 
   async patchGroup(tenantId: string, groupId: string, ops: ScimPatchOp[], baseUrl: string): Promise<ScimGroup> {
+    assertKnownIdShape(groupId, "Group");
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
     if (!group) throw scimError(404, "Group not found");
 
     for (const op of ops) {
+      if (op.path === "members" && op.op !== "remove" && Array.isArray(op.value)) {
+        await this.assertMembersExist(tenantId, (op.value as Array<{ value: string }>).map((m) => m.value));
+      }
       if (op.path === "displayName" && op.op === "replace") {
         group.name = String(op.value ?? group.name);
       }
@@ -229,9 +267,10 @@ export class ScimService {
   }
 
   async deleteGroup(tenantId: string, groupId: string): Promise<void> {
+    assertKnownIdShape(groupId, "Group");
     const group = await this.groupRepo.findOne({ where: { id: groupId, tenantId } });
     if (!group) throw scimError(404, "Group not found");
     await this.userGroupRepo.delete({ groupId });
-    await this.groupRepo.softDelete(groupId);
+    await this.groupRepo.delete({ id: groupId, tenantId });
   }
 }

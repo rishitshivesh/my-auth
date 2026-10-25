@@ -117,7 +117,8 @@ Content-Type: application/json
 
 ### GET /tenants/current/password-policy
 
-Get the tenant's password policy.
+Get the tenant's effective password and lockout policy. Tenants that never configured one get
+the platform defaults. Requires `tenant:read`.
 
 ```http
 GET /tenants/current/password-policy
@@ -128,29 +129,42 @@ Authorization: Bearer <admin-token>
 
 ```json
 {
-  "minLength": 8,
-  "requireUppercase": true,
-  "requireDigit": true,
-  "requireSymbol": false,
-  "maxHistoryCount": 5,
-  "maxAgeDays": 90
+  "minLength": 12,
+  "requireCommonPasswordCheck": true,
+  "historyCount": 5,
+  "maxAgeDays": 0,
+  "lockoutThreshold": 5,
+  "lockoutDurationMinutes": 15
 }
 ```
 
 ---
 
-### PATCH /tenants/current/password-policy
+### PUT /tenants/current/password-policy
 
-Update the tenant's password policy.
+Set any of the fields below (omitted fields keep their current value). Requires `tenant:write`;
+the change is audited as `tenant.settings_updated`.
+
+| Field | Range | Effect |
+|---|---|---|
+| `minLength` | 12-128 | Minimum password length. A tenant can only be stricter than the platform minimum of 12. |
+| `requireCommonPasswordCheck` | boolean | Reject passwords on the common-password deny list. |
+| `historyCount` | 0-24 | Previous passwords that cannot be reused. |
+| `maxAgeDays` | 0-3650 | Days before a password expires; `0` means never. An expired password is refused at sign-in with `AUTH_PASSWORD_EXPIRED` (403) until it is reset. |
+| `lockoutThreshold` | 3-20 | Failed sign-ins before the account locks. |
+| `lockoutDurationMinutes` | 1-1440 | How long a locked account stays locked. |
 
 ```http
-PATCH /tenants/current/password-policy
+PUT /tenants/current/password-policy
 Authorization: Bearer <admin-token>
 Content-Type: application/json
 
-{
-  "minLength": 12,
-  "requireSymbol": true,
-  "maxHistoryCount": 10
-}
+{ "minLength": 16, "historyCount": 10, "maxAgeDays": 90 }
 ```
+
+**Response `200`:** the full effective policy (same shape as `GET`). Values outside the ranges
+answer `422`.
+
+The policy applies to registration, invite acceptance, password reset and password change.
+
+---

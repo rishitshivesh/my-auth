@@ -4,8 +4,7 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  ValidateNested,
-} from "class-validator";
+  ValidateNested, IsEmail } from "class-validator";
 import { Type } from "class-transformer";
 
 export class ScimNameDto {
@@ -58,7 +57,7 @@ export class ScimUserDto {
   externalId?: string;
 
   @ApiProperty()
-  @IsString()
+  @IsEmail()
   userName!: string;
 
   @ApiPropertyOptional({ type: ScimNameDto })

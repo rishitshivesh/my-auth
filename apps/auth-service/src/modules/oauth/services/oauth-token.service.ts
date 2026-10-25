@@ -27,8 +27,21 @@ export interface CreateAuthorizationCodeDto {
   nonce?: string;
   codeChallenge?: string;
   codeChallengeMethod?: "S256";
+  /** Browser session that authorised the code (ID token `sid`). */
+  sessionId?: string;
+  /** When the user last authenticated (ID token `auth_time`). */
+  authTime?: Date;
+  /** Authentication methods used (ID token `amr`). */
+  amr?: string[];
   ipAddress?: string;
   userAgent?: string;
+}
+
+/** Authentication context carried from the authorize step into the ID token. */
+export interface IdTokenAuthContext {
+  sessionId?: string;
+  authTime?: Date;
+  amr?: string[];
 }
 
 export interface CreateAccessTokenDto {
@@ -49,11 +62,16 @@ export interface CreateRefreshTokenDto {
   accessTokenId?: string;
   familyId?: string; // For rotation
   parentTokenId?: string; // For rotation
+  sessionId?: string; // Browser session the grant originated from
   scope?: string;
   deviceId?: string;
   ipAddress?: string;
   userAgent?: string;
 }
+
+/** OIDC Core: "0" is the lowest level; these are ISO 29115 levels 1 and 2. */
+const ACR_SINGLE_FACTOR = "1";
+const ACR_MULTI_FACTOR = "2";
 
 @Injectable()
 export class OAuthTokenService {
@@ -80,7 +98,9 @@ export class OAuthTokenService {
       privateKey: privateKeyPem,
       algorithm: 'RS256',
       header: { alg: 'RS256', kid },
-      expiresIn: expiresIn as StringValue,
+      // Payloads already carry an absolute `exp`; jsonwebtoken rejects
+      // `expiresIn` alongside it, so only set it when exp is absent.
+      ...(payload.exp === undefined ? { expiresIn: expiresIn as StringValue } : {}),
     });
   }
 
@@ -122,6 +142,9 @@ export class OAuthTokenService {
       nonce: data.nonce,
       codeChallenge: data.codeChallenge,
       codeChallengeMethod: data.codeChallengeMethod,
+      sessionId: data.sessionId,
+      authTime: data.authTime,
+      amr: data.amr?.join(" "),
       expiresAt,
       ipAddress: data.ipAddress,
       userAgent: data.userAgent,
@@ -183,9 +206,16 @@ export class OAuthTokenService {
       }
     }
 
-    // Mark as used
-    authCode.usedAt = new Date();
-    await this.authCodeRepository.save(authCode);
+    // Consume atomically: only one concurrent exchange can flip used_at from NULL.
+    const usedAt = new Date();
+    const consumed = await this.authCodeRepository.update(
+      { codeHash, usedAt: IsNull() },
+      { usedAt },
+    );
+    if (consumed.affected !== 1) {
+      throw oauthError("invalid_grant", "Invalid authorization code");
+    }
+    authCode.usedAt = usedAt;
 
     logger.info({ userId: authCode.userId }, "Consumed authorization code");
 
@@ -313,7 +343,10 @@ export class OAuthTokenService {
     }
 
     // Look up token in database (for revocation check)
-    const jti = payload.jti as string;
+    const jti = payload.jti;
+    if (typeof jti !== "string" || jti.length === 0) {
+      throw oauthError("invalid_token", "Access token missing jti");
+    }
     const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
 
     const accessToken = await this.accessTokenRepository.findOne({
@@ -354,7 +387,10 @@ export class OAuthTokenService {
       return; // Invalid token, nothing to revoke
     }
 
-    const jti = payload.jti as string;
+    const jti = payload.jti;
+    if (typeof jti !== "string" || jti.length === 0) {
+      throw oauthError("invalid_token", "Access token missing jti");
+    }
     const tokenHash = crypto.createHash("sha256").update(jti).digest("hex");
 
     await this.accessTokenRepository.update(
@@ -403,6 +439,7 @@ export class OAuthTokenService {
       tokenHash,
       familyId,
       parentTokenId: data.parentTokenId,
+      sessionId: data.sessionId,
       scope: data.scope,
       expiresAt,
       deviceId: data.deviceId,
@@ -422,10 +459,7 @@ export class OAuthTokenService {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const refreshToken = await this.refreshTokenRepository.findOne({
-      where: {
-        tokenHash,
-        revokedAt: IsNull(),
-      },
+      where: { tokenHash },
       relations: ["client", "user"],
     });
 
@@ -452,6 +486,11 @@ export class OAuthTokenService {
       throw oauthError("invalid_grant", "Refresh token reuse detected");
     }
 
+    // Rotation sets usedAt, so only explicitly revoked tokens reach here.
+    if (refreshToken.revokedAt) {
+      throw oauthError("invalid_grant", "Invalid refresh token");
+    }
+
     return refreshToken;
   }
 
@@ -459,11 +498,20 @@ export class OAuthTokenService {
    * Rotate refresh token (exchange old for new)
    */
   async rotateRefreshToken(oldToken: OAuthRefreshToken): Promise<string> {
-    // Mark old token as used
-    oldToken.usedAt = new Date();
-    oldToken.revokedAt = new Date();
+    // Mark old token as used atomically; a lost race is a replay -> revoke family.
+    const now = new Date();
+    const marked = await this.refreshTokenRepository.update(
+      { id: oldToken.id, usedAt: IsNull() },
+      { usedAt: now, revokedAt: now, revokedReason: "rotated" },
+    );
+    if (marked.affected !== 1) {
+      logger.error({ tokenId: oldToken.id, familyId: oldToken.familyId }, "REFRESH TOKEN REUSE DETECTED (concurrent rotation)");
+      await this.revokeRefreshTokenFamily(oldToken.familyId, "token_reuse_detected");
+      throw oauthError("invalid_grant", "Refresh token reuse detected");
+    }
+    oldToken.usedAt = now;
+    oldToken.revokedAt = now;
     oldToken.revokedReason = "rotated";
-    await this.refreshTokenRepository.save(oldToken);
 
     // Create new token in same family
     const newToken = await this.createRefreshToken({
@@ -472,6 +520,7 @@ export class OAuthTokenService {
       userId: oldToken.userId,
       familyId: oldToken.familyId, // Same family
       parentTokenId: oldToken.id, // Track rotation chain
+      sessionId: oldToken.sessionId,
       scope: oldToken.scope,
       deviceId: oldToken.deviceId,
       ipAddress: oldToken.ipAddress,
@@ -548,6 +597,27 @@ export class OAuthTokenService {
   }
 
   /**
+   * Revoke every OAuth access and refresh token issued from a browser session
+   * (RP-initiated logout). Tenant-scoped.
+   */
+  async revokeSessionTokens(
+    tenantId: string,
+    sessionId: string,
+    reason: string = "session_ended",
+  ): Promise<void> {
+    const revocation = { revokedAt: new Date(), revokedReason: reason };
+    await this.accessTokenRepository.update(
+      { tenantId, sessionId, revokedAt: IsNull() },
+      revocation,
+    );
+    await this.refreshTokenRepository.update(
+      { tenantId, sessionId, revokedAt: IsNull() },
+      revocation,
+    );
+    logger.info({ sessionId, reason }, "Revoked OAuth tokens for session");
+  }
+
+  /**
    * Revoke all tokens for client
    */
   async revokeAllClientTokens(
@@ -594,6 +664,7 @@ export class OAuthTokenService {
     user: User,
     client: OAuthClient,
     nonce?: string,
+    auth: IdTokenAuthContext = {},
   ): Promise<string> {
     const exp = Math.floor(Date.now() / 1000) + client.idTokenTtl;
     const iat = Math.floor(Date.now() / 1000);
@@ -622,12 +693,64 @@ export class OAuthTokenService {
       payload.picture = user.avatarUrl;
     }
 
+    // Authentication context (OIDC Core 2.): sid, auth_time, acr, amr.
+    if (auth.sessionId) {
+      payload.sid = auth.sessionId;
+    }
+    if (auth.authTime) {
+      payload.auth_time = Math.floor(auth.authTime.getTime() / 1000);
+    }
+    if (auth.amr && auth.amr.length > 0) {
+      payload.amr = auth.amr;
+      payload.acr = auth.amr.includes("mfa") ? ACR_MULTI_FACTOR : ACR_SINGLE_FACTOR;
+    }
+
     // Sign ID token
     const idToken = await this.signToken(payload, client.idTokenTtl, client.tenantId);
 
     logger.info({ userId: user.id }, "Created ID token");
 
     return idToken;
+  }
+
+  /**
+   * Verify an `id_token_hint` for RP-initiated logout. The signature and issuer
+   * must be ours, but expiry is ignored (OIDC RP-Initiated Logout 1.0 section 2).
+   * Access tokens and purpose-bound tokens share our signing keys, so they are
+   * refused: only a token with an `aud` and none of those markers is an ID token.
+   */
+  async verifyIdTokenHint(
+    token: string,
+  ): Promise<{ audience: string; subject: string; sessionId?: string }> {
+    let payload: Record<string, unknown>;
+    try {
+      const publicKey = await this.jwksService.getPublicKeyForToken(token);
+      payload = this.jwtService.verify(token, {
+        publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+        algorithms: ["RS256"],
+        ignoreExpiration: true,
+        issuer: this.configService.get("JWT_ISSUER", "https://sentry.scrolloop.com"),
+      }) as Record<string, unknown>;
+    } catch {
+      throw oauthError("invalid_request", "Invalid id_token_hint");
+    }
+
+    const aud = Array.isArray(payload["aud"]) ? payload["aud"][0] : payload["aud"];
+    const isIdToken =
+      typeof aud === "string" &&
+      typeof payload["sub"] === "string" &&
+      payload["token_type"] === undefined &&
+      payload["type"] === undefined &&
+      payload["purpose"] === undefined &&
+      payload["mode"] === undefined;
+    if (!isIdToken) {
+      throw oauthError("invalid_request", "id_token_hint is not an ID token");
+    }
+    return {
+      audience: aud,
+      subject: payload["sub"] as string,
+      sessionId: typeof payload["sid"] === "string" ? payload["sid"] : undefined,
+    };
   }
 
   // ============================================================

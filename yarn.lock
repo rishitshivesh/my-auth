@@ -5891,7 +5891,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@repo/emails@workspace:packages/emails":
+"@repo/emails@npm:*, @repo/emails@workspace:packages/emails":
   version: 0.0.0-use.local
   resolution: "@repo/emails@workspace:packages/emails"
   dependencies:
@@ -9092,6 +9092,7 @@ __metadata:
     "@nestjs/typeorm": "npm:^11.0.0"
     "@peculiar/x509": "npm:^1.14.2"
     "@repo/database": "npm:*"
+    "@repo/emails": "npm:*"
     "@repo/security": "npm:*"
     "@repo/shared": "npm:*"
     "@simplewebauthn/browser": "npm:^13.2.2"
@@ -9124,7 +9125,6 @@ __metadata:
     eslint-plugin-prettier: "npm:^5.2.2"
     express-session: "npm:^1.18.2"
     globals: "npm:^16.0.0"
-    handlebars: "npm:^4.7.8"
     helmet: "npm:^8.1.0"
     ioredis: "npm:^5.8.0"
     jest: "npm:^30.0.0"

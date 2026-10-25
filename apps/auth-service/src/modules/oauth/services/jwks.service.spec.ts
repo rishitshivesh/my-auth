@@ -61,7 +61,7 @@ describe("JwksService", () => {
       const service = new JwksService(mockRepo, mockConfig);
       const jwk = service.toJWK(publicKeyPem, "test-kid-2");
 
-      const reconstructed = crypto.createPublicKey({ key: jwk as any, format: "jwk" });
+      const reconstructed = crypto.createPublicKey({ key: jwk as unknown as crypto.JsonWebKey, format: "jwk" });
       const reconstructedPem = reconstructed.export({
         type: "spki",
         format: "pem",

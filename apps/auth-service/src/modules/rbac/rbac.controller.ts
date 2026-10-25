@@ -12,6 +12,9 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { SecurityEventService } from "@/common/service/security-event.service";
+import { SecurityEventType } from "@repo/database";
+import { SessionGuard } from "@/common/guards/session.guard";
 import {
   ApiTags,
   ApiOperation,
@@ -53,11 +56,13 @@ interface AuthenticatedRequest {
   tenantId: string;
   user: { sub: string; mfaVerified?: boolean };
   ip?: string;
+  requestId?: string;
+  get?(name: string): string | undefined;
 }
 
 @ApiTags("RBAC")
 @Controller("rbac")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SessionGuard)
 @ApiBearerAuth()
 export class RbacController {
   constructor(
@@ -67,7 +72,29 @@ export class RbacController {
     private policyService: PolicyService,
     private groupService: GroupService,
     private policyEvaluationService: PolicyEvaluationService,
+    private securityEvents: SecurityEventService,
   ) {}
+
+  private audit(
+    req: AuthenticatedRequest,
+    eventType: (typeof SecurityEventType)[keyof typeof SecurityEventType],
+    resourceType: string,
+    resourceId: string,
+    metadata: Record<string, unknown> = {},
+  ): void {
+    this.securityEvents.log({
+      tenantId: req.tenantId,
+      userId: req.user.sub,
+      eventType,
+      severity: "warning",
+      ipAddress: req.ip ?? "0.0.0.0",
+      userAgent: String(req.get?.("user-agent") ?? "unknown"),
+      requestId: req.requestId,
+      resourceType,
+      resourceId,
+      metadata,
+    });
+  }
 
   // ============================================================
   // PERMISSION ENDPOINTS
@@ -156,11 +183,14 @@ export class RbacController {
   async createRole(@Request() req: AuthenticatedRequest, @Body() dto: CreateRoleDto) {
     const tenantId = req.tenantId;
     const userId = req.user.sub;
-    return this.roleService.createRole({
+    await this.rbacService.assertCanSetRolePriority(userId, tenantId, dto.priority ?? 0);
+    const created = await this.roleService.createRole({
       tenantId,
       ...dto,
       createdBy: userId,
     });
+    this.audit(req, SecurityEventType.ROLE_CREATED, "role", created.id, { name: created.name });
+    return created;
   }
 
   @Get("roles/:id")
@@ -186,6 +216,7 @@ export class RbacController {
     @Body() dto: UpdateRoleDto,
   ) {
     const tenantId = req.tenantId;
+    await this.rbacService.assertCanSetRolePriority(req.user.sub, tenantId, dto.priority ?? 0);
     return this.roleService.updateRole(id, tenantId, dto);
   }
 
@@ -197,6 +228,7 @@ export class RbacController {
   async deleteRole(@Request() req: AuthenticatedRequest, @Param("id") id: string) {
     const tenantId = req.tenantId;
     await this.roleService.deleteRole(id, tenantId);
+    this.audit(req, SecurityEventType.ROLE_DELETED, "role", id);
   }
 
   // ============================================================
@@ -292,6 +324,7 @@ export class RbacController {
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
       reason: dto.reason,
     });
+    this.audit(req, SecurityEventType.ROLE_ASSIGNED, "user", userId, { roles: dto.roleNames });
 
     return { message: "Roles assigned successfully" };
   }
@@ -314,6 +347,7 @@ export class RbacController {
       tenantId,
       assignedBy,
     );
+    this.audit(req, SecurityEventType.ROLE_ASSIGNED, "user", userId, { roles: dto.roleNames, mode: "replace" });
     return { message: "User roles updated successfully" };
   }
 
@@ -334,6 +368,7 @@ export class RbacController {
       tenantId,
       req.user.sub,
     );
+    this.audit(req, SecurityEventType.ROLE_REMOVED, "user", userId, { role: roleName });
     return { message: "Role removed successfully" };
   }
 

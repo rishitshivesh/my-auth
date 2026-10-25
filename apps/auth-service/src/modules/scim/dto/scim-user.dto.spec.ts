@@ -6,9 +6,17 @@ describe("ScimUserDto validation", () => {
   it("accepts a minimal valid SCIM user", async () => {
     const dto = plainToInstance(ScimUserDto, {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: "jdoe",
+      userName: "jdoe@example.com",
     });
     expect((await validate(dto)).length).toBe(0);
+  });
+
+  it("rejects a userName that is not an email address", async () => {
+    const dto = plainToInstance(ScimUserDto, {
+      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+      userName: "jdoe",
+    });
+    expect((await validate(dto)).some((e) => e.property === "userName")).toBe(true);
   });
 
   it("rejects a missing userName", async () => {
@@ -22,7 +30,7 @@ describe("ScimUserDto validation", () => {
   it("rejects a malformed nested email", async () => {
     const dto = plainToInstance(ScimUserDto, {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      userName: "jdoe",
+      userName: "jdoe@example.com",
       emails: [{ value: 123 }],
     });
     const errors = await validate(dto);

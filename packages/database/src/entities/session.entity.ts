@@ -85,6 +85,14 @@ export class Session extends BaseEntity {
   deviceId?: string;
 
   @Column({
+    type: "text",
+    nullable: true,
+    name: "amr",
+    comment: "Space-separated authentication methods the login completed with (OIDC amr)",
+  })
+  amr?: string | null;
+
+  @Column({
     type: "jsonb",
     name: "device_info",
     comment: "Device information (browser, OS, etc.)",

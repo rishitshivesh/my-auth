@@ -41,6 +41,7 @@ import { GroupPolicy } from "./entities/group-policy.entity";
 import { UserPolicy } from "./entities/user-policy.entity";
 import { RolePolicy } from "./entities/role-policy.entity";
 import { TenantMfaPolicy } from "./entities/tenant-mfa-policy.entity";
+import { TenantPasswordPolicy } from "./entities/tenant-password-policy.entity";
 
 /**
  * Database connection configuration — single source of truth.
@@ -134,6 +135,7 @@ export const ENTITIES = [
   UserPolicy,
   RolePolicy,
   TenantMfaPolicy,
+  TenantPasswordPolicy,
 ];
 
 export function buildDataSourceOptions(env: DatabaseEnv = process.env): DataSourceOptions {

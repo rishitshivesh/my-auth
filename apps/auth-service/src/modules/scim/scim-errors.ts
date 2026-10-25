@@ -4,7 +4,7 @@ import type { ScimError } from "./scim.types";
 export const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error";
 
 /** RFC 7644 section 3.12 scimType values used here. */
-export type ScimType = "uniqueness" | "invalidValue" | "invalidSyntax" | "noTarget";
+export type ScimType = "uniqueness" | "invalidFilter" | "invalidValue" | "invalidSyntax" | "noTarget";
 
 /** RFC 7644 error response: status is a string, content type application/scim+json. */
 export function scimError(

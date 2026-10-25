@@ -66,6 +66,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new ApiException("AUTH_TOKEN_INVALID");
     }
 
+    // Purpose-bound tokens (mfa_pending, social_completion, link, ...) are
+    // signed with the same RS256 key as access tokens. A full access token
+    // never carries these claims, so refuse them here — otherwise a password-only
+    // mfa_pending token authenticates routes that skip SessionGuard (ASVS 3.5.x / 2.8).
+    if (payload.type !== undefined || payload.mode !== undefined || payload.purpose !== undefined) {
+      throw new ApiException("AUTH_TOKEN_INVALID");
+    }
+
     const roles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
     const groups = Array.isArray(payload.groups) ? (payload.groups as string[]) : [];
 
@@ -82,7 +90,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       sub: payload.sub,
       userId: payload.sub,
-      tenantId: payload.tenantId as string | undefined,
+      // OAuth-issued access tokens use the snake_case `tenant_id` claim.
+      tenantId: (payload.tenantId ?? payload.tenant_id) as string | undefined,
       tenantSlug: payload.tenantSlug as string | undefined,
       sessionId: payload.sessionId as string | undefined,
       authTime: typeof payload.authTime === "number" ? payload.authTime : undefined,

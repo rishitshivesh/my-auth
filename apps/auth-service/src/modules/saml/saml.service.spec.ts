@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { ProtocolException } from "@/common/http";
 import * as crypto from "crypto";
 import * as samlify from "samlify";
+import { EncryptionService } from "@repo/security";
 import { SamlServiceProvider, KeyPair, User, Tenant } from "@repo/database";
 import { SamlService } from "./saml.service";
 import { TenantService } from "@/modules/tenant/tenant.service";
@@ -20,16 +21,9 @@ samlify.setSchemaValidator({ validate: () => Promise.resolve("valid") });
 
 const MASTER_KEY = "test-keyring-master-key";
 
-function encryptPrivateKey(privateKeyPem: string): { encryptedPrivateKey: string; iv: string; authTag: string } {
-  const key = Buffer.from(MASTER_KEY.padEnd(32, "0").slice(0, 32));
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(privateKeyPem, "utf8"), cipher.final()]);
-  return {
-    encryptedPrivateKey: encrypted.toString("hex"),
-    iv: iv.toString("hex"),
-    authTag: cipher.getAuthTag().toString("hex"),
-  };
+async function encryptPrivateKey(privateKeyPem: string): Promise<{ encryptedPrivateKey: string; iv: string; authTag: string }> {
+  const enc = await EncryptionService.encrypt(privateKeyPem, MASTER_KEY);
+  return { encryptedPrivateKey: enc.encrypted, iv: enc.iv, authTag: enc.authTag };
 }
 
 describe("SamlService — assertion signing", () => {
@@ -63,14 +57,14 @@ describe("SamlService — assertion signing", () => {
     encryptAssertions: false,
   } as unknown as SamlServiceProvider;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
       modulusLength: 2048,
       publicKeyEncoding: { type: "spki", format: "pem" },
       privateKeyEncoding: { type: "pkcs8", format: "pem" },
     });
     publicKeyPem = publicKey;
-    const enc = encryptPrivateKey(privateKey);
+    const enc = await encryptPrivateKey(privateKey);
     keyPairRow = {
       id: "kp-1",
       kid: "test-kid",
@@ -146,7 +140,7 @@ describe("SamlService — assertion signing", () => {
         publicKeyEncoding: { type: "spki", format: "pem" },
         privateKeyEncoding: { type: "pkcs8", format: "pem" },
       });
-      const otherEnc = encryptPrivateKey(otherPriv);
+      const otherEnc = await encryptPrivateKey(otherPriv);
       const otherTenantKeyRow = {
         id: "kp-2",
         kid: "other-tenant-kid",

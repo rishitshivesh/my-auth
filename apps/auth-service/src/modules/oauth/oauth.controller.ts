@@ -14,6 +14,7 @@ import {
   Delete,
   Put,
 } from "@nestjs/common";
+import { SessionGuard } from "@/common/guards/session.guard";
 import {
   ApiTags,
   ApiOperation,
@@ -55,6 +56,7 @@ import { logger } from "@/common/logger";
 import { OAuthClient } from "@repo/database";
 import { ApiException } from "@/common/http";
 import { oauthError } from "./oauth-errors";
+import { RawResponse } from "@/common/decorators/raw-response.decorator";
 
 interface JwtUser {
   sub: string;
@@ -83,155 +85,39 @@ export class OAuthController {
     bodyClientId?: string,
     bodyClientSecret?: string,
   ): { clientId?: string; clientSecret?: string } {
-    if (authHeader && authHeader.startsWith("Basic ")) {
-      const decoded = Buffer.from(authHeader.slice(6), "base64").toString(
-        "utf-8",
-      );
-      const [id, secret] = decoded.split(":");
-      return { clientId: id, clientSecret: secret };
+    if (authHeader && /^basic /i.test(authHeader)) {
+      const encoded = authHeader.slice(6).trim();
+      const decoded = Buffer.from(encoded, "base64").toString("utf-8");
+      const isCanonicalBase64 =
+        /^[A-Za-z0-9+/]+={0,2}$/.test(encoded) &&
+        Buffer.from(decoded, "utf-8").toString("base64") === encoded;
+      const separator = decoded.indexOf(":");
+      if (!isCanonicalBase64 || separator < 0) {
+        throw oauthError("invalid_client", "Malformed Basic authorization header");
+      }
+      // RFC 6749 2.3.1: id and secret are form-urlencoded before Basic encoding.
+      // Only the FIRST colon separates them (secrets may contain ':').
+      let clientId: string;
+      let clientSecret: string;
+      try {
+        clientId = decodeURIComponent(decoded.slice(0, separator).replace(/\+/g, " "));
+        clientSecret = decodeURIComponent(decoded.slice(separator + 1).replace(/\+/g, " "));
+      } catch {
+        throw oauthError("invalid_client", "Malformed Basic authorization header");
+      }
+      if (!clientId) {
+        throw oauthError("invalid_client", "client_id required");
+      }
+      return { clientId, clientSecret };
     }
     return { clientId: bodyClientId, clientSecret: bodyClientSecret };
-  }
-
-  // ============================================================
-  // AUTHORIZATION ENDPOINT
-  // ============================================================
-
-  @Get("authorize")
-  @ApiOperation({
-    summary: "OAuth2 Authorization Endpoint",
-    description:
-      "Initiate OAuth2 authorization code flow. User must be logged in.",
-  })
-  @ApiQuery({ name: "client_id", required: true })
-  @ApiQuery({ name: "redirect_uri", required: true })
-  @ApiQuery({ name: "response_type", required: true, enum: ["code"] })
-  @ApiQuery({ name: "scope", required: true })
-  @ApiQuery({ name: "state", required: false })
-  @ApiQuery({ name: "nonce", required: false })
-  @ApiQuery({ name: "code_challenge", required: false })
-  @ApiQuery({
-    name: "code_challenge_method",
-    required: false,
-    enum: ["S256"],
-  })
-  @ApiResponse({
-    status: 302,
-    description: "Redirects to redirect_uri with code and state",
-  })
-  @ApiResponse({
-    status: 400,
-    description: "Invalid request parameters",
-  })
-  async authorize(
-    @Query() query: AuthorizeRequestDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    const tenantId = req.tenantId!;
-
-    // TODO: Check if user is logged in
-    // For now, assume user is authenticated and we have userId
-    const userId = (req.user as JwtUser)?.userId;
-
-    if (!userId) {
-      // Redirect to login with return URL
-      const loginUrl = `/auth/login?return_url=${encodeURIComponent(req.url)}`;
-      return res.redirect(loginUrl);
-    }
-
-    // Validate client
-    const client = await this.clientService
-      .getClient(query.client_id)
-      .catch((error: unknown) => {
-        if (error instanceof ApiException && error.code === "RESOURCE_NOT_FOUND") {
-          throw oauthError("invalid_request", "Unknown client_id");
-        }
-        throw error;
-      });
-
-    // Validate redirect URI
-    await this.clientService.validateRedirectUri(client, query.redirect_uri);
-
-    // Validate grant type
-    await this.clientService.validateGrantType(client, "authorization_code");
-
-    // Parse scopes
-    const requestedScopes = query.scope.split(" ");
-
-    // Validate scopes
-    const grantedScopes = await this.clientService.validateScopes(
-      client,
-      requestedScopes,
-    );
-
-    // PKCE: always required for public clients, and for confidential clients
-    // that opted in. Only S256 is accepted; an absent method would mean
-    // "plain" under RFC 7636, so it must be explicit.
-    const pkceRequired = client.requirePkce || client.clientType === "public";
-    if (pkceRequired && !query.code_challenge) {
-      throw oauthError("invalid_request", "code_challenge required for this client");
-    }
-    if (query.code_challenge && query.code_challenge_method !== "S256") {
-      throw oauthError("invalid_request", "code_challenge_method must be S256");
-    }
-
-    // Check if consent is required
-    const existingConsent = await this.consentService.getConsent(
-      tenantId,
-      userId,
-      client.id,
-    );
-
-    const requireConsent = await this.consentService.isConsentRequired(
-      client,
-      existingConsent ?? undefined,
-    );
-
-    if (requireConsent) {
-      // TODO: Show consent screen
-      // For now, auto-grant consent
-      await this.consentService.grantConsent({
-        tenantId,
-        clientId: client.id,
-        userId,
-        grantedScopes,
-        rememberConsent: false,
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent"),
-      });
-    }
-
-    // Generate authorization code
-    const code = await this.tokenService.createAuthorizationCode({
-      tenantId,
-      clientId: client.id,
-      userId,
-      redirectUri: query.redirect_uri,
-      scope: grantedScopes.join(" "),
-      state: query.state,
-      nonce: query.nonce,
-      codeChallenge: query.code_challenge,
-      codeChallengeMethod: query.code_challenge_method,
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    // Build redirect URL
-    const redirectUrl = new URL(query.redirect_uri);
-    redirectUrl.searchParams.set("code", code);
-    if (query.state) {
-      redirectUrl.searchParams.set("state", query.state);
-    }
-
-    // Redirect to client
-    return res.redirect(redirectUrl.toString());
   }
 
   // ============================================================
   // TOKEN ENDPOINT
   // ============================================================
 
+  @RawResponse()
   @Post("token")
   @RateLimit({ max: 10, windowMs: 60000, keyBy: "ip" })
   @HttpCode(HttpStatus.OK)
@@ -277,6 +163,15 @@ export class OAuthController {
       clientId,
       clientSecret,
     );
+
+    if (!body.grant_type) {
+      throw oauthError("invalid_request", "grant_type required");
+    }
+
+    // A client may only use the grant types it was registered for (RFC 6749 5.2 unauthorized_client).
+    if (["authorization_code", "refresh_token", "client_credentials"].includes(body.grant_type)) {
+      await this.clientService.validateGrantType(client, body.grant_type);
+    }
 
     // Handle different grant types
     switch (body.grant_type) {
@@ -344,6 +239,7 @@ export class OAuthController {
         tenantId,
         clientId: client.id,
         userId: authCode.userId,
+        sessionId: authCode.sessionId,
         scope: authCode.scope,
         ipAddress,
         userAgent,
@@ -356,6 +252,7 @@ export class OAuthController {
       tenantId,
       clientId: client.id,
       userId: authCode.userId,
+      sessionId: authCode.sessionId,
       scope: authCode.scope,
       ipAddress,
       userAgent,
@@ -368,6 +265,11 @@ export class OAuthController {
         authCode.user,
         client,
         authCode.nonce,
+        {
+          sessionId: authCode.sessionId,
+          authTime: authCode.authTime,
+          amr: authCode.amr ? authCode.amr.split(" ") : undefined,
+        },
       );
     }
 
@@ -415,6 +317,7 @@ export class OAuthController {
         tenantId,
         clientId: client.id,
         userId: refreshToken.userId,
+        sessionId: refreshToken.sessionId,
         scope: refreshToken.scope,
         ipAddress,
         userAgent,
@@ -475,6 +378,7 @@ export class OAuthController {
   // USERINFO ENDPOINT
   // ============================================================
 
+  @RawResponse()
   @Get("userinfo")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -494,6 +398,14 @@ export class OAuthController {
   async userInfo(@Req() req: Request): Promise<UserInfoResponseDto> {
     const user = req.user as JwtUser;
 
+    // OAuth-issued tokens are tracked server-side; enforce revocation for them.
+    const bearer = req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.slice(7)
+      : undefined;
+    if (bearer && this.isOAuthAccessToken(bearer)) {
+      await this.tokenService.validateAccessToken(bearer);
+    }
+
     return {
       sub: user.userId,
       email: user.email ?? '',
@@ -506,10 +418,23 @@ export class OAuthController {
     };
   }
 
+  private isOAuthAccessToken(token: string): boolean {
+    try {
+      const payloadPart = token.split(".")[1] ?? "";
+      const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString()) as {
+        token_type?: string;
+      };
+      return payload.token_type === "access_token";
+    } catch {
+      return false;
+    }
+  }
+
   // ============================================================
   // REVOKE ENDPOINT
   // ============================================================
 
+  @RawResponse()
   @Post("revoke")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -550,6 +475,7 @@ export class OAuthController {
   // INTROSPECT ENDPOINT
   // ============================================================
 
+  @RawResponse()
   @Post("introspect")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -579,6 +505,7 @@ export class OAuthController {
   // DISCOVERY ENDPOINTS
   // ============================================================
 
+  @RawResponse()
   @Get(".well-known/openid-configuration")
   @ApiOperation({
     summary: "OpenID Connect Discovery",
@@ -593,6 +520,7 @@ export class OAuthController {
     return buildOpenIdConfiguration(this.configService);
   }
 
+  @RawResponse()
   @Get("jwks")
   @ApiOperation({
     summary: "JSON Web Key Set",
@@ -693,7 +621,7 @@ export class OAuthController {
    * Only developers and admins can create OAuth clients
    */
   @Post("clients")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
@@ -715,8 +643,9 @@ export class OAuthController {
     const userId = (req.user as JwtUser).sub;
 
     const { client, clientSecret } = await this.clientService.createClient({
-      tenantId,
       ...dto,
+      // Must follow the spread: the request tenant can never be overridden by the body.
+      tenantId,
       createdBy: userId,
     });
 
@@ -731,7 +660,7 @@ export class OAuthController {
    * Requires: clients:read permission
    */
   @Get("clients")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_READ)
   @ApiBearerAuth()
   @ApiOperation({
@@ -759,7 +688,7 @@ export class OAuthController {
    * Requires: clients:read permission
    */
   @Get("clients/:clientId")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_READ)
   @ApiBearerAuth()
   @ApiOperation({
@@ -772,8 +701,8 @@ export class OAuthController {
     type: OAuthClientResponseDto,
   })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async getClient(@Param("clientId") clientId: string) {
-    return this.clientService.getClient(clientId);
+  async getClient(@Param("clientId") clientId: string, @Req() req: Request) {
+    return this.clientService.getClientForTenant(clientId, req.tenantId!);
   }
 
   /**
@@ -781,7 +710,7 @@ export class OAuthController {
    * Requires: clients:write permission
    */
   @Put("clients/:clientId")
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
@@ -796,8 +725,7 @@ export class OAuthController {
     @Body() dto: UpdateOAuthClientDto,
     @Req() req: Request,
   ) {
-    const tenantId = req.tenantId!;
-    // TODO: Implement updateClient in service
+    await this.clientService.updateClient(clientId, req.tenantId!, dto);
     return { message: "Client updated successfully" };
   }
 
@@ -807,7 +735,7 @@ export class OAuthController {
    */
   @Delete("clients/:clientId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_DELETE)
   @ApiBearerAuth()
   @ApiOperation({
@@ -817,8 +745,8 @@ export class OAuthController {
   @ApiResponse({ status: 204, description: "Client deleted" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
   @ApiResponse({ status: 404, description: "Client not found" })
-  async deleteClient(@Param("clientId") clientId: string) {
-    await this.clientService.deleteClient(clientId);
+  async deleteClient(@Param("clientId") clientId: string, @Req() req: Request) {
+    await this.clientService.deleteClient(clientId, req.tenantId!);
   }
 
   /**
@@ -827,7 +755,7 @@ export class OAuthController {
    */
   @Post("clients/:clientId/rotate-secret")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, SessionGuard, PermissionsGuard)
   @RequirePermissions(Permissions.CLIENTS_WRITE)
   @ApiBearerAuth()
   @ApiOperation({
@@ -836,11 +764,11 @@ export class OAuthController {
   })
   @ApiResponse({ status: 200, description: "Secret rotated" })
   @ApiResponse({ status: 403, description: "Forbidden - missing permissions" })
-  async rotateClientSecret(@Param("clientId") clientId: string) {
-    const newSecret = await this.clientService.rotateClientSecret(clientId);
+  async rotateClientSecret(@Param("clientId") clientId: string, @Req() req: Request) {
+    const { clientSecret } = await this.clientService.rotateClientSecret(clientId, req.tenantId!);
     return {
       message: "Client secret rotated successfully",
-      clientSecret: newSecret, // Only shown once!
+      clientSecret, // Only shown once!
     };
   }
 

@@ -25,6 +25,17 @@ import {
 } from '../types/policy.types';
 import { logger } from '@/common/logger';
 
+const SUPPORTED_CONDITION_OPERATORS: ReadonlySet<string> = new Set([
+  'IpAddress',
+  'Bool',
+  'DateGreaterThan',
+  'DateLessThan',
+  'StringEquals',
+]);
+
+const isValidDate = (value: unknown): boolean =>
+  (typeof value === 'string' || value instanceof Date) && !Number.isNaN(new Date(value).getTime());
+
 @Injectable()
 export class PolicyEvaluationService {
   constructor(
@@ -58,7 +69,7 @@ export class PolicyEvaluationService {
         if (!this.matchesAction(statement.Action, action)) continue;
         const substitutedResource = this.substituteResourceVars(statement.Resource, substitutionVars);
         if (!this.matchesResource(substitutedResource, resource)) continue;
-        if (!this.evaluateConditions(statement.Condition, context)) continue;
+        if (!this.statementConditionsApply(statement, context)) continue;
 
         if (statement.Effect === 'Deny') {
           deniedBy.push(`${policy.name}:${statement.Sid ?? 'unnamed'}`);
@@ -98,7 +109,7 @@ export class PolicyEvaluationService {
         const actionMatch = this.matchesAction(statement.Action, request.action);
         const substitutedResource = this.substituteResourceVars(statement.Resource, substitutionVars);
         const resourceMatch = this.matchesResource(substitutedResource, request.resource);
-        const conditionMatch = this.evaluateConditions(statement.Condition, request.context);
+        const conditionMatch = this.statementConditionsApply(statement, request.context);
 
         trace.push({
           policyName: policy.name,
@@ -143,11 +154,49 @@ export class PolicyEvaluationService {
     return new RegExp(`^${escaped}$`).test(value);
   }
 
+  /**
+   * Whether a statement's conditions let it apply. A malformed condition never
+   * matches (fail closed) -- except on a Deny statement, where "never applies"
+   * would silently lift the deny, so a malformed Deny condition applies.
+   */
+  private statementConditionsApply(
+    statement: PolicyStatement,
+    context: EvaluationContext,
+  ): boolean {
+    if (this.evaluateConditions(statement.Condition, context)) return true;
+    return statement.Effect === 'Deny' && this.isMalformedCondition(statement.Condition);
+  }
+
+  /**
+   * True when the condition block contains an unsupported operator or an
+   * operand we cannot interpret (unknown operators used to be ignored, which
+   * made the condition pass).
+   */
+  isMalformedCondition(condition: PolicyCondition | undefined): boolean {
+    if (!condition) return false;
+    if (typeof condition !== 'object' || Array.isArray(condition)) return true;
+    const block = condition as Record<string, unknown>;
+    if (Object.keys(block).some((op) => !SUPPORTED_CONDITION_OPERATORS.has(op))) return true;
+
+    if (condition.IpAddress) {
+      const ips: unknown = condition.IpAddress['sentry:SourceIp'];
+      const list = Array.isArray(ips) ? ips : [ips];
+      if (list.length === 0 || list.some((ip) => typeof ip !== 'string')) return true;
+    }
+    if (condition.Bool !== undefined) {
+      if (typeof condition.Bool['sentry:MultiFactorAuthPresent'] !== 'boolean') return true;
+    }
+    if (condition.DateGreaterThan && !isValidDate(condition.DateGreaterThan['sentry:CurrentTime'])) return true;
+    if (condition.DateLessThan && !isValidDate(condition.DateLessThan['sentry:CurrentTime'])) return true;
+    return false;
+  }
+
   evaluateConditions(
     condition: PolicyCondition | undefined,
     context: EvaluationContext,
   ): boolean {
     if (!condition) return true;
+    if (this.isMalformedCondition(condition)) return false;
 
     if (condition.IpAddress) {
       const allowedIps = condition.IpAddress['sentry:SourceIp'];
@@ -166,13 +215,13 @@ export class PolicyEvaluationService {
     if (condition.DateGreaterThan) {
       const threshold = new Date(condition.DateGreaterThan['sentry:CurrentTime']);
       const now = context.timestamp ? new Date(context.timestamp) : new Date();
-      if (now <= threshold) return false;
+      if (Number.isNaN(now.getTime()) || now <= threshold) return false;
     }
 
     if (condition.DateLessThan) {
       const threshold = new Date(condition.DateLessThan['sentry:CurrentTime']);
       const now = context.timestamp ? new Date(context.timestamp) : new Date();
-      if (now >= threshold) return false;
+      if (Number.isNaN(now.getTime()) || now >= threshold) return false;
     }
 
     if (condition.StringEquals) {
@@ -188,6 +237,7 @@ export class PolicyEvaluationService {
   }
 
   private matchesCidr(ip: string, cidr: string): boolean {
+    if (typeof ip !== 'string' || typeof cidr !== 'string') return false;
     if (!cidr.includes('/')) return ip === cidr;
 
     try {

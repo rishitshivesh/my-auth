@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+import { hashToken } from "@/common/security/token-hash";
 import { ApiException } from "../../common/http";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, IsNull, In, FindOptionsWhere } from "typeorm";
+import { Repository, MoreThan, IsNull, In, Not, FindOptionsWhere } from "typeorm";
 import {
   User,
   Tenant,
@@ -16,8 +17,9 @@ import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { logger } from "@/common/logger";
 import { UserRepository, OrgMembership } from "./user.repository";
-import { canManage } from "../rbac/role-hierarchy";
-import { assertPasswordPolicy } from "../auth/password-policy";
+import { canManage, maxPriority } from "../rbac/role-hierarchy";
+import { toCsvCell } from "@/common/security/csv-sanitize";
+import { assertTenantPasswordPolicy, TenantPasswordPolicyService } from "../password-policy/tenant-password-policy.service";
 import { hashPassword, verifyPassword } from "../auth/password-hashing";
 import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 
@@ -30,6 +32,15 @@ import { PasswordChangeEffectsService } from "@/common/service/password-change-e
  * - Session management
  * - Security event tracking
  */
+export interface PendingInvite {
+  id: string;
+  email: string;
+  roleIds: string[];
+  invitedBy: string | null;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
 @Injectable()
 export class UserService {
   constructor(
@@ -45,6 +56,7 @@ export class UserService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly passwordChangeEffects: PasswordChangeEffectsService,
+    @Optional() private readonly passwordPolicy?: TenantPasswordPolicyService,
   ) {}
 
   /**
@@ -115,6 +127,18 @@ export class UserService {
     return user;
   }
 
+  /** Admin edit of another user's profile: the actor must outrank the target. */
+  async adminUpdate(
+    tenantId: string,
+    userId: string,
+    actorId: string,
+    data: Parameters<UserService["update"]>[2],
+  ) {
+    await this.findById(tenantId, userId);
+    await this.assertOutranks(actorId, userId, tenantId);
+    return this.update(tenantId, userId, data);
+  }
+
   /**
    * Change password
    */
@@ -162,11 +186,12 @@ export class UserService {
     }
 
     // Validate new password strength
-    assertPasswordPolicy(newPassword, { email: user.email });
+    await assertTenantPasswordPolicy(this.passwordPolicy, user.tenantId, newPassword, { email: user.email });
 
-    // Check password history
+    // Check password history (depth is per tenant)
+    const historyCount = (await this.passwordPolicy?.get(user.tenantId))?.historyCount ?? 5;
     const passwordHistory = user.passwordHistory || [];
-    for (const oldHash of passwordHistory) {
+    for (const oldHash of passwordHistory.slice(0, historyCount)) {
       const isReused = await verifyPassword(oldHash, newPassword);
       if (isReused) {
         throw new ApiException("BAD_REQUEST", { detail: "Password has been used recently. Please choose a different password." });
@@ -180,7 +205,7 @@ export class UserService {
     const updatedHistory = [
       ...(user.passwordHash ? [user.passwordHash] : []),
       ...passwordHistory,
-    ].slice(0, 5);
+    ].slice(0, historyCount);
 
     await this.userRepository.update(userId, {
       passwordHash: newHash,
@@ -263,11 +288,20 @@ export class UserService {
   /**
    * Revoke all sessions for user
    */
-  async revokeAllSessions(tenantId: string, userId: string) {
+  async revokeAllSessions(
+    tenantId: string,
+    userId: string,
+    exceptSessionId?: string,
+  ) {
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     // Both layers must match for a query to succeed
     await this.sessionRepository.update(
-      { userId, revokedAt: IsNull(), tenantId },
+      {
+        userId,
+        revokedAt: IsNull(),
+        tenantId,
+        ...(exceptSessionId ? { id: Not(exceptSessionId) } : {}),
+      },
       {
         revokedAt: new Date(),
         revokedReason: "user_request",
@@ -453,7 +487,7 @@ export class UserService {
   async resetFailedAttempts(tenantId: string, userId: string) {
     await this.userRepository.update(userId, {
       failedLoginAttempts: 0,
-      lockedUntil: undefined,
+      lockedUntil: null, // null (not undefined) so TypeORM actually clears the column
     });
   }
 
@@ -465,7 +499,7 @@ export class UserService {
       lastLoginAt: new Date(),
       lastLoginIp: ip,
       failedLoginAttempts: 0,
-      lockedUntil: undefined,
+      lockedUntil: null, // null (not undefined) so TypeORM actually clears the column
     });
   }
 
@@ -693,6 +727,11 @@ export class UserService {
       throw new ApiException("BAD_REQUEST", { detail: "Some users not found or belong to different tenant" });
     }
 
+    // Every target must be strictly below the acting admin (same rule as the single-user endpoints).
+    for (const user of users) {
+      await this.assertOutranks(adminUserId, user.id, tenantId);
+    }
+
     // Update all users
     const result = await this.userRepository.update(
       {
@@ -879,6 +918,19 @@ export class UserService {
       throw new ApiException("RESOURCE_CONFLICT", { detail: "An active invitation already exists for this email" });
     }
 
+    // Privilege-escalation guard: an inviter may only grant roles strictly below
+    // their own tier, and only roles that belong to this tenant (ASVS 4.1.3).
+    if (data.roleIds && data.roleIds.length > 0) {
+      const priorities = await this.userRepository.getRolePriorities(tenantId, data.roleIds);
+      if (!priorities) {
+        throw new ApiException("BAD_REQUEST", { detail: "Unknown role in roleIds" });
+      }
+      const actor = await this.userRepository.getMaxRolePriority(invitedBy, tenantId);
+      if (!canManage(actor, maxPriority(priorities))) {
+        throw new ApiException("HIERARCHY_VIOLATION");
+      }
+    }
+
     const inviter = await this.userRepository.findOne({ where: { id: invitedBy, tenantId } });
     const inviterFullName = `${inviter?.firstName ?? ''} ${inviter?.lastName ?? ''}`.trim();
     const inviterName = inviter
@@ -892,7 +944,7 @@ export class UserService {
     const invite = this.userInviteRepository.create({
       tenantId,
       email: data.email,
-      token,
+      token: hashToken(token), // raw token only travels in the emailed link
       roleIds: data.roleIds ?? [],
       invitedBy,
       expiresAt,
@@ -912,6 +964,53 @@ export class UserService {
     });
 
     return { message: "Invitation sent" };
+  }
+
+  /** Pending (unaccepted, unexpired) invitations. Never exposes the (hashed) token. */
+  async listPendingInvites(tenantId: string): Promise<PendingInvite[]> {
+    const invites = await this.userInviteRepository.find({
+      where: { tenantId, acceptedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+      order: { createdAt: "DESC" },
+    });
+    return invites.map((i) => ({
+      id: i.id,
+      email: i.email,
+      roleIds: i.roleIds,
+      invitedBy: i.invitedBy ?? null,
+      expiresAt: i.expiresAt,
+      createdAt: i.createdAt,
+    }));
+  }
+
+  /**
+   * Revokes a pending invitation. The row (which holds the token hash) is deleted, so the
+   * emailed link can no longer be accepted. Tenant-scoped; accepted invites cannot be revoked.
+   */
+  async revokeInvite(
+    tenantId: string,
+    inviteId: string,
+    actor: { userId: string; email?: string; ip?: string; userAgent?: string; requestId?: string },
+  ): Promise<void> {
+    const invite = await this.userInviteRepository.findOne({ where: { id: inviteId, tenantId } });
+    if (!invite) throw new ApiException("RESOURCE_NOT_FOUND");
+    if (invite.acceptedAt) {
+      throw new ApiException("RESOURCE_CONFLICT", { detail: "This invitation was already accepted" });
+    }
+    await this.userInviteRepository.delete({ id: inviteId, tenantId });
+
+    this.securityEventService.log({
+      tenantId,
+      userId: actor.userId,
+      actorEmail: actor.email,
+      eventType: SecurityEventType.USER_INVITE_REVOKED,
+      severity: "info",
+      ipAddress: actor.ip ?? "0.0.0.0",
+      userAgent: actor.userAgent ?? "unknown",
+      requestId: actor.requestId,
+      resourceId: inviteId,
+      resourceType: "user_invite",
+      metadata: { inviteeEmail: invite.email },
+    });
   }
 
   async exportUsers(
@@ -953,7 +1052,7 @@ export class UserService {
     const csv = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+        row.map(toCsvCell).join(","),
       ),
     ].join("\n");
 

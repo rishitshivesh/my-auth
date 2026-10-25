@@ -14,6 +14,13 @@ import * as crypto from "crypto";
  * - Compliance: GDPR, SOC2, ISO 27001 require encryption at rest
  * - Best practice: Never store sensitive tokens in plaintext
  */
+const IV_BYTES = 16;
+const AUTH_TAG_BYTES = 16;
+/** Envelope prefix for stored secrets: `enc:<keyId>:<iv>:<authTag>:<ciphertext>`. */
+export const SECRET_ENVELOPE_KEY_ID = "v1";
+export const SECRET_ENVELOPE_PREFIX = `enc:${SECRET_ENVELOPE_KEY_ID}:`;
+const HEX_PATTERN = /^(?:[0-9a-fA-F]{2})*$/;
+
 @Injectable()
 export class TokenEncryptionService {
   private readonly logger = new Logger(TokenEncryptionService.name);
@@ -56,10 +63,10 @@ export class TokenEncryptionService {
 
     try {
       // Generate random IV (initialization vector)
-      const iv = crypto.randomBytes(16);
+      const iv = crypto.randomBytes(IV_BYTES);
 
       // Create cipher
-      const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
+      const cipher = crypto.createCipheriv(this.algorithm, this.key, iv, { authTagLength: AUTH_TAG_BYTES });
 
       // Encrypt
       let encrypted = cipher.update(plaintext, "utf8", "hex");
@@ -104,12 +111,21 @@ export class TokenEncryptionService {
 
       const [ivHex, authTagHex, encrypted] = parts;
 
-      // Convert from hex
+      // Strict hex validation: Buffer.from silently drops malformed input.
+      if (!HEX_PATTERN.test(ivHex!) || !HEX_PATTERN.test(authTagHex!) || !HEX_PATTERN.test(encrypted!)) {
+        throw new Error("Invalid encrypted data format");
+      }
       const iv = Buffer.from(ivHex!, "hex");
       const authTag = Buffer.from(authTagHex!, "hex");
 
+      // Fail closed on truncated tags: GCM would otherwise accept short tags,
+      // weakening forgery resistance.
+      if (iv.length !== IV_BYTES || authTag.length !== AUTH_TAG_BYTES) {
+        throw new Error("Invalid IV or authentication tag length");
+      }
+
       // Create decipher
-      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv, { authTagLength: AUTH_TAG_BYTES });
       decipher.setAuthTag(authTag);
 
       // Decrypt
@@ -125,6 +141,25 @@ export class TokenEncryptionService {
       });
       throw new Error("Token decryption failed");
     }
+  }
+
+  /** True when the stored value is already an encrypted secret envelope. */
+  isSecretEnvelope(value: string | null | undefined): boolean {
+    return typeof value === "string" && value.startsWith("enc:");
+  }
+
+  /** Encrypt a configuration secret for storage. Idempotent for values already enveloped. */
+  encryptSecret(plaintext: string): string {
+    if (this.isSecretEnvelope(plaintext)) return plaintext;
+    return `${SECRET_ENVELOPE_PREFIX}${this.encrypt(plaintext)}`;
+  }
+
+  /** Decrypt a stored secret. Only the current key id is known; unknown ids fail closed. */
+  decryptSecret(stored: string): string {
+    if (!stored.startsWith(SECRET_ENVELOPE_PREFIX)) {
+      throw new Error("Stored secret is not encrypted with a supported key id");
+    }
+    return this.decrypt(stored.slice(SECRET_ENVELOPE_PREFIX.length));
   }
 
   /**

@@ -6,7 +6,7 @@
  * POST /tenants/current/branding/logo   – upload logo (multipart/form-data)
  */
 
-import { Controller, Get, Put, Post, Body, Param, Req, UnsupportedMediaTypeException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, Param, Req, UnsupportedMediaTypeException, UseInterceptors, UseGuards, UploadedFile } from '@nestjs/common';
 import { ApiException } from '../../common/http';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TenantBrandingService } from './tenant-branding.service';
@@ -18,6 +18,9 @@ import {
 } from './dto/tenant-branding.dto';
 import { SecurityEventService } from '@/common/service/security-event.service';
 import { SecurityEventType } from '@repo/database';
+import { PermissionsGuard } from '@/modules/rbac/guards/permissions.guard';
+import { RequirePermissions } from '@/modules/rbac/decorators/rbac.decorator';
+import { Permissions } from '@/modules/rbac/constants/permissions.catalog';
 
 interface AuthenticatedRequest {
   tenantId: string;
@@ -48,6 +51,8 @@ export class TenantBrandingController {
 
   /** PUT /tenants/current/branding */
   @Put()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   async updateBranding(
     @Req() req: AuthenticatedRequest,
     @Body() dto: TenantBrandingDto,
@@ -80,6 +85,8 @@ export class TenantBrandingController {
 
   /** POST /tenants/current/branding/logo */
   @Post('logo')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permissions.TENANT_WRITE)
   @UseInterceptors(
     FileInterceptor('logo', {
       limits: { fileSize: LOGO_MAX_BYTES },

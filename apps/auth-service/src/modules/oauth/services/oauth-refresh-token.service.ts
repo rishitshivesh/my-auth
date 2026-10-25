@@ -223,12 +223,25 @@ export class OAuthRefreshTokenService {
     // ROTATION
     // ============================================================
 
-    // Mark current token as USED
+    // Mark current token as USED atomically. The guard on used_at means that of N
+    // concurrent rotations of the same token exactly one updates a row; the rest
+    // are replays and are handled as reuse.
     const usedAt = new Date();
-    await this.refreshTokenRepository.manager.query(
-      `UPDATE "${schemaName}"."oauth_refresh_tokens" SET used_at = $1 WHERE id = $2`,
-      [usedAt, storedToken.id]
+    const markResult = await this.refreshTokenRepository.manager.query(
+      `UPDATE "${schemaName}"."oauth_refresh_tokens" SET used_at = $1
+       WHERE id = $2 AND tenant_id = $3 AND used_at IS NULL`,
+      [usedAt, storedToken.id, tenantId]
     );
+    const affectedRows: unknown = Array.isArray(markResult) ? markResult[1] : 0;
+    if (affectedRows !== 1) {
+      this.logger.error("REFRESH TOKEN REUSE DETECTED (concurrent rotation)", {
+        tokenId: storedToken.id,
+        userId: storedToken.userId,
+        familyId: storedToken.familyId,
+      });
+      await this.revokeTokenFamily(storedToken.familyId, tenantId);
+      throw new ApiException("AUTH_REFRESH_REUSED");
+    }
 
     this.logger.debug("Marked refresh token as used", {
       tokenId: storedToken.id,

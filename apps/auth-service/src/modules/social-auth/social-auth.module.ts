@@ -23,6 +23,7 @@ import { SecurityEventModule } from "@/common/service/security-event.module";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { OAuthModule } from "@/modules/oauth/oauth.module";
 import { MfaModule } from "@/modules/mfa/mfa.module";
+import { TenantModule } from "@/modules/tenant/tenant.module";
 
 import { EmailModule } from "../email/email.module";
 
@@ -40,6 +41,7 @@ import { EmailModule } from "../email/email.module";
     SecurityEventModule,
     OAuthModule,
     MfaModule,
+    TenantModule,
     EmailModule,
     JwtModule.register({}),
   ],

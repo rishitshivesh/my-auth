@@ -48,7 +48,9 @@ export class TenantResolverMiddleware implements NestMiddleware {
       const tenant = await this.resolveTenant(req);
 
       if (!tenant) {
-        if (this.isPublicEndpoint(req.path)) {
+        // Nest mounts this middleware per route, so req.path can be "/" here;
+        // the full request path lives in originalUrl.
+        if (this.isPublicEndpoint((req.originalUrl ?? req.path).split("?")[0] ?? req.path)) {
           return next();
         }
 
@@ -106,7 +108,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
       if (tenantIdHeader) {
         // Accept UUID or slug
         const tenant =
-          (await this.tenantService.findById(tenantIdHeader)) ??
+          (await this.tenantService.findById(tenantIdHeader).catch(() => null)) ??
           (await this.tenantService.findBySlug(tenantIdHeader));
         if (tenant) return tenant;
       }

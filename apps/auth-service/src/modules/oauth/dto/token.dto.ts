@@ -12,8 +12,8 @@ export class TokenRequestDto {
     example: "authorization_code",
   })
   @IsString()
-  @IsIn(["authorization_code", "refresh_token", "client_credentials"])
-  grant_type!: string;
+  @IsOptional()
+  grant_type?: string;
 
   @ApiPropertyOptional({
     description: "Authorization code (for authorization_code grant)",
@@ -44,8 +44,8 @@ export class TokenRequestDto {
     example: "client_abc123",
   })
   @IsString()
-  @IsNotEmpty()
-  client_id!: string;
+  @IsOptional()
+  client_id?: string;
 
   @ApiPropertyOptional({
     description: "OAuth2 client secret (for confidential clients)",

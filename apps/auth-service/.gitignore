@@ -7,3 +7,5 @@ src/**/*.js
 src/**/*.js.map
 src/**/*.d.ts
 src/**/*.d.ts.map
+.e2e-uploads/
+.e2e-setup-log/

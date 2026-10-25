@@ -400,7 +400,9 @@ export class WebAuthnService {
     const oldCounter = credential.counter;
 
     // Atomic counter update — prevents replay attacks
-    const result = await this.dataSource
+    // Through the repository so the update runs on the tenant-scoped connection
+    // (the bare DataSource would hit the public schema).
+    const result = await this.credentialRepository
       .createQueryBuilder()
       .update(WebAuthnCredential)
       .set({ counter: newCounter, lastUsedAt: new Date() })
@@ -436,7 +438,7 @@ export class WebAuthnService {
     ctx: MfaRequestContext,
   ): Promise<void> {
     const { userId, tenantId, credentialId } = credential;
-    await this.credentialRepository.remove(credential);
+    await this.credentialRepository.delete({ id: credential.id });
 
     const remaining = await this.credentialRepository.count({
       where: { userId, tenantId },
@@ -524,7 +526,7 @@ export class WebAuthnService {
       throw new ApiException("RESOURCE_NOT_FOUND", { detail: "Passkey not found" });
     }
 
-    await this.credentialRepository.remove(credential);
+    await this.credentialRepository.delete({ id: credential.id });
 
     // Disable webauthn flag if no credentials remain
     const remaining = await this.credentialRepository.count({

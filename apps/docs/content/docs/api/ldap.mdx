@@ -1,0 +1,17 @@
+---
+title: LDAP
+description: Directory connections and sync behaviour.
+---
+
+# LDAP
+
+Manage connections under `/ldap/connections`; `POST /ldap/connections/{id}/sync` runs a sync.
+
+## Sync behaviour
+
+- New directory entries (valid `mail`) are created as verified, active users and tagged with the connection that provisioned them. Existing users with the same email are updated but **not** tagged.
+- Users provisioned by this connection that are missing from the directory are **deactivated, never deleted**. Their sessions and refresh tokens are revoked and a `ldap.user_deactivated` audit event is written.
+- A deactivated user who reappears is reactivated (`ldap.user_reactivated`). Users disabled manually by an admin are not re-enabled.
+- Safety valve: if more than `LDAP_MAX_DEACTIVATE_PERCENT` (default 20) of the connection's active provisioned users would be deactivated (e.g. a broken filter or empty directory), the sync aborts before changing anything, sets `lastSyncStatus` to `aborted`, writes `ldap.sync_aborted` and returns `aborted: true` with an explanation in `errors`.
+
+Result: `{ usersCreated, usersUpdated, usersDeactivated, usersReactivated, aborted, errors }`.

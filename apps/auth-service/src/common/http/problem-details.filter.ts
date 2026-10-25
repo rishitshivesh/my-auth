@@ -40,6 +40,13 @@ function statusOf(exception: unknown): number | null {
   return null;
 }
 
+/** Postgres 22P02: a malformed uuid in a path/query id cannot match any row. */
+function isInvalidIdentifier(exception: unknown): boolean {
+  if (typeof exception !== "object" || exception === null) return false;
+  const driver = (exception as { driverError?: { code?: unknown } }).driverError;
+  return driver?.code === "22P02";
+}
+
 /** Pure: maps anything thrown to a problem document; unexpected errors never leak their message. */
 export function toProblemDetails(
   exception: unknown,
@@ -48,7 +55,9 @@ export function toProblemDetails(
   const code: ErrorCode =
     exception instanceof ApiException
       ? exception.code
-      : codeForStatus(statusOf(exception) ?? 500);
+      : isInvalidIdentifier(exception)
+        ? "RESOURCE_NOT_FOUND"
+        : codeForStatus(statusOf(exception) ?? 500);
 
   const problem: ProblemDetails = {
     type: `${PROBLEM_TYPE_PREFIX}${code}`,

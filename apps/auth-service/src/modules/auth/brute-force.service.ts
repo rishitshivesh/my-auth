@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { ApiException } from "@/common/http";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Repository } from "typeorm";
@@ -6,18 +6,27 @@ import { User, SecurityEventType } from "@repo/database";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { logger } from "@/common/logger";
 import { EmailService } from "@/modules/email/email.service";
+import { PLATFORM_PASSWORD_POLICY, TenantPasswordPolicyService } from "@/modules/password-policy/tenant-password-policy.service";
 
 @Injectable()
 export class BruteForceService {
-  private readonly MAX_ATTEMPTS = 5;
-  private readonly LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in ms
+  /** Platform defaults; a tenant's password policy may override them (see lockoutFor). */
+  private readonly MAX_ATTEMPTS = PLATFORM_PASSWORD_POLICY.lockoutThreshold;
+  private readonly LOCKOUT_DURATION = PLATFORM_PASSWORD_POLICY.lockoutDurationMinutes * 60 * 1000;
 
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private readonly securityEventService: SecurityEventService,
     private readonly emailService: EmailService,
+    @Optional() private readonly passwordPolicy?: TenantPasswordPolicyService,
   ) {}
+
+  private async lockoutFor(tenantId: string): Promise<{ maxAttempts: number; durationMs: number }> {
+    if (!this.passwordPolicy) return { maxAttempts: this.MAX_ATTEMPTS, durationMs: this.LOCKOUT_DURATION };
+    const policy = await this.passwordPolicy.get(tenantId);
+    return { maxAttempts: policy.lockoutThreshold, durationMs: policy.lockoutDurationMinutes * 60 * 1000 };
+  }
 
   /**
    * Check if account is currently locked.
@@ -68,14 +77,15 @@ export class BruteForceService {
     tenantId: string,
     ipAddress?: string,
   ): Promise<void> {
+    const { maxAttempts, durationMs } = await this.lockoutFor(tenantId);
     user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
     user.lastFailedLogin = new Date();
 
-    logger.warn({ userId: user.id, attempts: user.failedLoginAttempts, maxAttempts: this.MAX_ATTEMPTS }, "Failed login attempt");
+    logger.warn({ userId: user.id, attempts: user.failedLoginAttempts, maxAttempts: maxAttempts }, "Failed login attempt");
 
     // Emit brute-force threshold event when approaching the lockout limit
     // (fires one attempt before the final lock so analysts see the build-up)
-    if (user.failedLoginAttempts === this.MAX_ATTEMPTS - 1) {
+    if (user.failedLoginAttempts === maxAttempts - 1) {
       this.securityEventService.log({
         userId: user.id,
         tenantId,
@@ -86,15 +96,15 @@ export class BruteForceService {
         userAgent: "system",
         metadata: {
           attempts: user.failedLoginAttempts,
-          maxAttempts: this.MAX_ATTEMPTS,
+          maxAttempts: maxAttempts,
           attemptsUntilLock: 1,
         },
       });
     }
 
     // Lock account after max attempts
-    if (user.failedLoginAttempts >= this.MAX_ATTEMPTS) {
-      user.lockedUntil = new Date(Date.now() + this.LOCKOUT_DURATION);
+    if (user.failedLoginAttempts >= maxAttempts) {
+      user.lockedUntil = new Date(Date.now() + durationMs);
       await this.userRepository.save(user);
 
       logger.warn({ userId: user.id, lockedUntil: user.lockedUntil }, "Account locked due to too many failed attempts");
@@ -116,7 +126,7 @@ export class BruteForceService {
       // Queued, never throws: a mail outage must not change the lockout response.
       await this.emailService.sendAccountLockedEmail(
         user,
-        this.LOCKOUT_DURATION / 60000,
+        durationMs / 60000,
         { ipAddress },
       );
 

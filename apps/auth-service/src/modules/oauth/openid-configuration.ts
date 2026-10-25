@@ -28,6 +28,7 @@ export function buildOpenIdConfiguration(
     jwks_uri: `${baseUrl}/.well-known/jwks.json`,
     revocation_endpoint: `${baseUrl}/oauth/revoke`,
     introspection_endpoint: `${baseUrl}/oauth/introspect`,
+    end_session_endpoint: `${baseUrl}/oauth/end_session`,
     response_types_supported: ["code"],
     grant_types_supported: [
       "authorization_code",
@@ -50,6 +51,8 @@ export function buildOpenIdConfiguration(
       "none",
     ],
     code_challenge_methods_supported: ["S256"],
+    prompt_values_supported: ["none", "login", "consent"],
+    claim_types_supported: ["normal"],
     claims_supported: [
       "sub",
       "email",
@@ -58,6 +61,10 @@ export function buildOpenIdConfiguration(
       "given_name",
       "family_name",
       "picture",
+      "sid",
+      "auth_time",
+      "acr",
+      "amr",
     ],
   };
 }

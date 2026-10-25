@@ -7,6 +7,7 @@ import {
   IsObject,
   ValidateNested,
   IsIn,
+  IsDefined,
   ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -53,9 +54,11 @@ export class PolicyStatementDto {
   Principal?: string | string[] | '*';
 
   @ApiProperty({ example: ['users:read'] })
+  @IsDefined()
   Action!: string | string[];
 
   @ApiProperty({ example: ['sentry:tenant:*/user:*'] })
+  @IsDefined()
   Resource!: string | string[];
 
   @ApiPropertyOptional()

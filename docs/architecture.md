@@ -48,6 +48,10 @@ maintained by migrations.
    `DataSource` proxy in `DatabaseModule` makes every repository use that QueryRunner.
 2. *Row:* tenant tables keep `tenant_id`, and queries keep `WHERE tenant_id = …`.
 
+Tenant-schema tables have **no foreign key to `public.tenants`** (ADR-0005): with hundreds of
+schemas those constraints made `DELETE FROM tenants` exhaust shared lock memory. Deleting a
+tenant drops its schema explicitly (`TenantSchemaService.dropSchema`) and then removes the row.
+
 `TenantBindingGuard` additionally rejects a token whose tenant differs from the request's tenant.
 
 Routes that run without a tenant: `/health*`, `/.well-known/*`, `/superadmin/*`,
@@ -73,6 +77,14 @@ Routes that run without a tenant: `/health*`, `/.well-known/*`, `/superadmin/*`,
 | Refresh token | 256-bit opaque, SHA-256 hashed at rest | 30 days, rotated on use | `refreshToken` httpOnly cookie; `oauth_refresh_tokens` |
 | Session | row in `fk_*.sessions` + Redis cache | `SESSION_TTL` (7 days) | Redis first, Postgres fallback |
 | MFA enrollment token | HS256 JWT (`JWT_SECRET`) | 5 min | `mfa_enrollment_token` cookie, path `/mfa/enroll` |
+
+A session also records the authentication methods its login completed with (`sessions.amr`,
+OIDC `amr`); the access token carries `amr` and `authTime`, refresh keeps both, and
+`/oauth/authorize` puts them in the code and ID token.
+
+Per-tenant password and lockout settings live in `tenant_password_policy` (`GET/PUT
+/tenants/current/password-policy`); defaults apply until a tenant sets them, and the length floor
+is the platform minimum of 12.
 
 Refresh tokens are grouped in **families**. Presenting an already-used token revokes the whole
 family (stolen-token detection). Logout and password reset revoke the session in Postgres

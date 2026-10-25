@@ -21,6 +21,7 @@ OIDC discovery document. No auth required.
   "authorization_endpoint": "https://sentry.scrolloop.com/oauth/authorize",
   "token_endpoint": "https://sentry.scrolloop.com/oauth/token",
   "userinfo_endpoint": "https://sentry.scrolloop.com/oauth/userinfo",
+  "end_session_endpoint": "https://sentry.scrolloop.com/oauth/end_session",
   "jwks_uri": "https://sentry.scrolloop.com/.well-known/jwks.json",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
@@ -76,6 +77,48 @@ Generate a code verifier and challenge:
 const verifier = crypto.randomBytes(32).toString('base64url');
 const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
 ```
+
+Optional parameters: `nonce`, `prompt`, `max_age`.
+
+| Situation | Result |
+|---|---|
+| Invalid `client_id`, `redirect_uri`, scope or PKCE | `400` JSON `invalid_request` (never redirected) |
+| No valid session cookie | `302` to `{FRONTEND_URL}/u/login?tenant={slug}&continue=/oauth/authorize?...` |
+| Consent required | `302` to `{FRONTEND_URL}/u/consent?transaction_id=...` |
+| Otherwise | `302` to `redirect_uri?code=...&state=...` |
+
+The user is resolved from the access-token session cookie, bound to the request tenant.
+`continue` is always a same-origin relative `/oauth/authorize` URL rebuilt from validated
+parameters; the login UI must refuse any other value.
+
+- `prompt=none`: never shows UI; returns `error=login_required` or `error=consent_required` to the `redirect_uri`. Must be used alone.
+- `prompt=login`: forces re-authentication (the `continue` URL carries an internal `auth_after` marker).
+- `prompt=consent`: always shows the consent screen.
+- `max_age`: a session whose login is older than this many seconds re-authenticates.
+- First-party clients, and clients with an unexpired consent covering the scopes, skip consent.
+
+The code is bound to the client, `redirect_uri`, PKCE challenge, nonce, user, tenant, session id,
+`auth_time` and `amr`. The ID token carries `sid`, `auth_time`, `amr` and `acr`
+(`1` single factor, `2` with MFA). `amr` and `auth_time` come from the login that created the session and are stored on it, so they
+survive token refresh: password `["pwd"]`, password + TOTP `["pwd","otp","totp","mfa"]`, password +
+backup code `["pwd","backup_code","mfa"]`, passkey `["hwk","webauthn"]`, magic link `["magic_link"]`,
+social sign-in `["social"]`. Sessions created before this was recorded report `["pwd"]`.
+
+### Consent
+
+`GET /oauth/consent/{transaction_id}` (session cookie) returns the client, scopes and a `csrf_token`.
+`POST /oauth/consent` with `{ "transaction_id", "csrf_token", "decision": "allow"|"deny", "remember"? }`
+returns `{ "redirect_to": "..." }` (code on allow, `access_denied` on deny). The transaction is
+single-use, expires after 10 minutes and is bound to the user's session.
+
+### GET|POST /oauth/end_session
+
+OIDC RP-Initiated Logout. Parameters: `id_token_hint`, `post_logout_redirect_uri`, `state`, `client_id`.
+
+- `id_token_hint` must be an ID token we issued (expiry ignored). Its session and the OAuth tokens
+  issued from it are revoked, auth cookies are cleared and the audit log records a logout.
+- `post_logout_redirect_uri` must exactly match a URI registered on the client (and requires a hint), otherwise `400`.
+- Without a hint nothing is ended; the browser is sent to `{FRONTEND_URL}/u/logout` to confirm.
 
 ### POST /oauth/token (authorization code)
 

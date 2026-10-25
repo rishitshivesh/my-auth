@@ -87,7 +87,7 @@ export class PolicyService {
       throw new ApiException("BAD_REQUEST", { detail: 'Cannot delete system policy' });
     }
 
-    await this.policyRepo.remove(policy);
+    await this.policyRepo.delete({ id: policy.id });
     await this.cacheService.invalidateTenant(tenantId);
     logger.info({ policyId: id }, 'Policy deleted');
   }
@@ -115,7 +115,7 @@ export class PolicyService {
       throw new ApiException("RESOURCE_NOT_FOUND");
     }
 
-    await this.rolePolicyRepo.remove(rp);
+    await this.rolePolicyRepo.delete({ id: rp.id });
     await this.cacheService.invalidateTenant(tenantId);
     logger.info({ roleId, policyId }, 'Policy detached from role');
   }
@@ -129,7 +129,7 @@ export class PolicyService {
   }
 
   private validateDocument(doc: { Version: string; Statement: Array<{ Effect: string; Action: string | string[]; Resource: string | string[] }> }): void {
-    if (!doc.Version || !doc.Statement || !Array.isArray(doc.Statement)) {
+    if (!doc || typeof doc !== 'object' || !doc.Version || !doc.Statement || !Array.isArray(doc.Statement)) {
       throw new ApiException("BAD_REQUEST", { detail: 'Invalid policy document: Version and Statement[] required' });
     }
 
@@ -138,6 +138,9 @@ export class PolicyService {
     }
 
     for (const stmt of doc.Statement) {
+      if (!stmt || typeof stmt !== 'object' || Array.isArray(stmt)) {
+        throw new ApiException("BAD_REQUEST", { detail: 'Each statement must be an object' });
+      }
       if (!['Allow', 'Deny'].includes(stmt.Effect)) {
         throw new ApiException("BAD_REQUEST", { detail: `Invalid Effect: "${stmt.Effect}". Must be "Allow" or "Deny"` });
       }

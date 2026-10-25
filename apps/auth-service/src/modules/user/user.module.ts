@@ -23,8 +23,11 @@ import { EmailModule } from "@/modules/email/email.module";
 import { SessionModule } from "@/modules/session/session.module";
 import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 
+import { PasswordPolicyModule } from "@/modules/password-policy/password-policy.module";
+
 @Module({
   imports: [
+    PasswordPolicyModule,
     TypeOrmModule.forFeature([
       User,
       Tenant,

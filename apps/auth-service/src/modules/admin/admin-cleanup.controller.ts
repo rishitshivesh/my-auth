@@ -9,12 +9,15 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import { TokenCleanupService } from "../auth/token-cleanup.service";
-import { Protected } from "@/common/decorators/protected.decorator";
+import { SuperAdminGuard } from "@/common/guards/super-admin.guard";
+import { JwtAuthGuard } from "@/common/guards";
+import { TenantBindingGuard } from "@/common/guards/tenant-binding.guard";
+import { SessionGuard } from "@/common/guards/session.guard";
 import { RequireRoles } from "@/common/decorators/permission.decorator";
 
 @ApiTags("Admin - Token Cleanup")
 @Controller("admin/cleanup")
-@Protected()
+@UseGuards(JwtAuthGuard, TenantBindingGuard, SessionGuard, SuperAdminGuard)
 @RequireRoles("admin", "superadmin")
 export class AdminCleanupController {
   constructor(private readonly tokenCleanupService: TokenCleanupService) {}

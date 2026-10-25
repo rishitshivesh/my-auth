@@ -1,4 +1,5 @@
 import * as argon2 from "argon2";
+import { randomInt } from "crypto";
 
 /**
  * Password hashing service using Argon2id (OWASP recommended)
@@ -171,20 +172,22 @@ export class PasswordService {
     let password = "";
 
     // Ensure at least one of each character type
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += special[Math.floor(Math.random() * special.length)];
+    password += uppercase[randomInt(uppercase.length)];
+    password += lowercase[randomInt(lowercase.length)];
+    password += numbers[randomInt(numbers.length)];
+    password += special[randomInt(special.length)];
 
     // Fill the rest randomly
     for (let i = password.length; i < length; i++) {
-      password += all[Math.floor(Math.random() * all.length)];
+      password += all[randomInt(all.length)];
     }
 
     // Shuffle the password
-    return password
-      .split("")
-      .sort(() => Math.random() - 0.5)
-      .join("");
+    const chars = password.split("");
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+    }
+    return chars.join("");
   }
 }

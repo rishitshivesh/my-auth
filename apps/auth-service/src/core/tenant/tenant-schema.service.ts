@@ -35,6 +35,18 @@ export class TenantSchemaService {
     return ready;
   }
 
+  /**
+   * Drops a tenant's schema and everything in it. The identifier comes from getSchemaName()
+   * (restricted to [a-z0-9_]); it is never built from request input. Tenant-schema tables hold
+   * no FK to public.tenants (ADR 0005), so this takes only the schema's own locks.
+   */
+  async dropSchema(tenantSlug: string): Promise<void> {
+    const schemaName = this.getSchemaName(tenantSlug);
+    await this.dataSource.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
+    this.verifiedSchemas.delete(schemaName);
+    logger.info({ schemaName, tenantSlug }, "Tenant schema dropped");
+  }
+
   /** Call after creating a schema so subsequent requests skip the DB check. */
   markVerified(tenantSlug: string): void {
     this.verifiedSchemas.add(this.getSchemaName(tenantSlug));
@@ -96,6 +108,7 @@ export class TenantSchemaService {
         "scim_tokens",
         "ldap_connections",
         "tenant_mfa_policy",
+        "tenant_password_policy",
       ];
 
       for (const table of tables) {
@@ -170,6 +183,9 @@ export class TenantSchemaService {
 
     for (const fk of fkeys) {
       if (existingNames.has(fk.constraint_name)) continue;
+      // Never recreate FKs that point outside the tenant schema (e.g. public.tenants): they
+      // multiply cross-schema locking and break tenant deletion at scale (ADR 0005).
+      if (fk.foreign_table_schema !== "template") continue;
 
       const targetSchema =
         fk.foreign_table_schema === "template" ? schemaName : fk.foreign_table_schema;
