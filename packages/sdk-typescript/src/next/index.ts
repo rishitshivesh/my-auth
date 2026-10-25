@@ -43,10 +43,10 @@ export function createServerClient(
       credentials: 'include',
     });
 
-    let data: any;
+    let data: unknown;
     const contentType = response.headers.get('content-type');
 
-    if (contentType?.includes('application/json')) {
+    if (contentType?.includes('json')) {
       data = await response.json();
     } else {
       data = await response.text();

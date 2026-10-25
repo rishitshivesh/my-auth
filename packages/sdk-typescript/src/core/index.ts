@@ -30,8 +30,11 @@ export type {
   AuthEvent,
   AuthEventListener,
   AuthErrorCode,
+  LoginIntentResponse,
 } from './types';
 
 export { AuthError } from './types';
+export * from './api-types';
+export * from './modules';
 export { SentryApiError, isSentryApiError } from './errors';
 export type { ApiErrorInit } from './errors';

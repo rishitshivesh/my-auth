@@ -1,95 +1,129 @@
 ---
 title: TypeScript SDK
-description: Browser-compatible SDK for vanilla TypeScript and JavaScript applications.
+description: Typed client for every auth-service flow a client application needs, including the admin portal.
 ---
 
 # TypeScript SDK
 
 Package: `@scrolloop/sdk`
 
-## Installation
+The SDK is the only way client applications (the admin portal included) talk to the auth service.
+It is a session runtime plus small typed feature modules. The access token is an httpOnly cookie
+(ADR-0003); the SDK never reads or stores it, it only tracks whether a session is live and the
+non-secret session claims (`tenantId`, `tenantSlug`, `groups`).
 
-```bash
-npm install @scrolloop/sdk
-# or
-yarn add @scrolloop/sdk
-```
+## Create a client per tenant
 
-## Setup
+There is no singleton. The portal serves tenants on subdomains, so build one client per tenant:
 
 ```ts
-import { ScrolloopSentry } from '@scrolloop/sdk';
+import { SentryClient, createWebClient, getTenantFromSubdomain } from "@scrolloop/sdk";
 
-const sentry = new ScrolloopSentry({
-  domain: 'acme.sentry.scrolloop.com',
-  clientId: 'your-oauth-client-id',
+const client = createWebClient({
+  baseURL: "https://api.sentry.scrolloop.com",
+  tenant: getTenantFromSubdomain() ?? "acme",
 });
+await client.waitForInit(); // restores the session from the refresh cookie
 ```
 
-## Authentication
+## Modules
+
+| Property | Covers |
+|---|---|
+| `client.signIn` | `login`, `loginIntent`, `getProviders`, `forgotPassword`, `resetPassword`, `verifyMfa`, `verifyMfaBackupCode`, `sendMagicLink`, `verifyMagicLink` |
+| `client.account` | `register`, `verifyEmail`, `resendVerification`, `getProfile`, `updateProfile`, `changePassword`, `deleteAccount`, `listSecurityEvents`, `reauthenticate` |
+| `client.mfa` | `getStatus`, `setupTotp`, `confirmTotp`, `disableTotp`, `disableAll`, `regenerateBackupCodes`, `requestEmailOtp`, `verifyEmailOtp` |
+| `client.passkeys` | `startLogin`, `finishLogin`, `authenticate`, `startRegistration`, `finishRegistration`, `list`, `remove` |
+| `client.sessions` | `list`, `revoke`, `revokeOthers`, `revokeAll` |
+| `client.invites` | `preview`, `accept` |
+| `client.consent` | `buildAuthorizeUrl`, `getDetails`, `decide` |
+| `client.social` | `loginUrl`, `login`, `listConnections`, `unlink`, `startLinking` |
+| `client.tenant` | `listMyOrgs`, `checkSlug`, `register` |
+
+The older flat methods (`client.login`, `client.verifyMfaLogin`, `client.listPasskeys`, ...) still work and delegate to the modules.
+`client.request()` remains the escape hatch for endpoints without a typed method (admin APIs); it adds the tenant header, cookies, and a silent refresh on 401.
+
+## Result branches are never flattened
+
+Flows that can end without a session return a discriminated union (`AuthOutcome`). Handle every branch:
 
 ```ts
-// Password login
-const { accessToken, user } = await sentry.auth.loginWithPassword({
-  email: 'user@example.com',
-  password: 'secret',
+import { isMfaChallenge, isMfaEnrollmentRequired } from "@scrolloop/sdk";
+
+const outcome = await client.signIn.login({ email, password });
+
+if (isMfaChallenge(outcome)) {
+  // outcome.mfaChallenge: { tempToken, methods, preferredMethod }
+  const done = await client.signIn.verifyMfa(outcome.mfaChallenge.tempToken, code);
+} else if (isMfaEnrollmentRequired(outcome)) {
+  // Tenant policy requires enrolling a factor first. `enrollmentToken` is present for
+  // password login; magic-link and passkey login deliver it only as a cookie.
+} else {
+  // Session established: outcome.tenantSlug, outcome.session, outcome.expiresIn
+}
+```
+
+`login`, `verifyMagicLink`, `passkeys.finishLogin` and `passkeys.authenticate` all return `AuthOutcome`.
+`verifyMfa` and `verifyMfaBackupCode` return a session (backup-code logins may carry a `warning`).
+
+## Email links
+
+```ts
+await client.account.verifyEmail(tokenFromUrl);
+await client.account.resendVerification(email);        // RATE_LIMITED carries retryAfterSeconds
+const invite = await client.invites.preview(tokenFromUrl); // { email, tenantName, tenantSlug }
+await client.invites.accept({ token: tokenFromUrl, name, password }); // does NOT sign in
+const outcome = await client.signIn.verifyMagicLink(tokenFromUrl);
+```
+
+Reading a link token on page load must not consume it: show a confirmation step and call the
+verify method from the button handler.
+
+## Recent authentication (step-up)
+
+`changePassword`, `deleteAccount`, `mfa.disableTotp` and `mfa.disableAll` require a recent sign-in.
+The server answers `403` with code `ACCESS_RECENT_AUTH_REQUIRED`:
+
+```ts
+import { isRecentAuthRequired } from "@scrolloop/sdk";
+
+try {
+  await client.account.changePassword({ currentPassword, newPassword });
+} catch (err) {
+  if (isRecentAuthRequired(err)) {
+    const outcome = await client.account.reauthenticate(password); // may return an MFA challenge
+    // then retry the action
+  } else throw err;
+}
+```
+
+There is no dedicated step-up endpoint; `reauthenticate` signs in again as the current user.
+
+## Sessions, MFA, consent
+
+```ts
+const sessions = await client.sessions.list();      // ActiveSession[] with isCurrent
+await client.sessions.revoke(sessions[0].id);
+await client.sessions.revokeAll();                   // also clears the local session
+
+const setup = await client.mfa.setupTotp();          // { secret, qrCode, backupCodes }
+const { backupCodes } = await client.mfa.confirmTotp("123456");
+
+window.location.href = client.consent.buildAuthorizeUrl({ client_id, redirect_uri, scope: "openid profile", state });
+const details = await client.consent.getDetails(transactionId);
+const { redirect_to } = await client.consent.decide({
+  transactionId, csrfToken: details.csrf_token, decision: "allow", remember: true,
 });
-
-// Magic link
-await sentry.auth.sendMagicLink({ email: 'user@example.com' });
-
-// Verify magic link token (from URL)
-const { accessToken } = await sentry.auth.verifyMagicLink({ token: urlToken });
-
-// Logout
-await sentry.auth.logout();
-
-// Refresh tokens
-const { accessToken } = await sentry.auth.refresh();
+window.location.href = redirect_to;
 ```
 
-## User
+## Passkeys
+
+The browser ceremony uses `@simplewebauthn/browser` (optional peer, loaded on demand; pass `webauthn: () => import(...)` in the config to supply your own).
 
 ```ts
-// Get current user
-const user = await sentry.users.getMe();
-
-// Update profile
-await sentry.users.updateMe({ firstName: 'Ada' });
-
-// Change password
-await sentry.users.changePassword({
-  currentPassword: 'old',
-  newPassword: 'new-strong-pass',
-});
-
-// List active sessions
-const sessions = await sentry.users.getSessions();
-
-// Revoke a session
-await sentry.users.revokeSession(sessionId);
-```
-
-## RBAC
-
-```ts
-// Check if current user has a permission
-const canDelete = await sentry.rbac.can('users:delete');
-
-// Get current user's roles
-const roles = await sentry.rbac.getRoles();
-```
-
-## Token management
-
-The SDK stores the access token in memory and the refresh token in a secure cookie. Tokens are refreshed automatically before they expire.
-
-```ts
-// Get current access token (auto-refreshes if needed)
-const token = await sentry.getAccessToken();
-
-// Verify a token using the JWKS endpoint
-const payload = await sentry.verifyToken(token);
+const outcome = await client.passkeys.authenticate(email);
+// Cancelled prompts throw AuthError("PASSKEY_AUTH_CANCELLED") / ("PASSKEY_REGISTRATION_CANCELLED").
 ```
 
 ## Errors
@@ -112,7 +146,7 @@ response. It extends `AuthError`, so existing `catch` blocks and `instanceof Aut
 import { SentryApiError } from "@scrolloop/sdk";
 
 try {
-  await sentry.login({ email, password });
+  await client.signIn.login({ email, password });
 } catch (err) {
   if (err instanceof SentryApiError) {
     switch (err.code) {
@@ -131,3 +165,8 @@ try {
 
 Responses from older API versions (`{ statusCode, message }` or `{ error: { code, message } }`) and
 non-JSON gateway errors are still converted into a `SentryApiError` with a best-effort `code`.
+
+## Known limits
+
+Flows the backend does not support yet (link-based password reset, pre-session MFA enrollment,
+cross-device completion, ...) are listed in `docs/ui-sdk-gaps.md`. The SDK does not fake them.

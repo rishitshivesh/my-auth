@@ -1,130 +1,72 @@
 ---
 title: React SDK
-description: React hooks and provider for Next.js and React applications.
+description: Provider and hooks over the typed client, with one client per tenant.
 ---
 
 # React SDK
 
-The React SDK is included in `@scrolloop/sdk`. It exports a `ScrolloopProvider` and hooks for accessing auth state.
+Included in `@scrolloop/sdk/react` (re-exported from `@scrolloop/sdk`). The provider holds the current user and
+exposes the client; hooks expose the typed modules of [the TypeScript SDK](/docs/sdks/typescript).
 
-## Installation
-
-```bash
-npm install @scrolloop/sdk
-```
-
-## Setup
-
-Wrap your application with `ScrolloopProvider`:
+## Setup: a client per tenant, never a singleton
 
 ```tsx
-// app/layout.tsx (Next.js App Router)
-import { ScrolloopProvider } from '@scrolloop/sdk';
+"use client";
+import { SentryProvider, useCreateSentryClient } from "@scrolloop/sdk/react";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <ScrolloopProvider
-          domain="acme.sentry.scrolloop.com"
-          clientId="your-oauth-client-id"
-        >
-          {children}
-        </ScrolloopProvider>
-      </body>
-    </html>
-  );
+export function Providers({ tenant, children }: { tenant: string; children: React.ReactNode }) {
+  const client = useCreateSentryClient({ baseURL: process.env.NEXT_PUBLIC_AUTH_URL!, tenant });
+  return <SentryProvider client={client}>{children}</SentryProvider>;
 }
 ```
 
-## Hooks
+`useCreateSentryClient` memoises by `baseURL` and `tenant`, so navigating to another tenant's subdomain builds a new client.
 
-### useAuth
-
-Access the current auth state:
+## Auth state
 
 ```tsx
-import { useAuth } from '@scrolloop/sdk';
-
-function Header() {
-  const { user, isLoading, isAuthenticated } = useAuth();
-
-  if (isLoading) return <Spinner />;
-  if (!isAuthenticated) return <a href="/login">Sign in</a>;
-
-  return <span>Hello, {user.firstName}</span>;
-}
+const { user, isLoading, isAuthenticated, error, login, logout } = useAuth();
+const { user } = useUser();
+const { session } = useSession(); // non-secret claims: tenantId, tenantSlug, groups
 ```
 
-### useUser
+`login`, `verifyMagicLink`, `finishPasskeyLogin` and `authenticateWithPasskey` resolve with the full `AuthOutcome`;
+the provider loads the user only when a session was actually established, so MFA challenge and enrollment
+branches are yours to render.
+
+## Module hooks
+
+Each returns the matching client module (stable reference):
+
+`useSignIn()`, `useAccount()`, `useMfa()`, `usePasskeys()`, `useSessions()`, `useInvites()`, `useConsent()`, `useSocial()`, `useTenantApi()`, and `useSentryClient()` for the client itself.
+
+## Pending and error state
+
+`useSentryAction` wraps any SDK call. `run` rethrows, so typed errors still reach your handler, and `data`
+is only set after the server confirmed success:
 
 ```tsx
-import { useUser } from '@scrolloop/sdk';
+const accountApi = useAccount();
+const resend = useSentryAction(accountApi.resendVerification);
 
-function Profile() {
-  const { user, isLoading } = useUser();
-  return <p>{user?.email}</p>;
-}
+<button disabled={resend.isPending} onClick={() => resend.run(email).catch(() => {})}>Resend</button>
+{resend.error && <p role="alert">{resend.error.message}</p>}
 ```
 
-### useSentry
-
-Access the underlying SDK instance:
+## Recent authentication
 
 ```tsx
-import { useSentry } from '@scrolloop/sdk';
+const account = useAccount();
+const recent = useRecentAuth();
 
-function LogoutButton() {
-  const sentry = useSentry();
+await recent.guard(() => account.changePassword({ currentPassword, newPassword })).catch(() => {});
 
-  return (
-    <button onClick={() => sentry.auth.logout()}>
-      Sign out
-    </button>
-  );
-}
+{recent.needsReauth && (
+  <PasswordPrompt
+    onSubmit={(pw) => recent.reauthenticate(pw)} // re-runs the interrupted action on success
+    onCancel={recent.cancel}
+  />
+)}
 ```
 
-## Route protection
-
-### withAuth HOC
-
-```tsx
-import { withAuth } from '@scrolloop/sdk';
-
-const ProtectedPage = withAuth(function Page() {
-  return <div>Only visible when logged in</div>;
-});
-```
-
-### useRequireAuth hook
-
-```tsx
-import { useRequireAuth } from '@scrolloop/sdk';
-
-function Dashboard() {
-  useRequireAuth({ redirectTo: '/login' }); // redirects if not authed
-  return <div>Dashboard</div>;
-}
-```
-
-## Next.js App Router integration
-
-For server components and Server Actions:
-
-```ts
-// lib/auth.ts
-import { createServerClient } from '@scrolloop/sdk/next';
-
-export const auth = createServerClient({
-  domain: 'acme.sentry.scrolloop.com',
-  clientId: process.env.SENTRY_CLIENT_ID!,
-  clientSecret: process.env.SENTRY_CLIENT_SECRET!,
-});
-
-// In a Server Component:
-const user = await auth.getUser();
-
-// In a Server Action:
-const session = await auth.requireSession(); // throws if not authed
-```
+If the account has MFA, `reauthenticate` resolves with `{ retried: false, outcome }` where `outcome` is the MFA challenge; complete it, then call `guard` again.

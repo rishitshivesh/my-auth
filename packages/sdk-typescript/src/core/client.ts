@@ -1,8 +1,10 @@
 /**
  * Scrolloop Sentry SDK - Core Client
  *
- * The session runtime - owns tokens, knows when to refresh
- * Works in any environment (browser, Node, Next.js)
+ * The session runtime - owns session state, knows when to refresh, and
+ * composes the typed feature modules (core/modules/*) that cover every
+ * auth-service flow the admin portal or any other client application needs.
+ * Works in any environment (browser, Node, Next.js).
  *
  * The access token itself never lives here (see docs/adr/0003-access-token-delivery.md):
  * it is set by the server as an httpOnly cookie and sent automatically via
@@ -10,6 +12,9 @@
  * believed to be live (`state.authenticated`), when it is expected to expire
  * (for proactive refresh), and the non-secret session claims the server
  * returns alongside the cookie.
+ *
+ * There is deliberately no module-level singleton: construct one client per
+ * tenant (the portal serves tenants on subdomains).
  */
 
 import type {
@@ -21,13 +26,21 @@ import type {
   LoginCredentials,
   LoginResponse,
   User,
-  AuthError,
   AuthEvent,
   AuthEventListener,
   LoginIntentResponse,
   SessionClaims,
 } from "./types";
 import { AuthError as AuthErrorClass } from "./types";
+import type {
+  MfaLoginOutcome,
+  OrgMembership,
+  Passkey,
+  SocialConnection,
+  WebAuthnCredentialJSON,
+  AuthOutcome,
+  PasskeyLoginStart,
+} from "./api-types";
 import { createFetchTransport } from "./transport";
 import { SentryApiError } from "./errors";
 import {
@@ -38,13 +51,56 @@ import {
   flushPendingRequests,
   rejectPendingRequests,
 } from "./state";
+import {
+  createAccountModule,
+  createConsentModule,
+  createInvitesModule,
+  createMfaModule,
+  createPasskeysModule,
+  createSessionsModule,
+  createSignInModule,
+  createSocialModule,
+  createTenantModule,
+  type AccountModule,
+  type ConsentModule,
+  type InvitesModule,
+  type MfaModule,
+  type PasskeysModule,
+  type SessionsModule,
+  type SignInModule,
+  type SocialModule,
+  type TenantModule,
+  type ModuleContext,
+} from "./modules";
+import { call, payloadOf } from "./modules/context";
+
+type ResolvedConfig = Required<Omit<SentryConfig, "webauthn">> & Pick<SentryConfig, "webauthn">;
 
 export class SentryClient {
-  private config: Required<SentryConfig>;
+  private config: ResolvedConfig;
   private state: AuthState;
   private transport: Transport;
   private listeners: AuthEventListener[] = [];
   private initPromise?: Promise<void>;
+
+  /** Password login, MFA completion, magic link, recovery, provider discovery. */
+  readonly signIn: SignInModule;
+  /** Registration, email verification, profile, password, deletion, step-up. */
+  readonly account: AccountModule;
+  /** Authenticated MFA management (TOTP, backup codes, email OTP). */
+  readonly mfa: MfaModule;
+  /** Passkey sign-in, registration and management. */
+  readonly passkeys: PasskeysModule;
+  /** Device/session list and revocation. */
+  readonly sessions: SessionsModule;
+  /** Invitation preview and acceptance. */
+  readonly invites: InvitesModule;
+  /** OAuth/OIDC authorize URL and consent decision. */
+  readonly consent: ConsentModule;
+  /** Social login and account linking. */
+  readonly social: SocialModule;
+  /** Workspace discovery and self-service creation. */
+  readonly tenant: TenantModule;
 
   constructor(config: SentryConfig) {
     this.config = {
@@ -60,6 +116,18 @@ export class SentryClient {
 
     this.state = createAuthState();
     this.transport = this.config.transport;
+
+    const ctx = this.createModuleContext();
+    this.signIn = createSignInModule(ctx);
+    this.account = createAccountModule(ctx, this.signIn);
+    this.mfa = createMfaModule(ctx);
+    this.passkeys = createPasskeysModule(ctx, { loadBrowser: this.config.webauthn });
+    this.sessions = createSessionsModule(ctx);
+    this.invites = createInvitesModule(ctx);
+    this.consent = createConsentModule(ctx);
+    this.social = createSocialModule(ctx, this.config.tenant);
+    this.tenant = createTenantModule(ctx);
+
     this.initPromise = this.tryRestoreSession();
 
     this.log("Sentry client initialized", {
@@ -68,472 +136,141 @@ export class SentryClient {
     });
   }
 
+  private createModuleContext(): ModuleContext {
+    return {
+      baseURL: this.config.baseURL,
+      request: (req) => this.request(req),
+      publicRequest: (req) => this.transport(this.withTenantHeaders(req)),
+      fail: (response) => this.createError(response),
+      sessionEstablished: (expiresIn, session) => this.onSessionEstablished(expiresIn, session),
+      endLocalSession: () => this.clearSession(),
+      log: (...args) => this.log(...args),
+    };
+  }
+
   // ============================================================
-  // PUBLIC API - AUTHENTICATION
+  // PUBLIC API - AUTHENTICATION (flat, backwards-compatible entry points;
+  // each delegates to the typed module of the same name)
   // ============================================================
 
-  /**
-   * Login with email and password
-   */
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    this.log("Login attempt", { email: credentials.email });
-
-    const response = await this.request({
-      url: `${this.config.baseURL}/auth/login`,
-      method: "POST",
-      body: credentials,
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    const data = response.data?.data;
-
-    // Handle MFA challenge
-    if (data.mfaRequired) {
-      this.log("MFA required");
-      return {
-        mfaRequired: true,
-        mfaChallenge: {
-          tempToken: data.tempToken,
-          methods: data.availableMethods || [],
-          preferredMethod: data.preferredMethod,
-        },
-      } as any;
-    }
-
-    this.onSessionEstablished(data.expiresIn, data.session);
-    this.log("Login successful", { email: data.user?.email });
-
-    return data;
+  /** Login with email and password. Branch on the result: session / MFA challenge / MFA enrollment. */
+  login(credentials: LoginCredentials): Promise<LoginResponse> {
+    return this.signIn.login(credentials);
   }
 
-  async loginIntent(email: string): Promise<LoginIntentResponse> {
-    this.log("Login Intent request", { email });
-    const response = await this.request({
-      url: `${this.config.baseURL}/auth/login-intent`,
-      method: "POST",
-      body: { email },
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    return response.data?.data;
+  loginIntent(email: string): Promise<LoginIntentResponse> {
+    return this.signIn.loginIntent(email);
   }
 
-  /**
-   * Request password reset OTP
-   */
-  async forgotPassword(email: string): Promise<void> {
-    this.log("Forgot password request", { email });
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/forgot-password`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { email },
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
+  /** Request a password reset code by email. */
+  forgotPassword(email: string): Promise<void> {
+    return this.signIn.forgotPassword(email);
   }
 
-  /**
-   * Reset password with the code emailed by forgotPassword().
-   * The code is bound to `email`; it is rejected for any other account.
-   */
-  async resetPassword(email: string, otp: string, password: string): Promise<void> {
-    this.log("Reset password with OTP");
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/reset-password`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { email, otp, password },
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
+  /** Reset password with the code emailed by forgotPassword(); the code is bound to `email`. */
+  resetPassword(email: string, otp: string, password: string): Promise<void> {
+    return this.signIn.resetPassword(email, otp, password);
   }
 
-  /**
-   * Verify TOTP code during MFA login step.
-   * tempToken is the short-lived token returned by /auth/login when mfaRequired=true.
-   */
-  async verifyMfaLogin(tempToken: string, code: string): Promise<void> {
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/mfa/verify`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { tempToken, code },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    const data = response.data?.data;
-    this.onSessionEstablished(data?.expiresIn, data?.session);
+  /** Complete an MFA challenge with a TOTP code (tempToken comes from login()). */
+  verifyMfaLogin(tempToken: string, code: string): Promise<MfaLoginOutcome> {
+    return this.signIn.verifyMfa(tempToken, code);
   }
 
-  /**
-   * Initiate social login — redirects the browser to the OAuth provider
-   */
+  /** Complete an MFA challenge with a backup code (XXXX-XXXX). */
+  verifyMfaBackupLogin(tempToken: string, code: string): Promise<MfaLoginOutcome> {
+    return this.signIn.verifyMfaBackupCode(tempToken, code);
+  }
+
+  /** Initiate social login - redirects the browser to the OAuth provider. */
   initiateSocialLogin(provider: string): void {
-    if (typeof window === "undefined") {
-      throw new Error(
-        "initiateSocialLogin is only available in browser environments",
-      );
-    }
-    const returnUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `${this.config.baseURL}/auth/social/${provider}/login?tenant_id=${this.config.tenant}&return_url=${returnUrl}`;
+    this.social.login(provider);
   }
 
   /**
    * Claim a social session using the completion token from /u/auth/callback?ct=...
    */
   async claimSocialSession(completionToken: string): Promise<void> {
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/social/claim-session`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { ct: completionToken },
-      credentials: "include",
-    });
+    const response = await this.transport(
+      this.withTenantHeaders({
+        url: `${this.config.baseURL}/auth/social/claim-session`,
+        method: "POST",
+        body: { ct: completionToken },
+      }),
+    );
+    if (!response.ok) throw this.createError(response);
 
-    if (!response.ok) {
-      throw this.createError(response);
-    }
+    const data = payloadOf(response);
+    const expiresIn = typeof data.expiresIn === "number" ? data.expiresIn : undefined;
+    this.onSessionEstablished(expiresIn, undefined);
 
-    const data = response.data?.data;
-    this.onSessionEstablished(data?.expiresIn, data?.session);
-
-    // The claim-session completion token carries no tenant/group claims (it
-    // only wraps the access token itself), so `data.session` is always
-    // absent here. Backfill it with one refresh call — the refresh-token
-    // cookie is already set from the OAuth callback step, so this succeeds
-    // silently and brings `getSessionClaims()`/`getUserTenantSlug()` in line
-    // with every other login path. Best-effort: a failure here just leaves
-    // session claims unset until the next natural refresh, it does not
-    // affect the session this method just established.
-    if (!data?.session) {
-      try {
-        await this.refreshOnce();
-      } catch {
-        this.log("Could not backfill session claims after social login");
-      }
+    // The completion token carries no tenant/group claims, so session claims
+    // are always absent here. Backfill with one refresh (the refresh cookie is
+    // already set). Best-effort: a failure leaves claims unset until the next
+    // natural refresh and does not affect the session just established.
+    try {
+      await this.refreshOnce();
+    } catch {
+      this.log("Could not backfill session claims after social login");
     }
   }
 
-  /**
-   * Send a magic link sign-in email
-   */
-  async sendMagicLink(email: string): Promise<void> {
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/magic-link/send`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { email },
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
+  sendMagicLink(email: string): Promise<void> {
+    return this.signIn.sendMagicLink(email);
   }
 
-  /**
-   * Verify a magic link token and establish session
-   */
-  async verifyMagicLink(token: string): Promise<void> {
-    const response = await this.transport({
-      url: `${this.config.baseURL}/auth/magic-link/verify`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Tenant-Slug": this.config.tenant,
-      },
-      body: { token },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    const data = response.data?.data;
-    this.onSessionEstablished(data?.expiresIn, data?.session);
+  /** Verify a magic link token. May yield a session, an MFA challenge or required MFA enrollment. */
+  verifyMagicLink(token: string): Promise<AuthOutcome> {
+    return this.signIn.verifyMagicLink(token);
   }
 
-  /**
-   * Start WebAuthn (passkey) authentication.
-   * Returns the raw server response which includes both WebAuthn options and
-   * the opaque `sessionNonce` required by `finishPasskeyLogin`.
-   */
-  async startPasskeyLogin(email: string): Promise<any> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/auth/webauthn/login/start`,
-      method: "POST",
-      body: { email },
-    });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    return response.data?.data || response.data;
+  /** Start WebAuthn authentication; returns options plus the `sessionNonce` for finishPasskeyLogin(). */
+  startPasskeyLogin(email: string): Promise<PasskeyLoginStart> {
+    return this.passkeys.startLogin(email);
   }
 
-  /**
-   * Finish WebAuthn (passkey) authentication with the browser assertion.
-   *
-   * @param sessionNonce - Opaque nonce returned by `startPasskeyLogin()`; the
-   *   server uses it to retrieve the single-use challenge from Redis.
-   */
-  async finishPasskeyLogin(
+  finishPasskeyLogin(
     email: string,
-    assertion: any,
+    assertion: WebAuthnCredentialJSON,
     sessionNonce: string,
-  ): Promise<void> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/auth/webauthn/login/finish`,
-      method: "POST",
-      body: { email, response: assertion, sessionNonce },
-      credentials: "include",
-    } as any);
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    const data = response.data?.data;
-    this.onSessionEstablished(data?.expiresIn, data?.session);
+  ): Promise<AuthOutcome> {
+    return this.passkeys.finishLogin(email, assertion, sessionNonce);
   }
 
-  /**
-   * Complete passkey authentication in one step (browser-side orchestration).
-   *
-   * 1. Fetches WebAuthn options + sessionNonce from the server.
-   * 2. Calls `startAuthentication(options)` from `@simplewebauthn/browser`.
-   * 3. Verifies the assertion with the server and establishes a session.
-   *
-   * Throws `AuthError` with code `PASSKEY_AUTH_CANCELLED` if the user cancels
-   * or if the browser does not support WebAuthn.
-   */
-  async authenticateWithPasskey(email: string): Promise<void> {
-    if (typeof window === "undefined") {
-      throw new AuthErrorClass(
-        "PASSKEY_NOT_SUPPORTED",
-        "authenticateWithPasskey is only available in browser environments",
-      );
-    }
-
-    // Step 1: Get options + nonce from server
-    const serverData = await this.startPasskeyLogin(email);
-    const { sessionNonce, ...optionsJSON } = serverData;
-
-    // Step 2: Invoke the browser's native WebAuthn API
-    let assertion: any;
-    try {
-      const { startAuthentication } = await import(
-        "@simplewebauthn/browser" as any
-      );
-      assertion = await startAuthentication({ optionsJSON });
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
-        throw new AuthErrorClass(
-          "PASSKEY_AUTH_CANCELLED",
-          "Passkey authentication was cancelled",
-        );
-      }
-      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
-        throw new AuthErrorClass(
-          "PASSKEY_NOT_SUPPORTED",
-          "This browser or device does not support passkeys",
-        );
-      }
-      throw err;
-    }
-
-    // Step 3: Verify with server (establishes session, sets auth cookies)
-    await this.finishPasskeyLogin(email, assertion, sessionNonce);
+  /** Complete passkey authentication in one step (browser only). */
+  authenticateWithPasskey(email: string): Promise<AuthOutcome> {
+    return this.passkeys.authenticate(email);
   }
 
-  // ── Passkey Registration & Management ──────────────────────────────
-
-  /**
-   * Register a new passkey credential.
-   *
-   * 1. Fetches WebAuthn registration options from the server.
-   * 2. Calls `startRegistration(options)` from `@simplewebauthn/browser`
-   *    to invoke the device's authenticator.
-   * 3. Returns the browser's `RegistrationResponseJSON` for use with
-   *    `finishPasskeyRegistration()`.
-   *
-   * Throws `AuthError` with code `PASSKEY_REGISTRATION_CANCELLED` if the
-   * user dismisses the prompt or if the browser API is unavailable.
-   */
-  async startPasskeyRegistration(): Promise<any> {
-    if (typeof window === "undefined") {
-      throw new AuthErrorClass(
-        "PASSKEY_NOT_SUPPORTED",
-        "startPasskeyRegistration is only available in browser environments",
-      );
-    }
-
-    // Step 1: Fetch registration options from server
-    const optionsResponse = await this.request({
-      url: `${this.config.baseURL}/mfa/webauthn/register/start`,
-      method: "POST",
-    });
-    if (!optionsResponse.ok) throw this.createError(optionsResponse);
-    const optionsJSON = optionsResponse.data?.data || optionsResponse.data;
-
-    // Step 2: Invoke the browser's native WebAuthn API
-    try {
-      const { startRegistration } = await import(
-        "@simplewebauthn/browser" as any
-      );
-      return await startRegistration({ optionsJSON });
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "AbortError") {
-        throw new AuthErrorClass(
-          "PASSKEY_REGISTRATION_CANCELLED",
-          "Passkey registration was cancelled",
-        );
-      }
-      if (err?.name === "NotSupportedError" || err?.name === "SecurityError") {
-        throw new AuthErrorClass(
-          "PASSKEY_REGISTRATION_CANCELLED",
-          "This browser or device does not support passkeys",
-        );
-      }
-      throw err;
-    }
+  startPasskeyRegistration(): Promise<WebAuthnCredentialJSON> {
+    return this.passkeys.startRegistration();
   }
 
-  /** Finish WebAuthn passkey registration — verifies and stores the credential */
-  async finishPasskeyRegistration(
-    registrationResponse: any,
+  finishPasskeyRegistration(
+    registrationResponse: WebAuthnCredentialJSON,
     deviceName?: string,
   ): Promise<{ credentialId: string }> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/mfa/webauthn/register/finish`,
-      method: "POST",
-      body: { response: registrationResponse, deviceName },
-    });
-    if (!response.ok) throw this.createError(response);
-    const data = response.data?.data || response.data;
-    if (!data?.credentialId) {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "No credentialId in registration response",
-      );
-    }
-    return data as { credentialId: string };
+    return this.passkeys.finishRegistration(registrationResponse, deviceName);
   }
 
-  /** List all registered passkeys for the current user */
-  async listPasskeys(): Promise<
-    Array<{
-      id: string;
-      deviceName?: string;
-      createdAt: string;
-      lastUsedAt?: string;
-      transports: string[];
-    }>
-  > {
-    const response = await this.request({
-      url: `${this.config.baseURL}/mfa/webauthn/credentials`,
-      method: "GET",
-    });
-    if (!response.ok) throw this.createError(response);
-    return response.data?.data?.credentials || response.data?.credentials || [];
+  listPasskeys(): Promise<Passkey[]> {
+    return this.passkeys.list();
   }
 
-  /** Delete a registered passkey by credential ID */
-  async deletePasskey(credentialId: string): Promise<void> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/mfa/webauthn/credentials/${credentialId}`,
-      method: "DELETE",
-    });
-    if (!response.ok) throw this.createError(response);
+  deletePasskey(credentialId: string): Promise<void> {
+    return this.passkeys.remove(credentialId);
   }
 
-  // ── Social Connections & Account Linking ───────────────────────────
-
-  /** Get all linked social accounts for the current user */
-  async getSocialConnections(): Promise<
-    Array<{
-      id: string;
-      provider: string;
-      email: string;
-      displayName: string;
-      avatarUrl?: string;
-      primary: boolean;
-      lastUsedAt?: string;
-      createdAt: string;
-    }>
-  > {
-    const response = await this.request({
-      url: `${this.config.baseURL}/social/connections`,
-      method: "GET",
-    });
-    if (!response.ok) throw this.createError(response);
-    return response.data?.data?.connections || response.data?.connections || [];
+  getSocialConnections(): Promise<SocialConnection[]> {
+    return this.social.listConnections();
   }
 
-  /** Unlink a social account from the current user */
-  async unlinkSocialAccount(provider: string): Promise<void> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/social/connections/${provider}`,
-      method: "DELETE",
-    });
-    if (!response.ok) throw this.createError(response);
+  unlinkSocialAccount(provider: string): Promise<void> {
+    return this.social.unlink(provider);
   }
 
-  /**
-   * Initiate social account linking for an already-authenticated user.
-   * Fetches a short-lived link token then navigates the browser to the
-   * OAuth flow so the backend can associate the callback with this user.
-   */
-  async initiateSocialLinking(provider: string): Promise<void> {
-    const response = await this.request({
-      url: `${this.config.baseURL}/social/link/token`,
-      method: "POST",
-    });
-    if (!response.ok) throw this.createError(response);
-    const linkToken =
-      response.data?.data?.linkToken || response.data?.linkToken;
-    if (!linkToken) {
-      throw new AuthErrorClass("UNKNOWN_ERROR", "No link token in response");
-    }
-    // Full page navigation — OAuth requires a browser redirect, not fetch
-    if (typeof window === "undefined") {
-      throw new AuthErrorClass(
-        "UNKNOWN_ERROR",
-        "initiateSocialLinking is only available in browser environments",
-      );
-    }
-    window.location.href = `${this.config.baseURL}/social/link/${provider}?lt=${linkToken}`;
+  initiateSocialLinking(provider: string): Promise<void> {
+    return this.social.startLinking(provider);
   }
 
   /**
@@ -562,14 +299,11 @@ export class SentryClient {
   private async tryRestoreSession(): Promise<void> {
     try {
       this.log("Attempting to restore session from refresh cookie");
-
-      // Try to refresh - uses httpOnly cookie
       await this.refreshOnce();
-
       this.log("Session restored successfully");
     } catch (error) {
-      // No valid refresh cookie — this is expected on first load or after magic-link
-      // landing before a session has been established. Do not surface to console.
+      // No valid refresh cookie — expected on first load or after magic-link
+      // landing before a session has been established.
       this.log("No valid session to restore", error);
     }
   }
@@ -590,26 +324,16 @@ export class SentryClient {
     return this.config.baseURL;
   }
 
+  /** The tenant slug this client is bound to. */
+  getTenant(): string {
+    return this.config.tenant;
+  }
+
   /**
    * Get all orgs the current user belongs to (home tenant + guest memberships)
    */
-  async getUserOrgs(): Promise<
-    Array<{
-      tenantId: string;
-      slug: string;
-      name: string;
-      role: string;
-      isGuest: boolean;
-      logoUrl?: string;
-    }>
-  > {
-    const response = await this.request({
-      url: `${this.config.baseURL}/users/orgs`,
-      method: 'GET',
-    });
-    if (!response.ok) throw this.createError(response);
-    const payload = response.data?.data ?? response.data;
-    return Array.isArray(payload) ? payload : [];
+  getUserOrgs(): Promise<OrgMembership[]> {
+    return this.tenant.listMyOrgs();
   }
 
   /**
@@ -618,17 +342,10 @@ export class SentryClient {
   async getCurrentUser(): Promise<User> {
     await this.waitForInit();
     this.log("Get current user");
-
-    const response = await this.request({
+    return call<User>(this.createModuleContext(), {
       url: `${this.config.baseURL}/users/me`,
       method: "GET",
     });
-
-    if (!response.ok) {
-      throw this.createError(response);
-    }
-
-    return response.data?.data;
   }
 
   /**
@@ -757,7 +474,7 @@ export class SentryClient {
    */
   private async refreshWithRetry(): Promise<void> {
     let attempt = 0;
-    let lastError: any;
+    let lastError: unknown;
 
     while (attempt < this.config.maxRefreshRetries) {
       try {
@@ -813,8 +530,11 @@ export class SentryClient {
       );
     }
 
-    const data = response.data?.data;
-    this.onSessionEstablished(data?.expiresIn, data?.session);
+    const data = payloadOf(response);
+    this.onSessionEstablished(
+      typeof data.expiresIn === "number" ? data.expiresIn : undefined,
+      data.session as SessionClaims | undefined,
+    );
   }
 
   /**
@@ -926,7 +646,7 @@ export class SentryClient {
   /**
    * Create AuthError from response
    */
-  private createError(response: TransportResponse): AuthError {
+  private createError(response: TransportResponse): AuthErrorClass {
     const error = SentryApiError.fromResponse(response);
 
     this.emit({ type: "error", error });
@@ -945,7 +665,7 @@ export class SentryClient {
   /**
    * Debug logging
    */
-  private log(...args: any[]): void {
+  log(...args: unknown[]): void {
     if (this.config.debug) {
       console.log("[Sentry]", ...args);
     }

@@ -33,6 +33,20 @@ export {
 
 export * from "./core/client";
 export * from "./core/types";
+export * from "./core/api-types";
+export { isRecentAuthRequired } from "./core/modules/context";
+export type {
+  SignInModule,
+  AccountModule,
+  MfaModule,
+  PasskeysModule,
+  SessionsModule,
+  InvitesModule,
+  ConsentModule,
+  SocialModule,
+  TenantModule,
+  WebAuthnBrowser,
+} from "./core/modules";
 export * from "./web/index";
 export * from "./react/index";
 export * from "./next/index";

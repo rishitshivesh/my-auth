@@ -10,6 +10,7 @@
 // and external consumers can import from '@scrolloop/sdk' without knowing about @scrolloop/types.
 // export type { User, Session, SecurityEventType } from '@scrolloop/types';
 import type { ErrorCode } from '@scrolloop/types';
+import type { AuthOutcome, MfaMethod } from './api-types';
 
 // ============================================================
 // TRANSPORT ABSTRACTION
@@ -27,7 +28,7 @@ export interface TransportRequest {
   url: string;
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
   headers?: Record<string, string>;
-  body?: any;
+  body?: unknown;
   credentials?: "include" | "omit" | "same-origin";
 }
 
@@ -36,6 +37,13 @@ export interface TransportResponse {
   status: number;
   statusText: string;
   headers: Record<string, string>;
+  /**
+   * Parsed response body. Deliberately `any`: it is the one untyped escape
+   * hatch, kept so `client.request()` callers (the admin portal's ~90 calls)
+   * can index into responses. All typed SDK methods narrow it internally via
+   * `modules/context.ts`; do not read it directly in new code.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
 }
 
@@ -75,7 +83,7 @@ export interface AuthState {
 export interface PendingRequest {
   request: TransportRequest;
   resolve: (response: TransportResponse) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
 }
 
 // ============================================================
@@ -94,6 +102,12 @@ export interface SentryConfig {
 
   /** Enable debug logging */
   debug?: boolean;
+
+  /**
+   * Loader for `@simplewebauthn/browser` (or a compatible implementation).
+   * Defaults to a dynamic import of the optional peer dependency.
+   */
+  webauthn?: () => Promise<import("./modules/passkeys").WebAuthnBrowser>;
 
   /** Token refresh margin in seconds (default: 30) */
   refreshMargin?: number;
@@ -134,14 +148,12 @@ export interface SessionClaims {
   groups: string[];
 }
 
-export interface LoginResponse {
-  expiresIn: number;
-  tenantSlug: string;
-  session?: SessionClaims;
-  user: User;
-  mfaRequired?: boolean;
-  mfaChallenge?: MfaChallenge;
-}
+/**
+ * Result of password login: a session, an MFA challenge, or a required MFA
+ * enrolment. Discriminate with `mfaRequired` / `status` or the
+ * isMfaChallenge / isMfaEnrollmentRequired / isSessionEstablished guards.
+ */
+export type LoginResponse = AuthOutcome;
 
 export interface LoginIntentResponse {
   exists: boolean;
@@ -153,17 +165,25 @@ export interface LoginIntentResponse {
     mfa: boolean;
     social: string[];
   };
-  preferredMethod: string[];
-  branding: {
-    logo: string;
-    primaryColor: string;
-    companyName: string;
+  preferredMethod?: "password" | "magicLink" | "passkey" | "social";
+  branding?: {
+    logoUrl?: string;
+    faviconUrl?: string;
+    primaryColor?: string;
+    backgroundColor?: string;
+    textColor?: string;
+    buttonColor?: string;
+    buttonTextColor?: string;
+    companyName?: string;
+    supportEmail?: string;
+    privacyPolicyUrl?: string;
+    termsOfServiceUrl?: string;
   };
 }
 
 export interface MfaChallenge {
   tempToken: string;
-  methods: ("totp" | "sms" | "webauthn")[];
+  methods: MfaMethod[];
   remainingAttempts?: number;
 }
 
@@ -175,7 +195,7 @@ export class AuthError extends Error {
   constructor(
     public code: AuthErrorCode | ErrorCode,
     message: string,
-    public details?: any,
+    public details?: unknown,
   ) {
     super(message);
     this.name = "AuthError";

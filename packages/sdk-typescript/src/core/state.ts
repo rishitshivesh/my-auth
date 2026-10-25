@@ -95,7 +95,7 @@ export function flushPendingRequests(
  */
 export function rejectPendingRequests(
   state: AuthState,
-  error: any,
+  error: unknown,
 ): void {
   const requests = [...state.pendingRequests];
   state.pendingRequests = [];

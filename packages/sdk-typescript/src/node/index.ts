@@ -57,10 +57,10 @@ export function createNodeClient(config: NodeClientConfig): SentryClient {
       body: req.body ? JSON.stringify(req.body) : undefined,
     });
 
-    let data: any;
+    let data: unknown;
     const contentType = response.headers.get('content-type');
     
-    if (contentType?.includes('application/json')) {
+    if (contentType?.includes('json')) {
       data = await response.json();
     } else {
       data = await response.text();
