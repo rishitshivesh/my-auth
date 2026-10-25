@@ -1,0 +1,86 @@
+export const auth = {
+  shell: {
+    poweredBy: "Secured by {product}",
+    workspace: "Workspace: {name}",
+    help: "Need help?",
+    language: "Language",
+    mainLabel: "Sign-in",
+  },
+  otp: {
+    label: "Verification code",
+    slotLabel: "Digit {index} of {length}",
+    hint: "Enter the {length}-digit code.",
+    invalid: "That code is invalid or has expired.",
+    verifying: "Verifying code",
+  },
+  resend: {
+    action: "Resend email",
+    cooldown: "Resend available in {seconds}s",
+    sent: "We sent a new email to {email}.",
+    sending: "Sending",
+  },
+  steps: {
+    progress: "Step {current} of {total}",
+    stepLabel: "Step {index}: {label}",
+  },
+  linkLanding: {
+    purposes: {
+      verifyEmail: "Verify your email",
+      resetPassword: "Reset your password",
+      acceptInvite: "Accept your invitation",
+      signIn: "Complete sign-in",
+      confirmOwnership: "Confirm ownership transfer",
+    },
+    valid: {
+      title: "{purpose}",
+      description: "You are continuing as {account} in {workspace}. Nothing changes until you confirm.",
+      action: "Continue",
+      cancel: "This is not me",
+    },
+    expired: {
+      title: "This link has expired",
+      description: "For your security, links only work for a short time.",
+      action: "Send a new link",
+      cancel: "Back to sign in",
+    },
+    used: {
+      title: "This link was already used",
+      description: "Each link works once. If that was you, you can continue from sign in.",
+      action: "Go to sign in",
+      cancel: "Send a new link",
+    },
+    invalid: {
+      title: "This link is not valid",
+      description: "It may have been copied incompletely or replaced by a newer link.",
+      action: "Back to sign in",
+      cancel: "Send a new link",
+    },
+    wrongAccount: {
+      title: "This link is for a different account",
+      description: "You are signed in as {account}. Switch accounts to use this link.",
+      action: "Sign out and continue",
+      cancel: "Stay signed in",
+    },
+    pending: {
+      title: "Completing",
+      description: "This can take a moment. Please keep this page open.",
+    },
+    loading: { title: "Checking your link", description: "Verifying that this link is still valid." },
+    alternateDevice: "Opened this on a different device? Enter the code from the email instead.",
+  },
+  login: {
+    title: "Sign in",
+    emailLabel: "Email address",
+    passwordLabel: "Password",
+    continue: "Continue",
+    passkey: "Sign in with a passkey",
+    emailLink: "Email me a sign-in link",
+    usePassword: "Use a password instead",
+    forgotPassword: "Forgot your password?",
+  },
+  mfa: {
+    title: "Verify it is you",
+    description: "Enter the code from your authenticator app.",
+    useBackupCode: "Use a recovery code",
+  },
+} as const;

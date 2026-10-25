@@ -5,7 +5,7 @@ import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../theme-provider';
 import { SentryButton } from './SentryButton';
 
-export function ThemeToggle() {
+export function ThemeToggle({ label }: { label: string }) {
   const { theme, toggle } = useTheme();
 
   return (
@@ -13,7 +13,7 @@ export function ThemeToggle() {
       variant="icon"
       size="icon"
       onClick={toggle}
-      aria-label="Toggle theme"
+      aria-label={label}
       className="rounded-full"
     >
       {theme === 'light' ? (

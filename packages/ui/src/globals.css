@@ -31,6 +31,11 @@
     --accent-foreground: #1A1A1A;
     
     --destructive: #C0392B;
+    --success: #2ABF6C;
+    --success-text: #1D8F50;
+    --warning: #C4830A;
+    --warning-text: #8A5A06;
+    --info: #2563EB;
     --destructive-foreground: #FFFFFF;
     
     --border: #D9D1C5; /* Platinum border */
@@ -117,6 +122,11 @@
     --accent-foreground: #111110;
     
     --destructive: #E74C3C;
+    --success: #34D473;
+    --success-text: #34D473;
+    --warning: #E0A030;
+    --warning-text: #E0A030;
+    --info: #6B9AFF;
     --destructive-foreground: #FFFFFF;
     
     --border: rgba(255, 255, 255, 0.08);
@@ -144,6 +154,11 @@
     --color-accent: var(--accent);
     --color-accent-foreground: var(--accent-foreground);
     --color-destructive: var(--destructive);
+    --color-success: var(--success);
+    --color-success-text: var(--success-text);
+    --color-warning: var(--warning);
+    --color-warning-text: var(--warning-text);
+    --color-info: var(--info);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-border: var(--border);
     --color-input: var(--input);
@@ -211,3 +226,13 @@ body {
     }
 }
 
+
+/* Reduced motion: no decorative animation or transition for users who ask. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

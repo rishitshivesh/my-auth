@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   data: T[];
   isLoading?: boolean;
   onRowClick?: (row: T) => void;
+  /** Text for the empty row; callers supply localised copy. */
+  emptyMessage?: string;
   className?: string;
 }
 
@@ -33,6 +35,7 @@ export function DataTable<T extends { id: string | number }>({
   data,
   isLoading,
   onRowClick,
+  emptyMessage = 'No results found.',
   className,
 }: DataTableProps<T>) {
   if (isLoading) {
@@ -71,7 +74,7 @@ export function DataTable<T extends { id: string | number }>({
                 colSpan={columns.length}
                 className="h-24 text-center text-sm font-body text-muted-foreground"
               >
-                No results found.
+                {emptyMessage}
               </TableCell>
             </TableRow>
           ) : (

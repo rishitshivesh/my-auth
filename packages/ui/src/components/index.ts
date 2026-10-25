@@ -20,7 +20,10 @@ export * from "./ui/drawer";
 export * from "./ui/dropdown-menu";
 export * from "./ui/empty";
 export * from "./ui/field";
-export * from "./ui/form";
+export {
+  useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage,
+  FormField as HookFormField,
+} from "./ui/form";
 export * from "./ui/hover-card";
 export * from "./ui/input-group";
 export * from "./ui/input-otp";
@@ -68,3 +71,6 @@ export * from "./sentry/SentrySkeleton";
 
 export * from "./sentry/ThemeToggle";
 
+export * from "./patterns";
+export * from "../lib/brand-color";
+export * from "../lib/clipboard";

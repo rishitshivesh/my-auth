@@ -1,26 +1,10 @@
 "use client"
 
-import { useAuth } from "@scrolloop/sdk"
+import { useAuth, type LoginIntentResponse } from "@scrolloop/sdk"
 import { useState } from "react"
 import { getErrorMessage } from "@/lib/api-error";
 
-export interface LoginIntentResponse {
-  exists: boolean
-  email: string
-  methods: {
-    password: boolean
-    magicLink: boolean
-    passkey: boolean
-    mfa: boolean
-    social: string[]
-  }
-  preferredMethod: "password" | "magicLink" | "passkey"
-  branding: {
-    logo: string
-    primaryColor: string
-    companyName: string
-  }
-}
+export type { LoginIntentResponse }
 
 export type AuthStep = "email" | "method-selection" | "credentials" | "mfa"
 
@@ -54,7 +38,7 @@ export function useEmailAuthFlow(): UseEmailAuthFlowReturn {
 
       setLoginIntent(response)
       setEmail(inputEmail)
-      setSelectedMethod(response.preferredMethod)
+      setSelectedMethod(response.preferredMethod ?? null)
       setStep("method-selection")
     } catch (err) {
       setError(getErrorMessage(err, "An error occurred"))

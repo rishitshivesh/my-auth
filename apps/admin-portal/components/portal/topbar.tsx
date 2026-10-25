@@ -7,6 +7,7 @@ import { ThemeToggle, SentryButton } from "@repo/ui";
 import { TenantSwitcher } from './tenant-switcher';
 import { UserMenu } from './user-menu';
 import { Bell } from 'lucide-react';
+import { t } from "@/i18n";
 
 interface TopbarProps {
   title?: string;
@@ -58,7 +59,7 @@ export function Topbar({ title, subtitle }: TopbarProps) {
             <Bell className="h-4 w-4" />
             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-accent rounded-full border border-card" />
           </SentryButton>
-          <ThemeToggle />
+          <ThemeToggle label={t("common.labels.toggleTheme")} />
         </div>
         <div className="w-px h-6 bg-border mx-2" />
         <UserMenu

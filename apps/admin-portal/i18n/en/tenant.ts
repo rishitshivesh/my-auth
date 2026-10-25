@@ -1,0 +1,33 @@
+export const tenant = {
+  shell: {
+    title: "Workspace console",
+    sections: { overview: "Overview", access: "Access", applications: "Applications", connections: "Connections", monitor: "Monitor", settings: "Settings" },
+    nav: {
+      dashboard: "Dashboard",
+      users: "People",
+      roles: "Roles",
+      groups: "Groups",
+      policies: "Policies",
+      simulator: "Policy simulator",
+      applications: "Applications",
+      connections: "Connections",
+      saml: "SAML",
+      scim: "SCIM",
+      ldap: "LDAP",
+      webhooks: "Webhooks",
+      audit: "Audit log",
+      branding: "Branding",
+      domains: "Domains",
+      settings: "Settings",
+      security: "Security",
+    },
+    switcher: {
+      label: "Switch workspace",
+      current: "Current workspace",
+      none: "No other workspaces",
+      loading: "Loading workspaces",
+      error: "Could not load workspaces",
+      note: "Switching changes the page you are viewing, not your signed-in session.",
+    },
+  },
+} as const;
