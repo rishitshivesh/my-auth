@@ -2,9 +2,7 @@ import {
   IsString,
   IsEmail,
   IsOptional,
-  MinLength,
   MaxLength,
-  Matches,
   IsInt,
   Min,
   Max,
@@ -67,12 +65,7 @@ export class ChangePasswordDto {
 
   @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
   @IsString()
-  @MinLength(8)
   @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      "Password must contain uppercase, lowercase, number and special character",
-  })
   newPassword!: string;
 }
 

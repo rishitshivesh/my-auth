@@ -1,8 +1,13 @@
 import { EventEmitter } from "events";
+import * as dns from "dns/promises";
 import * as ldapjs from "ldapjs";
 import { ApiException } from "@/common/http";
 import { LdapService } from "./ldap.service";
 
+jest.mock("dns/promises", () => {
+  const actual = jest.requireActual("dns/promises");
+  return { ...actual, lookup: jest.fn(actual.lookup) };
+});
 jest.mock("ldapjs", () => ({ createClient: jest.fn() }));
 jest.mock("@/common/logger", () => ({
   logger: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() },
@@ -41,7 +46,7 @@ function fakeClient(o: FakeOpts = {}) {
   return client;
 }
 
-function build() {
+function build(env: Record<string, string> = {}) {
   const connRepo = {
     create: jest.fn((v: object) => ({ id: "c1", ...v })),
     save: jest.fn((v: object) => Promise.resolve(v)),
@@ -53,7 +58,7 @@ function build() {
   };
   const config = {
     getOrThrow: (k: string) => { if (k === "KEYRING_MASTER_KEY") return MASTER; throw new Error(k); },
-    get: (_k: string, d?: unknown) => d,
+    get: (k: string, d?: unknown) => env[k] ?? d,
   };
   const sessions = { revokeOtherUserSessions: jest.fn().mockResolvedValue([]) };
   const events = { log: jest.fn() };
@@ -90,6 +95,39 @@ describe("LdapService CRUD and encryption", () => {
     const { service, connRepo } = build();
     await expect(service.create("t1", { ...(createDto as object), host } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     expect(connRepo.save).not.toHaveBeenCalled();
+  });
+
+  it("create refuses private hosts unless inside LDAP_ALLOWED_PRIVATE_CIDRS", async () => {
+    const denied = build();
+    await expect(denied.service.create("t1", { ...(createDto as object), host: "10.20.1.5" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    const allowed = build({ LDAP_ALLOWED_PRIVATE_CIDRS: "10.20.0.0/16" });
+    await expect(allowed.service.create("t1", { ...(createDto as object), host: "10.20.1.5" } as never)).resolves.toBeDefined();
+    await expect(allowed.service.create("t1", { ...(createDto as object), host: "10.21.1.5" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("allow-list never unlocks loopback or metadata", async () => {
+    const { service } = build({ LDAP_ALLOWED_PRIVATE_CIDRS: "0.0.0.0/0,169.254.0.0/16,127.0.0.0/8" });
+    for (const host of ["127.0.0.1", "169.254.169.254"]) {
+      await expect(service.create("t1", { ...(createDto as object), host } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    }
+  });
+
+  it("checks the RESOLVED address, not the hostname (DNS rebinding)", async () => {
+    const lookup = dns.lookup as unknown as jest.Mock;
+    const original = lookup.getMockImplementation();
+    try {
+      const denied = build();
+      lookup.mockResolvedValue([{ address: "169.254.169.254", family: 4 }] as never);
+      await expect(denied.service.create("t1", { ...(createDto as object), host: "innocent.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      // one benign + one internal record: any bad answer refuses the host
+      lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }, { address: "10.0.0.5", family: 4 }] as never);
+      await expect(denied.service.create("t1", { ...(createDto as object), host: "mixed.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+      // public resolution passes
+      lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
+      await expect(denied.service.create("t1", { ...(createDto as object), host: "ldap.example.com" } as never)).resolves.toBeDefined();
+    } finally {
+      lookup.mockImplementation(original as never);
+    }
   });
 
   it("create honours explicit options and uses a fresh IV each time", async () => {

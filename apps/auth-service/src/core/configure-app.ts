@@ -6,6 +6,8 @@ import { ProblemDetailsFilter, validationExceptionFactory } from "@/common/http"
 import { ResponseInterceptor } from '@/common/interceptors/response.interceptors';
 import { CorsRefreshService } from "./cors-refresh.service";
 import { AdminService } from "@/modules/admin/admin.service";
+import type { Request } from "express";
+import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import helmet from "helmet";
@@ -80,8 +82,6 @@ export async function configureApp(
   await corsRefreshService.refresh();
   if (options.startBackgroundJobs !== false) corsRefreshService.startAutoRefresh();
 
-  const dynamicOrigins = corsRefreshService.getOrigins();
-
   // Used to allow all origins during first-run bootstrap.
   // The setup token authenticates those requests; CORS enforcement is
   // meaningless before any tenant or admin exists.
@@ -95,23 +95,7 @@ export async function configureApp(
     ...(process.env['ADMIN_PORTAL_ORIGIN'] ? [process.env['ADMIN_PORTAL_ORIGIN']] : []),
   ]);
 
-  app.enableCors({
-    origin: (
-      origin: string | undefined,
-      cb: (err: Error | null, allow?: boolean) => void,
-    ) => {
-      if (!origin) return cb(null, true);
-      if (staticOrigins.includes(origin) || dynamicOrigins.has(origin)) {
-        return cb(null, true);
-      }
-      // During first-run bootstrap, allow localhost + the configured admin portal.
-      // The setup token authenticates these requests; CORS is a browser-only
-      // control and the token is the real secret here.
-      if (adminService.isBootstrapping() && bootstrapOrigins.has(origin)) {
-        return cb(null, true);
-      }
-      return cb(new Error(`CORS blocked for origin: ${origin}`), false);
-    },
+  const corsBase: CorsOptions = {
     credentials: true,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: [
@@ -127,6 +111,28 @@ export async function configureApp(
     ],
     exposedHeaders: ["set-cookie", "x-request-id"],
     optionsSuccessStatus: 204,
+  };
+  const platformOrigins = new Set(staticOrigins);
+
+  // Per-request decision (ADR-0006): the platform fallback (CORS_ORIGINS) applies everywhere; a
+  // tenant's own origins apply only to requests that resolve to that tenant.
+  app.enableCors((req: Request, cb: (err: Error | null, options: CorsOptions) => void) => {
+    const origin = req.headers.origin;
+    if (!origin) return cb(null, { ...corsBase, origin: true });
+
+    const fallback = adminService.isBootstrapping()
+      ? new Set([...platformOrigins, ...bootstrapOrigins])
+      : platformOrigins;
+    const allowed = corsRefreshService.isOriginAllowed(
+      origin,
+      { hostname: req.hostname, headers: req.headers, method: req.method },
+      fallback,
+    );
+    if (allowed) return cb(null, { ...corsBase, origin: true });
+    return cb(null, {
+      ...corsBase,
+      origin: (_o, done) => done(new Error(`CORS blocked for origin: ${origin}`), false),
+    });
   });
 
   app.useGlobalPipes(

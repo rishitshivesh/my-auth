@@ -38,6 +38,7 @@ const SYSTEM_ROLES = [
   { name: "Owner",     description: "Full access to everything in the organization",  isSystem: true  },
   { name: "Admin",     description: "Administrative access with some limitations",     isSystem: true  },
   { name: "Member",    description: "Basic member access",                             isSystem: true  },
+  { name: "Guest",     description: "Minimal read-only access to own profile",         isSystem: true  },
   { name: "Developer", description: "Access to API keys and developer tools",          isSystem: false },
   { name: "Viewer",    description: "Read-only access",                                isSystem: false },
 ];

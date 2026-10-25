@@ -98,3 +98,5 @@ for (const k of ["SENTRY_PLATFORM_DOMAIN", "COOKIE_DOMAIN", "SEED_SUPERADMIN_EMA
 set("SENTRY_SETUP_LOG_DIR", path.resolve(__dirname, "../../.e2e-setup-log"));
 set("ALLOW_TENANT_ID_HEADER", "true");
 set("UPLOAD_DIR", path.resolve(__dirname, "../../.e2e-uploads"));
+// LDAP e2e dials an in-process server on this machine's LAN address.
+set("LDAP_ALLOWED_PRIVATE_CIDRS", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10");

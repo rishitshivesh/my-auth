@@ -168,3 +168,48 @@ answer `422`.
 The policy applies to registration, invite acceptance, password reset and password change.
 
 ---
+
+---
+
+### GET /tenants/current/allowed-origins
+
+Browser origins allowed to call the API with credentials for **this tenant**. Requires `tenant:read`.
+
+```http
+GET /tenants/current/allowed-origins
+Authorization: Bearer <admin-token>
+```
+
+**Response `200`:** `{ "origins": ["https://app.acme.com"] }`
+
+### PUT /tenants/current/allowed-origins
+
+Replaces the whole list. Requires `tenant:write`; audited as `tenant.settings_updated` with the
+added/removed origins.
+
+```http
+PUT /tenants/current/allowed-origins
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{ "origins": ["https://app.acme.com", "http://localhost:3000"] }
+```
+
+| Rule | Detail |
+|---|---|
+| Shape | scheme + host + optional port only. No path, query, fragment, credentials or trailing slash |
+| Scheme | `https` required; `http` only for `localhost` / `127.0.0.1` |
+| Wildcards | never (`*`, `https://*.x.com`, `null` are rejected) |
+| Size | at most 50 entries, 255 characters each |
+
+Entries are lower-cased and de-duplicated; the response echoes the stored list. Any invalid entry
+answers `422` and nothing is saved.
+
+**How the CORS check uses it.** The API resolves the tenant of each request (custom domain, tenant
+subdomain, `X-Tenant-Slug`, as for every other route). An `Origin` is accepted when it is in that
+tenant's list, in the tenant's OAuth clients' `allowedOrigins`, or in the platform `CORS_ORIGINS`
+fallback (the admin portal, platform and setup routes). One tenant's origin is never accepted for
+another tenant. Changes apply immediately on the instance that handled the `PUT` and within about a
+minute on other instances. Browsers send no `X-Tenant-Slug` on a CORS preflight, so a preflight
+that does not identify its tenant by host is answered from all tenants' lists; the actual request
+is always checked against its own tenant. See ADR-0006.

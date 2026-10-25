@@ -19,12 +19,7 @@ export class RegisterDto {
 
   @ApiProperty({ example: "SecureP@ssw0rd123!" })
   @IsString()
-  @MinLength(8)
   @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      "Password must contain uppercase, lowercase, number and special character",
-  })
   password!: string;
 
   @ApiProperty({ example: "tenant-uuid", required: false })
@@ -90,12 +85,7 @@ export class ResetPasswordDto {
 
   @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
   @IsString()
-  @MinLength(8)
   @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      "Password must contain uppercase, lowercase, number and special character",
-  })
   password!: string;
 }
 

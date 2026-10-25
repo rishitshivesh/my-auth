@@ -77,3 +77,41 @@ export function isLoopbackOrMetadataIp(address: string): boolean {
   if (family === 0) return false;
   return loopbackMetadata.check(ip, family === 4 ? "ipv4" : "ipv6");
 }
+
+/** Parses one "addr/prefix" CIDR; throws a descriptive Error on malformed input. */
+function parseCidr(cidr: string): { address: string; prefix: number; family: "ipv4" | "ipv6" } {
+  const [address, prefixRaw, ...rest] = cidr.split("/");
+  const family = address ? net.isIP(address) : 0;
+  if (!address || family === 0 || prefixRaw === undefined || rest.length > 0 || !/^\d{1,3}$/.test(prefixRaw)) {
+    throw new Error(`"${cidr}" is not a valid CIDR (expected e.g. 10.0.0.0/8)`);
+  }
+  const prefix = Number(prefixRaw);
+  const max = family === 4 ? 32 : 128;
+  if (prefix > max) throw new Error(`"${cidr}" has a prefix longer than ${max}`);
+  return { address, prefix, family: family === 4 ? "ipv4" : "ipv6" };
+}
+
+/** Parses a comma-separated CIDR list. Empty/undefined means "none". Throws on any bad entry. */
+export function parseCidrList(raw: string | undefined): string[] {
+  const entries = (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  for (const entry of entries) parseCidr(entry);
+  return entries;
+}
+
+/**
+ * True when `address` is a public address, or a private (RFC1918/ULA/CGNAT/...) address that lies
+ * inside one of `allowedCidrs`. Loopback, "this host", link-local and the cloud metadata address
+ * are NEVER allowed, whatever the list says. Call it on the RESOLVED IP, not the hostname.
+ */
+export function isDialableAddress(address: string, allowedCidrs: readonly string[]): boolean {
+  if (isLoopbackOrMetadataIp(address)) return false;
+  if (!isPrivateIp(address)) return true;
+  const ip = unwrapMappedV4(address.replace(/^\[|\]$/g, ""));
+  const family = net.isIP(ip) === 4 ? "ipv4" : "ipv6";
+  const allowed = new net.BlockList();
+  for (const cidr of allowedCidrs) {
+    const parsed = parseCidr(cidr);
+    allowed.addSubnet(parsed.address, parsed.prefix, parsed.family);
+  }
+  return net.isIP(ip) !== 0 && allowed.check(ip, family);
+}

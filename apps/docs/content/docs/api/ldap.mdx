@@ -7,6 +7,15 @@ description: Directory connections and sync behaviour.
 
 Manage connections under `/ldap/connections`; `POST /ldap/connections/{id}/sync` runs a sync.
 
+## Network restrictions (SSRF)
+
+The connection `host` is resolved and every resolved address is checked, not the hostname, so a DNS name
+that rebinds to an internal address is refused. Private addresses (RFC1918, CGNAT, IPv6 ULA) are denied
+unless they fall inside a CIDR listed in the `LDAP_ALLOWED_PRIVATE_CIDRS` environment variable
+(comma-separated, e.g. `10.20.0.0/16,192.168.50.0/24`; default empty = deny all private). Loopback,
+`0.0.0.0/8` and link-local (`169.254.0.0/16`, cloud metadata) are always denied. A malformed CIDR list
+stops the service at startup. Rejected hosts return `400 VALIDATION_FAILED` on field `host`.
+
 ## Sync behaviour
 
 - New directory entries (valid `mail`) are created as verified, active users and tagged with the connection that provisioned them. Existing users with the same email are updated but **not** tagged.

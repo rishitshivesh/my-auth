@@ -9,6 +9,7 @@ import {
 import { Request, Response, NextFunction } from "express";
 import { TenantService } from "../../modules/tenant/tenant.service";
 import { Tenant } from "@repo/database";
+import { extractTenantSlugFromHost } from "../tenant/tenant-host";
 
 // Extend Express Request to include tenant
 declare global {
@@ -117,62 +118,8 @@ export class TenantResolverMiddleware implements NestMiddleware {
     return null;
   }
 
-  /**
-   * Extract the tenant slug from a hostname.
-   *
-   * When SENTRY_PLATFORM_DOMAIN is set (production):
-   *   acme.sentry.scrolloop.com  →  "acme"
-   *   sentry.scrolloop.com       →  "sentry"  (platform = sentry tenant)
-   *   api.sentry.scrolloop.com   →  null      (reserved label, not a tenant)
-   *   unrelated.com              →  null
-   *
-   * Without SENTRY_PLATFORM_DOMAIN (local dev):
-   *   Falls back to splitting on "." and using the first label.
-   *   localhost → null (no routing on localhost).
-   */
   private extractTenantSlug(hostname: string): string | null {
-    const host = hostname.split(":")[0] as string; // strip port
-
-    if (this.platformDomain) {
-      // Exact match: request IS the platform domain → sentry tenant
-      if (host === this.platformDomain) {
-        return "sentry";
-      }
-
-      // Subdomain of platform: {slug}.{platformDomain}
-      const suffix = `.${this.platformDomain}`;
-      if (host.endsWith(suffix)) {
-        const prefix = host.slice(0, host.length - suffix.length);
-        // Only accept single-label prefixes (no nested subdomains like a.b.platform.com)
-        if (prefix && !prefix.includes(".") && !this.isReservedLabel(prefix)) {
-          return prefix;
-        }
-      }
-
-      // Host doesn't belong to the platform domain — custom-domain flow handles it
-      return null;
-    }
-
-    // ── Local dev fallback (no SENTRY_PLATFORM_DOMAIN) ─────────────────────
-    if (host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
-      return null;
-    }
-
-    const parts = host.split(".");
-    if (parts.length < 3) return null;
-
-    const first = parts[0] as string;
-    return this.isReservedLabel(first) ? null : first;
-  }
-
-  /** Labels that are infrastructure identifiers, not tenant slugs. */
-  private isReservedLabel(label: string): boolean {
-    const reserved = new Set([
-      "www", "api", "admin", "mail", "smtp", "ftp",
-      "cdn", "static", "assets", "media", "auth",
-      "status", "docs", "help", "support",
-    ]);
-    return reserved.has(label.toLowerCase());
+    return extractTenantSlugFromHost(hostname, this.platformDomain);
   }
 
   /**

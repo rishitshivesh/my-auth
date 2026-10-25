@@ -17,6 +17,13 @@ const baseEnv = (): Record<string, unknown> => ({
 const validate = (env: Record<string, unknown>) => validationSchema.validate(env);
 
 describe('env validation schema', () => {
+  it('defaults LDAP_ALLOWED_PRIVATE_CIDRS to empty and rejects malformed CIDRs', () => {
+    expect(validate(baseEnv()).value.LDAP_ALLOWED_PRIVATE_CIDRS).toBe('');
+    expect(validate({ ...baseEnv(), LDAP_ALLOWED_PRIVATE_CIDRS: '10.0.0.0/8, 192.168.0.0/16' }).error).toBeUndefined();
+    const { error } = validate({ ...baseEnv(), LDAP_ALLOWED_PRIVATE_CIDRS: '10.0.0.0/99' });
+    expect(error?.message).toMatch(/LDAP_ALLOWED_PRIVATE_CIDRS/);
+  });
+
   it('accepts a minimal valid env and applies defaults', () => {
     const { error, value } = validate(baseEnv());
     expect(error).toBeUndefined();

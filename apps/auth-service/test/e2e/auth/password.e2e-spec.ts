@@ -112,7 +112,7 @@ describe("forgot / reset / change password", () => {
       expect(weak.body.errors.length).toBeGreaterThan(0);
       expect(weak.body.errors[0]).toHaveProperty("field");
 
-      const common = await reset(user.email, otp, "password1234567");
+      const common = await reset(user.email, otp, "123456789abc");
       expect(common.status).toBe(422);
     });
 

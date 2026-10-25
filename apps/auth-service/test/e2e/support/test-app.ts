@@ -29,6 +29,7 @@ export interface HttpClient {
   put(path: string): request.Test;
   patch(path: string): request.Test;
   delete(path: string): request.Test;
+  options(path: string): request.Test;
 }
 
 export interface TestApp {
@@ -67,6 +68,7 @@ function makeHttp(app: NestExpressApplication, opts: HttpOptions = {}): HttpClie
     put: (p) => apply(request(server).put(p)),
     patch: (p) => apply(request(server).patch(p)),
     delete: (p) => apply(request(server).delete(p)),
+    options: (p) => apply(request(server).options(p)),
   };
 }
 

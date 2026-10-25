@@ -12,13 +12,14 @@ Sentry ships with a two-layer authorization model:
 
 ## Default roles
 
-Every tenant workspace is bootstrapped with three system roles:
+Every tenant workspace is bootstrapped with four system roles:
 
 | Role | Description |
 |------|-------------|
 | `owner` | Full access to all resources. Assigned to the user who created the workspace. |
 | `admin` | Can manage users, roles, and settings. Cannot delete the workspace. |
 | `member` | Read-only access to workspace resources. |
+| `guest` | Lowest priority (below `member`). Minimal read-only access: own profile and own sessions only. Seeded for every tenant, including existing ones via migration `SeedGuestSystemRole1951000000000`. |
 
 Custom roles can be created via the API or the admin portal.
 

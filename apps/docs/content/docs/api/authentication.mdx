@@ -80,7 +80,10 @@ x-tenant-id: acme
 }
 ```
 
-**Errors:** `409` email already exists · `400` password too weak
+The password is checked only against the tenant password policy (minimum length, common-password list,
+repetition, must not contain the email). There is no forced uppercase/digit/symbol rule; passphrases are fine.
+
+**Errors:** `409` email already exists · `400` password violates the tenant password policy
 
 ---
 

@@ -77,4 +77,26 @@ export const SystemRoles = {
       ],
     },
   },
+
+  GUEST: {
+    name: 'Guest',
+    slug: 'guest',
+    description: 'Minimal read-only access: own profile and own sessions only.',
+    isSystem: true,
+    priority: 5,
+    policy: {
+      Version: '2024-01-01',
+      Statement: [
+        {
+          Sid: 'GuestOwnReadOnly',
+          Effect: 'Allow' as const,
+          Action: ['users:read', 'sessions:read'],
+          Resource: [
+            'sentry:tenant:*:user:${sentry:UserId}',
+            'sentry:tenant:*:session:${sentry:UserId}:*',
+          ],
+        },
+      ],
+    },
+  },
 };

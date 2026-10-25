@@ -1,3 +1,4 @@
+import { SystemRoles } from '@/modules/rbac/constants/system-roles';
 import { TenantRegistrationService, RegisterTenantDto } from './tenant-registration.service';
 import { assertPasswordPolicy } from '../auth/password-policy';
 import { hashPassword } from '../auth/password-hashing';
@@ -120,9 +121,11 @@ describe('TenantRegistrationService.registerTenant', () => {
     expect(assertPasswordPolicy).toHaveBeenCalledWith('Str0ng!Pass', { email: 'ada@acme.io' });
     expect(hashPassword).toHaveBeenCalledWith('Str0ng!Pass');
     expect(b.user.create).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tn1', passwordHash: 'HASH', firstName: 'Ada', lastName: 'Lovelace King', emailVerified: true, mfaEnabled: false }));
-    expect(b.role.save).toHaveBeenCalledTimes(3);
-    expect(b.policy.save).toHaveBeenCalledTimes(3);
-    expect(b.rolePolicy.save).toHaveBeenCalledTimes(3);
+    expect(b.role.save).toHaveBeenCalledTimes(Object.keys(SystemRoles).length);
+    expect(b.policy.save).toHaveBeenCalledTimes(Object.keys(SystemRoles).length);
+    expect(b.rolePolicy.save).toHaveBeenCalledTimes(Object.keys(SystemRoles).length);
+    expect(Object.values(SystemRoles).map((r) => r.slug)).toEqual(['owner', 'admin', 'member', 'guest']);
+    expect(b.role.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'guest', priority: 5, isSystem: true }));
     expect(b.userRole.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', tenantId: 'tn1' }));
     expect(b.qr.startTransaction).toHaveBeenCalled();
     expect(b.qr.commitTransaction).toHaveBeenCalled();

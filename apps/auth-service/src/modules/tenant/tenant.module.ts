@@ -27,6 +27,8 @@ import { RedisService } from "@/common/service/redis.service";
 import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
+import { TenantAllowedOriginsController } from "./tenant-allowed-origins.controller";
+import { TenantAllowedOriginsService } from "./tenant-allowed-origins.service";
 import { GuardsModule } from "@/common/guards/guards.module";
 
 @Module({
@@ -53,12 +55,14 @@ import { GuardsModule } from "@/common/guards/guards.module";
     FileStorageService,
     TenantSchemaService,
     TenantRegistrationService,
+    TenantAllowedOriginsService,
   ],
   controllers: [
     TenantController,
     TenantBrandingController,
     PublicBrandingController,
     TenantRegistrationController,
+    TenantAllowedOriginsController,
   ],
   exports: [TenantService, TenantBrandingService, TenantSchemaService],
 })

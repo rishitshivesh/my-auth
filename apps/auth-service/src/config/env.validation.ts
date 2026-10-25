@@ -1,4 +1,5 @@
 import * as Joi from "joi";
+import { parseCidrList } from "../common/security/private-ip";
 
 /**
  * Environment contract for the auth-service.
@@ -53,6 +54,21 @@ export const validationSchema = Joi.object({
   // LDAP sync aborts (deactivating nobody) when more than this share of a connection's
   // provisioned users would be deactivated at once, e.g. after a broken filter.
   LDAP_MAX_DEACTIVATE_PERCENT: Joi.number().min(0).max(100).default(20),
+  // Comma-separated CIDRs of private networks LDAP directories may live in (e.g. "10.20.0.0/16").
+  // Empty (default) denies every private address. Loopback, 0.0.0.0/8 and link-local
+  // (169.254.0.0/16, cloud metadata) stay denied regardless.
+  LDAP_ALLOWED_PRIVATE_CIDRS: Joi.string()
+    .allow("")
+    .default("")
+    .custom((value: string, helpers) => {
+      try {
+        parseCidrList(value);
+        return value;
+      } catch (err) {
+        return helpers.error("any.invalid", { message: (err as Error).message });
+      }
+    })
+    .messages({ "any.invalid": "LDAP_ALLOWED_PRIVATE_CIDRS: {{#message}}" }),
   // Test-only: lets e2e webhook deliveries reach 127.0.0.1. Rejected (must be
   // "false") whenever NODE_ENV is not "test", so it cannot be enabled in production.
   WEBHOOK_ALLOW_LOOPBACK: Joi.when("NODE_ENV", {

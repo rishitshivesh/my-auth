@@ -12,7 +12,7 @@ import { CreateLdapConnectionDto, UpdateLdapConnectionDto } from "./ldap.dto";
 import * as dns from "dns/promises";
 import * as net from "net";
 import { logger } from "@/common/logger";
-import { isLoopbackOrMetadataIp } from "@/common/security/private-ip";
+import { isDialableAddress, parseCidrList } from "@/common/security/private-ip";
 
 const SYNC_EMAIL_PATTERN = /^[^\s@<>"'\\]+@[^\s@<>"'\\]+\.[^\s@<>"'\\]+$/;
 
@@ -50,14 +50,25 @@ export class LdapService {
     @Optional() private securityEvents?: SecurityEventService,
   ) {}
 
-  /** SSRF guard: tenant-supplied hosts must not resolve to loopback / link-local / metadata. */
+  /**
+   * SSRF guard: tenant-supplied hosts are resolved and every RESOLVED address is checked (never the
+   * hostname), so a DNS name that rebinds to an internal address is refused. Private ranges are
+   * dialable only inside LDAP_ALLOWED_PRIVATE_CIDRS; loopback/link-local/metadata never are.
+   */
   private async assertHostDialable(host: string): Promise<void> {
     const addresses = net.isIP(host)
       ? [host]
       : (await dns.lookup(host, { all: true }).catch(() => [])).map((a) => a.address);
-    if (addresses.some(isLoopbackOrMetadataIp)) {
+    const allowed = parseCidrList(this.config.get<string>("LDAP_ALLOWED_PRIVATE_CIDRS", ""));
+    if (addresses.some((address) => !isDialableAddress(address, allowed))) {
       throw new ApiException("VALIDATION_FAILED", {
-        errors: [{ field: "host", message: "LDAP host must not be a loopback or link-local address" }],
+        errors: [
+          {
+            field: "host",
+            message:
+              "LDAP host resolves to a private, loopback or link-local address that is not allowed for this deployment",
+          },
+        ],
       });
     }
   }
