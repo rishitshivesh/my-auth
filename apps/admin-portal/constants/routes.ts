@@ -27,6 +27,7 @@ export const authRoutes = {
   mfaEnroll: () => "/mfa/enroll",
   invite: (token: string) => `/invite/${seg(token)}`,
   callback: () => "/u/auth/callback",
+  consent: (query?: { transaction_id?: string }) => withQuery("/u/consent", query),
   error: () => "/error",
 } as const;
 
@@ -37,12 +38,14 @@ export const onboardingRoutes = {
 } as const;
 
 export const accountRoutes = {
-  overview: () => "/dashboard",
+  /** Landing page of the personal account (`/dashboard` itself is the platform dashboard). */
+  overview: () => "/dashboard/profile",
   profile: () => "/dashboard/profile",
   security: () => "/dashboard/security",
-  settings: () => "/dashboard/settings",
   applications: () => "/dashboard/applications",
   activity: () => "/dashboard/activity",
+  sessions: () => "/dashboard/security/sessions",
+  deleteAccount: () => "/dashboard/security/delete",
 } as const;
 
 /** Routes inside one workspace: `/t/[slug]/...`. */
@@ -55,21 +58,27 @@ export function tenantRoutes(slug: string) {
     user: (id: string) => `${base}/users/${seg(id)}`,
     roles: () => `${base}/roles`,
     groups: () => `${base}/groups`,
+    permissions: () => `${base}/permissions`,
     policies: () => `${base}/policies`,
     simulator: () => `${base}/policies/simulate`,
     applications: () => `${base}/applications`,
+    application: (clientId: string) => `${base}/applications/${seg(clientId)}`,
     clients: () => `${base}/clients`,
     connections: () => `${base}/connections`,
     saml: () => `${base}/connections/saml`,
     scim: () => `${base}/connections/scim`,
     ldap: () => `${base}/connections/ldap`,
     webhooks: () => `${base}/webhooks`,
+    webhookDeliveries: (id: string) => `${base}/webhooks/${seg(id)}`,
     audit: () => `${base}/audit`,
     branding: () => `${base}/branding`,
     domains: () => `${base}/domains`,
     settings: () => `${base}/settings`,
     security: () => `${base}/security`,
     devices: () => `${base}/security/devices`,
+    billing: () => `${base}/billing`,
+    provisioning: () => `${base}/connections/provisioning`,
+    notifications: () => `${base}/notifications`,
   } as const;
 }
 

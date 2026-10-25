@@ -1,3 +1,6 @@
-export default function TenantsLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+import { type ReactNode } from "react";
+import { PlatformConsoleFrame } from "@/features/shell/views/PlatformConsoleFrame";
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return <PlatformConsoleFrame>{children}</PlatformConsoleFrame>;
 }

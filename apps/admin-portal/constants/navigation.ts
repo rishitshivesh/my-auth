@@ -27,8 +27,10 @@ export function tenantNav(slug: string): readonly NavEntry[] {
     { id: "dashboard", href: r.dashboard(), icon: LayoutDashboard, labelKey: "tenant.shell.nav.dashboard", sectionKey: s("overview") },
     { id: "users", href: r.users(), icon: Users, labelKey: "tenant.shell.nav.users", sectionKey: s("access"), permission: "users:read" },
     { id: "roles", href: r.roles(), icon: ShieldCheck, labelKey: "tenant.shell.nav.roles", sectionKey: s("access"), permission: "roles:read" },
-    { id: "groups", href: r.groups(), icon: UsersRound, labelKey: "tenant.shell.nav.groups", sectionKey: s("access"), capability: "groups" },
+    { id: "groups", href: r.groups(), icon: UsersRound, labelKey: "tenant.shell.nav.groups", sectionKey: s("access"), permission: "groups:read" },
     { id: "policies", href: r.policies(), icon: ScrollText, labelKey: "tenant.shell.nav.policies", sectionKey: s("access"), permission: "policies:read" },
+    { id: "permissions", href: r.permissions(), icon: KeyRound, labelKey: "access.nav.permissions", sectionKey: s("access"), permission: "permissions:read" },
+    { id: "simulator", href: r.simulator(), icon: ShieldCheck, labelKey: "tenant.shell.nav.simulator", sectionKey: s("access"), permission: "policies:simulate" },
     { id: "applications", href: r.applications(), icon: AppWindow, labelKey: "tenant.shell.nav.applications", sectionKey: s("applications"), permission: "clients:read" },
     { id: "connections", href: r.connections(), icon: Plug, labelKey: "tenant.shell.nav.connections", sectionKey: s("connections") },
     { id: "saml", href: r.saml(), icon: KeyRound, labelKey: "tenant.shell.nav.saml", sectionKey: s("connections") },
@@ -55,7 +57,6 @@ export function platformNav(): readonly NavEntry[] {
 
 export function accountNav(): readonly NavEntry[] {
   return [
-    { id: "overview", href: accountRoutes.overview(), icon: LayoutDashboard, labelKey: "account.shell.nav.overview" },
     { id: "profile", href: accountRoutes.profile(), icon: User, labelKey: "account.shell.nav.profile" },
     { id: "security", href: accountRoutes.security(), icon: Fingerprint, labelKey: "account.shell.nav.security" },
     { id: "activity", href: accountRoutes.activity(), icon: Activity, labelKey: "account.shell.nav.activity", capability: "personalActivity" },

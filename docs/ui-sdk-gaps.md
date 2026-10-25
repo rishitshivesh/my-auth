@@ -28,3 +28,20 @@ Notes
 
 - Two session families exist (`/sessions/*` and `/users/me/sessions`). The SDK uses `/sessions/*` only.
 - `login` lockout surfaces as `AUTH_ACCOUNT_LOCKED` (423) or `RATE_LIMITED` with `retryAfterSeconds`.
+
+## Open in the UI
+
+`TODO(gap:...)` markers in `apps/admin-portal` (grep `TODO(gap:`), grouped by cause. Several auth markers
+predate the backend passes above and should be re-checked against the table before more UI work.
+
+| Area | Markers | What is missing |
+|---|---|---|
+| Auth (hosted) | Passwordless sign-up; Password recovery by link; Pre-session MFA enrollment; Email-OTP/passkey second factor; Destination retention; Invite lifecycle (invitee); Social login completion claims | Marked Closed in the table above for the backend and SDK; the portal views still carry the older notices and fallbacks. Passwordless sign-up stays genuinely open. |
+| Account | Profile response shape (clear a field, password-exists flag); Step-up / recent auth; Social link-token claims | Profile DTO; UI wiring of `account.reauthenticate`; link-token user claim. |
+| Connected applications | N02-grants | `GET /users/me/consents`, `DELETE /users/me/consents/:clientId`. Screen renders the proposed-capability view. |
+| Workspace | T04-register-session | Registration session handling in the portal now that cookies are set. |
+| Users and access | T02-boolean-filter, T08-member-lookup, N10-resend | Boolean list filter DTO, group members by user id only (names resolved client-side), no invite resend endpoint. |
+| Applications | T11-edit-contract, T12-sdk-snippets | Client update accepts a limited field set; tested SDK snippets contract. |
+| Connections | N09-provisioning-history | Per-run SCIM provisioning history. |
+| Tenant admin | T20 (provider credential screen), T22 (domains), N01 (MFA/session policy) | Dedicated credential editing screen (endpoint exists); domains and policy backends. |
+| Platform | P03 (owner email ignored, immediate delete), P05 (SMTP edit/test), P06 (server-side search/paging/export), P07 (cleanup stats, global user lookup) | Platform-scoped endpoints for each. |

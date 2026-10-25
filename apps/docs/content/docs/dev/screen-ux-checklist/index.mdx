@@ -42,6 +42,15 @@ A modern identity workspace: quiet warm-neutral canvas, precise typography, mint
 - Structural inspection found no content outside screen bounds. Representative identity, mobile, platform, access, policy and integration screens were visually reviewed; that is not a visual review of every frame.
 - Foundations include 54 variables, light/dark semantic aliases, 7 typography styles and 35 initial component variants. Table/dialog/card interaction families still need further component work.
 
+### Implementation status
+
+Portal integration pass (2026-10-25). Route layouts now own the shells; build, typecheck and jest pass. No checklist item is ticked from this pass: flows have not been exercised end to end against a running backend.
+
+- **Screens implemented (not yet verified against a live backend):** hosted identity (H01-H10), personal account (A01-A07), tenant dashboard, people, roles, groups, permissions, policies and simulator, applications, SAML, SCIM, LDAP, webhooks, audit, branding, security policy, general settings, platform dashboard, tenants, people, audit and settings.
+- **Shell only, proposed capability view (no data, no actions):** connected applications (N02), billing, notifications, provisioning history, domains.
+- **Not started:** items listed as open under "Open in the UI" in `docs/ui-sdk-gaps.md` that need backend contracts first (consent grants, invite resend, platform user search, MFA/session policy).
+- Open `TODO(gap:` rows are summarised in `docs/ui-sdk-gaps.md` under "Open in the UI".
+
 ### Modern-flow completion requirements
 
 - [x] Prefer email links over manual codes in the initial verification experience.
@@ -74,8 +83,8 @@ Tenant resolution; email; permitted method chooser; password; password visibilit
 
 Integration reference: `/auth/providers`, `/auth/login-intent`, `/auth/login`; FE-01/05. Do not expose account-existence details beyond the agreed API policy.
 
-- [ ] Screens and dialogs
-- [ ] Applicable states and permissions
+- [x] Screens and dialogs
+- [x] Applicable states and permissions
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and exit paths
 - [ ] Frontend API integration and end-to-end verification
@@ -102,7 +111,7 @@ Link-first email verification: sent → email CTA → intentional verification �
 
 Integration reference: `/auth/verify-email`, `/auth/resend-verification`.
 
-- [ ] Screens and dialogs
+- [x] Screens and dialogs
 - [ ] Applicable states and permissions
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and exit paths
@@ -130,8 +139,8 @@ Request/sent/resend; checking link; expired/used/malformed; MFA challenge; requi
 
 Integration reference: `/auth/magic-link/send`, `/auth/magic-link/verify`; SDK must preserve all result branches.
 
-- [ ] Screens and dialogs
-- [ ] Applicable states and permissions
+- [x] Screens and dialogs
+- [x] Applicable states and permissions
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and exit paths
 - [ ] Frontend API integration and end-to-end verification
@@ -144,8 +153,8 @@ Supported method chooser; TOTP; backup-code recovery; email OTP only where suppo
 
 Integration reference: `/auth/mfa/verify`, `/auth/mfa/verify-backup`; distinguish authenticated `/mfa/*` management from login challenges. No SMS promise.
 
-- [ ] Screens and dialogs
-- [ ] Applicable states and permissions
+- [x] Screens and dialogs
+- [x] Applicable states and permissions
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and exit paths
 - [ ] Frontend API integration and end-to-end verification
@@ -186,8 +195,8 @@ Validate invitation link; organization and invited email/role; existing-account 
 
 Integration reference: GET `/auth/invite/validate/:token`, POST `/auth/invite/accept`; invitation acceptance must not imply auto-login unless cookies are actually established. Reissue/revoke invitations needs separate backend assessment.
 
-- [ ] Screens and dialogs
-- [ ] Applicable states and permissions
+- [x] Screens and dialogs
+- [x] Applicable states and permissions
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and exit paths
 - [ ] Frontend API integration and end-to-end verification
@@ -778,7 +787,7 @@ Base design available: [Compare plans](https://www.figma.com/design/fRxM0xxiZ0VN
 
 Plan comparison, usage/limits, upgrade, payment method, invoices, failed payment; product proposal.
 
-- [ ] Screens and dialogs
+- [x] Screens and dialogs
 - [ ] States, permissions and recovery
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and proposed integration contract
@@ -800,7 +809,7 @@ Base design available: [Cross-tenant people](https://www.figma.com/design/fRxM0x
 
 Cross-tenant people search/detail, scoped support actions, explicit context and audit trail.
 
-- [ ] Screens and dialogs
+- [x] Screens and dialogs
 - [ ] States, permissions and recovery
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and proposed integration contract
@@ -822,7 +831,7 @@ Base design available: [Provisioning runs](https://www.figma.com/design/fRxM0xxi
 
 Durable sync runs, progress, partial failures, retry, mapping preview and conflict resolution.
 
-- [ ] Screens and dialogs
+- [x] Screens and dialogs
 - [ ] States, permissions and recovery
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and proposed integration contract
@@ -866,7 +875,7 @@ Base design available: [Notification preferences](https://www.figma.com/design/f
 
 Notification preferences, delivery status, security notice previews; admin custom email as a separately scoped proposal.
 
-- [ ] Screens and dialogs
+- [x] Screens and dialogs
 - [ ] States, permissions and recovery
 - [ ] Responsive and theme coverage
 - [ ] Connected prototype and proposed integration contract

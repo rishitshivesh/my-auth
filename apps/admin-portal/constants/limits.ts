@@ -19,3 +19,13 @@ export const RECENT_AUTH_INTENT_TTL_MS = 10 * 60_000;
 
 export const SECRET_AUTO_HIDE_MS = 60_000;
 export const DEFAULT_STALE_TIME_MS = 30_000;
+
+/** Personal account forms. */
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 128;
+export const PROFILE_NAME_MAX_LENGTH = 100;
+export const PROFILE_PHONE_MAX_LENGTH = 32;
+export const PASSKEY_NAME_MAX_LENGTH = 100;
+export const SECURITY_EVENTS_PAGE_SIZE = 25;
+export const SECURITY_EVENTS_MAX = 100;
+export const RECOVERY_CODES_LOW_THRESHOLD = 3;

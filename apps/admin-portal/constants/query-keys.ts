@@ -45,6 +45,7 @@ export function queryKeys(scope: QueryScope) {
     tenants: domain(scope, "tenants"),
     mfa: domain(scope, "mfa"),
     workspaces: domain(scope, "workspaces"),
+    account: domain(scope, "account"),
   } as const;
 }
 

@@ -6,18 +6,7 @@ import { nextJsConfig } from "@repo/eslint-config/next-js";
  * goes on this list.
  */
 const LEGACY_COPY_DEBT = [
-  "components/admin-sidebar.tsx",
-  "components/slug-input.tsx",
-  "components/tenant-sidebar.tsx",
-  "components/auth/**",
-  "components/branding/**",
-  "components/dashboard/**",
-  "components/inputs/**",
   "components/layouts/**",
-  "components/login/**",
-  "components/mfa/**",
-  "components/onboarding/**",
-  "components/portal/**",
   "components/providers/**",
 ];
 

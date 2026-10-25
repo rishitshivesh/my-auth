@@ -11,16 +11,20 @@ export interface LinkLandingViewProps {
   workspace?: string;
   onContinue?: () => void;
   onSecondary?: () => void;
+  /** Purpose-specific text for the valid state (replaces the generic account/workspace line). */
+  validDescription?: string;
+  /** Code-fallback hint. Pass null when the flow has no manual code. */
+  alternateDeviceHint?: string | null;
 }
 
-export function LinkLandingView({ status, purpose, account = "", workspace = "", onContinue, onSecondary }: LinkLandingViewProps) {
+export function LinkLandingView({ status, purpose, account = "", workspace = "", onContinue, onSecondary, validDescription, alternateDeviceHint }: LinkLandingViewProps) {
   const { t } = useCopy();
   const copy = (() => {
     switch (status) {
       case "valid":
         return {
           title: purpose,
-          description: t("auth.linkLanding.valid.description", { account, workspace }),
+          description: validDescription ?? t("auth.linkLanding.valid.description", { account, workspace }),
           action: t("auth.linkLanding.valid.action"),
           secondaryAction: t("auth.linkLanding.valid.cancel"),
         };
@@ -44,7 +48,7 @@ export function LinkLandingView({ status, purpose, account = "", workspace = "",
       copy={copy}
       onPrimary={onContinue}
       onSecondary={onSecondary}
-      alternateDeviceHint={t("auth.linkLanding.alternateDevice")}
+      alternateDeviceHint={alternateDeviceHint === null ? undefined : (alternateDeviceHint ?? t("auth.linkLanding.alternateDevice"))}
     />
   );
 }

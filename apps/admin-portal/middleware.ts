@@ -170,7 +170,7 @@ export async function middleware(request: NextRequest) {
     ?? 'sentry'
 
   const isSuperAdminRoute =
-    pathname.startsWith('/dashboard') ||
+    pathname === '/dashboard' ||
     pathname.startsWith('/tenants') ||
     pathname.startsWith('/users') ||
     pathname.startsWith('/audit-logs') ||

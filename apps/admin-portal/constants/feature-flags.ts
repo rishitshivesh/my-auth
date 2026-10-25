@@ -7,7 +7,7 @@ import type { CopyKey } from "@/i18n";
  * expose fake data. Until then routes render the honest ProposedCapability shell.
  */
 export const PROPOSED_CAPABILITIES = {
-  groups: false,
+  groups: true,
   domains: false,
   ownership: false,
   billing: false,
@@ -17,8 +17,8 @@ export const PROPOSED_CAPABILITIES = {
   notifications: false,
   developer: false,
   consent: false,
-  personalActivity: false,
-  accountDeletion: false,
+  personalActivity: true,
+  accountDeletion: true,
   passwordless: false,
   notAvailableForPlatform: false,
 } as const satisfies Record<string, boolean>;

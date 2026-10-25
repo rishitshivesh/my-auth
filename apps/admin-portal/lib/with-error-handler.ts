@@ -7,6 +7,8 @@ export interface ErrorHandlerConfig {
   showSuccessToast?: boolean;
   successMessage?: string;
   errorMessage?: string;
+  /** Public (pre-session) calls set false: an expired link token must not bounce to sign-in. */
+  redirectOnSessionEnd?: boolean;
 }
 
 interface HasMessage {
@@ -54,6 +56,7 @@ export function withErrorHandler<Args extends unknown[], R>(
     showSuccessToast = false,
     successMessage,
     errorMessage,
+    redirectOnSessionEnd = true,
   } = config;
 
   return async (...args: Args): Promise<R> => {
@@ -94,13 +97,14 @@ export function withErrorHandler<Args extends unknown[], R>(
 
       return result as R;
     } catch (error: unknown) {
-      if (error instanceof SentryApiError && SESSION_ENDED_CODES.has(error.code)) {
+      if (redirectOnSessionEnd && error instanceof SentryApiError && SESSION_ENDED_CODES.has(error.code)) {
         redirectToLogin();
         throw error;
       }
 
       const legacyExpired =
         !(error instanceof SentryApiError) &&
+        redirectOnSessionEnd &&
         error instanceof Error &&
         (error.message === "SESSION_EXPIRED" ||
           error.message.toLowerCase().includes("session expired") ||

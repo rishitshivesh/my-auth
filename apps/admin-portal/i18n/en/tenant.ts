@@ -21,6 +21,11 @@ export const tenant = {
       settings: "Settings",
       security: "Security",
     },
+    mismatch: {
+      title: "This workspace is not your current session",
+      description: "You are signed in to a different workspace. Open your own workspace, or sign out and sign in to this one.",
+      action: "Open my workspace",
+    },
     switcher: {
       label: "Switch workspace",
       current: "Current workspace",

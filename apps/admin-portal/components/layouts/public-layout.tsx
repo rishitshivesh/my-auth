@@ -9,7 +9,7 @@ interface PublicLayoutProps {
   showNav?: boolean
 }
 
-export function PublicLayout({ children, logoUrl, tenantName = "Scrolloop Sentry", showNav = true }: PublicLayoutProps) {
+export function PublicLayout({ children, tenantName = "Scrolloop Sentry", showNav = true }: PublicLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {showNav && (
