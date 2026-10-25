@@ -301,7 +301,7 @@ describe("social auth", () => {
 
     it("link flow: token -> provider redirect -> callback links to that user only", async () => {
       const u = await addMember(t, fx, "member");
-      const lt = (await as(t, fx.slug, u.accessToken).post("/auth/social/link/token")).body.data.data.linkToken as string;
+      const lt = (await as(t, fx.slug, u.accessToken).post("/auth/social/link/token")).body.data.linkToken as string;
       const redirect = await t.http({ tenant: fx.slug }).get(`/auth/social/link/google?lt=${lt}`);
       expect(redirect.status).toBe(302);
       stubProvider("google", googleProfile(u.email, "g-auth-link-" + Date.now()));
@@ -323,7 +323,7 @@ describe("social auth", () => {
       expect(conns.body.data).toHaveLength(0);
       // ... nor with a link token minted for a different user.
       const other = await addMember(t, fx, "member");
-      const lt = (await as(t, fx.slug, other.accessToken).post("/auth/social/link/token")).body.data.data.linkToken as string;
+      const lt = (await as(t, fx.slug, other.accessToken).post("/auth/social/link/token")).body.data.linkToken as string;
       await callback("google", stateOf({ ...forged, lt }));
       expect((await as(t, fx.slug, victim.accessToken).get("/auth/social/connections")).body.data).toHaveLength(0);
     });

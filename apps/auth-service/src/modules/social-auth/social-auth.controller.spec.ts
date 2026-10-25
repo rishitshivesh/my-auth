@@ -217,7 +217,12 @@ describe("claimSession", () => {
     const { c, jwt } = build();
     jwt.verify.mockReturnValue({ type: "social_completion", accessToken: "AT", tenantSlug: "acme" });
     const res = {} as never;
-    await expect(c.claimSession({ ct: "ct" }, res)).resolves.toEqual({ tenantSlug: "acme", expiresIn: 900 });
+    (jwt as unknown as { decode: jest.Mock }).decode = jest.fn().mockReturnValue({ tenantId: "t1", groups: ["owner"] });
+    await expect(c.claimSession({ ct: "ct" }, res)).resolves.toEqual({
+      tenantSlug: "acme",
+      session: { tenantId: "t1", tenantSlug: "acme", groups: ["owner"] },
+      expiresIn: 900,
+    });
     expect(setAccessTokenCookie).toHaveBeenCalledWith(res, "AT");
     expect(jwt.verify).toHaveBeenCalledWith("ct", { publicKey: "PUBPEM", algorithms: ["RS256"] });
   });
@@ -225,6 +230,7 @@ describe("claimSession", () => {
   it("defaults tenantSlug to ''", async () => {
     const { c, jwt } = build();
     jwt.verify.mockReturnValue({ type: "social_completion", accessToken: "AT" });
+    (jwt as unknown as { decode: jest.Mock }).decode = jest.fn().mockReturnValue(null);
     expect((await c.claimSession({ ct: "ct" }, {} as never)).tenantSlug).toBe("");
   });
 
@@ -261,9 +267,9 @@ describe("link confirmation and management", () => {
 
   it("getLinkToken, getConnections, unlinkAccount delegate with request identity", async () => {
     const { c, svc } = build();
-    const req = { tenantId: "t1", user: { sub: "u1", userId: "u1" } };
+    const req = { tenantId: "t1", user: { sub: "u1" } };
     svc.createLinkToken.mockResolvedValue({ linkToken: "L" });
-    expect(await c.getLinkToken(req)).toEqual({ status: 200, data: { linkToken: "L" } });
+    expect(await c.getLinkToken(req)).toEqual({ linkToken: "L" });
     await c.getConnections(req);
     await c.unlinkAccount(req, "google");
     expect(svc.getUserConnections).toHaveBeenCalledWith("u1", "t1");

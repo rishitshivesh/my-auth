@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { TenantMfaPolicy } from '@repo/database';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
+import { ApiException } from '@/common/http';
 
 @Injectable()
 export class MfaPolicyService {
@@ -58,11 +60,48 @@ export class MfaPolicyService {
     return this.policyRepo.save(policy);
   }
 
-  async issueEnrollmentToken(userId: string, tenantId: string): Promise<string> {
+  /**
+   * Short-lived, purpose-bound token that lets a user whose first factor already succeeded
+   * enroll a second factor before any session exists. `fa` records that first factor so the
+   * eventual session carries a truthful `amr`. `jti` makes it single-use.
+   */
+  async issueEnrollmentToken(
+    userId: string,
+    tenantId: string,
+    firstFactor: EnrollmentFirstFactor = 'pwd',
+  ): Promise<string> {
     const secret = this.configService.get<string>('JWT_SECRET');
     return this.jwtService.signAsync(
-      { sub: userId, tid: tenantId, purpose: 'mfa_enrollment' },
+      { sub: userId, tid: tenantId, purpose: 'mfa_enrollment', fa: firstFactor, jti: randomUUID() },
       { expiresIn: '15m', secret },
     );
   }
+
+  async verifyEnrollmentToken(token: string): Promise<EnrollmentClaims> {
+    const secret = this.configService.get<string>('JWT_SECRET');
+    let payload: Record<string, unknown>;
+    try {
+      payload = await this.jwtService.verifyAsync(token, { secret, algorithms: ['HS256'] });
+    } catch (err: unknown) {
+      throw new ApiException(
+        err instanceof Error && err.name === 'TokenExpiredError' ? 'AUTH_TOKEN_EXPIRED' : 'AUTH_TOKEN_INVALID',
+      );
+    }
+    const { sub, tid, purpose, fa, jti } = payload;
+    if (purpose !== 'mfa_enrollment' || typeof sub !== 'string' || typeof tid !== 'string' || typeof jti !== 'string') {
+      throw new ApiException('AUTH_TOKEN_INVALID');
+    }
+    const firstFactor: EnrollmentFirstFactor =
+      fa === 'magic_link' || fa === 'passkey' || fa === 'social' ? fa : 'pwd';
+    return { userId: sub, tenantId: tid, jti, firstFactor };
+  }
+}
+
+export type EnrollmentFirstFactor = 'pwd' | 'magic_link' | 'passkey' | 'social';
+
+export interface EnrollmentClaims {
+  userId: string;
+  tenantId: string;
+  jti: string;
+  firstFactor: EnrollmentFirstFactor;
 }

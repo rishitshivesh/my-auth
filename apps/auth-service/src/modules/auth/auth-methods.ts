@@ -36,3 +36,37 @@ export function serializeAmr(amr: readonly string[]): string {
 export function parseAmr(stored: string | null | undefined): string[] {
   return stored ? stored.split(" ").filter(Boolean) : [];
 }
+
+/** Second factors that can be completed at /auth/mfa/verify (+ its helper endpoints). */
+export const COMPLETABLE_MFA_METHODS = ["totp", "email", "webauthn"] as const;
+export type CompletableMfaMethod = (typeof COMPLETABLE_MFA_METHODS)[number];
+
+/** Never advertise a method (e.g. sms) the login cannot actually complete. */
+export function completableMfaMethods(methods: readonly string[]): string[] {
+  return methods.filter((m) => (COMPLETABLE_MFA_METHODS as readonly string[]).includes(m));
+}
+
+export function preferredCompletable(methods: readonly string[], preferred?: string | null): string {
+  const usable = completableMfaMethods(methods);
+  return preferred && usable.includes(preferred) ? preferred : (usable[0] ?? "totp");
+}
+
+export type FirstFactor = "pwd" | "magic_link" | "passkey" | "social";
+
+/** Truthful `amr` for a session: the first factor that was proven plus the second factor method. */
+export function amrAfterSecondFactor(
+  first: string | undefined,
+  second: CompletableMfaMethod | "backup_code",
+): readonly AmrValue[] {
+  const base =
+    first === "magic_link" ? AMR_MAGIC_LINK
+    : first === "social" ? AMR_SOCIAL
+    : first === "passkey" ? AMR_PASSKEY
+    : AMR_PASSWORD;
+  const extra: AmrValue[] =
+    second === "totp" ? [Amr.OTP, Amr.TOTP, Amr.MFA]
+    : second === "email" ? [Amr.OTP, Amr.MFA]
+    : second === "webauthn" ? [Amr.HARDWARE_KEY, Amr.WEBAUTHN, Amr.MFA]
+    : [Amr.BACKUP_CODE, Amr.MFA];
+  return [...new Set([...base, ...extra])];
+}

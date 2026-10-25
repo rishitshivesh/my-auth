@@ -86,8 +86,8 @@ describe("registration and email verification", () => {
 
     expect((await http.post("/auth/verify-email").send({ token })).status).toBe(200);
     const again = await t.http({ tenant: tenant.slug }).post("/auth/verify-email").send({ token });
-    expect(again.status).toBe(401);
-    expect(again.body.code).toBe("AUTH_TOKEN_INVALID");
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe("LINK_ALREADY_USED");
   });
 
   it("refuses an expired verification token", async () => {
@@ -100,8 +100,8 @@ describe("registration and email verification", () => {
     );
 
     const res = await t.http({ tenant: tenant.slug }).post("/auth/verify-email").send({ token });
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("AUTH_TOKEN_INVALID");
+    expect(res.status).toBe(410);
+    expect(res.body.code).toBe("LINK_EXPIRED");
   });
 
   it("refuses an unknown verification token", async () => {

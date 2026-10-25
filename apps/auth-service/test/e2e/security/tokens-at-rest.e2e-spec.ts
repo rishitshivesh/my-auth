@@ -28,7 +28,8 @@ describe("security: single-use tokens are hashed at rest; dev-only endpoints clo
     const ok = await t.http({ tenant: a.slug }).post("/auth/verify-email").send({ token: raw });
     expect(ok.status).toBe(200);
     const again = await t.http({ tenant: a.slug }).post("/auth/verify-email").send({ token: raw });
-    expect(again.status).toBe(401);
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe("LINK_ALREADY_USED");
   });
 
   it("invite token is stored as sha256, validates via the raw token, and the digest is not accepted", async () => {

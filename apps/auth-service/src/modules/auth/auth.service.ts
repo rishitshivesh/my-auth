@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { hashToken } from "@/common/security/token-hash";
+import { LinkTokenService } from "@/common/service/link-token.service";
 import type { StringValue } from 'ms';
 import { HttpException, Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -30,6 +31,8 @@ import { BruteForceService } from "@/modules/auth/brute-force.service";
 import { MfaService } from "@/modules/mfa/mfa.service";
 import { MfaPolicyService } from "@/modules/mfa/mfa-policy.service";
 import { WebAuthnService } from "@/modules/mfa/webauthn.service";
+import { RedirectUriService } from "./redirect-uri.service";
+import { EmailOtpService } from "@/modules/mfa/email-otp.service";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { GetProvidersResponseDto, SocialProviderDto, LoginIntentResponseDto } from "./auth.dto";
@@ -41,7 +44,7 @@ import {
 } from "@/common/service/domain-events.service";
 import { PasswordChangeEffectsService } from "@/common/service/password-change-effects.service";
 import { LoginThrottleService } from "./login-throttle.service";
-import { AMR_MAGIC_LINK, AMR_PASSKEY, AMR_PASSWORD, AMR_PASSWORD_BACKUP_CODE, AMR_PASSWORD_TOTP, parseAmr } from "./auth-methods";
+import { AMR_MAGIC_LINK, AMR_PASSKEY, AMR_PASSWORD, AMR_PASSWORD_BACKUP_CODE, AMR_PASSWORD_TOTP, amrAfterSecondFactor, completableMfaMethods, preferredCompletable, parseAmr, type CompletableMfaMethod } from "./auth-methods";
 import { assertTenantPasswordPolicy, passwordExpired, TenantPasswordPolicyService } from "@/modules/password-policy/tenant-password-policy.service";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "./password-hashing";
 /**
@@ -70,6 +73,25 @@ export interface SessionClaims {
   groups: string[];
 }
 const PASSWORD_RESET_ATTEMPTS_RESOURCE = "pwreset-attempts";
+const PASSWORD_RESET_LINK_PURPOSE = "password-reset";
+const MAGIC_LINK_TTL_SECONDS = 10 * 60;
+const MAGIC_POLL_RESOURCE = "magic-poll";
+const MAGIC_POLL_USED_RESOURCE = "magic-poll-used";
+const INVITE_RENEW_RESOURCE = "invite-renew";
+const INVITE_RENEW_COOLDOWN_SECONDS = 10 * 60;
+const INVITE_RENEW_DAYS = 7;
+const REAUTH_RESOURCE = "reauth-at";
+const REAUTH_TTL_SECONDS = 30 * 24 * 60 * 60;
+const MFA_ENROLL_USED_RESOURCE = "mfa-enroll-used";
+const MFA_ENROLL_ATTEMPTS_RESOURCE = "mfa-enroll-attempts";
+const MFA_ENROLL_TTL_SECONDS = 15 * 60;
+const MFA_ENROLL_MAX_ATTEMPTS = 5;
+const PASSWORD_RESET_LINK_TTL_SECONDS = 60 * 60;
+
+export type MagicLinkOutcome =
+  | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }
+  | { status: 'mfa_enrollment_required'; enrollmentToken: string }
+  | { mfaRequired: true; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string };
 
 @Injectable()
 export class AuthService {
@@ -105,7 +127,22 @@ export class AuthService {
     private readonly domainEvents: DomainEventsService,
     private readonly passwordEffects: PasswordChangeEffectsService,
     @Optional() private readonly passwordPolicy?: TenantPasswordPolicyService,
+    @Optional() private readonly linkTokenService?: LinkTokenService,
+    @Optional() private readonly emailOtpService?: EmailOtpService,
+    @Optional() private readonly redirectUriService?: RedirectUriService,
   ) {}
+
+  private async checkedRedirect(tenantId: string, raw?: string): Promise<string | undefined> {
+    if (raw === undefined || raw === "") return undefined;
+    if (!this.redirectUriService) throw new ApiException("NOT_IMPLEMENTED");
+    return this.redirectUriService.validate(tenantId, raw);
+  }
+
+  /** One-time link store; only absent in hand-built unit-test instances. */
+  private get links(): LinkTokenService {
+    if (!this.linkTokenService) throw new ApiException("INTERNAL_ERROR");
+    return this.linkTokenService;
+  }
 
   private async signToken(payload: Record<string, unknown>, expiresIn: string, tenantId?: string): Promise<string> {
     const { kid, privateKey } = await this.jwksService.getCurrentSigningKey(tenantId);
@@ -359,6 +396,7 @@ export class AuthService {
           email: user.email,
           tenantId,
           type: "mfa_pending",
+          pm: "pwd",
           // Identifies this MFA challenge so wrong codes can be counted per challenge.
           jti: randomUUID(),
         },
@@ -382,8 +420,8 @@ export class AuthService {
       return {
         mfaRequired: true,
         tempToken,
-        availableMethods: mfaStatus.methods,
-        preferredMethod: mfaStatus.preferredMethod || "totp",
+        availableMethods: completableMfaMethods(mfaStatus.methods),
+        preferredMethod: preferredCompletable(mfaStatus.methods, mfaStatus.preferredMethod),
         message: "MFA verification required",
       };
     }
@@ -559,7 +597,9 @@ export class AuthService {
   /**
    * Request password reset (TENANT SCOPED)
    */
-  async forgotPassword(tenantId: string, email: string, ip: string) {
+  async forgotPassword(tenantId: string, email: string, ip: string, redirectUri?: string) {
+    // Validated before the account lookup so the outcome never depends on whether the account exists.
+    const redirect = await this.checkedRedirect(tenantId, redirectUri);
     const user = await this.userRepository.findOne({
       where: {
         email,
@@ -601,7 +641,9 @@ export class AuthService {
       userAgent: "system",
     });
 
-    // Send password reset OTP email
+    // Link (primary) then code (fallback). The code email goes last so it stays the newest message.
+    const linkToken = await this.links.issue(tenantId, PASSWORD_RESET_LINK_PURPOSE, user.id, PASSWORD_RESET_LINK_TTL_SECONDS, redirect ? { redirectUri: redirect } : undefined, true);
+    await this.emailService.sendPasswordResetEmail(user, linkToken);
     await this.emailService.sendPasswordResetOtpEmail(user, otp);
 
     // OTP intentionally not logged for security
@@ -610,13 +652,22 @@ export class AuthService {
   /**
    * Send magic link sign-in email (TENANT SCOPED)
    */
-  async sendMagicLink(tenantId: string, email: string): Promise<void> {
+  async sendMagicLink(
+    tenantId: string,
+    email: string,
+    opts: { redirectUri?: string; poll?: boolean } = {},
+  ): Promise<{ pollingNonce?: string; expiresInSeconds: number }> {
+    const redirect = await this.checkedRedirect(tenantId, opts.redirectUri);
+    // Issued for every request (known or not) so the response never reveals whether the account exists.
+    const pollingNonce = opts.poll ? crypto.randomBytes(32).toString("hex") : undefined;
+    const result = { ...(pollingNonce ? { pollingNonce } : {}), expiresInSeconds: MAGIC_LINK_TTL_SECONDS };
+
     // Defense-in-depth: tenant_id filter retained alongside schema-level isolation
     // Both layers must match for a query to succeed
     const user = await this.userRepository.findOne({ where: { email, tenantId } });
 
     // Don't reveal if user exists
-    if (!user) return;
+    if (!user) return result;
 
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -625,13 +676,22 @@ export class AuthService {
       { id: user.id, tenantId },
       {
         magicLinkToken: tokenHash,
-        magicLinkExpiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        magicLinkExpiresAt: new Date(Date.now() + MAGIC_LINK_TTL_SECONDS * 1000),
       },
     );
+
+    const pollHash = pollingNonce ? hashToken(pollingNonce) : undefined;
+    if (redirect || pollHash) {
+      await this.links.setMeta(tenantId, "magic-link", rawToken, { ...(redirect ? { redirectUri: redirect } : {}), ...(pollHash ? { pollHash } : {}) }, MAGIC_LINK_TTL_SECONDS);
+    }
+    if (pollHash) {
+      await this.redisService.set(tenantId, MAGIC_POLL_RESOURCE, pollHash, { state: "pending", userId: user.id }, MAGIC_LINK_TTL_SECONDS);
+    }
 
     await this.emailService.sendMagicLinkEmail(user, rawToken);
 
     // Magic link token intentionally not logged for security
+    return result;
   }
 
   /**
@@ -642,11 +702,7 @@ export class AuthService {
     rawToken: string,
     ip: string,
     userAgent: string,
-  ): Promise<
-    | { accessToken: string; refreshToken: string; tenantSlug: string; session: SessionClaims }
-    | { status: 'mfa_enrollment_required'; enrollmentToken: string }
-    | { mfaRequired: true; tempToken: string; message: string; availableMethods: string[]; preferredMethod: string }
-  > {
+  ): Promise<MagicLinkOutcome & { redirectUri?: string }> {
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     const user = await this.userRepository
@@ -658,8 +714,16 @@ export class AuthService {
       .getOne();
 
     if (!user) {
-      throw new ApiException("AUTH_TOKEN_INVALID");
+      const stale = await this.userRepository
+        .createQueryBuilder("user")
+        .addSelect("user.magicLinkToken")
+        .where("user.magicLinkToken = :tokenHash", { tokenHash })
+        .andWhere("user.tenantId = :tenantId", { tenantId })
+        .getOne();
+      throw await this.links.failureFor(tenantId, "magic-link", rawToken, !!stale);
     }
+    await this.linkTokenService?.noteSpent(tenantId, "magic-link", rawToken);
+    const linkMeta = await this.linkTokenService?.getMeta<{ redirectUri?: string; pollHash?: string }>(tenantId, "magic-link", rawToken);
 
     // Clear the token (one-time use) and mark email as verified
     await this.userRepository.update(
@@ -673,6 +737,33 @@ export class AuthService {
       },
     );
 
+    // Another device may be waiting for this link (POST /auth/magic-link/poll).
+    if (linkMeta?.pollHash) {
+      await this.redisService.set(tenantId, MAGIC_POLL_RESOURCE, linkMeta.pollHash, { state: "complete", userId: user.id }, MAGIC_LINK_TTL_SECONDS);
+    }
+    const outcome = await this.finishMagicLinkLogin(user, tenantId, ip, userAgent);
+    return linkMeta?.redirectUri ? { ...outcome, redirectUri: linkMeta.redirectUri } : outcome;
+  }
+
+  /**
+   * Cross-device completion: the device that requested the link redeems its nonce once the link
+   * was verified elsewhere. The nonce never leaves that device (it is not in the email), is stored
+   * hashed, lives as long as the link and is single use. Unknown, pending and expired nonces all
+   * answer "pending", so nothing is revealed. MFA / enrollment policy still applies.
+   */
+  async pollMagicLink(tenantId: string, pollingNonce: string, ip: string, userAgent: string): Promise<MagicLinkOutcome | { status: "pending" }> {
+    const pollHash = hashToken(pollingNonce);
+    const record = await this.redisService.get<{ state: string; userId: string }>(tenantId, MAGIC_POLL_RESOURCE, pollHash);
+    if (!record || record.state !== "complete") return { status: "pending" };
+    if (!(await this.redisService.setIfAbsent(tenantId, MAGIC_POLL_USED_RESOURCE, pollHash, 1, MAGIC_LINK_TTL_SECONDS))) {
+      throw new ApiException("LINK_ALREADY_USED");
+    }
+    const user = await this.userRepository.findOne({ where: { id: record.userId, tenantId } });
+    if (!user) return { status: "pending" };
+    return this.finishMagicLinkLogin(user, tenantId, ip, userAgent);
+  }
+
+  private async finishMagicLinkLogin(user: User, tenantId: string, ip: string, userAgent: string): Promise<MagicLinkOutcome> {
     // MFA enrollment enforcement: check policy AFTER credential verification but BEFORE session
     if (user.isActive === false) {
       throw new ApiException("USER_SUSPENDED");
@@ -687,6 +778,7 @@ export class AuthService {
           email: user.email,
           tenantId,
           type: "mfa_pending",
+          pm: "magic_link",
           jti: randomUUID(),
         },
         "5m",
@@ -695,8 +787,8 @@ export class AuthService {
       return {
         mfaRequired: true,
         tempToken,
-        availableMethods: magicLinkMfaStatus.methods,
-        preferredMethod: magicLinkMfaStatus.preferredMethod || "totp",
+        availableMethods: completableMfaMethods(magicLinkMfaStatus.methods),
+        preferredMethod: preferredCompletable(magicLinkMfaStatus.methods, magicLinkMfaStatus.preferredMethod),
         message: "MFA verification required",
       };
     }
@@ -711,7 +803,7 @@ export class AuthService {
       if (needsEnrollment) {
         return {
           status: 'mfa_enrollment_required' as const,
-          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId),
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId, 'magic_link'),
         };
       }
     }
@@ -837,26 +929,76 @@ export class AuthService {
       throw invalid();
     }
 
-    await assertTenantPasswordPolicy(this.passwordPolicy, tenantId, newPassword, { email: user.email });
+    await this.assertPasswordAcceptable(user, tenantId, newPassword);
+    await this.applyNewPassword(user, tenantId, newPassword, ipAddress, meta);
+  }
 
-    // Check password history (depth is per tenant)
+  /**
+   * Non-consuming check of a reset link (safe for scanners and GET). Throws LINK_EXPIRED,
+   * LINK_ALREADY_USED or AUTH_TOKEN_INVALID; never reveals the account.
+   */
+  async validateResetLink(tenantId: string, token: string): Promise<{ valid: true; expiresInSeconds: number; redirectUri?: string }> {
+    const found = await this.links.inspect(tenantId, PASSWORD_RESET_LINK_PURPOSE, token);
+    if (found.state !== "valid" || !found.record) throw LinkTokenService.failure(found.state);
+    const redirectUri = found.record.meta?.["redirectUri"];
+    return {
+      valid: true,
+      expiresInSeconds: Math.max(0, Math.floor((found.record.expiresAt - Date.now()) / 1000)),
+      ...(typeof redirectUri === "string" ? { redirectUri } : {}),
+    };
+  }
+
+  /** Reset by emailed link: the token is bound to tenant + purpose + one account, single use. */
+  async resetPasswordWithToken(
+    tenantId: string,
+    token: string,
+    newPassword: string,
+    ipAddress = "0.0.0.0",
+    meta: { userAgent?: string; requestId?: string } = {},
+  ): Promise<{ redirectUri?: string }> {
+    const found = await this.links.inspect(tenantId, PASSWORD_RESET_LINK_PURPOSE, token);
+    if (found.state !== "valid" || !found.record) throw LinkTokenService.failure(found.state);
+
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash")
+      .addSelect("user.passwordHistory")
+      .where("user.tenantId = :tenantId", { tenantId })
+      .andWhere("user.id = :id", { id: found.record.subjectId })
+      .getOne();
+    if (!user) throw LinkTokenService.failure("invalid");
+
+    // Policy first: a rejected password must leave the link usable.
+    await this.assertPasswordAcceptable(user, tenantId, newPassword);
+    await this.links.consume(tenantId, PASSWORD_RESET_LINK_PURPOSE, token);
+    await this.applyNewPassword(user, tenantId, newPassword, ipAddress, meta);
+    const redirectUri = found.record.meta?.["redirectUri"];
+    return typeof redirectUri === "string" ? { redirectUri } : {};
+  }
+
+  private async assertPasswordAcceptable(user: User, tenantId: string, newPassword: string): Promise<void> {
+    await assertTenantPasswordPolicy(this.passwordPolicy, tenantId, newPassword, { email: user.email });
     const policy = await this.passwordPolicy?.get(tenantId);
     const historyCount = policy?.historyCount ?? 5;
-    const passwordHistory = user.passwordHistory || [];
-    for (const oldHash of passwordHistory.slice(0, historyCount)) {
-      const isReused = await verifyPassword(oldHash, newPassword);
-      if (isReused) {
+    for (const oldHash of (user.passwordHistory || []).slice(0, historyCount)) {
+      if (await verifyPassword(oldHash, newPassword)) {
         throw new ApiException("PASSWORD_POLICY", {
-          errors: [
-            {
-              field: "password",
-              message: "Password has been used recently. Please choose a different password.",
-            },
-          ],
+          errors: [{ field: "password", message: "Password has been used recently. Please choose a different password." }],
         });
       }
     }
+  }
 
+  private async applyNewPassword(
+    user: User,
+    tenantId: string,
+    newPassword: string,
+    ipAddress: string,
+    meta: { userAgent?: string; requestId?: string },
+  ): Promise<void> {
+    const policy = await this.passwordPolicy?.get(tenantId);
+    const historyCount = policy?.historyCount ?? 5;
+    const passwordHistory = user.passwordHistory || [];
     const newPasswordHash = await hashPassword(newPassword);
 
     // Update password and history
@@ -878,6 +1020,8 @@ export class AuthService {
       },
     );
     await this.redisService.delete(tenantId, PASSWORD_RESET_ATTEMPTS_RESOURCE, user.id);
+    // Any outstanding reset link for this account is spent too, whichever path was used.
+    await this.linkTokenService?.supersede(tenantId, PASSWORD_RESET_LINK_PURPOSE, user.id);
 
     // Revoke every session and refresh token IN THIS TENANT (force re-login),
     // record the event with the request id and email the owner.
@@ -894,7 +1038,7 @@ export class AuthService {
   /**
    * Verify email address (TENANT SCOPED)
    */
-  async verifyEmail(tenantId: string, token: string) {
+  async verifyEmail(tenantId: string, token: string): Promise<{ redirectUri?: string }> {
     const user = await this.userRepository.findOne({
       where: {
         tenantId, // ← Tenant filter
@@ -904,8 +1048,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new ApiException("AUTH_TOKEN_INVALID");
+      const stale = await this.userRepository.findOne({
+        where: { tenantId, emailVerificationToken: hashToken(token) },
+      });
+      throw await this.links.failureFor(tenantId, "verify-email", token, !!stale);
     }
+    await this.linkTokenService?.noteSpent(tenantId, "verify-email", token);
 
     await this.userRepository.update(
       { id: user.id, tenantId }, // ← Tenant-scoped update
@@ -926,12 +1074,15 @@ export class AuthService {
       ipAddress: "0.0.0.0",
       userAgent: "system",
     });
+    const meta = await this.linkTokenService?.getMeta<{ redirectUri?: string }>(tenantId, "verify-email", token);
+    return meta?.redirectUri ? { redirectUri: meta.redirectUri } : {};
   }
 
   /**
    * Resend verification email (TENANT SCOPED)
    */
-  async resendVerification(tenantId: string, email: string) {
+  async resendVerification(tenantId: string, email: string, redirectUri?: string) {
+    const redirect = await this.checkedRedirect(tenantId, redirectUri);
     const user = await this.userRepository.findOne({
       where: {
         email,
@@ -960,6 +1111,7 @@ export class AuthService {
       },
     );
 
+    if (redirect) await this.links.setMeta(tenantId, "verify-email", emailVerificationToken, { redirectUri: redirect }, 24 * 60 * 60);
     // Send verification email
     await this.emailService.sendVerificationEmail(user, emailVerificationToken);
 
@@ -1018,7 +1170,11 @@ export class AuthService {
       accessTokenPayload.tenantId as string,
       accessTokenPayload.sessionId as string,
       undefined,
-      loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0,
+      Math.max(
+        loginSession ? Math.floor(loginSession.createdAt.getTime() / 1000) : 0,
+        // A step-up (POST /auth/reauth) survives refresh.
+        (await this.redisService.get<number>(tenantId, REAUTH_RESOURCE, accessTokenPayload.sessionId as string)) ?? 0,
+      ),
       // Refreshing keeps the methods of the original login; legacy sessions without any count as password.
       parseAmr(loginSession?.amr).length > 0 ? parseAmr(loginSession?.amr) : AMR_PASSWORD,
     );
@@ -1215,8 +1371,42 @@ export class AuthService {
     return payload;
   }
 
+  /** Creates the session + tokens once every required factor has been proven. */
+  private async issueMfaSession(args: {
+    tenantId: string;
+    userId: string;
+    email: string;
+    amr: readonly string[];
+    ip: string;
+    userAgent: string;
+  }) {
+    const { tenantId, userId, email, amr, ip } = args;
+    const userAgent = args.userAgent || "unknown";
+    const session = await this.sessionService.createSession({ userId, tenantId, email, ipAddress: ip, userAgent, amr });
+    // Same refresh-token path as password login so /refresh can rotate it.
+    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+      tenantId,
+      userId,
+      sessionId: session.id,
+      clientId: undefined,
+      ipAddress: ip,
+      userAgent,
+      expiresInDays: 30,
+    });
+    const payload = await this.buildAccessTokenPayload(userId, email, tenantId, session.id, undefined, undefined, amr);
+    const accessToken = await this.signToken(payload, "15m", tenantId);
+    return {
+      accessToken,
+      refreshToken,
+      tenantSlug: (payload.tenantSlug as string) ?? "",
+      session: this.toSessionClaims(payload),
+    };
+  }
+
   /**
-   * Verify MFA code and complete login
+   * Verify the second factor and complete login. `opts.method` defaults to TOTP; `email` needs a
+   * code emailed through requestMfaEmailOtp; `webauthn` needs the assertion from
+   * startMfaWebAuthn. A method is accepted only if the user actually has it enrolled.
    */
   async verifyMfa(
     tenantId: string,
@@ -1224,56 +1414,195 @@ export class AuthService {
     code: string,
     ip: string,
     userAgent: string,
+    opts: { method?: CompletableMfaMethod; webauthn?: { response: AuthenticationResponseJSON; sessionNonce: string } } = {},
   ) {
     const payload = await this.verifyMfaTempToken(tempToken);
+    const userId = payload.sub as string;
+    const method = opts.method ?? "totp";
+    const challengeId = typeof payload.jti === "string" ? payload.jti : undefined;
 
-    logger.info({ userId: payload.sub }, "Verifying MFA for user");
+    logger.info({ userId, method }, "Verifying MFA for user");
 
-    // Step 2: Verify TOTP code
-    const verified = await this.mfaService.verifyTotp(
-      payload.sub as string,
+    if (method !== "totp") await this.assertMfaMethodEnrolled(userId, tenantId, method);
+
+    let verified: boolean;
+    if (method === "totp") {
+      verified = await this.mfaService.verifyTotp(userId, tenantId, code, challengeId);
+    } else if (method === "email") {
+      verified = await this.requireEmailOtp().verifyOtp(userId, tenantId, code);
+    } else {
+      if (!opts.webauthn) throw new ApiException("VALIDATION_FAILED", { errors: [{ field: "webauthnResponse", message: "required for method webauthn" }] });
+      verified = await this.webauthnService.finishAuthentication(userId, tenantId, opts.webauthn.response, opts.webauthn.sessionNonce);
+    }
+    if (!verified) throw new ApiException("AUTH_MFA_INVALID");
+
+    const issued = await this.issueMfaSession({
       tenantId,
-      code,
-      typeof payload.jti === "string" ? payload.jti : undefined,
-    );
+      userId,
+      email: payload.email as string,
+      amr: amrAfterSecondFactor(typeof payload.pm === "string" ? payload.pm : undefined, method),
+      ip,
+      userAgent,
+    });
+    logger.info({ userId }, "MFA verified successfully");
+    return { ...issued, message: "MFA verified successfully" };
+  }
 
-    if (!verified) {
-      throw new ApiException("AUTH_MFA_INVALID");
+  private requireEmailOtp(): EmailOtpService {
+    if (!this.emailOtpService) throw new ApiException("NOT_IMPLEMENTED");
+    return this.emailOtpService;
+  }
+
+  private async assertMfaMethodEnrolled(userId: string, tenantId: string, method: CompletableMfaMethod): Promise<void> {
+    const status = await this.mfaService.getMfaStatus(userId, tenantId);
+    if (!status.methods.includes(method)) throw new ApiException("AUTH_MFA_INVALID");
+  }
+
+  /** Emails a login-time code. Authenticated by the mfa_pending token; only for enrolled email MFA. */
+  async requestMfaEmailOtp(tenantId: string, tempToken: string): Promise<void> {
+    const payload = await this.verifyMfaTempToken(tempToken);
+    const userId = payload.sub as string;
+    await this.assertMfaMethodEnrolled(userId, tenantId, "email");
+    await this.requireEmailOtp().sendOtp(userId, tenantId);
+  }
+
+  /** WebAuthn assertion options for the second factor, authenticated by the mfa_pending token. */
+  async startMfaWebAuthn(tenantId: string, tempToken: string) {
+    const payload = await this.verifyMfaTempToken(tempToken);
+    const userId = payload.sub as string;
+    await this.assertMfaMethodEnrolled(userId, tenantId, "webauthn");
+    const { options, sessionNonce } = await this.webauthnService.startAuthentication(userId, tenantId);
+    return { ...options, sessionNonce };
+  }
+
+  // ------------------------------------------------------------------- step-up
+
+  /** Passkey assertion options for a step-up on the caller's own account. */
+  async startReauthWebAuthn(tenantId: string, userId: string) {
+    const { options, sessionNonce } = await this.webauthnService.startAuthentication(userId, tenantId);
+    return { ...options, sessionNonce };
+  }
+
+  /**
+   * Step-up: proves the signed-in user again (password, TOTP or passkey) and refreshes the
+   * session's `authTime` so @RequireRecentAuth passes. Same session, no new session is created.
+   * Returns a fresh access token carrying the new authTime/amr.
+   */
+  async reauthenticate(
+    tenantId: string,
+    userId: string,
+    sessionId: string,
+    input: {
+      method: "password" | "totp" | "webauthn";
+      password?: string;
+      code?: string;
+      webauthn?: { response: AuthenticationResponseJSON; sessionNonce: string };
+    },
+    ctx: { ip: string; userAgent: string } = { ip: "0.0.0.0", userAgent: "unknown" },
+  ) {
+    if (!sessionId) throw new ApiException("AUTH_SESSION_REVOKED");
+    const user = await this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.passwordHash")
+      .where("user.id = :userId", { userId })
+      .andWhere("user.tenantId = :tenantId", { tenantId })
+      .getOne();
+    if (!user || user.isActive === false) throw new ApiException("AUTH_TOKEN_INVALID");
+
+    let factorAmr: string[];
+    if (input.method === "password") {
+      const ok = user.passwordHash && input.password
+        ? await verifyPassword(user.passwordHash, input.password)
+        : (await verifyAgainstDummy(input.password ?? ""), false);
+      if (!ok) throw new ApiException("AUTH_INVALID_CREDENTIALS");
+      factorAmr = [...AMR_PASSWORD];
+    } else if (input.method === "totp") {
+      if (!input.code || !(await this.mfaService.verifyTotp(userId, tenantId, input.code))) {
+        throw new ApiException("AUTH_MFA_INVALID");
+      }
+      factorAmr = ["otp", "totp", "mfa"];
+    } else {
+      if (!input.webauthn || !(await this.webauthnService.finishAuthentication(userId, tenantId, input.webauthn.response, input.webauthn.sessionNonce))) {
+        throw new ApiException("PASSKEY_INVALID");
+      }
+      factorAmr = ["hwk", "webauthn"];
     }
 
-    // Step 3: Generate real session and tokens
-    const session = await this.sessionService.createSession({
-      userId: payload.sub as string,
+    const session = await this.sessionRepository.findOne({
+      where: { id: sessionId, tenantId, userId },
+      select: { id: true, amr: true, revokedAt: true },
+    });
+    if (!session || session.revokedAt) throw new ApiException("AUTH_SESSION_REVOKED");
+
+    const now = Math.floor(Date.now() / 1000);
+    await this.redisService.set(tenantId, REAUTH_RESOURCE, sessionId, now, REAUTH_TTL_SECONDS);
+    const amr = [...new Set([...parseAmr(session.amr), ...factorAmr])];
+    const payload = await this.buildAccessTokenPayload(userId, user.email, tenantId, sessionId, undefined, now, amr);
+    const accessToken = await this.signToken(payload, "15m", tenantId);
+
+    this.securityEventService.log({
+      userId,
       tenantId,
-      email: payload.email as string,
+      actorEmail: user.email,
+      eventType: SecurityEventType.LOGIN_SUCCESS,
+      severity: "info",
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+      metadata: { reauth: true, method: input.method },
+    });
+    return { accessToken, session: this.toSessionClaims(payload) };
+  }
+
+  // ------------------------------------------------------------ pre-session enrollment
+
+  private async resolveEnrollment(tenantId: string, token: string) {
+    const claims = await this.mfaPolicyService.verifyEnrollmentToken(token);
+    // Bound to the tenant it was issued for; a token never works across tenants.
+    if (claims.tenantId !== tenantId) throw new ApiException("AUTH_TOKEN_INVALID");
+    if (await this.redisService.get(tenantId, MFA_ENROLL_USED_RESOURCE, claims.jti)) {
+      throw new ApiException("LINK_ALREADY_USED");
+    }
+    const user = await this.userRepository.findOne({ where: { id: claims.userId, tenantId } });
+    if (!user || user.isActive === false) throw new ApiException("AUTH_TOKEN_INVALID");
+    if (await this.mfaService.isMfaEnabled(user.id, tenantId)) {
+      // Enrolled users must pass the normal second-factor challenge instead.
+      throw new ApiException("MFA_ALREADY_ENABLED");
+    }
+    return { claims, user };
+  }
+
+  /** Starts TOTP enrollment for a user holding an enrollment token. Backup codes come with confirm. */
+  async enrollTotpSetup(tenantId: string, token: string): Promise<{ secret: string; qrCode: string }> {
+    const { user } = await this.resolveEnrollment(tenantId, token);
+    const { secret, qrCode } = await this.mfaService.setupTotp(user.id, tenantId);
+    return { secret, qrCode };
+  }
+
+  /** Confirms the first TOTP code, enables TOTP, spends the token and issues the session. */
+  async enrollTotpConfirm(tenantId: string, token: string, code: string, ip: string, userAgent: string) {
+    const { claims, user } = await this.resolveEnrollment(tenantId, token);
+    const attempts = await this.redisService.incr(tenantId, MFA_ENROLL_ATTEMPTS_RESOURCE, claims.jti);
+    if (attempts === 1) await this.redisService.extendTTL(tenantId, MFA_ENROLL_ATTEMPTS_RESOURCE, claims.jti, MFA_ENROLL_TTL_SECONDS);
+    if (attempts > MFA_ENROLL_MAX_ATTEMPTS) {
+      await this.redisService.setIfAbsent(tenantId, MFA_ENROLL_USED_RESOURCE, claims.jti, 1, MFA_ENROLL_TTL_SECONDS);
+      throw new ApiException("AUTH_TOKEN_INVALID");
+    }
+    const { backupCodes } = await this.mfaService.verifyAndEnableTotp(user.id, tenantId, code, {
       ipAddress: ip,
       userAgent: userAgent || "unknown",
-      amr: AMR_PASSWORD_TOTP,
     });
-
-    // Same refresh-token path as password login so /refresh can rotate it.
-    const { token: refreshToken } = await this.oauthRefreshTokenService.createRefreshToken({
+    if (!(await this.redisService.setIfAbsent(tenantId, MFA_ENROLL_USED_RESOURCE, claims.jti, 1, MFA_ENROLL_TTL_SECONDS))) {
+      throw new ApiException("LINK_ALREADY_USED");
+    }
+    const issued = await this.issueMfaSession({
       tenantId,
-      userId: payload.sub as string,
-      sessionId: session.id,
-      clientId: undefined,
-      ipAddress: ip,
-      userAgent: userAgent || "unknown",
-      expiresInDays: 30,
+      userId: user.id,
+      email: user.email,
+      amr: amrAfterSecondFactor(claims.firstFactor, "totp"),
+      ip,
+      userAgent,
     });
-
-    const mfaPayload = await this.buildAccessTokenPayload(payload.sub as string, payload.email as string, tenantId, session.id, undefined, undefined, AMR_PASSWORD_TOTP);
-    const accessToken = await this.signToken(mfaPayload, "15m", tenantId);
-
-    logger.info({ userId: payload.sub }, "MFA verified successfully");
-
-    return {
-      accessToken,
-      refreshToken,
-      tenantSlug: (mfaPayload.tenantSlug as string) ?? '',
-      session: this.toSessionClaims(mfaPayload),
-      message: "MFA verified successfully",
-    };
+    return { ...issued, backupCodes };
   }
 
   /**
@@ -1456,7 +1785,7 @@ export class AuthService {
       if (needsEnrollment) {
         return {
           status: 'mfa_enrollment_required' as const,
-          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId),
+          enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(user.id, tenantId, 'passkey'),
         };
       }
     }
@@ -1790,10 +2119,10 @@ export class AuthService {
       throw new ApiException("INVITE_INVALID");
     }
     if (invite.acceptedAt) {
-      throw new ApiException("INVITE_INVALID", { detail: "This invitation has already been used." });
+      throw new ApiException("LINK_ALREADY_USED", { detail: "This invitation has already been used." });
     }
     if (invite.expiresAt < new Date()) {
-      throw new ApiException("INVITE_INVALID", { detail: "This invitation has expired." });
+      throw new ApiException("LINK_EXPIRED", { detail: "This invitation has expired." });
     }
 
     return {
@@ -1813,7 +2142,7 @@ export class AuthService {
     password: string;
     ip: string;
     userAgent: string;
-  }): Promise<{ message: string }> {
+  }): Promise<{ message: string; canSignInNow: boolean }> {
     const invite = await this.userInviteRepository.findOne({
       where: { token: hashToken(data.token) },
       relations: ['tenant'],
@@ -1823,10 +2152,10 @@ export class AuthService {
       throw new ApiException("INVITE_INVALID");
     }
     if (invite.acceptedAt) {
-      throw new ApiException("INVITE_INVALID", { detail: "This invitation has already been used." });
+      throw new ApiException("LINK_ALREADY_USED", { detail: "This invitation has already been used." });
     }
     if (invite.expiresAt < new Date()) {
-      throw new ApiException("INVITE_INVALID", { detail: "This invitation has expired." });
+      throw new ApiException("LINK_EXPIRED", { detail: "This invitation has expired." });
     }
 
     const tenant = invite.tenant;
@@ -1887,8 +2216,45 @@ export class AuthService {
       metadata: { via: "invite" },
     });
 
-    return { message: "Account created successfully" };
+    // Email is verified by the invite and the password was just set: the invitee can sign in right away
+    // (MFA / enrollment policy still applies at that sign-in).
+    return { message: "Account created successfully", canSignInNow: true };
   }
 
-}
 
+  /**
+   * Invitee-side "send me a new link". The caller holds the (possibly expired) invite token, so
+   * the answers can be specific without revealing anything else. A fresh token replaces the old
+   * one, goes only to the invited address, and is rate limited per invitation.
+   */
+  async requestNewInvite(tenantId: string, token: string): Promise<{ message: string; expiresInDays: number }> {
+    const invite = await this.userInviteRepository.findOne({
+      where: { token: hashToken(token) },
+      relations: ['tenant'],
+    });
+    if (!invite || invite.tenantId !== tenantId) throw new ApiException("INVITE_INVALID");
+    if (invite.acceptedAt) throw new ApiException("LINK_ALREADY_USED", { detail: "This invitation has already been used." });
+    if (!invite.tenant || !invite.tenant.active) throw new ApiException("TENANT_SUSPENDED");
+
+    const claimed = await this.redisService.setIfAbsent(tenantId, INVITE_RENEW_RESOURCE, invite.id, 1, INVITE_RENEW_COOLDOWN_SECONDS);
+    if (!claimed) {
+      throw new ApiException("RATE_LIMITED", { retryAfterSeconds: INVITE_RENEW_COOLDOWN_SECONDS, detail: "A new invitation was sent recently. Check your inbox." });
+    }
+
+    const freshToken = crypto.randomBytes(64).toString("hex");
+    await this.userInviteRepository.update(invite.id, {
+      token: hashToken(freshToken),
+      expiresAt: new Date(Date.now() + INVITE_RENEW_DAYS * 24 * 60 * 60 * 1000),
+    });
+    const frontendUrl = this.configService.get<string>("FRONTEND_URL") ?? "http://localhost:3000";
+    await this.emailService.sendInviteEmail({
+      to: invite.email,
+      inviterName: "A workspace admin",
+      tenantName: invite.tenant.name,
+      tenantId,
+      inviteUrl: `${frontendUrl}/invite/${freshToken}`,
+      expiresInDays: INVITE_RENEW_DAYS,
+    });
+    return { message: "A new invitation was sent to the invited email address.", expiresInDays: INVITE_RENEW_DAYS };
+  }
+}

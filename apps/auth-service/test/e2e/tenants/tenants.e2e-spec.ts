@@ -1,4 +1,4 @@
-import { createTestApp, createTenant, uniqueSlug, uniqueEmail, STRONG_PASSWORD, loginUser, type TenantFixture, type TestApp } from "../support";
+import { cookieValue, cookiesOf, createTestApp, createTenant, uniqueSlug, uniqueEmail, STRONG_PASSWORD, loginUser, type TenantFixture, type TestApp } from "../support";
 import { addMember, adminUserId, as, auditItems, decodeJwt, type Member } from "../_shared/fixtures";
 
 describe("tenants", () => {
@@ -33,6 +33,12 @@ describe("tenants", () => {
       const res = await t.http().post("/tenants/register").send(b);
       expect(res.status).toBe(201);
       expect(res.body.data.tenantSlug ?? res.body.tenantSlug).toBe(b.slug);
+      // ADR-0003: session as httpOnly cookies, no tokens in the body.
+      const cookies = cookiesOf(res);
+      expect(cookieValue(cookies, "accessToken")).not.toBe("");
+      expect(cookieValue(cookies, "refreshToken")).not.toBe("");
+      expect(JSON.stringify(res.body)).not.toMatch(/accessToken|refreshToken|eyJ/);
+      expect((await t.http({ tenant: b.slug, cookies }).get("/auth/me")).status).toBe(200);
       const login = await loginUser(t, { slug: b.slug }, b.adminEmail, b.adminPassword);
       expect(login.res.status).toBe(200);
       const me = await as(t, b.slug, login.accessToken).get("/rbac/me/roles");
@@ -45,6 +51,8 @@ describe("tenants", () => {
       const again = await t.http().post("/tenants/register").send(b);
       expect(a.status).toBe(201);
       expect(again.status).toBe(201);
+      expect(again.body.data.tenantSlug).toBe(b.slug);
+      expect(JSON.stringify(again.body)).not.toMatch(/accessToken|refreshToken|eyJ/);
     });
 
     it("rejects duplicate, reserved and malformed slugs", async () => {

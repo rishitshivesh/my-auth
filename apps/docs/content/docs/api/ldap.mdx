@@ -9,8 +9,7 @@ Manage connections under `/ldap/connections`; `POST /ldap/connections/{id}/sync`
 
 ## Network restrictions (SSRF)
 
-The connection `host` is resolved and every resolved address is checked, not the hostname, so a DNS name
-that rebinds to an internal address is refused. Private addresses (RFC1918, CGNAT, IPv6 ULA) are denied
+The connection `host` is resolved once and every resolved address is checked, not the hostname. The service then dials the checked IP (with the hostname kept as the TLS server name, certificate verification on), so a DNS name that rebinds between check and connect cannot reach an internal address. A host that does not resolve is refused (fail closed). Private addresses (RFC1918, CGNAT, IPv6 ULA) are denied
 unless they fall inside a CIDR listed in the `LDAP_ALLOWED_PRIVATE_CIDRS` environment variable
 (comma-separated, e.g. `10.20.0.0/16,192.168.50.0/24`; default empty = deny all private). Loopback,
 `0.0.0.0/8` and link-local (`169.254.0.0/16`, cloud metadata) are always denied. A malformed CIDR list

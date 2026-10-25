@@ -6,6 +6,10 @@ import {
   Matches,
   IsOptional,
   IsNotEmpty,
+  ValidateIf,
+  IsIn,
+  IsObject,
+  IsBoolean,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -64,24 +68,41 @@ export class ForgotPasswordDto {
   @ApiProperty({ example: "user@example.com" })
   @IsEmail()
   email!: string;
+
+  @ApiPropertyOptional({ description: "Where to send the user after the link is completed. Validated against the workspace's applications / portal." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  redirectUri?: string;
 }
 
 /**
  * Reset Password DTO
  */
 export class ResetPasswordDto {
-  @ApiProperty({
-    example: "user@example.com",
-    description: "Email the reset code was sent to. The code is only valid for this account.",
+  @ApiPropertyOptional({
+    description: "Single-use token from the reset email link. When present, email and otp are not needed.",
   })
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  token?: string;
+
+  @ApiPropertyOptional({
+    example: "user@example.com",
+    description: "Fallback flow: email the reset code was sent to. The code is only valid for this account.",
+  })
+  @ValidateIf((o: ResetPasswordDto) => !o.token)
   @IsEmail()
   @MaxLength(320)
-  email!: string;
+  email?: string;
 
-  @ApiProperty({ example: "123456", description: "6-digit code from the reset email" })
+  @ApiPropertyOptional({ example: "123456", description: "Fallback flow: 6-digit code from the reset email" })
+  @ValidateIf((o: ResetPasswordDto) => !o.token)
   @IsString()
   @Matches(/^\d{6}$/, { message: "otp must be a 6-digit code" })
-  otp!: string;
+  otp?: string;
 
   @ApiProperty({ example: "NewSecureP@ssw0rd123!" })
   @IsString()
@@ -277,6 +298,17 @@ export class SendMagicLinkDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
   email!: string;
+
+  @ApiPropertyOptional({ description: "Where to send the user after the link is completed. Validated against the workspace's applications / portal." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  redirectUri?: string;
+
+  @ApiPropertyOptional({ description: "Request a cross-device polling nonce; redeem it at POST /auth/magic-link/poll on this device." })
+  @IsOptional()
+  @IsBoolean()
+  poll?: boolean;
 }
 
 export class VerifyMagicLinkDto {
@@ -345,4 +377,97 @@ export class AcceptInviteDto {
   @IsString()
   @MinLength(8)
   password!: string;
+}
+
+export class ValidateResetLinkQueryDto {
+  @ApiProperty({ description: "Token from the reset email link" })
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  token!: string;
+}
+
+/** Second-factor step of login. `method` defaults to totp. */
+export class MfaVerifyDto {
+  @ApiProperty({ description: "mfa_pending token from login / magic link" })
+  @IsString()
+  tempToken!: string;
+
+  @ApiPropertyOptional({ enum: ["totp", "email", "webauthn"], default: "totp" })
+  @IsOptional()
+  @IsIn(["totp", "email", "webauthn"])
+  method?: "totp" | "email" | "webauthn";
+
+  @ApiPropertyOptional({ description: "6-digit code (totp / email)" })
+  @ValidateIf((o: MfaVerifyDto) => o.method !== "webauthn")
+  @IsString()
+  @MaxLength(16)
+  code?: string;
+
+  @ApiPropertyOptional({ description: "method=webauthn: assertion from the browser" })
+  @ValidateIf((o: MfaVerifyDto) => o.method === "webauthn")
+  @IsObject()
+  webauthnResponse?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: "method=webauthn: sessionNonce from /auth/mfa/webauthn/start" })
+  @ValidateIf((o: MfaVerifyDto) => o.method === "webauthn")
+  @IsString()
+  sessionNonce?: string;
+}
+
+export class MfaTempTokenDto {
+  @ApiProperty({ description: "mfa_pending token from login / magic link" })
+  @IsString()
+  tempToken!: string;
+}
+
+/** Pre-session enrollment. The token may instead come from the mfa_enrollment_token cookie. */
+export class EnrollTotpSetupDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  enrollmentToken?: string;
+}
+
+export class EnrollTotpConfirmDto extends EnrollTotpSetupDto {
+  @ApiProperty({ example: "123456" })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "code must be a 6-digit code" })
+  code!: string;
+}
+
+export class ReauthDto {
+  @ApiProperty({ enum: ["password", "totp", "webauthn"] })
+  @IsIn(["password", "totp", "webauthn"])
+  method!: "password" | "totp" | "webauthn";
+
+  @ApiPropertyOptional()
+  @ValidateIf((o: ReauthDto) => o.method === "password")
+  @IsString()
+  @MaxLength(128)
+  password?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((o: ReauthDto) => o.method === "totp")
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "code must be a 6-digit code" })
+  code?: string;
+
+  @ApiPropertyOptional()
+  @ValidateIf((o: ReauthDto) => o.method === "webauthn")
+  @IsObject()
+  webauthnResponse?: Record<string, unknown>;
+
+  @ApiPropertyOptional()
+  @ValidateIf((o: ReauthDto) => o.method === "webauthn")
+  @IsString()
+  sessionNonce?: string;
+}
+
+export class PollMagicLinkDto {
+  @ApiProperty({ description: "pollingNonce returned by magic-link/send" })
+  @IsString()
+  @MinLength(32)
+  @MaxLength(128)
+  pollingNonce!: string;
 }

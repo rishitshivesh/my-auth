@@ -15,6 +15,7 @@ import {
   SecurityEvent,
   UserInvite,
   TenantMfaPolicy,
+  OAuthClient,
 } from "@repo/database";
 import { UserModule } from "../user/user.module";
 import { EmailModule } from "../email/email.module";
@@ -37,6 +38,7 @@ import { RbacService } from "@/modules/rbac/services/rbac.service";
 import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh-token.service";
 import { MfaModule } from "@/modules/mfa/mfa.module";
 import { AdminCleanupController } from "@/modules/admin/admin-cleanup.controller";
+import { RedirectUriService } from "@/modules/auth/redirect-uri.service";
 import { TokenCleanupService } from "@/modules/auth/token-cleanup.service";
 import { SessionModule } from "@/modules/session/session.module";
 import { PasswordPolicyModule } from "@/modules/password-policy/password-policy.module";
@@ -57,6 +59,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
       SecurityEvent,
       UserInvite,
       TenantMfaPolicy,
+      OAuthClient,
     ]),
     DatabaseModule,
     SecurityEventModule,
@@ -79,6 +82,7 @@ import { OAuthModule } from "@/modules/oauth/oauth.module";
     LoginThrottleService,
     PasswordChangeEffectsService,
     TokenCleanupService,
+    RedirectUriService,
   ],
   exports: [AuthService, PasswordChangeEffectsService],
 })

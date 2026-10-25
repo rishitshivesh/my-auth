@@ -7,7 +7,7 @@ jest.mock('@/common/decorators/rate-limit.decorator', () => ({ RateLimit: () => 
 jest.mock('@/common/service/redis.service', () => ({ RedisService: class RedisService {} }));
 
 function build() {
-  const svc = { checkSlugAvailability: jest.fn().mockResolvedValue({ available: true }), registerTenant: jest.fn().mockResolvedValue({ accessToken: 'AT' }) };
+  const svc = { checkSlugAvailability: jest.fn().mockResolvedValue({ available: true }), registerTenant: jest.fn().mockResolvedValue({ accessToken: 'AT', refreshToken: 'RT', tenantSlug: 'acme', user: { id: 'u1' } }) };
   const redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(undefined) };
   return { c: new TenantRegistrationController(svc as never, redis as never), svc, redis };
 }
@@ -30,16 +30,22 @@ describe('TenantRegistrationController', () => {
   describe('registerTenant', () => {
     it('returns cached result for a repeated idempotency key without re-registering', async () => {
       const { c, svc, redis } = build();
-      redis.get.mockResolvedValue({ accessToken: 'CACHED' });
-      expect(await c.registerTenant(dto, '1.1.1.1', 'ua')).toEqual({ accessToken: 'CACHED' });
+      redis.get.mockResolvedValue({ tenantSlug: 'cached' });
+      expect(await c.registerTenant(dto, '1.1.1.1', 'ua')).toEqual({ tenantSlug: 'cached' });
       expect(redis.get).toHaveBeenCalledWith('', '', 'tenant-reg:idem:acme:key-12345');
       expect(svc.registerTenant).not.toHaveBeenCalled();
     });
     it('registers, then caches for 10 minutes', async () => {
       const { c, svc, redis } = build();
-      expect(await c.registerTenant(dto, '1.1.1.1', 'ua')).toEqual({ accessToken: 'AT' });
+      const res = { cookie: jest.fn() };
+      const out = await c.registerTenant(dto, '1.1.1.1', 'ua', res as never);
+      expect(out).toEqual({ tenantSlug: 'acme', user: { id: 'u1' }, expiresIn: 900 });
+      expect(JSON.stringify(out)).not.toMatch(/AT|RT/);
+      expect(res.cookie).toHaveBeenCalledWith('accessToken', 'AT', expect.objectContaining({ httpOnly: true }));
+      expect(res.cookie).toHaveBeenCalledWith('refreshToken', 'RT', expect.objectContaining({ httpOnly: true }));
       expect(svc.registerTenant).toHaveBeenCalledWith(dto, '1.1.1.1', 'ua');
-      expect(redis.set).toHaveBeenCalledWith('', '', 'tenant-reg:idem:acme:key-12345', { accessToken: 'AT' }, 600);
+      expect(redis.set).toHaveBeenCalledWith('', '', 'tenant-reg:idem:acme:key-12345', out, 600);
+      expect(JSON.stringify(redis.set.mock.calls)).not.toMatch(/"AT"|"RT"/);
     });
     it('defaults ip/user-agent when absent', async () => {
       const { c, svc } = build();
@@ -50,7 +56,7 @@ describe('TenantRegistrationController', () => {
       const { c, redis } = build();
       redis.get.mockRejectedValue(new Error('down'));
       redis.set.mockRejectedValue(new Error('down'));
-      await expect(c.registerTenant(dto, 'ip', 'ua')).resolves.toEqual({ accessToken: 'AT' });
+      await expect(c.registerTenant(dto, 'ip', 'ua')).resolves.toMatchObject({ tenantSlug: 'acme' });
     });
     it('does not cache failures', async () => {
       const { c, svc, redis } = build();

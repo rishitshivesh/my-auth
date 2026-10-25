@@ -41,7 +41,7 @@ describe("forgot / reset / change password", () => {
       expect(known.status).toBe(200);
       expect(unknown.status).toBe(known.status);
       expect(unknown.body).toEqual(known.body);
-      expect(t.mail.allTo(user.email)).toHaveLength(1);
+      expect(t.mail.allTo(user.email).map((m) => m.template).sort()).toEqual(["otp-code", "password-reset"]);
     });
 
     it("sends nothing to unknown addresses", async () => {

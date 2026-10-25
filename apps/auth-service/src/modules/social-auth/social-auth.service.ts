@@ -336,7 +336,7 @@ export class SocialAuthService {
     if (!needsEnrollment) return null;
     return {
       type: "mfa_enrollment_required",
-      enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(userId, tenantId),
+      enrollmentToken: await this.mfaPolicyService.issueEnrollmentToken(userId, tenantId, 'social'),
     };
   }
 

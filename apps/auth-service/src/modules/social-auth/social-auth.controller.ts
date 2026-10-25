@@ -47,7 +47,7 @@ interface SocialCallbackRequest {
 
 interface AuthenticatedRequest {
   tenantId: string;
-  user: { sub: string; userId: string; email?: string; mfaVerified?: boolean };
+  user: { sub: string; email?: string; mfaVerified?: boolean };
   ip?: string;
   route?: { path: string };
   params?: Record<string, string>;
@@ -372,8 +372,16 @@ export class SocialAuthController {
 
       setAccessTokenCookie(res, payload['accessToken'] as string);
 
+      // Non-secret claims so the client need not hold or decode the token (ADR-0003).
+      const claims = (this.jwtService.decode(payload['accessToken'] as string) ?? {}) as Record<string, unknown>;
+      const tenantSlug = (payload['tenantSlug'] as string) ?? '';
       return {
-        tenantSlug: (payload['tenantSlug'] as string) ?? '',
+        tenantSlug,
+        session: {
+          tenantId: (claims['tenantId'] as string | undefined) ?? (payload['tenantId'] as string | undefined) ?? '',
+          tenantSlug,
+          groups: Array.isArray(claims['groups']) ? (claims['groups'] as string[]) : [],
+        },
         expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       };
     } catch {
@@ -419,13 +427,10 @@ export class SocialAuthController {
   @Protected()
   @HttpCode(HttpStatus.OK)
   async getLinkToken(@Req() req: AuthenticatedRequest) {
-    const userId = req.user.userId;
+    const userId = req.user.sub;
     const tenantId = req.tenantId;
-    const result = await this.socialAuthService.createLinkToken(
-      userId,
-      tenantId,
-    );
-    return { status: 200, data: result };
+    // The ResponseInterceptor adds the {status, data} envelope; wrapping here doubled it.
+    return this.socialAuthService.createLinkToken(userId, tenantId);
   }
 
   @Get("link/google")

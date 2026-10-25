@@ -53,8 +53,8 @@ describe("magic link sign-in", () => {
     expect((await t.http({ tenant: tenant.slug, cookies }).get("/auth/me")).status).toBe(200);
 
     const replay = await verify(token);
-    expect(replay.status).toBe(401);
-    expect(replay.body.code).toBe("AUTH_TOKEN_INVALID");
+    expect(replay.status).toBe(409);
+    expect(replay.body.code).toBe("LINK_ALREADY_USED");
   });
 
   it("rejects an expired link", async () => {
@@ -65,8 +65,8 @@ describe("magic link sign-in", () => {
       [user.email],
     );
     const res = await verify(token);
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("AUTH_TOKEN_INVALID");
+    expect(res.status).toBe(410);
+    expect(res.body.code).toBe("LINK_EXPIRED");
   });
 
   it("rejects an unknown token", async () => {

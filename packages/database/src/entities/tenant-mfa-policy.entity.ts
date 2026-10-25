@@ -1,8 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn, Index } from 'typeorm';
 
-// schema: 'public' forces TypeORM to qualify with public. regardless of search_path
-// (TenantSchemaMiddleware sets search_path = fk_{slug} on auth routes)
-@Entity({ name: 'tenant_mfa_policy', schema: 'public' })
+// Per-tenant table (moved into the template/fk_* schemas by MoveToTemplateSchema1935...).
+// It must NOT be pinned to `public`: there is no such table, the lookup failed with 42P01 and
+// the policy silently fell back to "not enforced".
+@Entity({ name: 'tenant_mfa_policy' })
 @Index(['tenantId'], { unique: true })
 export class TenantMfaPolicy {
   @PrimaryGeneratedColumn('uuid')

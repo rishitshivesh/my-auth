@@ -58,6 +58,6 @@ import { SecurityEventService } from "@/common/service/security-event.service";
     EmailOtpService,
     WebAuthnService,
   ],
-  exports: [MfaService, MfaPolicyService, WebAuthnService],
+  exports: [MfaService, MfaPolicyService, WebAuthnService, EmailOtpService],
 })
 export class MfaModule {}

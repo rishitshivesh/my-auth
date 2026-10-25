@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { KeyPair, OAuthRefreshToken, SecurityEvent } from "@repo/database";
 import { RedisService } from "@/common/service/redis.service";
+import { LinkTokenService } from "@/common/service/link-token.service";
 import { SecurityEventService } from "@/common/service/security-event.service";
 import { SessionService } from "@/common/service/session.service";
 import { JwksService } from "@/modules/oauth/services/jwks.service";
@@ -27,6 +28,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
   imports: [TypeOrmModule.forFeature([KeyPair, OAuthRefreshToken, SecurityEvent])],
   providers: [
     RedisService,
+    LinkTokenService,
     SecurityEventService,
     SessionService,
     JwksService,
@@ -34,6 +36,7 @@ import { OAuthRefreshTokenService } from "@/modules/oauth/services/oauth-refresh
   ],
   exports: [
     RedisService,
+    LinkTokenService,
     SecurityEventService,
     SessionService,
     JwksService,

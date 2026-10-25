@@ -8,6 +8,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Res,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import {
@@ -17,6 +18,8 @@ import {
 } from "./tenant-registration.service";
 import { Public } from "@/common/decorators/public.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
+import type { Response } from "express";
+import { ACCESS_TOKEN_TTL_SECONDS, setAuthCookies } from "@/common/http/auth-cookies";
 import { RedisService } from "@/common/service/redis.service";
 
 @ApiTags("Tenant Registration")
@@ -64,23 +67,30 @@ export class TenantRegistrationController {
     @Body() dto: RegisterTenantDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
-  ): Promise<TenantRegistrationResult> {
-    // Idempotency: if this key was already submitted within 10 minutes, return cached result
+    @Res({ passthrough: true }) res?: Response,
+  ): Promise<PublicTenantRegistration> {
+    // Idempotency: a repeated key within 10 minutes returns the same public result. Only the
+    // non-secret part is cached; credentials are never stored, so a replay sets no cookies.
     const idempotencyKey = `tenant-reg:idem:${dto.slug}:${dto.idempotencyKey}`;
-    const cached = await this.redisService.get<TenantRegistrationResult>('', '', idempotencyKey).catch(() => null);
+    const cached = await this.redisService.get<PublicTenantRegistration>('', '', idempotencyKey).catch(() => null);
     if (cached) {
       return cached;
     }
 
-    const result = await this.tenantRegistrationService.registerTenant(
+    const { accessToken, refreshToken, ...publicPart } = await this.tenantRegistrationService.registerTenant(
       dto,
       ip ?? "0.0.0.0",
       userAgent ?? "unknown",
     );
+    // ADR-0003: tokens travel only as httpOnly cookies, never in the body.
+    if (res) setAuthCookies(res, accessToken, refreshToken);
+    const result: PublicTenantRegistration = { ...publicPart, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
 
-    // Cache the result for 10 minutes so duplicate submissions return the same result
     await this.redisService.set('', '', idempotencyKey, result, 600).catch(() => {});
 
     return result;
   }
 }
+
+/** Registration response: no credentials (they are set as cookies). */
+export type PublicTenantRegistration = Omit<TenantRegistrationResult, "accessToken" | "refreshToken"> & { expiresIn: number };

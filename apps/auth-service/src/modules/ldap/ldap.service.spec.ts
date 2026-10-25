@@ -6,7 +6,7 @@ import { LdapService } from "./ldap.service";
 
 jest.mock("dns/promises", () => {
   const actual = jest.requireActual("dns/promises");
-  return { ...actual, lookup: jest.fn(actual.lookup) };
+  return { ...actual, lookup: jest.fn() };
 });
 jest.mock("ldapjs", () => ({ createClient: jest.fn() }));
 jest.mock("@/common/logger", () => ({
@@ -14,6 +14,9 @@ jest.mock("@/common/logger", () => ({
 }));
 
 const createClient = ldapjs.createClient as unknown as jest.Mock;
+const lookupMock = dns.lookup as unknown as jest.Mock;
+const PUBLIC_ADDR = "93.184.216.34";
+beforeEach(() => lookupMock.mockReset().mockResolvedValue([{ address: PUBLIC_ADDR, family: 4 }]));
 const MASTER = "ldap-master-key";
 
 type Attr = { type: string; values: string[] };
@@ -113,21 +116,26 @@ describe("LdapService CRUD and encryption", () => {
   });
 
   it("checks the RESOLVED address, not the hostname (DNS rebinding)", async () => {
-    const lookup = dns.lookup as unknown as jest.Mock;
-    const original = lookup.getMockImplementation();
-    try {
-      const denied = build();
-      lookup.mockResolvedValue([{ address: "169.254.169.254", family: 4 }] as never);
-      await expect(denied.service.create("t1", { ...(createDto as object), host: "innocent.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-      // one benign + one internal record: any bad answer refuses the host
-      lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }, { address: "10.0.0.5", family: 4 }] as never);
-      await expect(denied.service.create("t1", { ...(createDto as object), host: "mixed.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-      // public resolution passes
-      lookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
-      await expect(denied.service.create("t1", { ...(createDto as object), host: "ldap.example.com" } as never)).resolves.toBeDefined();
-    } finally {
-      lookup.mockImplementation(original as never);
-    }
+    const denied = build();
+    lookupMock.mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
+    await expect(denied.service.create("t1", { ...(createDto as object), host: "innocent.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    // mixed benign + internal records: any bad answer refuses the host
+    lookupMock.mockResolvedValue([{ address: PUBLIC_ADDR, family: 4 }, { address: "10.0.0.5", family: 4 }]);
+    await expect(denied.service.create("t1", { ...(createDto as object), host: "mixed.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    // ...unless the private one is inside an allowed CIDR
+    const allowed = build({ LDAP_ALLOWED_PRIVATE_CIDRS: "10.0.0.0/8" });
+    await expect(allowed.service.create("t1", { ...(createDto as object), host: "mixed.example.com" } as never)).resolves.toBeDefined();
+    lookupMock.mockResolvedValue([{ address: PUBLIC_ADDR, family: 4 }]);
+    await expect(denied.service.create("t1", { ...(createDto as object), host: "ldap.example.com" } as never)).resolves.toBeDefined();
+  });
+
+  it("fails closed: a lookup error or an empty answer is refused", async () => {
+    const { service, connRepo } = build();
+    lookupMock.mockRejectedValue(new Error("ENOTFOUND"));
+    await expect(service.create("t1", { ...(createDto as object), host: "nx.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    lookupMock.mockResolvedValue([]);
+    await expect(service.create("t1", { ...(createDto as object), host: "empty.example.com" } as never)).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(connRepo.save).not.toHaveBeenCalled();
   });
 
   it("create honours explicit options and uses a fresh IV each time", async () => {
@@ -186,12 +194,12 @@ describe("LdapService.testConnection", () => {
     expect(res).toEqual({ success: true, message: "Connection successful" });
     expect(client.bind).toHaveBeenCalledWith("cn=a", "the-pw", expect.any(Function));
     expect(client.destroy).toHaveBeenCalled();
-    expect(createClient.mock.calls[0]?.[0]).toMatchObject({ url: "ldap://ldap.test:389", connectTimeout: 5000 });
+    expect(createClient.mock.calls[0]?.[0]).toMatchObject({ url: `ldap://${PUBLIC_ADDR}:389`, connectTimeout: 5000 });
   });
 
   it("uses ldaps:// when useTls", async () => {
     await run({}, { useTls: true, port: 636 });
-    expect(createClient.mock.calls[0]?.[0].url).toBe("ldaps://ldap.test:636");
+    expect(createClient.mock.calls[0]?.[0].url).toBe(`ldaps://${PUBLIC_ADDR}:636`);
   });
 
   it("reports bind failure", async () => {
@@ -403,3 +411,63 @@ describe("LdapService.syncNow deprovisioning", () => {
   });
 });
 
+
+describe("LdapService connection pinning", () => {
+  beforeEach(() => createClient.mockReset());
+
+  async function setupConn(over: Record<string, unknown>) {
+    const fx = build();
+    const enc = await stored(fx.service, fx.connRepo);
+    fx.connRepo.findOne.mockResolvedValue({
+      id: "c", tenantId: "t1", active: true, host: "ldap.example.com", port: 636, useTls: true, bindDn: "cn=a", baseDn: "dc=x",
+      userFilter: "(f)", emailAttribute: "mail", displayNameAttribute: "cn", firstNameAttribute: "givenName", lastNameAttribute: "sn",
+      ...enc, ...over,
+    });
+    fx.userRepo.find.mockResolvedValue([]);
+    fx.userRepo.findOne.mockResolvedValue(null);
+    return fx;
+  }
+
+  it("testConnection dials the validated IP and keeps the hostname as TLS servername", async () => {
+    const { service } = await setupConn({});
+    fakeClient();
+    createClient.mockClear();
+    await service.testConnection("t1", "c");
+    expect(createClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: `ldaps://${PUBLIC_ADDR}:636`,
+        tlsOptions: { servername: "ldap.example.com", rejectUnauthorized: true },
+      }),
+    );
+  });
+
+  it("a later resolution returning a different IP does not change the dialed IP (no second lookup)", async () => {
+    const { service } = await setupConn({});
+    fakeClient();
+    createClient.mockClear();
+    lookupMock.mockClear();
+    lookupMock.mockResolvedValueOnce([{ address: PUBLIC_ADDR, family: 4 }]).mockResolvedValue([{ address: "10.0.0.9", family: 4 }]);
+    await service.testConnection("t1", "c");
+    expect(lookupMock).toHaveBeenCalledTimes(1);
+    expect(createClient.mock.calls[0]?.[0].url).toBe(`ldaps://${PUBLIC_ADDR}:636`);
+  });
+
+  it("sync dials the pinned IP too, and brackets IPv6", async () => {
+    const { service } = await setupConn({ useTls: false, port: 389 });
+    fakeClient();
+    createClient.mockClear();
+    lookupMock.mockResolvedValue([{ address: "2606:4700:4700::1111", family: 6 }]);
+    await service.syncNow("t1", "c").catch(() => undefined);
+    expect(createClient.mock.calls[0]?.[0]).toMatchObject({ url: "ldap://[2606:4700:4700::1111]:389" });
+    expect(createClient.mock.calls[0]?.[0].tlsOptions).toBeUndefined();
+  });
+
+  it("testConnection and sync refuse an unresolvable host before dialing", async () => {
+    const { service } = await setupConn({});
+    createClient.mockClear();
+    lookupMock.mockRejectedValue(new Error("ENOTFOUND"));
+    await expect(service.testConnection("t1", "c")).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(service.syncNow("t1", "c")).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
+});

@@ -20,7 +20,7 @@ function build() {
     logout: jest.fn(async (..._a: unknown[]) => undefined),
     forgotPassword: jest.fn(async (..._a: unknown[]) => undefined),
     resetPassword: jest.fn(async (..._a: unknown[]) => undefined),
-    verifyEmail: jest.fn(async (..._a: unknown[]) => undefined),
+    verifyEmail: jest.fn(async (..._a: unknown[]) => ({})),
     resendVerification: jest.fn(async (..._a: unknown[]) => undefined),
     refreshToken: jest.fn(async (..._a: unknown[]) => ({ accessToken: "AT2", refreshToken: "RT2", tenantSlug: "acme", session })),
     getCurrentUser: jest.fn(async (..._a: unknown[]): Promise<Record<string, unknown> | null> => ({
@@ -30,7 +30,7 @@ function build() {
     verifyMfaBackup: jest.fn(async (..._a: unknown[]): Promise<Record<string, unknown>> => ({ accessToken: "AT", refreshToken: "RT", tenantSlug: "acme", session, message: "m", warning: "w" })),
     startWebAuthnLogin: jest.fn(async (..._a: unknown[]) => ({ sessionNonce: "n" })),
     finishWebAuthnLogin: jest.fn(async (..._a: unknown[]): Promise<Record<string, unknown>> => ({ accessToken: "AT", refreshToken: "RT", tenantSlug: "acme", session, user: { email: "e" } })),
-    sendMagicLink: jest.fn(async (..._a: unknown[]) => undefined),
+    sendMagicLink: jest.fn(async (..._a: unknown[]) => ({ expiresInSeconds: 600 })),
     verifyMagicLink: jest.fn(async (..._a: unknown[]): Promise<Record<string, unknown>> => ({ accessToken: "AT", refreshToken: "RT", tenantSlug: "acme", session })),
     getProviders: jest.fn(async (..._a: unknown[]) => ({ password: true })),
     getLoginIntent: jest.fn(async (..._a: unknown[]) => ({ exists: true, methods: {}, preferredMethod: "password" })),
@@ -98,7 +98,7 @@ describe("AuthController", () => {
   it("forgotPassword returns a non-enumerating message", async () => {
     const { ctl, svc } = build();
     const out = await ctl.forgotPassword(asReq(), { email: "e" } as never, "ip");
-    expect(svc.forgotPassword).toHaveBeenCalledWith("t1", "e", "ip");
+    expect(svc.forgotPassword).toHaveBeenCalledWith("t1", "e", "ip", undefined);
     expect(out.message).toMatch(/If an account exists/);
   });
 
@@ -113,7 +113,7 @@ describe("AuthController", () => {
     await expect(ctl.verifyEmail(asReq(), "tok")).resolves.toEqual({ message: "Email verified successfully" });
     await expect(ctl.resendVerification(asReq(), "e")).resolves.toEqual({ message: "Verification email sent" });
     expect(svc.verifyEmail).toHaveBeenCalledWith("t1", "tok");
-    expect(svc.resendVerification).toHaveBeenCalledWith("t1", "e");
+    expect(svc.resendVerification).toHaveBeenCalledWith("t1", "e", undefined);
   });
 
   describe("refresh", () => {
@@ -172,7 +172,7 @@ describe("AuthController", () => {
       const { ctl, svc } = build();
       const r = res();
       const out = await ctl.verifyMfa(asReq(), asRes(r), { tempToken: "tt", code: "123456" } as never, "ip", "ua");
-      expect(svc.verifyMfa).toHaveBeenCalledWith("t1", "tt", "123456", "ip", "ua");
+      expect(svc.verifyMfa).toHaveBeenCalledWith("t1", "tt", "123456", "ip", "ua", { method: undefined, webauthn: undefined });
       expect(cookieNames(r)).toEqual(["accessToken", "refreshToken"]);
       expect(out).toEqual({ message: "m", tenantSlug: "acme", session, expiresIn: TTL });
     });
@@ -229,8 +229,8 @@ describe("AuthController", () => {
   describe("magic link", () => {
     it("send is non-enumerating", async () => {
       const { ctl, svc } = build();
-      await expect(ctl.sendMagicLink(asReq(), { email: "e" } as never)).resolves.toMatchObject({ status: 200 });
-      expect(svc.sendMagicLink).toHaveBeenCalledWith("t1", "e");
+      await expect(ctl.sendMagicLink(asReq(), { email: "e" } as never)).resolves.toMatchObject({ message: expect.any(String) });
+      expect(svc.sendMagicLink).toHaveBeenCalledWith("t1", "e", { redirectUri: undefined, poll: undefined });
     });
 
     it("verify sets cookies and defaults the user agent", async () => {

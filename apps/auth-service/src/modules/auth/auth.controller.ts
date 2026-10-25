@@ -32,6 +32,14 @@ import {
   SendMagicLinkDto,
   VerifyMagicLinkDto,
   GetProvidersQueryDto,
+  ValidateResetLinkQueryDto,
+  MfaVerifyDto,
+  MfaTempTokenDto,
+  EnrollTotpSetupDto,
+  EnrollTotpConfirmDto,
+  ReauthDto,
+  PollMagicLinkDto,
+  VerifyEmailDto,
   GetProvidersResponseDto,
   AcceptInviteDto,
 } from "./auth.dto";
@@ -45,6 +53,8 @@ import { Protected } from "@/common/decorators/protected.decorator";
 import { RateLimit } from "@/common/decorators/rate-limit.decorator";
 import {
   clearAuthCookies,
+  MFA_ENROLLMENT_COOKIE,
+  setAccessTokenCookie,
   setAuthCookies,
   setMfaEnrollmentCookie,
   ACCESS_TOKEN_TTL_SECONDS,
@@ -186,6 +196,7 @@ export class AuthController {
       tenantId,
       forgotPasswordDto.email,
       ip,
+      forgotPasswordDto.redirectUri,
     );
     return {
       message:
@@ -210,15 +221,32 @@ export class AuthController {
   ) {
     const tenantId = req.tenantId!;
 
-    await this.authService.resetPassword(
-      tenantId,
-      resetPasswordDto.email,
-      resetPasswordDto.otp,
-      resetPasswordDto.password,
-      ip,
-      { userAgent: userAgent || "unknown", requestId: req.requestId },
-    );
+    const meta = { userAgent: userAgent || "unknown", requestId: req.requestId };
+    if (resetPasswordDto.token) {
+      const { redirectUri } = await this.authService.resetPasswordWithToken(tenantId, resetPasswordDto.token, resetPasswordDto.password, ip, meta);
+      return { message: "Password reset successfully", ...(redirectUri ? { redirectUri } : {}) };
+    } else {
+      await this.authService.resetPassword(
+        tenantId,
+        resetPasswordDto.email ?? "",
+        resetPasswordDto.otp ?? "",
+        resetPasswordDto.password,
+        ip,
+        meta,
+      );
+    }
     return { message: "Password reset successfully" };
+  }
+
+  /**
+   * Is this reset link still usable? Never consumes it, so email scanners and page loads are safe.
+   * LINK_EXPIRED (410), LINK_ALREADY_USED (409) or AUTH_TOKEN_INVALID (401) otherwise.
+   */
+  @Get("reset-password/validate")
+  @RateLimit({ max: 30, windowMs: 900000, keyBy: "ip" })
+  @ApiOperation({ summary: "Check a password reset link without consuming it" })
+  async validateResetLink(@Req() req: Request, @Query() query: ValidateResetLinkQueryDto) {
+    return this.authService.validateResetLink(req.tenantId!, query.token);
   }
 
   /**
@@ -232,8 +260,8 @@ export class AuthController {
   @ApiResponse({ status: 400, description: "Invalid or expired token" })
   async verifyEmail(@Req() req: Request, @Body("token") token: string) {
     const tenantId = req.tenantId!;
-    await this.authService.verifyEmail(tenantId, token);
-    return { message: "Email verified successfully" };
+    const { redirectUri } = await this.authService.verifyEmail(tenantId, token);
+    return { message: "Email verified successfully", ...(redirectUri ? { redirectUri } : {}) };
   }
 
   /**
@@ -244,9 +272,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resend email verification" })
   @ApiResponse({ status: 200, description: "Verification email sent" })
-  async resendVerification(@Req() req: Request, @Body("email") email: string) {
+  async resendVerification(@Req() req: Request, @Body("email") email: string, @Body("redirectUri") redirectUri?: string) {
     const tenantId = req.tenantId!;
-    await this.authService.resendVerification(tenantId, email);
+    await this.authService.resendVerification(tenantId, email, typeof redirectUri === "string" ? redirectUri : undefined);
     return { message: "Verification email sent" };
   }
 
@@ -469,7 +497,7 @@ export class AuthController {
   async verifyMfa(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() dto: VerifyMfaDto,
+    @Body() dto: MfaVerifyDto,
     @Ip() ip: string,
     @Headers("user-agent") userAgent: string,
   ) {
@@ -479,9 +507,15 @@ export class AuthController {
       const result = await this.authService.verifyMfa(
         tenantId,
         dto.tempToken,
-        dto.code,
+        dto.code ?? "",
         ip,
         userAgent,
+        {
+          method: dto.method,
+          webauthn: dto.method === "webauthn"
+            ? { response: dto.webauthnResponse as never, sessionNonce: dto.sessionNonce ?? "" }
+            : undefined,
+        },
       );
 
       setAuthCookies(res, result.accessToken, result.refreshToken);
@@ -500,6 +534,111 @@ export class AuthController {
 
       throw new ApiException("AUTH_TOKEN_INVALID");
     }
+  }
+
+  /** Email a login-time code (only when email is an enrolled second factor). */
+  @Post("mfa/request-email-otp")
+  @RateLimit({ max: 5, windowMs: 600000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Email a second-factor code, authenticated by the mfa_pending token" })
+  async requestMfaEmailOtp(@Req() req: Request, @Body() dto: MfaTempTokenDto) {
+    await this.authService.requestMfaEmailOtp(req.tenantId!, dto.tempToken);
+    return { message: "A code was sent to your email", expiresInSeconds: 600 };
+  }
+
+  /** Passkey assertion options for the login-time second factor. */
+  @Post("mfa/webauthn/start")
+  @RateLimit({ max: 10, windowMs: 600000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Start a passkey second factor, authenticated by the mfa_pending token" })
+  async startMfaWebAuthn(@Req() req: Request, @Body() dto: MfaTempTokenDto) {
+    return this.authService.startMfaWebAuthn(req.tenantId!, dto.tempToken);
+  }
+
+  private enrollmentTokenFrom(req: Request, bodyToken?: string): string {
+    const token = bodyToken || (req.cookies?.[MFA_ENROLLMENT_COOKIE] as string | undefined);
+    if (!token) throw new ApiException("AUTH_TOKEN_INVALID");
+    return token;
+  }
+
+  /** Pre-session TOTP enrollment (policy-required MFA). Token: body or mfa_enrollment_token cookie. */
+  @Post("mfa/enroll/totp/setup")
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Begin TOTP enrollment with an enrollment token (no session yet)" })
+  async enrollTotpSetup(@Req() req: Request, @Body() dto: EnrollTotpSetupDto) {
+    return this.authService.enrollTotpSetup(req.tenantId!, this.enrollmentTokenFrom(req, dto.enrollmentToken));
+  }
+
+  /** Confirms the first code, enables TOTP and signs the user in (amr includes totp + mfa). */
+  @Post("mfa/enroll/totp/confirm")
+  @RateLimit({ max: 10, windowMs: 900000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Confirm TOTP enrollment, then issue the session cookies" })
+  async enrollTotpConfirm(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto: EnrollTotpConfirmDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const result = await this.authService.enrollTotpConfirm(
+      req.tenantId!,
+      this.enrollmentTokenFrom(req, dto.enrollmentToken),
+      dto.code,
+      ip,
+      userAgent || "unknown",
+    );
+    setAuthCookies(res, result.accessToken, result.refreshToken);
+    res.clearCookie(MFA_ENROLLMENT_COOKIE, { path: "/mfa/enroll" });
+    return {
+      backupCodes: result.backupCodes,
+      tenantSlug: result.tenantSlug,
+      session: result.session,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    };
+  }
+
+  /** Passkey options for a step-up. */
+  @Post("reauth/webauthn/start")
+  @Protected()
+  @RateLimit({ max: 10, windowMs: 300000, keyBy: "user" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Start a passkey step-up" })
+  async startReauthWebAuthn(@Req() req: AuthenticatedRequest) {
+    return this.authService.startReauthWebAuthn(req.tenantId!, req.user.sub);
+  }
+
+  /**
+   * Step-up: re-prove password, TOTP or passkey. Keeps the same session, refreshes its authTime
+   * and reissues the access-token cookie, so @RequireRecentAuth endpoints pass again.
+   */
+  @Post("reauth")
+  @Protected()
+  @RateLimit({ max: 10, windowMs: 300000, keyBy: "user" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Step-up authentication for the current session" })
+  async reauth(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto: ReauthDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const result = await this.authService.reauthenticate(
+      req.tenantId!,
+      req.user.sub,
+      req.user.sessionId ?? "",
+      {
+        method: dto.method,
+        password: dto.password,
+        code: dto.code,
+        webauthn: dto.method === "webauthn" ? { response: dto.webauthnResponse as never, sessionNonce: dto.sessionNonce ?? "" } : undefined,
+      },
+      { ip, userAgent: userAgent || "unknown" },
+    );
+    setAccessTokenCookie(res, result.accessToken);
+    return { session: result.session, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
   }
 
   /**
@@ -713,8 +852,15 @@ export class AuthController {
     @Body() dto: SendMagicLinkDto,
   ) {
     const tenantId = req.tenantId!;
-    await this.authService.sendMagicLink(tenantId, dto.email);
-    return { status: 200, data: { message: "If an account exists, a magic link has been sent." } };
+    const { pollingNonce, expiresInSeconds } = await this.authService.sendMagicLink(tenantId, dto.email, {
+      redirectUri: dto.redirectUri,
+      poll: dto.poll,
+    });
+    return {
+      message: "If an account exists, a magic link has been sent.",
+      expiresInSeconds,
+      ...(pollingNonce ? { pollingNonce } : {}),
+    };
   }
 
   /**
@@ -739,19 +885,50 @@ export class AuthController {
       userAgent || "unknown",
     );
 
+    return this.respondMagicLink(res, result);
+  }
+
+  private respondMagicLink(
+    res: Response,
+    result: Awaited<ReturnType<AuthService["verifyMagicLink"]>>,
+  ) {
+    const redirect = result.redirectUri ? { redirectUri: result.redirectUri } : {};
     if ('mfaRequired' in result) {
-      return res.json(result);
+      const { redirectUri: _r, ...rest } = result;
+      return res.json({ ...rest, ...redirect });
     }
     if ('status' in result) {
       setMfaEnrollmentCookie(res, result.enrollmentToken);
-      return res.json({ status: result.status });
+      return res.json({ status: result.status, ...redirect });
     }
     setAuthCookies(res, result.accessToken, result.refreshToken);
     return res.json({
       tenantSlug: result.tenantSlug,
       session: result.session,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      ...redirect,
     });
+  }
+
+  /**
+   * Cross-device completion. The device that asked for the link polls with its pollingNonce; once
+   * the link was verified on another device this answers like magic-link/verify (cookies / MFA
+   * challenge / enrollment), otherwise `{ status: "pending" }`.
+   */
+  @Post("magic-link/poll")
+  @RateLimit({ max: 60, windowMs: 60000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Complete a magic-link sign-in that was confirmed on another device" })
+  async pollMagicLink(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Body() dto: PollMagicLinkDto,
+    @Ip() ip: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
+    const result = await this.authService.pollMagicLink(req.tenantId!, dto.pollingNonce, ip, userAgent || "unknown");
+    if ("status" in result && result.status === "pending") return res.json({ status: "pending" });
+    return this.respondMagicLink(res, result as Awaited<ReturnType<AuthService["verifyMagicLink"]>>);
   }
 
   /**
@@ -968,5 +1145,14 @@ export class AuthController {
       ip,
       userAgent: userAgent ?? "unknown",
     });
+  }
+
+  /** Invitee asks for a fresh link when theirs expired. Rate limited per invitation (10 min) and IP. */
+  @Post("invite/request-new")
+  @RateLimit({ max: 5, windowMs: 3600000, keyBy: "ip" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Send a new invitation link to the invited address" })
+  async requestNewInvite(@Req() req: Request, @Body() dto: VerifyEmailDto) {
+    return this.authService.requestNewInvite(req.tenantId!, dto.token);
   }
 }

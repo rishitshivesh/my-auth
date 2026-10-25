@@ -229,8 +229,11 @@ describe("users", () => {
       const token = inviteToken(t, email);
       await t.db.query(`UPDATE "fk_${fx.slug.replace(/-/g, "_")}".user_invites SET expires_at = now() - interval '1 day' WHERE email = $1`, [email]);
       const acc = await t.http({ tenant: fx.slug }).post("/auth/invite/accept").send({ token, name: "X Y", password: STRONG_PASSWORD });
-      expect(acc.status).toBe(400);
-      expect((await t.http({ tenant: fx.slug }).get(`/auth/invite/validate/${token}`)).status).toBeGreaterThanOrEqual(400);
+      expect(acc.status).toBe(410);
+      expect(acc.body.code).toBe("LINK_EXPIRED");
+      const v = await t.http({ tenant: fx.slug }).get(`/auth/invite/validate/${token}`);
+      expect(v.status).toBe(410);
+      expect(v.body.code).toBe("LINK_EXPIRED");
     });
 
     it("unknown token and weak password are refused", async () => {

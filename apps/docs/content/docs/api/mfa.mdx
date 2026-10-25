@@ -52,30 +52,51 @@ Content-Type: application/json
 
 ## POST /api/auth/mfa/verify
 
-Verify MFA during login (after receiving `mfaPendingToken`).
+Complete login after a response with `mfaRequired: true` (`tempToken`, `availableMethods`).
+Only methods the user has actually enrolled are advertised and accepted.
 
 ```http
 POST /api/auth/mfa/verify
 Content-Type: application/json
-x-tenant-id: acme
 
-{
-  "token": "<mfaPendingToken>",
-  "code": "123456",
-  "method": "totp"
-}
+{ "tempToken": "<tempToken>", "method": "totp", "code": "123456" }
 ```
 
-`method` is one of: `"totp"` · `"backup"` · `"webauthn"`
+| `method` | Needs |
+|---|---|
+| `totp` (default) | `code` |
+| `email` | `code` from `POST /api/auth/mfa/request-email-otp { tempToken }` (200, rate limited) |
+| `webauthn` | `webauthnResponse` + `sessionNonce` from `POST /api/auth/mfa/webauthn/start { tempToken }` |
 
-**Response `200`:**
+Backup codes use `POST /api/auth/mfa/verify-backup { tempToken, code }`. Session cookies are set; the
+body has `{ message, tenantSlug, session, expiresIn }`. The session `amr` reflects the first factor
+plus the second one (for example `["pwd","otp","totp","mfa"]`).
 
-```json
-{
-  "accessToken": "eyJ...",
-  "refreshToken": "..."
-}
+## Pre-session enrollment (policy requires MFA)
+
+When login / magic link / passkey answers `{ "status": "mfa_enrollment_required" }`, the enrollment
+token is in the body (password login) or the `mfa_enrollment_token` cookie. It is valid 15 minutes,
+bound to the tenant and user, single use, and burned after 5 wrong codes. Pass it as
+`enrollmentToken` in the body or rely on the cookie.
+
+- `POST /api/auth/mfa/enroll/totp/setup { enrollmentToken? }` returns `{ secret, qrCode }`.
+- `POST /api/auth/mfa/enroll/totp/confirm { enrollmentToken?, code }` enables TOTP, sets the session
+  cookies and returns `{ backupCodes, tenantSlug, session, expiresIn }` (show the codes once).
+
+## Step-up: POST /api/auth/reauth
+
+Authenticated. Re-prove the account and refresh `authTime` of the SAME session so
+`ACCESS_RECENT_AUTH_REQUIRED` endpoints pass again; the access-token cookie is reissued and the
+step-up survives token refresh.
+
+```http
+POST /api/auth/reauth
+{ "method": "password", "password": "..." }
+{ "method": "totp", "code": "123456" }
+{ "method": "webauthn", "webauthnResponse": { }, "sessionNonce": "..." }   // options: POST /api/auth/reauth/webauthn/start
 ```
+
+**Response `200`:** `{ session, expiresIn }`. Wrong credentials answer `401`.
 
 ---
 

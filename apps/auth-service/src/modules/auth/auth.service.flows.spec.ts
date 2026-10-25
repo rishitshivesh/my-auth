@@ -1,3 +1,4 @@
+import { LinkTokenService } from "@/common/service/link-token.service";
 import * as crypto from "crypto";
 import { createHash } from "crypto";
 import { HttpException } from "@nestjs/common";
@@ -79,6 +80,7 @@ function build(user: Record<string, unknown> | null = baseUser()) {
   const email = {
     sendWelcomeEmail: jest.fn(),
     sendPasswordResetOtpEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
     sendMagicLinkEmail: jest.fn(),
     sendVerificationEmail: jest.fn(),
   };
@@ -119,10 +121,27 @@ function build(user: Record<string, unknown> | null = baseUser()) {
     incr: jest.fn(async () => 1),
     extendTTL: jest.fn(),
     delete: jest.fn(),
+    get: jest.fn(async () => null),
+    set: jest.fn(),
+    setIfAbsent: jest.fn(async () => true),
   };
   const throttle = { charge: jest.fn(async () => ({ blocked: false })), refund: jest.fn() };
   const domainEvents = { publish: jest.fn() };
   const effects = { afterPasswordChange: jest.fn() };
+
+  const store = new Map<string, unknown>();
+  const k = (...p: string[]) => p.join("|");
+  const linkRedis = {
+    set: jest.fn(async (t: string, r: string, i: string, v: unknown) => { store.set(k(t, r, i), v); }),
+    get: jest.fn(async (t: string, r: string, i: string) => store.get(k(t, r, i)) ?? null),
+    delete: jest.fn(async (t: string, r: string, i: string) => { store.delete(k(t, r, i)); }),
+    setIfAbsent: jest.fn(async (t: string, r: string, i: string, v: unknown) => {
+      if (store.has(k(t, r, i))) return false;
+      store.set(k(t, r, i), v);
+      return true;
+    }),
+  };
+  const linkTokens = new LinkTokenService(linkRedis as never);
 
   const service = new AuthService(
     userRepo as never,
@@ -148,9 +167,11 @@ function build(user: Record<string, unknown> | null = baseUser()) {
     throttle as never,
     domainEvents as never,
     effects as never,
+    undefined,
+    linkTokens,
   );
   return {
-    service, builder, userRepo, sessionRepo, tenantRepo, refreshRepo, socialConnRepo, userRoleRepo, inviteRepo,
+    service, linkTokens, builder, userRepo, sessionRepo, tenantRepo, refreshRepo, socialConnRepo, userRoleRepo, inviteRepo,
     providerRepo, jwt, email, sessionService, brute, mfa, mfaPolicy, webauthn, oauthRefresh, events, jwks, redis,
     throttle, domainEvents, effects,
   };
@@ -245,7 +266,7 @@ describe("AuthService flows", () => {
       const h = build();
       h.mfa.getMfaStatus.mockResolvedValue({ enabled: true, methods: ["totp", "backup"], preferredMethod: undefined });
       const out = await h.service.login(creds);
-      expect(out).toMatchObject({ mfaRequired: true, tempToken: "signed", availableMethods: ["totp", "backup"], preferredMethod: "totp" });
+      expect(out).toMatchObject({ mfaRequired: true, tempToken: "signed", availableMethods: ["totp"], preferredMethod: "totp" });
       expect(h.jwt.sign).toHaveBeenCalledWith(
         expect.objectContaining({ type: "mfa_pending", sub: "u1", jti: expect.any(String) }),
         expect.objectContaining({ expiresIn: "5m" }),
@@ -347,6 +368,38 @@ describe("AuthService flows", () => {
       expect(eventTypes(h)).toEqual([SecurityEventType.PASSWORD_RESET_REQUESTED]);
     });
 
+    it("also emails a single-use link token (stored hashed) before the code", async () => {
+      const h = build();
+      await h.service.forgotPassword(T, "ann@example.com", "1.1.1.1");
+      const token = h.email.sendPasswordResetEmail.mock.calls[0]![1] as string;
+      expect(token).toMatch(/^[0-9a-f]{64}$/);
+      expect(h.email.sendPasswordResetEmail.mock.invocationCallOrder[0]).toBeLessThan(
+        h.email.sendPasswordResetOtpEmail.mock.invocationCallOrder[0]!,
+      );
+      await expect(h.service.validateResetLink(T, token)).resolves.toMatchObject({ valid: true });
+      // a second request supersedes the first link
+      await h.service.forgotPassword(T, "ann@example.com", "1.1.1.1");
+      await expect(h.service.validateResetLink(T, token)).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
+    });
+
+    it("validateResetLink is tenant-bound and never consumes", async () => {
+      const h = build();
+      await h.service.forgotPassword(T, "ann@example.com", "1.1.1.1");
+      const token = h.email.sendPasswordResetEmail.mock.calls[0]![1] as string;
+      await h.service.validateResetLink(T, token);
+      await h.service.validateResetLink(T, token);
+      await expect(h.service.validateResetLink("other-tenant", token)).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      await expect(h.service.validateResetLink(T, "x".repeat(64))).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+    });
+
+    it("validateResetLink reports an expired link distinctly", async () => {
+      const h = build();
+      await h.service.forgotPassword(T, "ann@example.com", "1.1.1.1");
+      const token = h.email.sendPasswordResetEmail.mock.calls[0]![1] as string;
+      jest.setSystemTime(new Date(NOW.getTime() + 61 * 60_000));
+      await expect(h.service.validateResetLink(T, token)).rejects.toMatchObject({ code: "LINK_EXPIRED" });
+    });
+
     it("zero-pads small OTPs", async () => {
       (crypto.randomInt as unknown as jest.Mock).mockImplementationOnce(() => 42);
       const h = build();
@@ -378,6 +431,14 @@ describe("AuthService flows", () => {
     it("verifyMagicLink rejects unknown/expired tokens", async () => {
       const h = build(null);
       await expect(h.service.verifyMagicLink(T, "bad", "ip", "ua")).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+    });
+
+    it("verifyMagicLink distinguishes an expired and an already-used link", async () => {
+      const h = build(null);
+      h.builder.getOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "u1" });
+      await expect(h.service.verifyMagicLink(T, "old", "ip", "ua")).rejects.toMatchObject({ code: "LINK_EXPIRED" });
+      await h.linkTokens.noteSpent(T, "magic-link", "spent");
+      await expect(h.service.verifyMagicLink(T, "spent", "ip", "ua")).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
     });
 
     it("verifyMagicLink looks up by hash within tenant and non-expired, then issues a session", async () => {
@@ -444,6 +505,56 @@ describe("AuthService flows", () => {
       const h = build(user);
       await expect(h.service.resetPassword(T, "a@b.c", OTP, STRONG)).rejects.toMatchObject({ code: "AUTH_OTP_INVALID" });
       expect(h.redis.incr).not.toHaveBeenCalled();
+    });
+
+    describe("by link token", () => {
+      const issue = async (h: ReturnType<typeof build>) => {
+        await h.service.forgotPassword(T, "ann@example.com", "1.1.1.1");
+        return h.email.sendPasswordResetEmail.mock.calls[0]![1] as string;
+      };
+
+      it("resets the password, spends the link, clears the code and revokes sessions", async () => {
+        const h = build(resetUser());
+        const token = await issue(h);
+        h.userRepo.update.mockClear();
+        await h.service.resetPasswordWithToken(T, token, STRONG, "9.9.9.9", { userAgent: "ua", requestId: "r1" });
+        const patch = h.userRepo.update.mock.calls[0]![1] as Record<string, unknown>;
+        expect(patch).toMatchObject({ passwordResetToken: null, passwordResetExpiresAt: null });
+        expect(h.effects.afterPasswordChange).toHaveBeenCalledWith(expect.objectContaining({ reason: "password_reset", ip: "9.9.9.9" }));
+        await expect(h.service.resetPasswordWithToken(T, token, STRONG)).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
+      });
+
+      it("a rejected password leaves the link usable", async () => {
+        const h = build(resetUser());
+        const token = await issue(h);
+        await expect(h.service.resetPasswordWithToken(T, token, "short")).rejects.toMatchObject({ code: "PASSWORD_POLICY" });
+        await expect(h.service.validateResetLink(T, token)).resolves.toMatchObject({ valid: true });
+        await h.service.resetPasswordWithToken(T, token, STRONG);
+      });
+
+      it("the OTP path spends an outstanding link", async () => {
+        const h = build(resetUser());
+        const token = await issue(h);
+        await h.service.resetPassword(T, "ann@example.com", OTP, STRONG);
+        await expect(h.service.validateResetLink(T, token)).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
+      });
+
+      it("rejects an unknown token and a token from another tenant", async () => {
+        const h = build(resetUser());
+        const token = await issue(h);
+        await expect(h.service.resetPasswordWithToken(T, "z".repeat(64), STRONG)).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+        await expect(h.service.resetPasswordWithToken("tenant-2", token, STRONG)).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+      });
+
+      it("only one of two concurrent uses wins", async () => {
+        const h = build(resetUser());
+        const token = await issue(h);
+        const results = await Promise.allSettled([
+          h.service.resetPasswordWithToken(T, token, STRONG),
+          h.service.resetPasswordWithToken(T, token, STRONG),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      });
     });
 
     it("binds the lookup to tenant and case-insensitive email", async () => {
@@ -544,6 +655,15 @@ describe("AuthService flows", () => {
       const h = build(null);
       h.userRepo.findOne.mockResolvedValue(null as never);
       await expect(h.service.verifyEmail(T, "tok")).rejects.toMatchObject({ code: "AUTH_TOKEN_INVALID" });
+    });
+
+    it("verifyEmail distinguishes expired and already-used tokens", async () => {
+      const h = build(null);
+      h.userRepo.findOne.mockResolvedValueOnce(null as never).mockResolvedValueOnce({ id: "u1" } as never);
+      await expect(h.service.verifyEmail(T, "old")).rejects.toMatchObject({ code: "LINK_EXPIRED" });
+      await h.linkTokens.noteSpent(T, "verify-email", "spent");
+      h.userRepo.findOne.mockResolvedValue(null as never);
+      await expect(h.service.verifyEmail(T, "spent")).rejects.toMatchObject({ code: "LINK_ALREADY_USED" });
     });
 
     it("marks the email verified (tenant-scoped) and logs", async () => {
@@ -1035,17 +1155,17 @@ describe("AuthService flows", () => {
     });
 
     it.each([
-      ["missing", null, undefined],
-      ["used", invite({ acceptedAt: NOW }), "already been used"],
-      ["expired", invite({ expiresAt: new Date(NOW.getTime() - 1) }), "expired"],
-    ])("validateInvite and acceptInvite reject a %s invite", async (_n, inv, detail) => {
+      ["missing", null, undefined, "INVITE_INVALID"],
+      ["used", invite({ acceptedAt: NOW }), "already been used", "LINK_ALREADY_USED"],
+      ["expired", invite({ expiresAt: new Date(NOW.getTime() - 1) }), "expired", "LINK_EXPIRED"],
+    ])("validateInvite and acceptInvite reject a %s invite", async (_n, inv, detail, code) => {
       const h = build();
       h.inviteRepo.findOne.mockResolvedValue(inv);
       const v = await h.service.validateInvite("tok").catch((e: ApiException) => e);
-      expect(v).toMatchObject({ code: "INVITE_INVALID" });
+      expect(v).toMatchObject({ code });
       if (detail) expect((v as ApiException).detail).toContain(detail);
       const a = await h.service.acceptInvite({ token: "tok", name: "A", password: STRONG, ip: "ip", userAgent: "ua" }).catch((e: ApiException) => e);
-      expect(a).toMatchObject({ code: "INVITE_INVALID" });
+      expect(a).toMatchObject({ code });
       expect(h.userRepo.save).not.toHaveBeenCalled();
     });
 
@@ -1072,7 +1192,7 @@ describe("AuthService flows", () => {
       const h = build(null);
       h.inviteRepo.findOne.mockResolvedValue(invite());
       h.userRepo.findOne.mockResolvedValue(null as never);
-      await expect(h.service.acceptInvite({ token: "tok-123456789", name: "  Mary Ann Smith ", password: STRONG, ip: "ip", userAgent: "ua" })).resolves.toEqual({ message: "Account created successfully" });
+      await expect(h.service.acceptInvite({ token: "tok-123456789", name: "  Mary Ann Smith ", password: STRONG, ip: "ip", userAgent: "ua" })).resolves.toEqual({ message: "Account created successfully", canSignInNow: true });
       expect(h.userRepo.create).toHaveBeenCalledWith(expect.objectContaining({ tenantId: T, email: "invitee@example.com", firstName: "Mary", lastName: "Ann Smith", emailVerified: true, isActive: true }));
       expect(h.userRoleRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({ roleId: "r1", tenantId: T, userId: "new-user", invitedBy: "admin", isGuest: false }),

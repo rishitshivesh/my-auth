@@ -28,16 +28,14 @@ Content-Type: application/json
 
 **Response `201`:**
 
+The session is set as `accessToken` / `refreshToken` httpOnly cookies (ADR-0003); no token is in the body.
+A repeated `idempotencyKey` returns the same body and sets no cookies (sign in instead).
+
 ```json
 {
-  "accessToken": "eyJ...",
-  "refreshToken": "...",
   "tenantSlug": "acme",
-  "user": {
-    "id": "uuid",
-    "email": "admin@acme.com",
-    "name": "Ada Lovelace"
-  }
+  "user": { "id": "uuid", "email": "admin@acme.com", "name": "Ada Lovelace" },
+  "expiresIn": 900
 }
 ```
 

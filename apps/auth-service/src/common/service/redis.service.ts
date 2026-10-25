@@ -121,6 +121,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Set only when the key does not exist; true for exactly one concurrent caller
+   * (atomic SET NX). Used to claim a one-time link.
+   */
+  async setIfAbsent(
+    tenantId: string,
+    resource: string,
+    identifier: string,
+    value: unknown,
+    ttl: number,
+  ): Promise<boolean> {
+    const key = this.buildKey(tenantId, resource, identifier);
+    return (await this.client.set(key, JSON.stringify(value), "EX", ttl, "NX")) === "OK";
+  }
+
+  /**
    * Delete multiple keys by pattern
    */
   async deletePattern(tenantId: string, pattern: string): Promise<number> {

@@ -178,45 +178,59 @@ x-tenant-id: acme
 
 ## POST /api/auth/forgot-password
 
-Send a password reset email.
+Always answers `200`, whether or not the account exists. For a known account two emails are sent: a
+single-use **link** (valid 60 minutes, purpose-bound, stored hashed, a newer request supersedes it)
+and a 6-digit **code** (fallback, 15 minutes). Optional `redirectUri` (see below).
 
 ```http
 POST /api/auth/forgot-password
-Content-Type: application/json
-x-tenant-id: acme
-
-{
-  "email": "user@example.com"
-}
+{ "email": "user@example.com", "redirectUri": "https://app.acme.com/welcome" }
 ```
 
-**Response `202`:**
+## GET /api/auth/reset-password/validate?token=
 
-```json
-{ "message": "Password reset email sent" }
-```
-
----
+Non-consuming check (safe for email scanners / page loads). `200`:
+`{ "valid": true, "expiresInSeconds": 3120, "redirectUri"?: "..." }`. Otherwise `410 LINK_EXPIRED`,
+`409 LINK_ALREADY_USED` or `401 AUTH_TOKEN_INVALID`. The response never contains the account.
 
 ## POST /api/auth/reset-password
 
-Complete a password reset.
+Either the link token or email + code. A rejected password (`422`) leaves the link usable. Success
+revokes every session of the account, spends any other outstanding link / code, and returns
+`{ message, redirectUri? }`.
 
 ```http
 POST /api/auth/reset-password
-Content-Type: application/json
-x-tenant-id: acme
-
-{
-  "token": "reset-token-from-email",
-  "password": "NewStrongPass123!"
-}
+{ "token": "<from the link>", "password": "NewStrongPass123!" }
+{ "email": "user@example.com", "otp": "123456", "password": "NewStrongPass123!" }
 ```
 
-**Response `200`:**
+## Link failure states
 
-```json
-{ "message": "Password reset successful" }
-```
+verify-email, magic-link/verify, reset-password(+validate), invite/validate and invite/accept answer
+with distinct stable codes: `LINK_EXPIRED` (410), `LINK_ALREADY_USED` (409), `AUTH_TOKEN_INVALID`
+(401, unknown) or `INVITE_INVALID` (400, unknown invitation). `LINK_WRONG_ACCOUNT` (403) is reserved
+for links bound to a different account.
 
-**Errors:** `400` token expired or invalid · `400` password too weak / previously used
+## redirectUri on email links
+
+`magic-link/send`, `forgot-password` and `resend-verification` accept an optional `redirectUri`. It must
+be an exact redirect URI of one of the workspace's OAuth clients or a URL on the portal / frontend
+origin; otherwise `422` (checked before the account is looked up). It is stored with the token and
+returned by `magic-link/verify`, `reset-password/validate`, `reset-password` and `verify-email`.
+
+## Cross-device magic link
+
+`POST /api/auth/magic-link/send { email, poll: true }` returns
+`{ message, expiresInSeconds, pollingNonce }` (a nonce is returned even for unknown emails). The
+nonce is never in the email. The requesting device calls `POST /api/auth/magic-link/poll
+{ pollingNonce }`: `{ "status": "pending" }` until the link was verified on any device, then once
+the same response as `magic-link/verify` (cookies, MFA challenge or enrollment) for the polling
+device; a second redemption answers `409 LINK_ALREADY_USED`. Tenant-bound, 10 minute lifetime.
+
+## Invitations
+
+`POST /api/auth/invite/request-new { token }` (invitee holds an expired link): mails a fresh link to the
+invited address and replaces the old one; `429` with `retryAfterSeconds` inside a 10 minute cooldown;
+`409 LINK_ALREADY_USED` if accepted. `POST /api/auth/invite/accept` now also returns
+`canSignInNow: true`.

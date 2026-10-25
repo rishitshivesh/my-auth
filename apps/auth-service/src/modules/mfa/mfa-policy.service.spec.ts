@@ -80,7 +80,7 @@ describe('MfaPolicyService', () => {
     await expect(svc.issueEnrollmentToken('u1', 't1')).resolves.toBe('signed');
     expect(config.get).toHaveBeenCalledWith('JWT_SECRET');
     expect(jwt.signAsync).toHaveBeenCalledWith(
-      { sub: 'u1', tid: 't1', purpose: 'mfa_enrollment' },
+      { sub: 'u1', tid: 't1', purpose: 'mfa_enrollment', fa: 'pwd', jti: expect.any(String) },
       { expiresIn: '15m', secret: 'secret-32-chars-xxxxxxxxxxxxxxxxx' },
     );
   });

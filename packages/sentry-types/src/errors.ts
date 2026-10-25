@@ -13,6 +13,11 @@ export const ERROR_STATUS = {
   AUTH_REFRESH_REUSED: 401,
   AUTH_ACCOUNT_LOCKED: 423,
   AUTH_PASSWORD_EXPIRED: 403,
+  // One-time email links (verify, magic link, reset, invite). Distinct states, none reveal whether
+  // an account exists: the token itself is the bearer secret.
+  LINK_EXPIRED: 410,
+  LINK_ALREADY_USED: 409,
+  LINK_WRONG_ACCOUNT: 403,
   // Authorization
   ACCESS_FORBIDDEN: 403,
   ACCESS_RECENT_AUTH_REQUIRED: 403,

@@ -51,26 +51,52 @@ export class LdapService {
   ) {}
 
   /**
-   * SSRF guard: tenant-supplied hosts are resolved and every RESOLVED address is checked (never the
-   * hostname), so a DNS name that rebinds to an internal address is refused. Private ranges are
-   * dialable only inside LDAP_ALLOWED_PRIVATE_CIDRS; loopback/link-local/metadata never are.
+   * SSRF guard. Resolves the host ONCE, checks EVERY resolved address (never the hostname) and
+   * returns the address to dial, so the connection is pinned to what was validated (no second
+   * lookup an attacker could rebind). Fails closed: a lookup error or zero addresses is refused.
+   * Private ranges are dialable only inside LDAP_ALLOWED_PRIVATE_CIDRS; loopback, link-local and
+   * metadata never are.
    */
-  private async assertHostDialable(host: string): Promise<void> {
+  private async resolveDialableAddress(host: string): Promise<string> {
     const addresses = net.isIP(host)
       ? [host]
       : (await dns.lookup(host, { all: true }).catch(() => [])).map((a) => a.address);
     const allowed = parseCidrList(this.config.get<string>("LDAP_ALLOWED_PRIVATE_CIDRS", ""));
-    if (addresses.some((address) => !isDialableAddress(address, allowed))) {
+    const first = addresses[0];
+    if (first === undefined || addresses.some((address) => !isDialableAddress(address, allowed))) {
       throw new ApiException("VALIDATION_FAILED", {
         errors: [
           {
             field: "host",
             message:
-              "LDAP host resolves to a private, loopback or link-local address that is not allowed for this deployment",
+              addresses.length === 0
+                ? "LDAP host could not be resolved"
+                : "LDAP host resolves to a private, loopback or link-local address that is not allowed for this deployment",
           },
         ],
       });
     }
+    return first;
+  }
+
+  /** Validation-only wrapper used when a host is saved. */
+  private async assertHostDialable(host: string): Promise<void> {
+    await this.resolveDialableAddress(host);
+  }
+
+  /**
+   * ldapjs options that dial the validated IP. For ldaps the original hostname is kept as the TLS
+   * servername so SNI and certificate verification still target the real name.
+   */
+  private clientOptions(conn: LdapConnection, address: string, timeouts: { connectTimeout: number; timeout: number }) {
+    const hostPart = net.isIPv6(address) ? `[${address}]` : address;
+    return {
+      url: `${conn.useTls ? "ldaps" : "ldap"}://${hostPart}:${conn.port}`,
+      ...timeouts,
+      ...(conn.useTls && !net.isIP(conn.host)
+        ? { tlsOptions: { servername: conn.host, rejectUnauthorized: true } }
+        : {}),
+    };
   }
 
   private encryptPassword(plaintext: string): string {
@@ -148,15 +174,11 @@ export class LdapService {
 
   async testConnection(tenantId: string, id: string): Promise<{ success: boolean; message: string }> {
     const conn = await this.findOne(tenantId, id);
-    await this.assertHostDialable(conn.host);
+    const address = await this.resolveDialableAddress(conn.host);
     const password = this.decryptPassword(conn.bindPasswordEncrypted);
 
     return new Promise((resolve) => {
-      const client = ldapjs.createClient({
-        url: `${conn.useTls ? "ldaps" : "ldap"}://${conn.host}:${conn.port}`,
-        connectTimeout: 5000,
-        timeout: 5000,
-      });
+      const client = ldapjs.createClient(this.clientOptions(conn, address, { connectTimeout: 5000, timeout: 5000 }));
 
       client.on("error", (err: Error) => {
         client.destroy();
@@ -177,7 +199,7 @@ export class LdapService {
   async syncNow(tenantId: string, id: string): Promise<LdapSyncResult> {
     const conn = await this.findOne(tenantId, id);
     if (!conn.active) throw new ApiException("BAD_REQUEST", { detail: "LDAP connection is inactive" });
-    await this.assertHostDialable(conn.host);
+    const address = await this.resolveDialableAddress(conn.host);
 
     const password = this.decryptPassword(conn.bindPasswordEncrypted);
     const result: LdapSyncResult = {
@@ -192,7 +214,7 @@ export class LdapService {
     let client: ldapjs.Client | null = null;
 
     try {
-      client = await this.createLdapClient(conn, password);
+      client = await this.createLdapClient(conn, address, password);
       const entries = await this.searchUsers(client, conn);
 
       const directoryEmails = new Set(
@@ -362,13 +384,9 @@ export class LdapService {
     return result;
   }
 
-  private createLdapClient(conn: LdapConnection, password: string): Promise<ldapjs.Client> {
+  private createLdapClient(conn: LdapConnection, address: string, password: string): Promise<ldapjs.Client> {
     return new Promise((resolve, reject) => {
-      const client = ldapjs.createClient({
-        url: `${conn.useTls ? "ldaps" : "ldap"}://${conn.host}:${conn.port}`,
-        connectTimeout: 10_000,
-        timeout: 30_000,
-      });
+      const client = ldapjs.createClient(this.clientOptions(conn, address, { connectTimeout: 10_000, timeout: 30_000 }));
 
       client.on("error", (err: Error) => {
         client.destroy();
