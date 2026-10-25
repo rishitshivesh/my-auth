@@ -148,3 +148,27 @@ export class SentryApiError extends AuthError {
 export function isSentryApiError(value: unknown): value is SentryApiError {
   return value instanceof SentryApiError;
 }
+
+export type LinkFailure = 'expired' | 'already_used' | 'wrong_account';
+
+/**
+ * Classify a failed email-link action (verify-email, magic link, reset, invite).
+ * Returns undefined for any other error so callers can fall through.
+ */
+export function linkFailureReason(value: unknown): LinkFailure | undefined {
+  if (!isSentryApiError(value)) return undefined;
+  switch (value.code) {
+    case 'LINK_EXPIRED':
+      return 'expired';
+    case 'LINK_ALREADY_USED':
+      return 'already_used';
+    case 'LINK_WRONG_ACCOUNT':
+      return 'wrong_account';
+    default:
+      return undefined;
+  }
+}
+
+export const isLinkExpired = (v: unknown): boolean => linkFailureReason(v) === 'expired';
+export const isLinkAlreadyUsed = (v: unknown): boolean => linkFailureReason(v) === 'already_used';
+export const isLinkWrongAccount = (v: unknown): boolean => linkFailureReason(v) === 'wrong_account';

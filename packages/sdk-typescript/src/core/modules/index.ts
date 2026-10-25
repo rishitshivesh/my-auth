@@ -1,5 +1,5 @@
 export type { ModuleContext } from "./context";
-export { isRecentAuthRequired, unwrapEnvelope } from "./context";
+export { isRecentAuthRequired, unwrapEnvelope, buildQuery } from "./context";
 export { createSignInModule, type SignInModule } from "./signin";
 export { createAccountModule, type AccountModule } from "./account";
 export { createMfaModule, type MfaModule } from "./mfa";
@@ -9,3 +9,5 @@ export { createConsentModule, type ConsentModule } from "./consent";
 export { createSocialModule, type SocialModule } from "./social";
 export { createTenantModule, type TenantModule } from "./tenant";
 export { createPasskeysModule, type PasskeysModule, type WebAuthnBrowser } from "./passkeys";
+export { createAuditModule, type AuditModule } from "./audit";
+export { createSamlModule, type SamlModule } from "./saml";

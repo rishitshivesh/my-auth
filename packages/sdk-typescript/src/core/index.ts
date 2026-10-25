@@ -36,5 +36,13 @@ export type {
 export { AuthError } from './types';
 export * from './api-types';
 export * from './modules';
-export { SentryApiError, isSentryApiError } from './errors';
+export {
+  SentryApiError,
+  isSentryApiError,
+  linkFailureReason,
+  isLinkExpired,
+  isLinkAlreadyUsed,
+  isLinkWrongAccount,
+} from './errors';
+export type { LinkFailure } from './errors';
 export type { ApiErrorInit } from './errors';

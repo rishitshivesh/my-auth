@@ -26,6 +26,10 @@ import type {
 } from "../core/types";
 import type {
   AuthOutcome,
+  ReauthInput,
+  SessionEstablished,
+  MagicLinkSent,
+  RedirectOptions,
   MfaLoginOutcome,
   Passkey,
   PasskeyLoginStart,
@@ -51,7 +55,7 @@ interface AuthContextValue {
   loginIntent: (params: { email: string }) => Promise<LoginIntentResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (email: string, options?: RedirectOptions) => Promise<void>;
   resetPassword: (email: string, otp: string, password: string) => Promise<void>;
 
   // MFA
@@ -61,7 +65,7 @@ interface AuthContextValue {
   // Other sign-in methods
   initiateSocialLogin: (provider: string) => void;
   claimSocialSession: (ct: string) => Promise<void>;
-  sendMagicLink: (email: string) => Promise<void>;
+  sendMagicLink: (email: string, options?: RedirectOptions & { poll?: boolean }) => Promise<MagicLinkSent>;
   verifyMagicLink: (token: string) => Promise<AuthOutcome>;
   startPasskeyLogin: (email: string) => Promise<PasskeyLoginStart>;
   finishPasskeyLogin: (
@@ -205,7 +209,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
         setUser(null);
       }
     },
-    forgotPassword: (email) => track(() => client.forgotPassword(email)),
+    forgotPassword: (email, options) => track(() => client.forgotPassword(email, options)),
     resetPassword: (email, otp, password) => track(() => client.resetPassword(email, otp, password)),
     verifyMfaLogin: (tempToken, code) =>
       trackLoading(async () => adopt(await client.verifyMfaLogin(tempToken, code))),
@@ -217,7 +221,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
         await client.claimSocialSession(ct);
         setUser(await client.getCurrentUser());
       }),
-    sendMagicLink: (email) => track(() => client.sendMagicLink(email)),
+    sendMagicLink: (email, options) => track(() => client.sendMagicLink(email, options)),
     verifyMagicLink: (token) => trackLoading(async () => adopt(await client.verifyMagicLink(token))),
     startPasskeyLogin: (email) => track(() => client.startPasskeyLogin(email)),
     finishPasskeyLogin: (email, assertion, sessionNonce) =>
@@ -323,7 +327,9 @@ export const useConsent = () => useSentryClient().consent;
 export const useSocial = () => useSentryClient().social;
 /** Passkey sign-in, registration and management. */
 export const usePasskeys = () => useSentryClient().passkeys;
-/** Workspace discovery and self-service creation. */
+/** Tenant audit log (admin). */
+export const useAudit = () => useSentryClient().audit;
+/** Workspace discovery, branding and self-service creation. */
 export const useTenantApi = () => useSentryClient().tenant;
 /** Sign-in building blocks (providers, intent, magic link, MFA). */
 export const useSignIn = () => useSentryClient().signIn;
@@ -386,11 +392,10 @@ export interface RecentAuthState {
    */
   guard: <T>(action: () => Promise<T>) => Promise<T>;
   /**
-   * Confirm the password, then re-run the action that was interrupted.
-   * Resolves with the retried action's result, or with the MFA challenge when
-   * the account needs a second factor before step-up can complete.
+   * Step up (password string, TOTP code or passkey assertion), then re-run the
+   * action that was interrupted. Rejects with the server error if step-up fails.
    */
-  reauthenticate: (password: string) => Promise<{ outcome: AuthOutcome; retried: boolean }>;
+  reauthenticate: (input: string | ReauthInput) => Promise<{ outcome: SessionEstablished; retried: boolean }>;
   cancel: () => void;
 }
 
@@ -413,9 +418,8 @@ export function useRecentAuth(): RecentAuthState {
   }, []);
 
   const reauthenticate = useCallback(
-    async (password: string) => {
-      const outcome = await client.account.reauthenticate(password);
-      if (!isSessionEstablished(outcome)) return { outcome, retried: false };
+    async (input: string | ReauthInput) => {
+      const outcome = await client.account.reauthenticate(input);
       const retry = pending.current;
       pending.current = null;
       setNeedsReauth(false);

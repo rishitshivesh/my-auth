@@ -3,12 +3,19 @@
  * in (no cookies are set); the UI must send them to sign-in afterwards.
  */
 
-import type { AcceptInviteRequest, InvitePreview, MessageResult } from "../api-types";
+import type {
+  AcceptInviteRequest,
+  AcceptInviteResult,
+  InvitePreview,
+  InviteRequestNewResult,
+} from "../api-types";
 import { call, enc, type ModuleContext } from "./context";
 
 export interface InvitesModule {
   preview(token: string): Promise<InvitePreview>;
-  accept(request: AcceptInviteRequest): Promise<MessageResult>;
+  accept(request: AcceptInviteRequest): Promise<AcceptInviteResult>;
+  /** Expired/used invitee link: ask for a fresh invitation to the original address. */
+  requestNew(token: string): Promise<InviteRequestNewResult>;
 }
 
 export function createInvitesModule(ctx: ModuleContext): InvitesModule {
@@ -20,9 +27,15 @@ export function createInvitesModule(ctx: ModuleContext): InvitesModule {
         { auth: false },
       ),
     accept: (request) =>
-      call<MessageResult>(
+      call<AcceptInviteResult>(
         ctx,
         { url: `${ctx.baseURL}/auth/invite/accept`, method: "POST", body: request },
+        { auth: false },
+      ),
+    requestNew: (token) =>
+      call<InviteRequestNewResult>(
+        ctx,
+        { url: `${ctx.baseURL}/auth/invite/request-new`, method: "POST", body: { token } },
         { auth: false },
       ),
   };

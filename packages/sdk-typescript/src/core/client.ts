@@ -40,6 +40,8 @@ import type {
   WebAuthnCredentialJSON,
   AuthOutcome,
   PasskeyLoginStart,
+  RedirectOptions,
+  MagicLinkSent,
 } from "./api-types";
 import { createFetchTransport } from "./transport";
 import { SentryApiError } from "./errors";
@@ -53,6 +55,8 @@ import {
 } from "./state";
 import {
   createAccountModule,
+  createAuditModule,
+  createSamlModule,
   createConsentModule,
   createInvitesModule,
   createMfaModule,
@@ -62,6 +66,8 @@ import {
   createSocialModule,
   createTenantModule,
   type AccountModule,
+  type AuditModule,
+  type SamlModule,
   type ConsentModule,
   type InvitesModule,
   type MfaModule,
@@ -101,6 +107,10 @@ export class SentryClient {
   readonly social: SocialModule;
   /** Workspace discovery and self-service creation. */
   readonly tenant: TenantModule;
+  /** Tenant audit log list/export. */
+  readonly audit: AuditModule;
+  /** SAML browser entry-point URLs. */
+  readonly saml: SamlModule;
 
   constructor(config: SentryConfig) {
     this.config = {
@@ -119,7 +129,7 @@ export class SentryClient {
 
     const ctx = this.createModuleContext();
     this.signIn = createSignInModule(ctx);
-    this.account = createAccountModule(ctx, this.signIn);
+    this.account = createAccountModule(ctx);
     this.mfa = createMfaModule(ctx);
     this.passkeys = createPasskeysModule(ctx, { loadBrowser: this.config.webauthn });
     this.sessions = createSessionsModule(ctx);
@@ -127,6 +137,8 @@ export class SentryClient {
     this.consent = createConsentModule(ctx);
     this.social = createSocialModule(ctx, this.config.tenant);
     this.tenant = createTenantModule(ctx);
+    this.audit = createAuditModule(ctx);
+    this.saml = createSamlModule(ctx);
 
     this.initPromise = this.tryRestoreSession();
 
@@ -163,8 +175,8 @@ export class SentryClient {
   }
 
   /** Request a password reset code by email. */
-  forgotPassword(email: string): Promise<void> {
-    return this.signIn.forgotPassword(email);
+  forgotPassword(email: string, options?: RedirectOptions): Promise<void> {
+    return this.signIn.forgotPassword(email, options);
   }
 
   /** Reset password with the code emailed by forgotPassword(); the code is bound to `email`. */
@@ -202,21 +214,24 @@ export class SentryClient {
 
     const data = payloadOf(response);
     const expiresIn = typeof data.expiresIn === "number" ? data.expiresIn : undefined;
-    this.onSessionEstablished(expiresIn, undefined);
+    const session =
+      typeof data.session === "object" && data.session !== null ? (data.session as SessionClaims) : undefined;
+    this.onSessionEstablished(expiresIn, session);
 
-    // The completion token carries no tenant/group claims, so session claims
-    // are always absent here. Backfill with one refresh (the refresh cookie is
-    // already set). Best-effort: a failure leaves claims unset until the next
-    // natural refresh and does not affect the session just established.
-    try {
-      await this.refreshOnce();
-    } catch {
-      this.log("Could not backfill session claims after social login");
+    // Older servers omit the claims; backfill them with one refresh (the
+    // refresh cookie is already set). Best-effort: failure leaves claims unset
+    // until the next natural refresh and does not affect the session.
+    if (!session) {
+      try {
+        await this.refreshOnce();
+      } catch {
+        this.log("Could not backfill session claims after social login");
+      }
     }
   }
 
-  sendMagicLink(email: string): Promise<void> {
-    return this.signIn.sendMagicLink(email);
+  sendMagicLink(email: string, options?: RedirectOptions & { poll?: boolean }): Promise<MagicLinkSent> {
+    return this.signIn.sendMagicLink(email, options);
   }
 
   /** Verify a magic link token. May yield a session, an MFA challenge or required MFA enrollment. */

@@ -30,15 +30,17 @@ await client.waitForInit(); // restores the session from the refresh cookie
 
 | Property | Covers |
 |---|---|
-| `client.signIn` | `login`, `loginIntent`, `getProviders`, `forgotPassword`, `resetPassword`, `verifyMfa`, `verifyMfaBackupCode`, `sendMagicLink`, `verifyMagicLink` |
-| `client.account` | `register`, `verifyEmail`, `resendVerification`, `getProfile`, `updateProfile`, `changePassword`, `deleteAccount`, `listSecurityEvents`, `reauthenticate` |
+| `client.signIn` | `login`, `loginIntent`, `getProviders`, `forgotPassword`, `resetPassword`, `validateResetLink`, `resetPasswordWithToken`, `verifyMfa`, `completeMfa`, `verifyMfaBackupCode`, `requestMfaEmailOtp`, `startMfaWebAuthn`, `enrollTotpSetup`, `enrollTotpConfirm`, `sendMagicLink`, `verifyMagicLink`, `pollMagicLink` |
+| `client.account` | `register`, `verifyEmail`, `resendVerification`, `getProfile`, `updateProfile`, `changePassword`, `deleteAccount`, `listSecurityEvents`, `reauthenticate`, `startReauthWebAuthn` |
 | `client.mfa` | `getStatus`, `setupTotp`, `confirmTotp`, `disableTotp`, `disableAll`, `regenerateBackupCodes`, `requestEmailOtp`, `verifyEmailOtp` |
 | `client.passkeys` | `startLogin`, `finishLogin`, `authenticate`, `startRegistration`, `finishRegistration`, `list`, `remove` |
 | `client.sessions` | `list`, `revoke`, `revokeOthers`, `revokeAll` |
-| `client.invites` | `preview`, `accept` |
+| `client.invites` | `preview`, `accept`, `requestNew` |
 | `client.consent` | `buildAuthorizeUrl`, `getDetails`, `decide` |
 | `client.social` | `loginUrl`, `login`, `listConnections`, `unlink`, `startLinking` |
-| `client.tenant` | `listMyOrgs`, `checkSlug`, `register` |
+| `client.tenant` | `listMyOrgs`, `checkSlug`, `register`, `getBranding`, `updateBranding`, `getPublicBranding` |
+| `client.audit` | `list`, `exportCsv` |
+| `client.saml` | `continueUrl`, `metadataUrl` |
 
 The older flat methods (`client.login`, `client.verifyMfaLogin`, `client.listPasskeys`, ...) still work and delegate to the modules.
 `client.request()` remains the escape hatch for endpoints without a typed method (admin APIs); it adds the tenant header, cookies, and a silent refresh on 401.
@@ -69,15 +71,40 @@ if (isMfaChallenge(outcome)) {
 ## Email links
 
 ```ts
-await client.account.verifyEmail(tokenFromUrl);
-await client.account.resendVerification(email);        // RATE_LIMITED carries retryAfterSeconds
-const invite = await client.invites.preview(tokenFromUrl); // { email, tenantName, tenantSlug }
-await client.invites.accept({ token: tokenFromUrl, name, password }); // does NOT sign in
-const outcome = await client.signIn.verifyMagicLink(tokenFromUrl);
+const result = await client.account.verifyEmail(tokenFromUrl);   // { message, redirectUri? }
+await client.account.resendVerification(email, { redirectUri }); // RATE_LIMITED carries retryAfterSeconds
+const invite = await client.invites.preview(tokenFromUrl);       // { email, tenantName, tenantSlug }
+const { canSignInNow } = await client.invites.accept({ token: tokenFromUrl, name, password }); // no cookies set
+await client.invites.requestNew(tokenFromUrl);                   // expired/used invite
+const outcome = await client.signIn.verifyMagicLink(tokenFromUrl); // outcome.redirectUri on every branch
 ```
 
 Reading a link token on page load must not consume it: show a confirmation step and call the
-verify method from the button handler.
+verify method from the button handler. Password reset is link-first:
+
+```ts
+const status = await client.signIn.validateResetLink(token);     // does not consume; { valid, expiresInSeconds, redirectUri? }
+await client.signIn.resetPasswordWithToken(token, newPassword);  // fallback: resetPassword(email, otp, password)
+```
+
+Failed links carry `LINK_EXPIRED`, `LINK_ALREADY_USED` or `LINK_WRONG_ACCOUNT`; use `linkFailureReason(err)`
+(`"expired" | "already_used" | "wrong_account"`) or `isLinkExpired` / `isLinkAlreadyUsed` / `isLinkWrongAccount`.
+
+Cross-device sign-in: `sendMagicLink(email, { poll: true })` returns `pollingNonce`; poll `pollMagicLink(nonce)` until it stops returning
+`{ status: "pending" }` (`isMagicLinkPending`). The final value is the same `AuthOutcome` as `verifyMagicLink`.
+
+## Login-time MFA and enrollment
+
+```ts
+await client.signIn.requestMfaEmailOtp(tempToken);
+await client.signIn.completeMfa({ tempToken, method: "email", code });
+const opts = await client.signIn.startMfaWebAuthn(tempToken);
+await client.signIn.completeMfa({ tempToken, method: "webauthn", webauthnResponse, sessionNonce: opts.sessionNonce });
+
+// outcome.status === "mfa_enrollment_required": token from the body or the cookie
+const { secret, qrCode } = await client.signIn.enrollTotpSetup(outcome.enrollmentToken);
+const done = await client.signIn.enrollTotpConfirm(code, outcome.enrollmentToken); // session + done.backupCodes
+```
 
 ## Recent authentication (step-up)
 
@@ -91,13 +118,15 @@ try {
   await client.account.changePassword({ currentPassword, newPassword });
 } catch (err) {
   if (isRecentAuthRequired(err)) {
-    const outcome = await client.account.reauthenticate(password); // may return an MFA challenge
+    await client.account.reauthenticate(password);                       // or { method: "totp", code }
+    // passkey: const o = await client.account.startReauthWebAuthn();
+    //          await client.account.reauthenticate({ method: "webauthn", webauthnResponse, sessionNonce: o.sessionNonce });
     // then retry the action
   } else throw err;
 }
 ```
 
-There is no dedicated step-up endpoint; `reauthenticate` signs in again as the current user.
+`reauthenticate` refreshes the current session (`POST /auth/reauth`); a wrong password rejects without signing the user out.
 
 ## Sessions, MFA, consent
 
@@ -125,6 +154,18 @@ The browser ceremony uses `@simplewebauthn/browser` (optional peer, loaded on de
 const outcome = await client.passkeys.authenticate(email);
 // Cancelled prompts throw AuthError("PASSKEY_AUTH_CANCELLED") / ("PASSKEY_REGISTRATION_CANCELLED").
 ```
+
+## Admin helpers
+
+```ts
+const page = await client.audit.list({ eventType: "LOGIN_FAILURE", limit: 50 }); // { items, nextCursor, total }
+const csv = await client.audit.exportCsv({ startDate });
+const branding = await client.tenant.getBranding();
+await client.tenant.updateBranding({ primaryColor: "#6366f1" });
+window.location.href = client.saml.continueUrl(nonce);
+```
+
+`buildQuery(params)` builds query strings that keep `false` and `0` (only `undefined`, `null` and `""` are dropped).
 
 ## Errors
 
@@ -168,5 +209,4 @@ non-JSON gateway errors are still converted into a `SentryApiError` with a best-
 
 ## Known limits
 
-Flows the backend does not support yet (link-based password reset, pre-session MFA enrollment,
-cross-device completion, ...) are listed in `docs/ui-sdk-gaps.md`. The SDK does not fake them.
+Remaining open contracts (passwordless sign-up, usernameless passkeys, invite sign-in-on-accept, envelope consistency) are listed in `docs/ui-sdk-gaps.md`. The SDK does not fake them.

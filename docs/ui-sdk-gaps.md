@@ -4,26 +4,27 @@ Screen flows from `apps/docs/content/docs/dev/screen-ux-checklist/index.mdx` tha
 on a real backend contract today. The SDK (`packages/sdk-typescript`) wraps everything that exists
 and never fakes the rest. Verified against `apps/auth-service/src` on 2026-10-25.
 
-| Flow | Missing contract | Suggested minimal backend change |
+| Flow | Status | Detail |
 |---|---|---|
-| Password recovery by link | `forgot-password` emails a 6-digit code; `reset-password` needs `email + otp + password`. No link token, no non-consuming "is this link valid" check. | Add a purpose-bound, single-use, short-lived `token` to the email and to `ResetPasswordDto` (keep `otp` as fallback); add `GET /auth/reset-password/validate?token=` that does not consume it. |
-| Pre-session MFA enrollment (`mfa_enrollment_required`) | Login / magic link / passkey issue an enrollment token (body for password login, `mfa_enrollment_token` cookie otherwise) but nothing in the tree accepts it. `/mfa/setup/totp` and `/mfa/verify/totp` need a full session. | Add `POST /auth/mfa/enroll/totp/setup` and `.../confirm` that accept the enrollment token (cookie or body), enable TOTP, then issue the session cookies. |
-| Email-OTP / passkey as login-time second factor | `login` can advertise `email` / `webauthn` in `availableMethods`, but `/auth/mfa/verify` only checks TOTP and `/auth/mfa/verify-backup` only backup codes. `/mfa/request-email-otp` needs a session. | Accept `method` on `/auth/mfa/verify` (tempToken-authenticated), plus `POST /auth/mfa/request-email-otp` taking the tempToken. Or stop advertising methods that cannot be completed. |
-| Step-up / recent auth | `RequireRecentAuth` answers `ACCESS_RECENT_AUTH_REQUIRED` but there is no step-up endpoint. SDK `account.reauthenticate()` re-runs `/auth/login`, which creates a second session and cannot use passkeys. | `POST /auth/reauth` (password, TOTP or passkey) that refreshes `authTime` on the current session and reissues the cookie. |
-| Passwordless sign-up | `register` requires a password; `magic-link/send` silently ignores unknown emails; invites require a password. | `POST /auth/register` with `password` optional when the tenant allows passwordless, creating the user and sending the verification/magic link. |
-| Cross-device completion of email links | Magic link / verification tokens complete only in the browser that opens them; nothing lets device A learn device B finished. | Optional `pollingNonce` issued by `magic-link/send`, redeemable once via `POST /auth/magic-link/poll` after the link is verified elsewhere (device-bound, short TTL). |
-| Distinct link failure states (expired / used / wrong account) | Errors are `AUTH_TOKEN_INVALID` / `INVITE_INVALID`; used vs expired is only in free-text `detail` for invites, and absent for verify-email and magic link. | Stable codes `LINK_EXPIRED`, `LINK_ALREADY_USED`, `LINK_WRONG_ACCOUNT` in `sentry-types` `ERROR_STATUS`, returned by verify-email, magic-link, reset and invite endpoints. |
-| Destination retention for email links | `magic-link/send`, `forgot-password`, `resend-verification` and invites carry no `returnTo` / application context, so the post-link destination cannot be validated or preserved. | Optional `redirectUri` (validated against tenant application `callbackUrls`) stored with the token and returned on verify. |
-| Invite lifecycle for the invitee | Acceptance creates the account but does not sign in, and there is no "wrong signed-in account" check or resend/reissue for an expired invite from the invitee side. | Return a `canSignInNow` hint or issue the session on accept when the tenant allows it; invitee-facing `POST /auth/invite/request-new` rate-limited. |
-| Passkey sign-in without typing an email | `webauthn/login/start` requires `email`. | Accept an empty email and return discoverable-credential options (usernameless / conditional UI). |
-| Workspace self-registration session | `POST /tenants/register` returns `accessToken` and `refreshToken` in the JSON body and sets no cookies, contradicting ADR-0003. The SDK drops them, so the owner has to sign in again. | Set the auth cookies server-side and remove the tokens from the body (return `tenantSlug` + `user` only). |
-| Social login completion claims | `social/claim-session` returns no session claims (the SDK backfills with a refresh call). `social/link/token` reads `req.user.userId` while every other route reads `req.user.sub`; confirm the JWT carries `userId`. | Return `session` claims from claim-session; align the link-token route on `sub`. |
-| Consistent response envelope | `magic-link/verify` and `webauthn/login/finish` (`@Res()`) and the OAuth consent endpoints (`@RawResponse()`) skip the `{status, data}` envelope; `magic-link/send` and `social/link/token` wrap it twice. The SDK tolerates all of these. | Return payloads from the handlers and let `ResponseInterceptor` envelope them; use `@Res({ passthrough: true })`. |
-| Profile response shape | `GET /users/me` returns the raw entity; the SDK `Profile` type only promises the fields the UI uses. No email-change or avatar-upload API. | Add an explicit response DTO for `/users/me`; email change and avatar upload need new endpoints before any such screen ships. |
-| SAML / OIDC browser entry points | `/saml/sso/:tenantSlug`, `/saml/sso/continue/:nonce` and `/oauth/end_session` are browser redirects with no typed SDK helper. | SDK follow-up: URL builders only; no backend change needed. |
-| Admin / management APIs | Users, RBAC, OAuth clients, webhooks, SCIM, LDAP, audit, dashboard are reached with `client.request` or `packages/admin-client`; they are outside this SDK pass (personal account and sign-in flows). | Type them in `packages/admin-client` against the same `ProblemDetails` errors. |
+| Password recovery by link | Closed | `validateResetLink`, `resetPasswordWithToken`, `redirectUri` (backend pass 2). |
+| Pre-session MFA enrollment | Closed | `signIn.enrollTotpSetup` / `enrollTotpConfirm`. |
+| Email-OTP / passkey as login second factor | Closed | `completeMfa`, `requestMfaEmailOtp`, `startMfaWebAuthn`. |
+| Step-up / recent auth | Closed | `account.reauthenticate` / `startReauthWebAuthn` use `/auth/reauth`; `useRecentAuth` wired. |
+| Cross-device completion of magic links | Closed | `sendMagicLink(email, {poll:true})`, `pollMagicLink`. |
+| Distinct link failure states | Closed | `LINK_EXPIRED` / `LINK_ALREADY_USED` / `LINK_WRONG_ACCOUNT`, `linkFailureReason`. |
+| Destination retention for email links | Closed | Optional `redirectUri` on send/forgot/resend, returned by verify/validate/reset. |
+| Invite expired/used (invitee side) | Closed | `invites.requestNew`. |
+| Workspace self-registration session | Closed | Cookies set, no tokens in body; `expiresIn` returned. |
+| Social claim-session claims | Closed | Claims returned; SDK only backfills for older servers. |
+| Passwordless sign-up | Open | `register` requires a password; `magic-link/send` ignores unknown emails. Suggest `password` optional on `POST /auth/register` when the tenant allows it. |
+| Passkey sign-in without typing an email | Open | `webauthn/login/start` requires `email`. Suggest empty email returning discoverable-credential options. |
+| Invite: sign in on accept / wrong-account check | Open | Accept sets no session (`canSignInNow` is only a hint); no check that a signed-in user is the invitee. Suggest optional session issue on accept and a `LINK_WRONG_ACCOUNT` check when a session cookie exists. |
+| Response envelope consistency | Open | `magic-link/verify`, `magic-link/poll`, `webauthn/login/finish` (`@Res()`) and OAuth consent (`@RawResponse()`) skip `{status,data}`; `magic-link/send` / `social/link/token` may double wrap. SDK tolerates all. Suggest `@Res({passthrough:true})` everywhere. |
+| Profile response shape / email change / avatar upload | Open | `/users/me` returns the raw entity; no email-change or upload API. Add a response DTO first. |
+| Branding logo upload | Open (SDK) | Multipart `POST /tenants/current/branding/logo`; the JSON transport cannot send it yet. |
+| Admin / management APIs | Open (SDK) | Users, RBAC, OAuth clients, webhooks, SCIM, LDAP, dashboard still use `client.request` / `packages/admin-client`. Audit list/export and branding are now typed. |
 
 Notes
 
 - Two session families exist (`/sessions/*` and `/users/me/sessions`). The SDK uses `/sessions/*` only.
-- `login` lockout surfaces as `AUTH_ACCOUNT_LOCKED` (423) or `RATE_LIMITED` with `retryAfterSeconds`; there is no per-email resend cooldown beyond the IP rate limit.
+- `login` lockout surfaces as `AUTH_ACCOUNT_LOCKED` (423) or `RATE_LIMITED` with `retryAfterSeconds`.

@@ -33,6 +33,8 @@ export interface SessionEstablished {
   user?: LoginUser;
   /** Present on backup-code logins: how many codes are left. */
   warning?: string;
+  /** Validated post-link destination, when the originating email carried one. */
+  redirectUri?: string;
 }
 
 /** A second factor is required before a session exists. */
@@ -45,6 +47,7 @@ export interface MfaChallengeResult {
     preferredMethod?: string;
     remainingAttempts?: number;
   };
+  redirectUri?: string;
 }
 
 /**
@@ -56,6 +59,7 @@ export interface MfaEnrollmentRequiredResult {
   mfaRequired?: false;
   status: "mfa_enrollment_required";
   enrollmentToken?: string;
+  redirectUri?: string;
 }
 
 /** Result of every flow that can end in a session: login, magic link, passkey. */
@@ -99,6 +103,71 @@ export interface RegisterResult {
 
 export interface MessageResult {
   message: string;
+}
+
+/** Result of link-driven actions that may carry the validated destination. */
+export interface RedirectResult extends MessageResult {
+  redirectUri?: string;
+}
+
+/** Optional destination (validated server-side against tenant application URLs). */
+export interface RedirectOptions {
+  redirectUri?: string;
+}
+
+export interface ResetLinkStatus {
+  valid: boolean;
+  expiresInSeconds: number;
+  redirectUri?: string;
+}
+
+export interface MagicLinkSent {
+  message: string;
+  expiresInSeconds?: number;
+  /** Only when sent with `poll: true`: redeem with signIn.pollMagicLink(). */
+  pollingNonce?: string;
+}
+
+export interface MagicLinkPending {
+  status: "pending";
+  mfaRequired?: undefined;
+}
+
+export type MagicLinkPoll = AuthOutcome | MagicLinkPending;
+
+export const isMagicLinkPending = (o: MagicLinkPoll): o is MagicLinkPending =>
+  o.status === "pending";
+
+export type CompleteMfaInput =
+  | { tempToken: string; method?: "totp"; code: string }
+  | { tempToken: string; method: "email"; code: string }
+  | { tempToken: string; method: "webauthn"; webauthnResponse: WebAuthnCredentialJSON; sessionNonce: string };
+
+export interface MfaEmailOtpSent {
+  message: string;
+  expiresInSeconds: number;
+}
+
+export type MfaWebAuthnStart = PasskeyLoginStart;
+
+export interface TotpEnrollmentSetup {
+  secret: string;
+  qrCode: string;
+}
+
+/** Enrollment finished: a session exists and the one-time backup codes are shown now. */
+export interface MfaEnrollmentCompleted extends SessionEstablished {
+  backupCodes: string[];
+}
+
+export type ReauthInput =
+  | { method: "password"; password: string }
+  | { method: "totp"; code: string }
+  | { method: "webauthn"; webauthnResponse: WebAuthnCredentialJSON; sessionNonce: string };
+
+export interface InviteRequestNewResult {
+  message: string;
+  expiresInDays: number;
 }
 
 // ============================================================
@@ -161,9 +230,7 @@ export interface Passkey {
 export type WebAuthnOptionsJSON = { challenge: string } & Record<string, unknown>;
 export type WebAuthnCredentialJSON = object;
 
-export interface PasskeyLoginStart extends WebAuthnOptionsJSON {
-  sessionNonce: string;
-}
+export type PasskeyLoginStart = WebAuthnOptionsJSON & { sessionNonce: string };
 
 // ============================================================
 // SESSIONS / PROFILE / SECURITY EVENTS
@@ -245,6 +312,11 @@ export interface InvitePreview {
   email: string;
   tenantName: string;
   tenantSlug: string;
+}
+
+export interface AcceptInviteResult extends MessageResult {
+  /** True when the invitee can sign in right away with the password just set. */
+  canSignInNow?: boolean;
 }
 
 export interface AcceptInviteRequest {
@@ -329,7 +401,48 @@ export interface RegisterTenantRequest {
   idempotencyKey: string;
 }
 
+/** The server sets the auth cookies; no tokens are ever in the body. */
 export interface RegisterTenantResult {
   tenantSlug: string;
   user: { id: string; email: string; name: string };
+  expiresIn: number;
+}
+
+// ============================================================
+// BRANDING / AUDIT
+// ============================================================
+
+export interface Branding {
+  primaryColor: string;
+  logoUrl?: string;
+  fontFamily: string;
+  headerWeight: "regular" | "bold";
+  backgroundStyle: "solid" | "gradient";
+}
+
+export type BrandingUpdate = Partial<Branding>;
+
+export interface AuditFilters {
+  userId?: string;
+  requestId?: string;
+  eventType?: string;
+  /** ISO 8601 */
+  startDate?: string;
+  endDate?: string;
+  cursor?: string;
+  /** 1-200 */
+  limit?: number;
+}
+
+export interface AuditEvent extends SecurityEvent {
+  userId?: string | null;
+  actorEmail?: string | null;
+  tenantId?: string;
+  userAgent?: string | null;
+}
+
+export interface AuditPage {
+  items: AuditEvent[];
+  nextCursor: string | null;
+  total: number;
 }

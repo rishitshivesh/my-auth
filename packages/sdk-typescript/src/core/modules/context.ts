@@ -84,3 +84,18 @@ export const enc = (segment: string): string => encodeURIComponent(segment);
 export function isRecentAuthRequired(error: unknown): boolean {
   return error instanceof AuthError && error.code === "ACCESS_RECENT_AUTH_REQUIRED";
 }
+
+/**
+ * Build a query string that drops only `undefined`, `null` and empty strings.
+ * `false` and `0` are real filter values and are kept (a plain truthiness check
+ * silently loses `?includeInactive=false`). Returns "" or "?a=b".
+ */
+export function buildQuery(params: object): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    query.set(key, String(value));
+  }
+  const text = query.toString();
+  return text ? `?${text}` : "";
+}

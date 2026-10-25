@@ -4,22 +4,25 @@
  */
 
 import type {
-  AuthOutcome,
   ChangePasswordRequest,
   MessageResult,
+  PasskeyLoginStart,
+  ReauthInput,
+  RedirectOptions,
+  RedirectResult,
+  SessionEstablished,
   Profile,
   ProfileUpdate,
   RegisterRequest,
   RegisterResult,
   SecurityEvent,
 } from "../api-types";
-import { call, type ModuleContext } from "./context";
-import type { SignInModule } from "./signin";
+import { call, payloadOf, type ModuleContext } from "./context";
 
 export interface AccountModule {
   register(request: RegisterRequest): Promise<RegisterResult>;
-  verifyEmail(token: string): Promise<MessageResult>;
-  resendVerification(email: string): Promise<MessageResult>;
+  verifyEmail(token: string): Promise<RedirectResult>;
+  resendVerification(email: string, options?: RedirectOptions): Promise<MessageResult>;
   getProfile(): Promise<Profile>;
   updateProfile(update: ProfileUpdate): Promise<MessageResult>;
   /** Requires recent authentication; see isRecentAuthRequired(). */
@@ -28,14 +31,16 @@ export interface AccountModule {
   deleteAccount(password: string): Promise<MessageResult>;
   listSecurityEvents(limit?: number): Promise<SecurityEvent[]>;
   /**
-   * Step-up: prove the password again so `ACCESS_RECENT_AUTH_REQUIRED` actions
-   * can be retried. The backend has no dedicated step-up endpoint; this signs in
-   * again as the current user, so it may itself return an MFA challenge.
+   * Step-up for `ACCESS_RECENT_AUTH_REQUIRED` actions: prove the password, a
+   * TOTP code or a passkey on the *current* session. A string is shorthand for
+   * a password. On success the session's auth time is refreshed; retry the action.
    */
-  reauthenticate(password: string): Promise<AuthOutcome>;
+  reauthenticate(input: string | ReauthInput): Promise<SessionEstablished>;
+  /** WebAuthn options + `sessionNonce` for a `{method:"webauthn"}` reauthenticate(). */
+  startReauthWebAuthn(): Promise<PasskeyLoginStart>;
 }
 
-export function createAccountModule(ctx: ModuleContext, signIn: SignInModule): AccountModule {
+export function createAccountModule(ctx: ModuleContext): AccountModule {
   const auth = (path: string): string => `${ctx.baseURL}/auth${path}`;
   const me = (path = ""): string => `${ctx.baseURL}/users/me${path}`;
 
@@ -44,12 +49,12 @@ export function createAccountModule(ctx: ModuleContext, signIn: SignInModule): A
       call<RegisterResult>(ctx, { url: auth("/register"), method: "POST", body: request }, { auth: false }),
 
     verifyEmail: (token) =>
-      call<MessageResult>(ctx, { url: auth("/verify-email"), method: "POST", body: { token } }, { auth: false }),
+      call<RedirectResult>(ctx, { url: auth("/verify-email"), method: "POST", body: { token } }, { auth: false }),
 
-    resendVerification: (email) =>
+    resendVerification: (email, options) =>
       call<MessageResult>(
         ctx,
-        { url: auth("/resend-verification"), method: "POST", body: { email } },
+        { url: auth("/resend-verification"), method: "POST", body: { email, redirectUri: options?.redirectUri } },
         { auth: false },
       ),
 
@@ -75,10 +80,25 @@ export function createAccountModule(ctx: ModuleContext, signIn: SignInModule): A
       return call<SecurityEvent[]>(ctx, { url: me(`/security-events${query}`), method: "GET" });
     },
 
-    async reauthenticate(password) {
-      const profile = await module.getProfile();
-      return signIn.login({ email: profile.email, password });
+    async reauthenticate(input) {
+      const body: ReauthInput = typeof input === "string" ? { method: "password", password: input } : input;
+      const payload = payloadOf(await send(ctx, auth("/reauth"), body));
+      const session = payload.session as SessionEstablished["session"];
+      const expiresIn = typeof payload.expiresIn === "number" ? payload.expiresIn : 0;
+      ctx.sessionEstablished(expiresIn, session);
+      return { expiresIn, tenantSlug: session?.tenantSlug ?? "", session };
     },
+
+    startReauthWebAuthn: () =>
+      call<PasskeyLoginStart>(ctx, { url: auth("/reauth/webauthn/start"), method: "POST" }),
   };
   return module;
+}
+
+async function send(ctx: ModuleContext, url: string, body: unknown) {
+  // publicRequest: a wrong password answers 401 and must not trigger the
+  // refresh/clear-session path (that would sign the user out for a typo).
+  const response = await ctx.publicRequest({ url, method: "POST", body });
+  if (!response.ok) throw ctx.fail(response);
+  return response;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BASE, envelope, makeClient, ok, problem } from "../test-utils";
-import { isMfaChallenge, isSessionEstablished } from "../api-types";
+import { isSessionEstablished } from "../api-types";
 import { isRecentAuthRequired } from "./context";
 
 describe("account registration and verification", () => {
@@ -90,26 +90,42 @@ describe("account profile and security", () => {
 });
 
 describe("account.reauthenticate (step-up)", () => {
-  it("signs in again as the current user and returns the session", async () => {
-    const { client, calls } = await makeClient((req) =>
-      req.url.endsWith("/users/me")
-        ? envelope({ id: "u1", email: "a@b.c" })
-        : envelope({ tenantSlug: "acme", expiresIn: 900, session: { tenantId: "t", tenantSlug: "acme", groups: [] } }),
-    );
+  const reauthed = envelope({ session: { tenantId: "t", tenantSlug: "acme", groups: [] }, expiresIn: 900 });
+
+  it("a string is a password step-up on the current session", async () => {
+    const { client, last } = await makeClient(() => reauthed);
     const out = await client.account.reauthenticate("pw");
     expect(isSessionEstablished(out)).toBe(true);
-    expect(calls[1]?.body).toEqual({ email: "a@b.c", password: "pw" });
+    expect(out.tenantSlug).toBe("acme");
+    expect(last()).toMatchObject({ url: `${BASE}/auth/reauth`, body: { method: "password", password: "pw" } });
+    expect(client.getSessionClaims()?.tenantSlug).toBe("acme");
   });
 
-  it("returns the MFA challenge when the account has MFA", async () => {
-    const { client } = await makeClient((req) =>
-      req.url.endsWith("/users/me") ? envelope({ id: "u1", email: "a@b.c" }) : envelope({ mfaRequired: true, tempToken: "t" }),
+  it("supports totp and webauthn inputs and the webauthn start call", async () => {
+    const { client, calls } = await makeClient((req) =>
+      req.url.endsWith("/reauth/webauthn/start") ? envelope({ challenge: "c", sessionNonce: "n" }) : reauthed,
     );
-    expect(isMfaChallenge(await client.account.reauthenticate("pw"))).toBe(true);
+    await client.account.reauthenticate({ method: "totp", code: "123456" });
+    const start = await client.account.startReauthWebAuthn();
+    await client.account.reauthenticate({ method: "webauthn", webauthnResponse: { id: "x" }, sessionNonce: start.sessionNonce });
+    expect(calls[0]?.body).toEqual({ method: "totp", code: "123456" });
+    expect(calls[2]?.body).toMatchObject({ method: "webauthn", sessionNonce: "n" });
   });
 
-  it("ok() raw body without envelope is also accepted", async () => {
+  it("rejects with the server error and keeps the session", async () => {
+    const { client } = await makeClient(() => problem(401, "AUTH_INVALID_CREDENTIALS", "No"));
+    await expect(client.account.reauthenticate("bad")).rejects.toMatchObject({ code: "AUTH_INVALID_CREDENTIALS" });
+  });
+
+  it("raw body without envelope is also accepted", async () => {
     const { client } = await makeClient(() => ok({ id: "u1", email: "a@b.c", emailVerified: false }));
     expect((await client.account.getProfile()).email).toBe("a@b.c");
+  });
+
+  it("verifyEmail returns the redirect and resend forwards it", async () => {
+    const { client, last } = await makeClient(() => envelope({ message: "ok", redirectUri: "https://app/x" }));
+    expect((await client.account.verifyEmail("t")).redirectUri).toBe("https://app/x");
+    await client.account.resendVerification("a@b.c", { redirectUri: "https://app/x" });
+    expect(last().body).toEqual({ email: "a@b.c", redirectUri: "https://app/x" });
   });
 });

@@ -38,7 +38,7 @@ branches are yours to render.
 
 Each returns the matching client module (stable reference):
 
-`useSignIn()`, `useAccount()`, `useMfa()`, `usePasskeys()`, `useSessions()`, `useInvites()`, `useConsent()`, `useSocial()`, `useTenantApi()`, and `useSentryClient()` for the client itself.
+`useSignIn()`, `useAccount()`, `useMfa()`, `usePasskeys()`, `useSessions()`, `useInvites()`, `useConsent()`, `useSocial()`, `useTenantApi()`, `useAudit()`, and `useSentryClient()` for the client itself.
 
 ## Pending and error state
 
@@ -63,10 +63,10 @@ await recent.guard(() => account.changePassword({ currentPassword, newPassword }
 
 {recent.needsReauth && (
   <PasswordPrompt
-    onSubmit={(pw) => recent.reauthenticate(pw)} // re-runs the interrupted action on success
+    onSubmit={(pw) => recent.reauthenticate(pw)} // POST /auth/reauth, then re-runs the interrupted action
     onCancel={recent.cancel}
   />
 )}
 ```
 
-If the account has MFA, `reauthenticate` resolves with `{ retried: false, outcome }` where `outcome` is the MFA challenge; complete it, then call `guard` again.
+`reauthenticate` also accepts `{ method: "totp", code }` or a passkey assertion. A failed step-up rejects and keeps the prompt open.

@@ -23,6 +23,7 @@ function parseSession(payload: Rec): SessionEstablished["session"] {
 }
 
 export function parseAuthOutcome(ctx: ModuleContext, payload: Rec): AuthOutcome {
+  const redirectUri = asString(payload.redirectUri);
   if (payload.mfaRequired === true) {
     ctx.log("MFA required");
     return {
@@ -32,6 +33,7 @@ export function parseAuthOutcome(ctx: ModuleContext, payload: Rec): AuthOutcome 
         methods: asMethods(payload.availableMethods),
         preferredMethod: asString(payload.preferredMethod),
       },
+      redirectUri,
     };
   }
 
@@ -40,6 +42,7 @@ export function parseAuthOutcome(ctx: ModuleContext, payload: Rec): AuthOutcome 
     return {
       status: "mfa_enrollment_required",
       enrollmentToken: asString(payload.enrollmentToken),
+      redirectUri,
     };
   }
 
@@ -53,6 +56,7 @@ export function parseAuthOutcome(ctx: ModuleContext, payload: Rec): AuthOutcome 
     session,
     user: payload.user as SessionEstablished["user"],
     warning: asString(payload.warning),
+    redirectUri,
   };
   return result;
 }
