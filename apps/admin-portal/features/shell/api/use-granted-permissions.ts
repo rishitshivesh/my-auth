@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth } from "@scrolloop/sdk";
-import { useUserEffectivePermissions } from "@/lib/queries";
+import { useMyPermissions, useMyRoles } from "@/lib/queries";
+import { grantedPermissions } from "../model/permission-grants";
 
 export interface GrantedPermissions {
   granted: readonly string[];
@@ -12,7 +13,9 @@ export interface GrantedPermissions {
 /** The signed-in user's effective permission names, for UI gating only. */
 export function useGrantedPermissions(): GrantedPermissions {
   const { user } = useAuth();
-  const query = useUserEffectivePermissions(user?.id ?? "");
-  if (!query.isSuccess) return { granted: [], isReady: false };
-  return { granted: query.data.map((permission) => permission.name), isReady: true };
+  const permissions = useMyPermissions(Boolean(user?.id));
+  const roles = useMyRoles(Boolean(user?.id));
+  if (!permissions.isSuccess || !roles.isSuccess) return { granted: [], isReady: false };
+  const attached = permissions.data.map((permission) => permission.name);
+  return { granted: grantedPermissions(roles.data, attached), isReady: true };
 }

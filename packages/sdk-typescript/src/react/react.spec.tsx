@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SentryClient } from "../core/client";
 import { BASE, ok } from "../core/test-utils";
-import { SentryProvider, useAccount, useCreateSentryClient, useSentryClient, useUser } from "./index";
+import { SentryProvider, shouldAdoptSession, useAccount, useCreateSentryClient, useSentryClient, useUser } from "./index";
 
 const transport = async () => ok({});
 
@@ -37,6 +37,12 @@ describe("react layer", () => {
     expect(account).toBe(client.account);
     expect(same).toBe(client);
     expect(html).toContain("true");
+  });
+
+  it("adopts a session established outside the provider only while nobody is shown", () => {
+    expect(shouldAdoptSession(false, true)).toBe(true);
+    expect(shouldAdoptSession(true, true)).toBe(false);
+    expect(shouldAdoptSession(false, false)).toBe(false);
   });
 
   it("hooks throw outside a provider", () => {

@@ -6,6 +6,8 @@ import { describeFailure, type Failure } from "../model/failure";
 import { nextStepAfterEmail, resolveMethods, type LoginMethods, type LoginStep } from "../model/login-flow";
 import { useAuthApi } from "./use-auth-api";
 import { useContinuation } from "./use-continuation";
+import { useMagicPoll, type MagicPollInput } from "./use-magic-poll";
+import { MAGIC_LINK_DEFAULT_TTL_SECONDS } from "@/constants/limits";
 
 interface FlowState {
   step: LoginStep;
@@ -14,6 +16,7 @@ interface FlowState {
   intent: LoginIntentResponse | null;
   pending: boolean;
   failure: Failure | null;
+  magic: (MagicPollInput & { matchCode: string }) | null;
 }
 
 export function useLoginFlow(initialEmail: string, next: string | null, initialFailure: boolean) {
@@ -26,6 +29,7 @@ export function useLoginFlow(initialEmail: string, next: string | null, initialF
     intent: null,
     pending: false,
     failure: initialFailure ? { kind: "generic", fieldErrors: {} } : null,
+    magic: null,
   });
 
   const patch = useCallback((change: Partial<FlowState>) => setState((s) => ({ ...s, ...change })), []);
@@ -63,13 +67,31 @@ export function useLoginFlow(initialEmail: string, next: string | null, initialF
   const submitPassword = (password: string): Promise<void> =>
     run(async () => proceed(await api.login(state.email, password)));
 
+  const issueLink = async (): Promise<void> => {
+    const sent = await api.requestMagicLink(state.email);
+    patch({
+      magic:
+        sent.pollingNonce && sent.matchCode
+          ? {
+              pollingNonce: sent.pollingNonce,
+              matchCode: sent.matchCode,
+              expiresInSeconds: sent.expiresInSeconds ?? MAGIC_LINK_DEFAULT_TTL_SECONDS,
+              startedAt: Date.now(),
+            }
+          : null,
+    });
+  };
+
   const sendLink = (): Promise<void> =>
     run(async () => {
-      await api.sendMagicLink(state.email);
+      await issueLink();
       patch({ step: "email-link-sent" });
     });
 
-  const resendLink = (): Promise<void> => api.sendMagicLink(state.email);
+  /** A new link supersedes the old one, so a new nonce and match code replace the old pair. */
+  const resendLink = (): Promise<void> => issueLink();
+
+  const poll = useMagicPoll(api, state.step === "email-link-sent" ? state.magic : null, proceed);
 
   const usePasskey = (): Promise<void> => run(async () => proceed(await api.passkey(state.email)));
 
@@ -77,5 +99,5 @@ export function useLoginFlow(initialEmail: string, next: string | null, initialF
 
   const goTo = (step: LoginStep): void => patch({ step, failure: null });
 
-  return { state, methods, submitEmail, submitPassword, sendLink, resendLink, usePasskey, social, goTo };
+  return { state, methods, poll, submitEmail, submitPassword, sendLink, resendLink, usePasskey, social, goTo };
 }

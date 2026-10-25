@@ -18,6 +18,9 @@ export function createFetchTransport(): Transport {
         headers: request.headers,
         body: request.body ? JSON.stringify(request.body) : undefined,
         credentials: request.credentials || 'include',
+        // Auth state (link validity, session, MFA status) must never come from the HTTP cache:
+        // browsers heuristically cache error statuses such as 410 and would replay a stale answer.
+        cache: 'no-store',
       });
 
       // Parse response body

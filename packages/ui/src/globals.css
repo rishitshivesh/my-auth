@@ -32,7 +32,7 @@
     
     --destructive: #C0392B;
     --success: #2ABF6C;
-    --success-text: #1D8F50;
+    --success-text: #157444;
     --warning: #C4830A;
     --warning-text: #8A5A06;
     --info: #2563EB;
@@ -116,7 +116,7 @@
     --secondary-foreground: #B8B4AE;
     
     --muted: #252422;
-    --muted-foreground: #6E6A64;
+    --muted-foreground: #A29E97;
     
     --accent: #34D473;
     --accent-foreground: #111110;
@@ -132,6 +132,15 @@
     --border: rgba(255, 255, 255, 0.08);
     --input: rgba(255, 255, 255, 0.08);
     --ring: rgba(52, 212, 115, 0.2);
+
+    /* Glass Surfaces: dark tints, so light text on them keeps AA contrast */
+    --glass-1-bg: rgba(28, 27, 25, 0.68);
+    --glass-1-border: rgba(255, 255, 255, 0.10);
+    --glass-2-bg: rgba(28, 27, 25, 0.80);
+    --glass-2-border: rgba(255, 255, 255, 0.12);
+    --glass-3-bg: rgba(28, 27, 25, 0.92);
+    --glass-3-border: rgba(255, 255, 255, 0.14);
+    --glass-stroke: rgba(255, 255, 255, 0.08);
     
     --sidebar: rgba(28, 27, 25, 0.95);
     --sidebar-foreground: #F5F4F2;

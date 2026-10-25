@@ -6,11 +6,14 @@ import type { LinkLandingStatus } from "@repo/ui";
  */
 export function linkStatusFromErrorCode(code: string | undefined): Extract<LinkLandingStatus, "expired" | "used" | "invalid" | "wrong-account"> {
   switch (code) {
+    case "LINK_EXPIRED":
     case "AUTH_TOKEN_EXPIRED":
       return "expired";
+    case "LINK_ALREADY_USED":
     case "AUTH_TOKEN_USED":
     case "RESOURCE_CONFLICT":
       return "used";
+    case "LINK_WRONG_ACCOUNT":
     case "TENANT_MISMATCH":
     case "ACCESS_FORBIDDEN":
       return "wrong-account";

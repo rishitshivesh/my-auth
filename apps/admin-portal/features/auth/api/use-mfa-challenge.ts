@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { describeFailure, type Failure } from "../model/failure";
 import type { StoredChallenge } from "../model/challenge";
 import { clearChallenge, loadChallenge } from "./challenge-store";
+import { runMfaPasskey } from "./mfa-passkey";
 import { useAuthApi } from "./use-auth-api";
 import { useContinuation } from "./use-continuation";
 
@@ -12,13 +13,17 @@ export type ChallengeState =
   | { status: "missing" }
   | { status: "ready"; challenge: StoredChallenge };
 
+export type CodeMode = "totp" | "email" | "backup";
+
 export function useMfaChallenge() {
   const { api, tenantSlug } = useAuthApi();
   const [state, setState] = useState<ChallengeState>({ status: "loading" });
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const next = state.status === "ready" ? state.challenge.next ?? null : null;
-  const proceed = useContinuation(tenantSlug, next);
+  const carried = state.status === "ready" ? state.challenge.redirectUri : undefined;
+  const proceed = useContinuation(tenantSlug, next, carried);
 
   useEffect(() => {
     const challenge = loadChallenge();
@@ -36,24 +41,54 @@ export function useMfaChallenge() {
     return () => clearTimeout(timer);
   }, [state]);
 
-  const submit = useCallback(
-    async (mode: "totp" | "backup", code: string): Promise<void> => {
+  const attempt = useCallback(
+    async (action: (tempToken: string) => Promise<void>): Promise<void> => {
       if (state.status !== "ready") return;
       setPending(true);
       setFailure(null);
       try {
-        const { tempToken } = state.challenge;
-        const outcome =
-          mode === "totp" ? await api.verifyMfa(tempToken, code) : await api.verifyBackup(tempToken, code);
-        clearChallenge();
-        proceed(outcome);
+        await action(state.challenge.tempToken);
       } catch (error) {
         setFailure(describeFailure(error));
       } finally {
         setPending(false);
       }
     },
-    [api, proceed, state],
+    [state],
+  );
+
+  const submit = useCallback(
+    (mode: CodeMode, code: string): Promise<void> =>
+      attempt(async (tempToken) => {
+        const outcome =
+          mode === "backup"
+            ? await api.verifyBackup(tempToken, code)
+            : await api.completeMfa(mode === "email" ? { tempToken, method: "email", code } : { tempToken, method: "totp", code });
+        clearChallenge();
+        proceed(outcome);
+      }),
+    [api, attempt, proceed],
+  );
+
+  const sendEmailCode = useCallback(
+    (): Promise<void> =>
+      attempt(async (tempToken) => {
+        await api.mfaEmailOtp(tempToken);
+        setEmailSent(true);
+      }),
+    [api, attempt],
+  );
+
+  const usePasskey = useCallback(
+    (): Promise<void> =>
+      attempt(async (tempToken) => {
+        const start = await api.mfaWebAuthnStart(tempToken);
+        const input = await runMfaPasskey(tempToken, start);
+        const outcome = await api.completeMfa(input);
+        clearChallenge();
+        proceed(outcome);
+      }),
+    [api, attempt, proceed],
   );
 
   const restart = useCallback((): void => {
@@ -61,5 +96,5 @@ export function useMfaChallenge() {
     setState({ status: "missing" });
   }, []);
 
-  return { state, pending, failure, submit, restart };
+  return { state, pending, failure, emailSent, submit, sendEmailCode, usePasskey, restart };
 }

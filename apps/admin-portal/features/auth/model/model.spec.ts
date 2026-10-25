@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { resolveDestination } from "./destination";
 import { classifyOutcome } from "./outcome";
 import { tenantSlugFromHost, tenantOrigin } from "./tenant";
-import { createChallenge, isChallengeLive, parseChallenge, completableMethods } from "./challenge";
+import { activeTenantSlug, tenantSlugFromPath } from "@/lib/tenant-host";
+import { createChallenge, initialMethod, isChallengeLive, offeredMethods, parseChallenge } from "./challenge";
 import { nextStepAfterEmail, resolveMethods } from "./login-flow";
 import { parseLoginParams } from "./login-params";
 import { checkPassword } from "./password-policy";
@@ -46,6 +47,17 @@ describe("tenant", () => {
   });
 });
 
+describe("active tenant", () => {
+  it("prefers the subdomain, then the console path, then the platform workspace", () => {
+    expect(activeTenantSlug({ host: "acme.sentry.test:3000", pathname: "/t/other/users" }, "sentry.test", "sentry")).toBe("acme");
+    expect(activeTenantSlug({ host: "sentry.test", pathname: "/t/other/users" }, "sentry.test", "sentry")).toBe("other");
+    expect(activeTenantSlug({ host: "sentry.test", pathname: "/dashboard/profile" }, "sentry.test", "sentry")).toBe("sentry");
+    expect(tenantSlugFromPath("/t/a%20b/x")).toBe("a b");
+    expect(tenantSlugFromPath("/t/%E0%A4%A")).toBeNull();
+    expect(tenantSlugFromPath("/u/login")).toBeNull();
+  });
+});
+
 describe("classifyOutcome", () => {
   it("handles the session branch with validated next", () => {
     const out = classifyOutcome({ expiresIn: 1, tenantSlug: "acme" }, "/t/acme/users", "x", ctx);
@@ -60,7 +72,7 @@ describe("classifyOutcome", () => {
     expect(out).toEqual({ kind: "mfa", tempToken: "t", methods: ["totp"], preferred: undefined, remainingAttempts: 3 });
   });
   it("handles the enrollment branch", () => {
-    expect(classifyOutcome({ status: "mfa_enrollment_required" }, null, "x", ctx)).toEqual({ kind: "enroll", enrollmentToken: undefined });
+    expect(classifyOutcome({ status: "mfa_enrollment_required" }, null, "x", ctx)).toEqual({ kind: "enroll", enrollmentToken: undefined, redirectUri: undefined });
   });
 });
 
@@ -78,7 +90,11 @@ describe("challenge", () => {
     expect(parseChallenge('{"tempToken":1}')).toBeNull();
   });
   it("offers only completable methods", () => {
-    expect(completableMethods(["totp", "email", "webauthn"])).toEqual(["totp", "backup"]);
+    expect(offeredMethods(["webauthn", "email", "totp"])).toEqual(["totp", "email", "webauthn"]);
+    expect(offeredMethods([])).toEqual(["totp"]);
+    expect(offeredMethods(["sms"])).toEqual(["totp"]);
+    expect(initialMethod(["totp", "email"], "email")).toBe("email");
+    expect(initialMethod(["totp", "email"], "sms")).toBe("totp");
   });
 });
 

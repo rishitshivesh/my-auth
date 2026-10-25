@@ -96,6 +96,28 @@ export function useRevokeRoleFromUser() {
   });
 }
 
+/** The signed-in user's own role assignments (no permission needed to read). */
+export function useMyRoles(enabled = true) {
+  return useQuery<Array<{ name: string; isSystem?: boolean }>>({
+    queryKey: ['rbac', 'me', 'roles'],
+    queryFn: withErrorHandler<[], Array<{ name: string; isSystem?: boolean }>>(
+      async () => authClient.request({ url: apiUrl('/rbac/me/roles'), method: 'GET' })
+    ),
+    enabled,
+  });
+}
+
+/** The signed-in user's own role-attached permissions (readable without `users:read`). */
+export function useMyPermissions(enabled = true) {
+  return useQuery<Permission[]>({
+    queryKey: ['rbac', 'me', 'permissions'],
+    queryFn: withErrorHandler<[], Permission[]>(
+      async () => authClient.request({ url: apiUrl('/rbac/me/permissions'), method: 'GET' })
+    ),
+    enabled,
+  });
+}
+
 export function useUserEffectivePermissions(userId: string) {
   return useQuery<Permission[]>({
     queryKey: ['rbac', 'users', userId, 'permissions'],

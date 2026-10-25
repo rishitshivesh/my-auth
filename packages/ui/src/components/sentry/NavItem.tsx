@@ -22,8 +22,9 @@ export function NavItem({ href, icon: Icon, label, className }: NavItemProps) {
       href={href}
       className={cn(
         'group flex items-center h-9 px-3 gap-3 rounded-sm transition-all duration-200 relative',
-        'text-muted-foreground hover:text-foreground hover:bg-black/5',
-        isActive && 'text-accent-foreground bg-accent/10',
+        'text-muted-foreground hover:text-foreground hover:bg-foreground/5',
+        // accent-foreground is dark on the accent fill; on the 10% tint it is unreadable in dark mode.
+        isActive && 'text-foreground bg-accent/10',
         className
       )}
     >

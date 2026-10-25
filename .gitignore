@@ -67,3 +67,9 @@ venv/
 # ── Local service data ──────────────────────────────────────────
 dump.rdb
 apps/docs/.source/
+
+# e2e journey tests
+e2e/.runtime/
+e2e/test-results/
+e2e/playwright-report/
+apps/admin-portal/.next-e2e/

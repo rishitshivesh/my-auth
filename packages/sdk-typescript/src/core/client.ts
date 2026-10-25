@@ -41,7 +41,11 @@ import type {
   AuthOutcome,
   PasskeyLoginStart,
   RedirectOptions,
+  MagicLinkPreview,
+  ReauthRequirements,
   MagicLinkSent,
+  MagicLinkVerifyOptions,
+  MagicLinkVerifyOutcome,
 } from "./api-types";
 import { createFetchTransport } from "./transport";
 import { SentryApiError } from "./errors";
@@ -234,9 +238,28 @@ export class SentryClient {
     return this.signIn.sendMagicLink(email, options);
   }
 
-  /** Verify a magic link token. May yield a session, an MFA challenge or required MFA enrollment. */
-  verifyMagicLink(token: string): Promise<AuthOutcome> {
-    return this.signIn.verifyMagicLink(token);
+  /**
+   * Verify a magic link token. May yield a session, an MFA challenge, required MFA enrollment,
+   * or (with `matchCode`) `{status:"confirmed-on-other-device"}` and no session.
+   */
+  verifyMagicLink(token: string, options?: MagicLinkVerifyOptions): Promise<MagicLinkVerifyOutcome> {
+    return this.signIn.verifyMagicLink(token, options);
+  }
+
+  /** Tells the UI which proof a step-up needs, from the existing MFA status (no extra endpoint). */
+  async getReauthRequirements(): Promise<ReauthRequirements> {
+    const status = await this.mfa.getStatus();
+    const methods = status.methods ?? [];
+    return {
+      mfaEnabled: status.enabled,
+      methods,
+      canUseTotp: status.enabled && methods.includes("totp"),
+      canUsePasskey: status.enabled && (methods.includes("webauthn") || methods.includes("passkey")),
+    };
+  }
+
+  previewMagicLink(token: string): Promise<MagicLinkPreview> {
+    return this.signIn.previewMagicLink(token);
   }
 
   /** Start WebAuthn authentication; returns options plus the `sessionNonce` for finishPasskeyLogin(). */

@@ -16,7 +16,8 @@ describe("workspace form model", () => {
   it("validates details and owner", () => {
     expect(validateDetails({ name: "", slug: "ab" })).toEqual({ name: "required", slug: "tooShort" });
     expect(validateOwner({ name: "", email: "x", password: "short" })).toEqual({ name: "required", email: "email", password: "passwordShort" });
-    expect(validateOwner({ name: "A", email: "a@b.co", password: "longenough1" })).toEqual({});
+    expect(validateOwner({ name: "A", email: "a@b.co", password: "longenough1" })).toEqual({ password: "passwordShort" });
+    expect(validateOwner({ name: "A", email: "a@b.co", password: "long-enough-passphrase" })).toEqual({});
   });
   it("only continues once the slug is confirmed available", () => {
     expect(canContinueDetails({}, "checking")).toBe(false);
@@ -25,8 +26,8 @@ describe("workspace form model", () => {
     expect(canContinueDetails({ name: "required" }, "available")).toBe(false);
   });
   it("normalises the registration body", () => {
-    expect(buildRegisterBody({ name: " Acme ", slug: "acme" }, { name: " Ann ", email: " ANN@X.CO ", password: "pw" })).toEqual({
-      workspaceName: "Acme", slug: "acme", adminName: "Ann", adminEmail: "ann@x.co", adminPassword: "pw",
+    expect(buildRegisterBody({ name: " Acme ", slug: "acme" }, { name: " Ann ", email: " ANN@X.CO ", password: "pw" }, "key-12345678")).toEqual({
+      idempotencyKey: "key-12345678", workspaceName: "Acme", slug: "acme", adminName: "Ann", adminEmail: "ann@x.co", adminPassword: "pw",
     });
   });
 });

@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, Suspense, useContext, useMemo, type ReactNode } from "react";
-import { useRecentAuth } from "@/hooks/use-recent-auth";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { StepUpDialog } from "../components/StepUpDialog";
+import { useStepUpDialog } from "./use-step-up-dialog";
 
 interface StepUpState {
   requestReauth: (action: string) => void;
@@ -10,20 +11,35 @@ interface StepUpState {
 
 const StepUpContext = createContext<StepUpState | null>(null);
 
-function Inner({ children }: { children: ReactNode }) {
-  // One consumer for the whole page: the stored intent is single-use, so
-  // sections must share it instead of each reading (and clearing) it.
-  const { requestReauth, resumedAction } = useRecentAuth();
-  const value = useMemo(() => ({ requestReauth, resumedAction }), [requestReauth, resumedAction]);
-  return <StepUpContext.Provider value={value}>{children}</StepUpContext.Provider>;
-}
-
-/** Shares the recent-sign-in return flow with every section on an account page. */
+/**
+ * Shares one step-up dialog with every section of an account page. Verifying keeps the user on the
+ * page (drafts survive) and names the interrupted action so its view re-opens the confirmation;
+ * the action itself is never re-run automatically.
+ */
 export function StepUpProvider({ children }: { children: ReactNode }) {
+  const [resumedAction, setResumedAction] = useState<string | null>(null);
+  const dialog = useStepUpDialog(setResumedAction);
+  const { open } = dialog;
+  const requestReauth = useCallback((action: string) => {
+    setResumedAction(null);
+    void open(action);
+  }, [open]);
+  const value = useMemo(() => ({ requestReauth, resumedAction }), [requestReauth, resumedAction]);
   return (
-    <Suspense fallback={null}>
-      <Inner>{children}</Inner>
-    </Suspense>
+    <StepUpContext.Provider value={value}>
+      {children}
+      <StepUpDialog
+        phase={dialog.phase}
+        requirements={dialog.requirements}
+        mode={dialog.mode}
+        pending={dialog.pending}
+        failure={dialog.failure}
+        onModeChange={dialog.setMode}
+        onSubmit={(password, code) => void dialog.submit(password, code)}
+        onPasskey={() => void dialog.usePasskey()}
+        onClose={dialog.close}
+      />
+    </StepUpContext.Provider>
   );
 }
 

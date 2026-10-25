@@ -13,6 +13,7 @@ import { FormAlert } from "../components/FormAlert";
 import { loginFailureText } from "../components/failure-text";
 import { HostedFrame } from "../components/HostedFrame";
 import { LinkSentStep } from "../components/LinkSentStep";
+import { MagicLinkWaitStep } from "../components/MagicLinkWaitStep";
 import { MethodsStep } from "../components/MethodsStep";
 import { PasswordStep } from "../components/PasswordStep";
 import { hasAnyMethod, LOGIN_STEP_ORDER } from "../model/login-flow";
@@ -66,6 +67,18 @@ export function LoginView({ branding }: { branding?: PublicTenantBranding | null
           />
         );
       case "email-link-sent":
+        if (state.magic) {
+          return (
+            <MagicLinkWaitStep
+              email={state.email}
+              matchCode={state.magic.matchCode}
+              phase={flow.poll.phase}
+              remaining={flow.poll.remaining}
+              onResend={flow.resendLink}
+              onBack={() => flow.goTo("methods")}
+            />
+          );
+        }
         return (
           <LinkSentStep
             title={t("auth.magicLink.sentTitle")}

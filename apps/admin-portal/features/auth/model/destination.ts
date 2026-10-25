@@ -1,8 +1,11 @@
 /**
  * Validated post-auth destinations. Only same-origin paths, tenant subdomains of the
  * portal root domain, or the auth-service OAuth authorize endpoint are followed.
- * TODO(gap:Destination retention for email links): application callbackUrls cannot be
- * checked in the browser; the server must validate and return the stored destination.
+ *
+ * Two trust levels. `next` from the address bar is untrusted and only follows the allow-list
+ * above. A `redirectUri` returned by the auth-service (verify, reset, magic link, poll) was
+ * checked server-side against portal origins and the tenant's application redirect URIs when the
+ * link was requested, so `resolveServerDestination` also accepts that absolute http(s) URL.
  */
 
 export interface DestinationContext {
@@ -62,4 +65,22 @@ export function resolveDestination(
   }
   if (isPortalHost(url.hostname, ctx.rootDomain)) return { href: url.toString(), isExternal: true };
   return null;
+}
+
+const MAX_SERVER_DESTINATION_LENGTH = 2048;
+
+/** Destination echoed back by the auth-service after it validated it against the tenant's applications. */
+export function resolveServerDestination(
+  raw: string | null | undefined,
+  ctx: DestinationContext,
+): Destination | null {
+  if (!raw || raw.length > MAX_SERVER_DESTINATION_LENGTH || CONTROL_CHARS.test(raw)) return null;
+  const strict = resolveDestination(raw, ctx);
+  if (strict) return strict;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:" ? { href: url.toString(), isExternal: true } : null;
+  } catch {
+    return null;
+  }
 }

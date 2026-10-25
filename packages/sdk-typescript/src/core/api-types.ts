@@ -71,15 +71,21 @@ export type AuthOutcome =
 /** Result of completing an MFA challenge: only a session can come back. */
 export type MfaLoginOutcome = SessionEstablished;
 
-export const isMfaChallenge = (o: AuthOutcome): o is MfaChallengeResult =>
+/** Any shape a link endpoint can answer with (verify, poll). */
+export type LinkOutcome = AuthOutcome | MagicLinkConfirmedElsewhere | MagicLinkPending;
+
+export const isMfaChallenge = (o: LinkOutcome): o is MfaChallengeResult =>
   o.mfaRequired === true;
 
 export const isMfaEnrollmentRequired = (
-  o: AuthOutcome,
+  o: LinkOutcome,
 ): o is MfaEnrollmentRequiredResult => o.status === "mfa_enrollment_required";
 
-export const isSessionEstablished = (o: AuthOutcome): o is SessionEstablished =>
-  o.mfaRequired !== true && o.status !== "mfa_enrollment_required";
+export const isSessionEstablished = (o: LinkOutcome): o is SessionEstablished =>
+  o.mfaRequired !== true &&
+  o.status !== "mfa_enrollment_required" &&
+  o.status !== "confirmed-on-other-device" &&
+  o.status !== "pending";
 
 // ============================================================
 // REGISTRATION / EMAIL
@@ -126,7 +132,37 @@ export interface MagicLinkSent {
   expiresInSeconds?: number;
   /** Only when sent with `poll: true`: redeem with signIn.pollMagicLink(). */
   pollingNonce?: string;
+  /** Only when sent with `poll: true`: 6 digits to show on THIS device and type on the confirming one. */
+  matchCode?: string;
 }
+
+/** Coarse description of the device that asked for a link (non-consuming preview). */
+export interface MagicLinkPreview {
+  requestedFrom: { userAgent: string; ip: string } | null;
+  /** True when a cross-device request is pending and approving elsewhere needs its match code. */
+  requiresMatchCode: boolean;
+}
+
+/**
+ * verify with the correct `matchCode`: the link is spent and the polling device
+ * completes the sign-in. This device receives NO session.
+ */
+export interface MagicLinkConfirmedElsewhere {
+  status: "confirmed-on-other-device";
+  mfaRequired?: undefined;
+  redirectUri?: string;
+}
+
+export interface MagicLinkVerifyOptions {
+  /** The 6-digit code shown on the requesting device. Omit for an ordinary same-device sign-in. */
+  matchCode?: string;
+}
+
+/** Result of magic-link verify: a normal sign-in outcome or a cross-device confirmation. */
+export type MagicLinkVerifyOutcome = AuthOutcome | MagicLinkConfirmedElsewhere;
+
+export const isConfirmedOnOtherDevice = (o: LinkOutcome): o is MagicLinkConfirmedElsewhere =>
+  o.status === "confirmed-on-other-device";
 
 export interface MagicLinkPending {
   status: "pending";
@@ -160,10 +196,28 @@ export interface MfaEnrollmentCompleted extends SessionEstablished {
   backupCodes: string[];
 }
 
+/**
+ * Step-up proof. A user with any enrolled second factor cannot use the password alone
+ * (401 AUTH_MFA_REQUIRED): send password + `code`, password + passkey, or one strong factor.
+ */
 export type ReauthInput =
   | { method: "password"; password: string }
+  | { method: "password"; password: string; code: string }
+  | { method: "password"; password: string; webauthnResponse: WebAuthnCredentialJSON; sessionNonce: string }
   | { method: "totp"; code: string }
   | { method: "webauthn"; webauthnResponse: WebAuthnCredentialJSON; sessionNonce: string };
+
+/** What a step-up must prove for the signed-in user (derived from the MFA status). */
+export interface ReauthRequirements {
+  /** True when any second factor is enrolled: the password alone is refused. */
+  mfaEnabled: boolean;
+  /** Enrolled second-factor methods (e.g. "totp", "webauthn", "email"). */
+  methods: string[];
+  /** Password plus a 6-digit TOTP code is possible. */
+  canUseTotp: boolean;
+  /** Password plus a passkey, or a passkey alone, is possible. */
+  canUsePasskey: boolean;
+}
 
 export interface InviteRequestNewResult {
   message: string;

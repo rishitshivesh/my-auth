@@ -50,7 +50,7 @@ describe("PasswordForm", () => {
   });
   it("offers sign-in-again when the server requires recent auth, and success only when confirmed", () => {
     const out = html(<PasswordForm {...base} needsReauth />);
-    expect(out).toContain("Sign in again");
+    expect(out).toContain("Confirm it is you");
     expect(out).not.toContain("Password changed");
     expect(html(<PasswordForm {...base} success />)).toContain("Password changed");
   });

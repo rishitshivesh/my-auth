@@ -9,6 +9,9 @@ import { PasswordStep } from "./PasswordStep";
 import { LinkSentStep } from "./LinkSentStep";
 import { SuccessPanel } from "./SuccessPanel";
 import { LinkLandingView } from "../views/LinkLandingView";
+import { MagicLinkConfirm } from "./MagicLinkConfirm";
+import { MagicLinkWaitStep } from "./MagicLinkWaitStep";
+import { MfaMethodSwitch } from "./MfaMethodSwitch";
 
 const noop = () => undefined;
 
@@ -91,5 +94,56 @@ describe("auth components", () => {
 
   it("LinkLandingView pending is busy", () => {
     expect(html(<LinkLandingView status="pending" purpose="Verify" />)).toContain('aria-busy="true"');
+  });
+
+  const preview = { requestedFrom: { userAgent: "Chrome on macOS", ip: "1.2.3.4" }, requiresMatchCode: true };
+  const confirmProps = {
+    preview, workspace: "acme", pending: false, entering: false, attempts: 0, codeError: false,
+    onSignInHere: noop, onStartApprove: noop, onCancelApprove: noop, onApprove: noop, onNotMe: noop,
+  };
+
+  it("MagicLinkConfirm shows the requesting device and two deliberate choices for a cross-device request", () => {
+    const out = html(<MagicLinkConfirm {...confirmProps} />);
+    expect(out).toContain("Chrome on macOS");
+    expect(out).toContain("1.2.3.4");
+    expect(out).toContain("Sign in on this device");
+    expect(out).toContain("Approve sign-in on the other device");
+    expect(out).not.toContain("Code from the other device");
+  });
+
+  it("MagicLinkConfirm offers a single sign-in action for an ordinary link", () => {
+    const out = html(<MagicLinkConfirm {...confirmProps} preview={{ requestedFrom: null, requiresMatchCode: false }} />);
+    expect(out).toContain(">Sign in<");
+    expect(out).not.toContain("Approve sign-in on the other device");
+    expect(out).not.toContain("magic-requester");
+  });
+
+  it("MagicLinkConfirm asks for the six-digit code and reports remaining attempts after a wrong one", () => {
+    const out = html(<MagicLinkConfirm {...confirmProps} entering attempts={2} codeError />);
+    expect(out).toContain("Code from the other device");
+    expect(out).toContain('autoComplete="one-time-code"');
+    expect(out).toContain("3 attempts left");
+    expect(out).toContain('role="alert"');
+  });
+
+  it("MagicLinkWaitStep shows the match code prominently while waiting and a notice once stopped", () => {
+    const waiting = html(<MagicLinkWaitStep email="a@b.c" matchCode="123456" phase={{ phase: "waiting" }} remaining={540} onResend={async () => undefined} onBack={noop} />);
+    expect(waiting).toContain("123 456");
+    expect(waiting).toContain("Your confirmation code is 1 2 3 4 5 6");
+    expect(waiting).toContain("9 min");
+    const expired = html(<MagicLinkWaitStep email="a@b.c" matchCode="123456" phase={{ phase: "expired" }} remaining={0} onResend={async () => undefined} onBack={noop} />);
+    expect(expired).not.toContain("123 456");
+    expect(expired).toContain("This request expired");
+    const used = html(<MagicLinkWaitStep email="a@b.c" matchCode="123456" phase={{ phase: "used" }} remaining={10} onResend={async () => undefined} onBack={noop} />);
+    expect(used).toContain("already completed");
+  });
+
+  it("MfaMethodSwitch lists the other methods and always ends with the recovery code", () => {
+    const out = html(<MfaMethodSwitch current="totp" offered={["totp", "email", "webauthn"]} onChoose={noop} />);
+    expect(out).toContain("Email me a code instead");
+    expect(out).toContain("Use a passkey instead");
+    expect(out).toContain("Use a recovery code");
+    expect(out).not.toContain("Use authenticator app");
+    expect(html(<MfaMethodSwitch current="backup" offered={["totp"]} onChoose={noop} />)).toContain("Use authenticator app");
   });
 });

@@ -29,3 +29,13 @@ export const PASSKEY_NAME_MAX_LENGTH = 100;
 export const SECURITY_EVENTS_PAGE_SIZE = 25;
 export const SECURITY_EVENTS_MAX = 100;
 export const RECOVERY_CODES_LOW_THRESHOLD = 3;
+
+/** Cross-device magic link: polling cadence and the server-side wrong-code budget (void after this many). */
+export const MAGIC_LINK_POLL_START_MS = 2_000;
+export const MAGIC_LINK_POLL_MAX_MS = 8_000;
+export const MAGIC_LINK_POLL_BACKOFF_FACTOR = 1.5;
+export const MAGIC_LINK_MATCH_MAX_ATTEMPTS = 5;
+export const MAGIC_LINK_DEFAULT_TTL_SECONDS = 600;
+export const MATCH_CODE_LENGTH = 6;
+/** Password-reset link tokens and the redirect-validation cutoff for server-supplied destinations. */
+export const MAX_REDIRECT_URI_LENGTH = 2048;

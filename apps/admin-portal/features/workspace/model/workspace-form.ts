@@ -1,7 +1,8 @@
 export const SLUG_MIN = 4;
 export const SLUG_MAX = 63;
 export const NAME_MAX = 100;
-export const PASSWORD_MIN = 8;
+/** Mirrors the server floor (12), so people are told before the request is made. */
+export const PASSWORD_MIN = 12;
 export const PASSWORD_MAX = 128;
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -51,6 +52,8 @@ export function validateOwner(o: OwnerDetails): OwnerErrors {
 }
 
 export interface RegisterBody {
+  /** Lets the service answer a repeated submission (double click, retry) with the same workspace. */
+  idempotencyKey: string;
   workspaceName: string;
   slug: string;
   adminName: string;
@@ -58,8 +61,9 @@ export interface RegisterBody {
   adminPassword: string;
 }
 
-export function buildRegisterBody(d: WorkspaceDetails, o: OwnerDetails): RegisterBody {
+export function buildRegisterBody(d: WorkspaceDetails, o: OwnerDetails, idempotencyKey: string): RegisterBody {
   return {
+    idempotencyKey,
     workspaceName: d.name.trim(),
     slug: d.slug.trim(),
     adminName: o.name.trim(),

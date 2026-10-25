@@ -30,7 +30,7 @@ const LINK_RESULTS: ReadonlySet<string> = new Set(["linked", "cancelled", "expir
 
 /**
  * Result of the provider round trip, read from `?link=`.
- * TODO(gap:Social login completion claims): the backend does not yet redirect back with a
+ * TODO(gap:Social link result redirect): the backend does not yet redirect back with a
  * documented result parameter; this reads `link=<result>` once it does and ignores anything else.
  */
 export function parseLinkResult(value: string | null): LinkResult | null {

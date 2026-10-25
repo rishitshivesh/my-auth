@@ -17,7 +17,7 @@ type CallbackState = "working" | "failed" | "incomplete" | "link-done";
  * Provider callback: `?ct=` completion token, `?error=` provider/cancel failure, `?mode=link`
  * account linking. Redirect from the provider is the user's own action, so the completion
  * token is claimed once on mount (guarded against double effects). Raw error text is never shown.
- * TODO(gap:Social login completion claims): claim-session returns no claims; MFA after social login is not modelled.
+ * Claims now come back with claim-session. TODO(gap:Social login MFA): a second factor after social login is not modelled.
  */
 export function SocialCallbackView({ branding }: { branding?: PublicTenantBranding | null }) {
   const { t } = useCopy();

@@ -13,6 +13,7 @@ import { HostedFrame } from "../components/HostedFrame";
 import { PasswordInput } from "../components/PasswordInput";
 import { SuccessPanel } from "../components/SuccessPanel";
 import { passwordIssueText } from "../components/password-issue-text";
+import { waitText } from "../components/failure-text";
 import { checkPassword } from "../model/password-policy";
 import { tenantOrigin } from "../model/tenant";
 import { LinkLandingView } from "./LinkLandingView";
@@ -20,7 +21,7 @@ import { LinkLandingView } from "./LinkLandingView";
 export function InviteView({ token, branding }: { token: string; branding?: PublicTenantBranding | null }) {
   const { t } = useCopy();
   const router = useRouter();
-  const { state, pending, failure, accept } = useInvite(token);
+  const { state, pending, failure, accept, renewal, requestNew } = useInvite(token);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
@@ -36,11 +37,42 @@ export function InviteView({ token, branding }: { token: string; branding?: Publ
 
   if (state.status === "failed") {
     const status = state.phase.status;
-    // TODO(gap:Invite lifecycle for the invitee): re-requesting an invite has no endpoint; the copy tells the user whom to ask.
     const go = (): void => router.push(authRoutes.login());
+    if (renewal.status === "sent") {
+      // The old link no longer works once a fresh one is issued, so offer no second request.
+      return (
+        <HostedFrame title={t("auth.invite.purpose")} branding={branding}>
+          <SuccessPanel
+            title={t("auth.invite.renewal.sentTitle")}
+            description={t("auth.invite.renewal.sent")}
+            actionLabel={t("auth.invite.renewal.back")}
+            onAction={go}
+          />
+        </HostedFrame>
+      );
+    }
+    const renewalText = (() => {
+      switch (renewal.status) {
+        case "cooldown":
+          return t("auth.invite.renewal.cooldown", { wait: waitText(renewal.retryAfterSeconds) });
+        case "failed":
+          return t("auth.invite.renewal.failed");
+        default:
+          return undefined;
+      }
+    })();
     return (
-      <HostedFrame title={t("auth.invite.purpose")} description={t("auth.invite.expiredHelp")} branding={branding}>
-        <LinkLandingView status={status} purpose={t("auth.invite.purpose")} onContinue={go} onSecondary={go} />
+      <HostedFrame title={t("auth.invite.purpose")} description={status === "expired" ? t("auth.invite.expiredHelp") : undefined} branding={branding}>
+        <LinkLandingView
+          status={status}
+          purpose={t("auth.invite.purpose")}
+          onContinue={status === "expired" ? () => void requestNew() : go}
+          onSecondary={go}
+          alternateDeviceHint={null}
+        />
+        <p role="status" aria-live="polite" className="mt-3 text-center font-body text-xs text-muted-foreground">
+          {renewal.status === "sending" ? t("auth.invite.renewal.sending") : renewalText}
+        </p>
       </HostedFrame>
     );
   }
@@ -53,7 +85,7 @@ export function InviteView({ token, branding }: { token: string; branding?: Publ
       <HostedFrame title={t("auth.invite.doneTitle", { workspace: invite.tenantName })} branding={branding}>
         <SuccessPanel
           title={t("auth.invite.doneTitle", { workspace: invite.tenantName })}
-          description={t("auth.invite.doneDescription")}
+          description={state.canSignInNow ? t("auth.invite.doneDescription") : t("auth.invite.doneDescriptionManual")}
           actionLabel={t("auth.invite.doneAction")}
           onAction={() => (origin ? window.location.assign(`${origin}${path}`) : router.push(path))}
         />

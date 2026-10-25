@@ -112,6 +112,26 @@ describe("account.reauthenticate (step-up)", () => {
     expect(calls[2]?.body).toMatchObject({ method: "webauthn", sessionNonce: "n" });
   });
 
+  it("sends password together with a second factor for MFA users", async () => {
+    const { client, calls } = await makeClient(() => reauthed);
+    await client.account.reauthenticate({ method: "password", password: "pw", code: "123456" });
+    await client.account.reauthenticate({ method: "password", password: "pw", webauthnResponse: { id: "x" }, sessionNonce: "n" });
+    expect(calls[0]?.body).toEqual({ method: "password", password: "pw", code: "123456" });
+    expect(calls[1]?.body).toMatchObject({ method: "password", sessionNonce: "n" });
+  });
+
+  it("password-only for an MFA user fails with AUTH_MFA_REQUIRED", async () => {
+    const { client } = await makeClient(() => problem(401, "AUTH_MFA_REQUIRED", "Second factor needed"));
+    await expect(client.account.reauthenticate("pw")).rejects.toMatchObject({ code: "AUTH_MFA_REQUIRED" });
+  });
+
+  it("getReauthRequirements derives the needed proof from the MFA status", async () => {
+    const { client } = await makeClient(() => envelope({ enabled: true, methods: ["totp", "webauthn"], backupCodesRemaining: 3 }));
+    expect(await client.getReauthRequirements()).toEqual({ mfaEnabled: true, methods: ["totp", "webauthn"], canUseTotp: true, canUsePasskey: true });
+    const { client: none } = await makeClient(() => envelope({ enabled: false, methods: [], backupCodesRemaining: 0 }));
+    expect(await none.getReauthRequirements()).toMatchObject({ mfaEnabled: false, canUseTotp: false });
+  });
+
   it("rejects with the server error and keeps the session", async () => {
     const { client } = await makeClient(() => problem(401, "AUTH_INVALID_CREDENTIALS", "No"));
     await expect(client.account.reauthenticate("bad")).rejects.toMatchObject({ code: "AUTH_INVALID_CREDENTIALS" });

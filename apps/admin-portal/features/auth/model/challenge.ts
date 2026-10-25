@@ -11,6 +11,8 @@ export interface StoredChallenge {
   remainingAttempts?: number;
   /** Where to continue once the session exists (validated again on use). */
   next?: string;
+  /** Destination the auth-service validated for an emailed link; carried through the challenge. */
+  redirectUri?: string;
   expiresAt: number;
 }
 
@@ -39,6 +41,7 @@ export function parseChallenge(raw: string | null): StoredChallenge | null {
       preferred: typeof rec.preferred === "string" ? rec.preferred : undefined,
       remainingAttempts: typeof rec.remainingAttempts === "number" ? rec.remainingAttempts : undefined,
       next: typeof rec.next === "string" ? rec.next : undefined,
+      redirectUri: typeof rec.redirectUri === "string" ? rec.redirectUri : undefined,
       expiresAt: rec.expiresAt,
     };
   } catch {
@@ -46,18 +49,20 @@ export function parseChallenge(raw: string | null): StoredChallenge | null {
   }
 }
 
+export const MFA_METHODS: readonly ChallengeMethod[] = ["totp", "email", "webauthn"];
+
 /**
- * Methods the login-time endpoints can really complete today: TOTP and recovery code.
- * TODO(gap:Email-OTP / passkey as login-time second factor): email/webauthn are
- * advertised by `login` but /auth/mfa/verify only checks TOTP.
+ * Second factors the challenge offers, in the order we present them. An empty list from older
+ * servers means authenticator app only. Recovery codes are always a fallback ("backup").
  */
-export function completableMethods(methods: readonly string[]): ChallengeMethod[] {
-  const out: ChallengeMethod[] = [];
-  if (methods.length === 0 || methods.includes("totp")) out.push("totp");
-  out.push("backup");
-  return out;
+export function offeredMethods(methods: readonly string[]): ChallengeMethod[] {
+  const out = MFA_METHODS.filter((m) => methods.includes(m));
+  return out.length > 0 ? [...out] : ["totp"];
 }
 
-export function hasUnsupportedMethods(methods: readonly string[]): boolean {
-  return methods.some((m) => m === "email" || m === "webauthn");
+/** The method to show first: the server's preference when it is one we can complete, else the first offered. */
+export function initialMethod(methods: readonly string[], preferred?: string): ChallengeMethod {
+  const offered = offeredMethods(methods);
+  const match = offered.find((m) => m === preferred);
+  return match ?? offered[0] ?? "totp";
 }

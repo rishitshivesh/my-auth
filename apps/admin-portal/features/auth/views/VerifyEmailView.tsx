@@ -24,10 +24,10 @@ export function VerifyEmailView({ branding }: { branding?: PublicTenantBranding 
   const token = params.get("token");
   const { api, tenantSlug } = useAuthApi();
   const { resolve } = useDestination();
-  const { phase, redeem } = useLinkRedemption(api.verifyEmail);
+  const { phase, result, redeem } = useLinkRedemption(api.verifyEmail);
   const [typedEmail, setTypedEmail] = useState("");
   const email = (params.get("email") ?? typedEmail).trim();
-  const next = resolve(params.get("next"))?.href;
+  const next = resolve(result?.redirectUri ?? params.get("next"))?.href;
   const toLogin = (): void => router.push(authRoutes.login({ next, email: params.get("email") ?? undefined }));
 
   if (phase.phase === "done") {

@@ -11,8 +11,9 @@ import type { PublicTenantBranding } from "../api/tenant-branding";
 import { CodeField } from "../components/CodeField";
 import { FormAlert } from "../components/FormAlert";
 import { HostedFrame } from "../components/HostedFrame";
+import { MfaMethodSwitch } from "../components/MfaMethodSwitch";
 import { loginFailureText } from "../components/failure-text";
-import { hasUnsupportedMethods, type ChallengeMethod } from "../model/challenge";
+import { initialMethod, offeredMethods, type ChallengeMethod } from "../model/challenge";
 import type { Failure } from "../model/failure";
 import { t as translate } from "@/i18n";
 
@@ -22,10 +23,25 @@ function mfaFailureText(failure: Failure): string {
     : loginFailureText(failure);
 }
 
+const TITLE_KEYS = {
+  totp: "auth.mfa.title",
+  email: "auth.mfa.emailTitle",
+  webauthn: "auth.mfa.passkeyTitle",
+  backup: "auth.mfa.backupTitle",
+} as const;
+
+const DESCRIPTION_KEYS = {
+  totp: "auth.mfa.description",
+  email: "auth.mfa.emailDescription",
+  webauthn: "auth.mfa.passkeyDescription",
+  backup: "auth.mfa.backupDescription",
+} as const;
+
 export function MfaChallengeView({ branding }: { branding?: PublicTenantBranding | null }) {
-  const { t } = useCopy();
-  const { state, pending, failure, submit, restart } = useMfaChallenge();
-  const [mode, setMode] = useState<Extract<ChallengeMethod, "totp" | "backup">>("totp");
+  const { t, tk } = useCopy();
+  const flow = useMfaChallenge();
+  const { state, pending, failure } = flow;
+  const [chosen, setChosen] = useState<ChallengeMethod | null>(null);
   const [code, setCode] = useState("");
   const [backup, setBackup] = useState("");
 
@@ -51,38 +67,38 @@ export function MfaChallengeView({ branding }: { branding?: PublicTenantBranding
   }
 
   const { challenge } = state;
+  const offered = offeredMethods(challenge.methods);
+  const mode = chosen ?? initialMethod(challenge.methods, challenge.preferred);
   const error = failure ? mfaFailureText(failure) : undefined;
-  const isBackup = mode === "backup";
 
-  const switchMode = (next: "totp" | "backup"): void => {
-    setMode(next);
+  const choose = (next: ChallengeMethod): void => {
+    setChosen(next);
     setCode("");
     setBackup("");
   };
 
   const onFormSubmit = (event: FormEvent): void => {
     event.preventDefault();
-    if (isBackup && backup.trim().length > 0) void submit("backup", backup.trim());
-    if (!isBackup && code.length === OTP_LENGTH) void submit("totp", code);
+    if (mode === "backup" && backup.trim().length > 0) void flow.submit("backup", backup.trim());
+    else if ((mode === "totp" || mode === "email") && code.length === OTP_LENGTH) void flow.submit(mode, code);
   };
+
+  const needsEmailSend = mode === "email" && !flow.emailSent;
 
   return (
     <HostedFrame
-      title={isBackup ? t("auth.mfa.backupTitle") : t("auth.mfa.title")}
-      description={isBackup ? t("auth.mfa.backupDescription") : t("auth.mfa.description")}
+      title={tk(TITLE_KEYS[mode])}
+      description={tk(DESCRIPTION_KEYS[mode])}
       branding={branding}
       footer={
-        <Link href={authRoutes.login()} onClick={restart} className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={authRoutes.login()} onClick={flow.restart} className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {t("auth.mfa.cancel")}
         </Link>
       }
     >
       <form onSubmit={onFormSubmit} className="space-y-4" noValidate>
         <FormAlert message={error} reference={failure?.requestId} />
-        {hasUnsupportedMethods(challenge.methods) && (
-          <p className="font-body text-xs text-muted-foreground">{t("auth.mfa.unsupportedMethods")}</p>
-        )}
-        {isBackup ? (
+        {mode === "backup" && (
           <FormField label={t("auth.mfa.backupLabel")} hint={t("auth.mfa.backupHint")} required>
             {(control) => (
               <SentryInput
@@ -99,13 +115,24 @@ export function MfaChallengeView({ branding }: { branding?: PublicTenantBranding
               />
             )}
           </FormField>
-        ) : (
+        )}
+        {mode === "webauthn" && (
+          <SentryButton type="button" variant="accent" className="w-full" isLoading={pending} onClick={() => void flow.usePasskey()}>
+            {t("auth.mfa.passkeyAction")}
+          </SentryButton>
+        )}
+        {needsEmailSend && (
+          <SentryButton type="button" variant="accent" className="w-full" isLoading={pending} onClick={() => void flow.sendEmailCode()}>
+            {t("auth.mfa.emailSend")}
+          </SentryButton>
+        )}
+        {(mode === "totp" || (mode === "email" && flow.emailSent)) && (
           <CodeField
             label={t("auth.otp.label")}
             value={code}
             onChange={setCode}
-            onComplete={(value) => void submit("totp", value)}
-            hint={t("auth.otp.hint", { length: OTP_LENGTH })}
+            onComplete={(value) => void flow.submit(mode, value)}
+            hint={mode === "email" ? t("auth.mfa.emailSentHint") : t("auth.otp.hint", { length: OTP_LENGTH })}
             disabled={pending}
             autoFocus
           />
@@ -115,12 +142,12 @@ export function MfaChallengeView({ branding }: { branding?: PublicTenantBranding
             {t("auth.mfa.attempts", { count: challenge.remainingAttempts })}
           </p>
         )}
-        <SentryButton type="submit" className="w-full" isLoading={pending} disabled={isBackup ? backup.trim().length === 0 : code.length < OTP_LENGTH}>
-          {pending ? t("auth.mfa.verifying") : t("auth.mfa.submit")}
-        </SentryButton>
-        <SentryButton type="button" variant="ghost" size="sm" className="w-full border-0" onClick={() => switchMode(isBackup ? "totp" : "backup")} disabled={pending}>
-          {isBackup ? t("auth.mfa.useAuthenticator") : t("auth.mfa.useBackupCode")}
-        </SentryButton>
+        {mode !== "webauthn" && !needsEmailSend && (
+          <SentryButton type="submit" className="w-full" isLoading={pending} disabled={mode === "backup" ? backup.trim().length === 0 : code.length < OTP_LENGTH}>
+            {pending ? t("auth.mfa.verifying") : t("auth.mfa.submit")}
+          </SentryButton>
+        )}
+        <MfaMethodSwitch current={mode} offered={offered} disabled={pending} onChoose={choose} />
       </form>
     </HostedFrame>
   );

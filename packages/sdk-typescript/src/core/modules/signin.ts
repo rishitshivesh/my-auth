@@ -9,6 +9,9 @@ import type {
   AuthProviders,
   CompleteMfaInput,
   MagicLinkPoll,
+  MagicLinkPreview,
+  MagicLinkVerifyOptions,
+  MagicLinkVerifyOutcome,
   MagicLinkSent,
   MfaEmailOtpSent,
   MfaEnrollmentCompleted,
@@ -46,7 +49,14 @@ export interface SignInModule {
   enrollTotpSetup(enrollmentToken?: string): Promise<TotpEnrollmentSetup>;
   enrollTotpConfirm(code: string, enrollmentToken?: string): Promise<MfaEnrollmentCompleted>;
   sendMagicLink(email: string, options?: RedirectOptions & { poll?: boolean }): Promise<MagicLinkSent>;
-  verifyMagicLink(token: string): Promise<AuthOutcome>;
+  /** Non-consuming: who asked for this link and whether approving elsewhere needs a match code. */
+  previewMagicLink(token: string): Promise<MagicLinkPreview>;
+  /**
+   * Without `matchCode` this signs in the clicking device (and voids any pending cross-device
+   * request). With the correct code it resolves `{status:"confirmed-on-other-device"}` and
+   * creates NO session here. A wrong code is 401 AUTH_OTP_INVALID; five voids the request.
+   */
+  verifyMagicLink(token: string, options?: MagicLinkVerifyOptions): Promise<MagicLinkVerifyOutcome>;
   /** Cross-device completion: resolves `{status:"pending"}` until the link is opened elsewhere. */
   pollMagicLink(pollingNonce: string): Promise<MagicLinkPoll>;
 }
@@ -160,14 +170,28 @@ export function createSignInModule(ctx: ModuleContext): SignInModule {
         { auth: false },
       ),
 
-    async verifyMagicLink(token) {
+    previewMagicLink: (token) =>
+      call<MagicLinkPreview>(
+        ctx,
+        { url: url(`/magic-link/preview${buildQuery({ token })}`), method: "GET" },
+        { auth: false },
+      ),
+
+    async verifyMagicLink(token, options) {
       const response = await ctx.publicRequest({
         url: url("/magic-link/verify"),
         method: "POST",
-        body: { token },
+        body: { token, matchCode: options?.matchCode },
       });
       if (!response.ok) throw ctx.fail(response);
-      return parseAuthOutcome(ctx, payloadOf(response));
+      const payload = payloadOf(response);
+      if (payload.status === "confirmed-on-other-device") {
+        return {
+          status: "confirmed-on-other-device",
+          redirectUri: typeof payload.redirectUri === "string" ? payload.redirectUri : undefined,
+        };
+      }
+      return parseAuthOutcome(ctx, payload);
     },
 
     async pollMagicLink(pollingNonce) {

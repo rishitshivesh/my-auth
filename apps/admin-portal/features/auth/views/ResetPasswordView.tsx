@@ -18,11 +18,17 @@ import { passwordIssueText } from "../components/password-issue-text";
 import { waitText } from "../components/failure-text";
 import { describeFailure, type Failure } from "../model/failure";
 import { resetIssue, type ResetStep } from "../model/reset-flow";
+import { ResetByLinkView } from "./ResetByLinkView";
 
+/** Link (`?token=`) is the primary path; the emailed 6-digit code remains the fallback. */
 export function ResetPasswordView({ branding }: { branding?: PublicTenantBranding | null }) {
+  const token = useSearchParams().get("token");
+  return token ? <ResetByLinkView token={token} branding={branding} /> : <ResetByCodeView branding={branding} />;
+}
+
+function ResetByCodeView({ branding }: { branding?: PublicTenantBranding | null }) {
   const { t, tk } = useCopy();
   const router = useRouter();
-  // TODO(gap:Password recovery by link): `?token=` is ignored until the backend issues link tokens.
   const params = useSearchParams();
   const { api } = useAuthApi();
   const [step, setStep] = useState<ResetStep>("request");

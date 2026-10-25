@@ -13,14 +13,12 @@ import { FormAlert } from "../components/FormAlert";
 import { HostedFrame } from "../components/HostedFrame";
 import { SuccessPanel } from "../components/SuccessPanel";
 import { ENROLL_STEPS, formatRecoveryCode, manualKeyGroups } from "../model/enroll";
-import { defaultDashboard } from "../model/outcome";
 
 export function MfaEnrollView({ branding }: { branding?: PublicTenantBranding | null }) {
   const { t, tk } = useCopy();
   const router = useRouter();
   const flow = useMfaEnroll();
   const [code, setCode] = useState("");
-  const toDashboard = (): void => router.replace(defaultDashboard(flow.tenantSlug));
 
   if (flow.session === "checking") {
     return (
@@ -30,10 +28,14 @@ export function MfaEnrollView({ branding }: { branding?: PublicTenantBranding | 
     );
   }
 
-  if (flow.session === "signed-out") {
+  if (flow.session === "missing" || flow.session === "expired") {
+    const expired = flow.session === "expired";
     return (
-      <HostedFrame title={t("auth.enroll.signInRequiredTitle")} description={t("auth.enroll.signInRequiredDescription")} branding={branding}>
-        <p className="mb-4 font-body text-xs text-muted-foreground">{t("auth.enroll.pendingContractNotice")}</p>
+      <HostedFrame
+        title={expired ? t("auth.enroll.expiredTitle") : t("auth.enroll.signInRequiredTitle")}
+        description={expired ? t("auth.enroll.expiredDescription") : t("auth.enroll.signInRequiredDescription")}
+        branding={branding}
+      >
         <SentryButton type="button" variant="accent" className="w-full" onClick={() => router.push(authRoutes.login())}>
           {t("auth.mfa.restart")}
         </SentryButton>
@@ -123,7 +125,7 @@ export function MfaEnrollView({ branding }: { branding?: PublicTenantBranding | 
             title={t("auth.enroll.doneTitle")}
             description={t("auth.enroll.doneDescription")}
             actionLabel={t("auth.enroll.finish")}
-            onAction={toDashboard}
+            onAction={flow.finish}
           />
         );
     }
@@ -137,7 +139,7 @@ export function MfaEnrollView({ branding }: { branding?: PublicTenantBranding | 
         progressLabel={t("auth.steps.progress", { current: index + 1, total: ENROLL_STEPS.length })}
         stepLabel={(step, i) => t("auth.steps.stepLabel", { index: i + 1, label: step.label })}
       >
-        {flow.step !== "setup" && <FormAlert message={flow.failure ? t("auth.login.failures.generic") : undefined} className="mb-4" />}
+        {flow.step !== "setup" && <FormAlert message={flow.failure ? t("auth.login.failures.generic") : undefined} reference={flow.failure?.requestId} className="mb-4" />}
         {body}
       </StepFlow>
     </HostedFrame>

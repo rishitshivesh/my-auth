@@ -1,42 +1,40 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { TotpSetup } from "@scrolloop/sdk";
+import type { TotpEnrollmentSetup } from "@scrolloop/sdk";
 import type { EnrollStep } from "../model/enroll";
+import { resolveDestination, resolveServerDestination, type Destination } from "../model/destination";
+import { type StoredEnrollment } from "../model/enrollment";
 import { describeFailure, type Failure } from "../model/failure";
+import { defaultDashboard } from "../model/outcome";
+import { clearEnrollment, loadEnrollment } from "./enrollment-store";
+import { destinationDefaults } from "./tenant-client";
 import { useAuthApi } from "./use-auth-api";
+import { useDestination } from "./use-destination";
 
-export type EnrollSession = "checking" | "signed-in" | "signed-out";
+export type EnrollSession = "checking" | "ready" | "missing" | "expired";
 
 /**
- * TOTP enrollment against the authenticated /mfa/* endpoints.
- * TODO(gap:Pre-session MFA enrollment): users who arrive with only an enrollment token
- * (policy-forced) have no session yet, so they land in "signed-out" until the backend accepts
- * the token on dedicated enrollment endpoints.
+ * Pre-session TOTP enrollment (sign-in returned `mfa_enrollment_required`). Setup and confirm
+ * accept the short-lived enrollment token (from sign-in, or the httpOnly cookie when the sign-in
+ * method could not hand it over); confirming establishes the session and returns the recovery codes.
  */
 export function useMfaEnroll() {
   const { api, tenantSlug } = useAuthApi();
+  const { follow } = useDestination();
   const [session, setSession] = useState<EnrollSession>("checking");
+  const [enrollment, setEnrollment] = useState<StoredEnrollment | null>(null);
   const [step, setStep] = useState<EnrollStep>("intro");
-  const [setup, setSetup] = useState<TotpSetup | null>(null);
+  const [setup, setSetup] = useState<TotpEnrollmentSetup | null>(null);
   const [codes, setCodes] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
 
   useEffect(() => {
-    let live = true;
-    api
-      .mfaStatus()
-      .then((status) => {
-        if (!live) return;
-        setSession("signed-in");
-        if (status.enabled) setStep("done");
-      })
-      .catch(() => live && setSession("signed-out"));
-    return () => {
-      live = false;
-    };
-  }, [api]);
+    const stored = loadEnrollment();
+    setEnrollment(stored);
+    setSession(stored ? "ready" : "missing");
+  }, []);
 
   const run = useCallback(async (action: () => Promise<void>): Promise<void> => {
     setPending(true);
@@ -44,7 +42,13 @@ export function useMfaEnroll() {
     try {
       await action();
     } catch (error) {
-      setFailure(describeFailure(error));
+      const failed = describeFailure(error);
+      const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (code === "AUTH_TOKEN_EXPIRED" || code === "AUTH_TOKEN_INVALID" || code === "AUTH_UNAUTHORIZED") {
+        clearEnrollment();
+        setSession("expired");
+      }
+      setFailure(failed);
     } finally {
       setPending(false);
     }
@@ -52,13 +56,13 @@ export function useMfaEnroll() {
 
   const start = (): Promise<void> =>
     run(async () => {
-      setSetup(await api.setupTotp());
+      setSetup(await api.enrollSetup(enrollment?.enrollmentToken));
       setStep("setup");
     });
 
   const confirm = (code: string): Promise<void> =>
     run(async () => {
-      const result = await api.confirmTotp(code);
+      const result = await api.enrollConfirm(code, enrollment?.enrollmentToken);
       setCodes(result.backupCodes);
       setSetup(null);
       setStep("recovery");
@@ -69,5 +73,15 @@ export function useMfaEnroll() {
     setStep("done");
   };
 
-  return { session, step, setup, codes, pending, failure, tenantSlug, start, confirm, acknowledgeCodes };
+  /** Where "finish" goes: the validated destination carried through sign-in, else the dashboard. */
+  const finish = (): void => {
+    const ctx = { origin: window.location.origin, ...destinationDefaults };
+    const destination: Destination =
+      resolveServerDestination(enrollment?.redirectUri, ctx) ??
+      resolveDestination(enrollment?.next, ctx) ?? { href: defaultDashboard(tenantSlug), isExternal: false };
+    clearEnrollment();
+    follow(destination);
+  };
+
+  return { session, step, setup, codes, pending, failure, tenantSlug, start, confirm, acknowledgeCodes, finish };
 }

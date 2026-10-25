@@ -48,10 +48,19 @@ export function useSlugCheck(slug: string): { state: SlugCheckState; reason?: st
   return result;
 }
 
+/** Registration answer: the credentials arrive as httpOnly cookies, never in the body. */
+export interface WorkspaceRegistration {
+  tenantSlug: string;
+  user: { id: string; email: string; name: string };
+  expiresIn: number;
+}
+
 /**
- * TODO(gap:T04-register-session): POST /tenants/register returns tokens in the body and sets no
- * cookies; the response is discarded, so the owner signs in again after creating a workspace.
+ * POST /tenants/register creates the workspace AND signs the owner in (cookies). The response only
+ * carries the slug and owner details, so the UI can open the workspace without another sign-in.
  */
 export function useRegisterWorkspace() {
-  return useMutation({ mutationFn: (body: RegisterBody) => tenantRequest<unknown>("/tenants/register", "POST", body) });
+  return useMutation({
+    mutationFn: (body: RegisterBody) => tenantRequest<WorkspaceRegistration>("/tenants/register", "POST", body),
+  });
 }

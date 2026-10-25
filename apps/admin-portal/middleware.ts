@@ -79,6 +79,21 @@ function setCookies(
   })
 }
 
+/**
+ * Routes that exist as-is on every host, including tenant subdomains: hosted identity, the
+ * console (which already carries /t/{slug}) and the personal account. Rewriting them to
+ * /t/{slug}/... would yield 404s (e.g. /t/acme/u/login or /t/acme/t/acme/dashboard).
+ */
+const HOST_INDEPENDENT_PREFIXES = [
+  '/u/', '/t/', '/invite/', '/mfa/', '/dashboard', '/onboarding', '/verify-email', '/reset-password', '/error', '/setup',
+]
+
+function isHostIndependent(pathname: string): boolean {
+  return HOST_INDEPENDENT_PREFIXES.some((prefix) =>
+    prefix.endsWith('/') ? pathname.startsWith(prefix) : pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0]!
@@ -89,9 +104,11 @@ export async function middleware(request: NextRequest) {
   if (hostname !== rootDomain && hostname.endsWith(`.${rootDomain}`)) {
     const slug = hostname.replace(`.${rootDomain}`, '')
     if (slug === 'app' || slug === 'admin') return NextResponse.next()
-    const url = request.nextUrl.clone()
-    url.pathname = `/t/${slug}${request.nextUrl.pathname}`
-    return NextResponse.rewrite(url)
+    if (!isHostIndependent(pathname)) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/t/${slug}${request.nextUrl.pathname}`
+      return NextResponse.rewrite(url)
+    }
   }
 
   // ── Always-pass-through paths ──────────────────────────────────

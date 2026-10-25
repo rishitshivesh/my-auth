@@ -26,6 +26,9 @@ import type {
 } from "../core/types";
 import type {
   AuthOutcome,
+  LinkOutcome,
+  MagicLinkVerifyOptions,
+  MagicLinkVerifyOutcome,
   ReauthInput,
   SessionEstablished,
   MagicLinkSent,
@@ -66,7 +69,7 @@ interface AuthContextValue {
   initiateSocialLogin: (provider: string) => void;
   claimSocialSession: (ct: string) => Promise<void>;
   sendMagicLink: (email: string, options?: RedirectOptions & { poll?: boolean }) => Promise<MagicLinkSent>;
-  verifyMagicLink: (token: string) => Promise<AuthOutcome>;
+  verifyMagicLink: (token: string, options?: MagicLinkVerifyOptions) => Promise<MagicLinkVerifyOutcome>;
   startPasskeyLogin: (email: string) => Promise<PasskeyLoginStart>;
   finishPasskeyLogin: (
     email: string,
@@ -105,8 +108,18 @@ interface AuthProviderProps {
   client: SentryClient;
 }
 
+/**
+ * A session can be established outside this provider's own methods (hosted sign-in drives
+ * `client.signIn.*` directly). When that happens while the provider still shows nobody, load the user.
+ */
+export function shouldAdoptSession(hasUser: boolean, clientAuthenticated: boolean): boolean {
+  return !hasUser && clientAuthenticated;
+}
+
 export function SentryProvider({ children, client }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -139,6 +152,18 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
   useEffect(() => {
     const unsubscribe = client.on((event: AuthEvent) => {
       switch (event.type) {
+        case "token_refreshed":
+          if (shouldAdoptSession(userRef.current !== null, client.isAuthenticated())) {
+            // Loading (not signed-out) while the user loads, so route guards wait instead of bouncing.
+            setIsLoading(true);
+            client
+              .getCurrentUser()
+              .then((current) => setUser((existing) => existing ?? current))
+              .catch(() => undefined)
+              .finally(() => setIsLoading(false));
+          }
+          break;
+
         case "logout":
         case "session_expired":
           setUser(null);
@@ -176,7 +201,7 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
     });
 
   /** If the outcome established a session, load the user; otherwise leave state alone. */
-  const adopt = async <T extends AuthOutcome>(outcome: T): Promise<T> => {
+  const adopt = async <T extends LinkOutcome>(outcome: T): Promise<T> => {
     if (isSessionEstablished(outcome)) {
       setUser(outcome.user ? (outcome.user as unknown as User) : null);
       try {
@@ -222,7 +247,8 @@ export function SentryProvider({ children, client }: AuthProviderProps) {
         setUser(await client.getCurrentUser());
       }),
     sendMagicLink: (email, options) => track(() => client.sendMagicLink(email, options)),
-    verifyMagicLink: (token) => trackLoading(async () => adopt(await client.verifyMagicLink(token))),
+    verifyMagicLink: (token, options) =>
+      trackLoading(async () => adopt(await client.verifyMagicLink(token, options))),
     startPasskeyLogin: (email) => track(() => client.startPasskeyLogin(email)),
     finishPasskeyLogin: (email, assertion, sessionNonce) =>
       trackLoading(async () => adopt(await client.finishPasskeyLogin(email, assertion, sessionNonce))),

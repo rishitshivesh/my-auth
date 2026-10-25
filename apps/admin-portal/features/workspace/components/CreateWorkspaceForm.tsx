@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SentryButton, StepFlow } from "@repo/ui";
-import { authRoutes, tenantRoutes } from "@/constants/routes";
+import { tenantRoutes } from "@/constants/routes";
 import { useCopy } from "@/i18n";
+import { randomKey } from "@/lib/random-id";
 import { TextField } from "@/features/access/components/TextField";
 import { useSlugCheck } from "../api/use-workspace";
 import {
@@ -30,6 +31,8 @@ export function CreateWorkspaceForm({ pending, created, error, onSubmit, onCance
   const [slugEdited, setSlugEdited] = useState(false);
   const [owner, setOwner] = useState<OwnerDetails>({ name: "", email: "", password: "" });
   const [touched, setTouched] = useState(false);
+  // One key per form: a retry or double submit resolves to the same workspace instead of a second one.
+  const [idempotencyKey] = useState(() => randomKey());
   const check = useSlugCheck(slug);
   const detailErrors = validateDetails({ name, slug });
   const ownerErrors = validateOwner(owner);
@@ -78,7 +81,7 @@ export function CreateWorkspaceForm({ pending, created, error, onSubmit, onCance
         <form
           noValidate
           className="space-y-4"
-          onSubmit={(e) => { e.preventDefault(); setTouched(true); if (Object.keys(ownerErrors).length === 0 && !pending) onSubmit(buildRegisterBody({ name, slug }, owner)); }}
+          onSubmit={(e) => { e.preventDefault(); setTouched(true); if (Object.keys(ownerErrors).length === 0 && !pending) onSubmit(buildRegisterBody({ name, slug }, owner, idempotencyKey)); }}
         >
           <p className="font-body text-sm text-muted-foreground">{t("workspace.create.ownerIntro", { name: name.trim() })}</p>
           <TextField label={t("workspace.create.ownerName")} value={owner.name} onChange={(v) => setOwner((o) => ({ ...o, name: v }))} required autoComplete="name" error={touched && ownerErrors.name ? tk(`workspace.create.ownerErrors.${ownerErrors.name}`) : undefined} />
@@ -96,10 +99,7 @@ export function CreateWorkspaceForm({ pending, created, error, onSubmit, onCance
           <h2 className="font-display text-lg font-semibold text-foreground">{t("workspace.create.doneTitle", { name: name.trim() })}</h2>
           <p className="font-body text-sm text-muted-foreground">{t("workspace.create.doneBody", { email: owner.email.trim() })}</p>
           <div className="flex flex-wrap gap-2">
-            <Link href={authRoutes.login({ email: owner.email.trim() })} className="inline-flex h-[42px] items-center rounded-sm bg-primary px-6 font-display text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              {t("workspace.create.signIn")}
-            </Link>
-            <Link href={tenantRoutes(slug).dashboard()} className="inline-flex h-[42px] items-center rounded-sm border border-border px-6 font-display text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Link href={tenantRoutes(slug).dashboard()} className="inline-flex h-[42px] items-center rounded-sm bg-primary px-6 font-display text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {t("workspace.create.openWorkspace")}
             </Link>
           </div>

@@ -1,5 +1,12 @@
 import type { SentryClient } from "@scrolloop/sdk";
-import type { AcceptInviteRequest, ConsentDecision, RegisterRequest } from "@scrolloop/sdk";
+import type {
+  AcceptInviteRequest,
+  CompleteMfaInput,
+  ConsentDecision,
+  MagicLinkSent,
+  RedirectResult,
+  RegisterRequest,
+} from "@scrolloop/sdk";
 import { withErrorHandler } from "@/lib/with-error-handler";
 
 /**
@@ -20,8 +27,40 @@ export function createAuthApi(client: SentryClient) {
       client.passkeys.authenticate(email),
     ),
     sendMagicLink: quiet<[string], void>((email) => client.signIn.sendMagicLink(email)),
-    verifyMagicLink: quiet<[string], Awaited<ReturnType<typeof client.signIn.verifyMagicLink>>>((token) =>
-      client.signIn.verifyMagicLink(token),
+    /** Sign-in link whose requesting device shows a match code and polls for completion. */
+    requestMagicLink: quiet<[string], MagicLinkSent>((email) => client.signIn.sendMagicLink(email, { poll: true })),
+    previewMagicLink: quiet<[string], Awaited<ReturnType<typeof client.signIn.previewMagicLink>>>((token) =>
+      client.signIn.previewMagicLink(token),
+    ),
+    verifyMagicLink: quiet<[string, string | undefined], Awaited<ReturnType<typeof client.signIn.verifyMagicLink>>>(
+      (token, matchCode) => client.signIn.verifyMagicLink(token, matchCode ? { matchCode } : undefined),
+    ),
+    pollMagicLink: quiet<[string], Awaited<ReturnType<typeof client.signIn.pollMagicLink>>>((nonce) =>
+      client.signIn.pollMagicLink(nonce),
+    ),
+    validateResetLink: quiet<[string], Awaited<ReturnType<typeof client.signIn.validateResetLink>>>((token) =>
+      client.signIn.validateResetLink(token),
+    ),
+    resetWithToken: quiet<[string, string], RedirectResult>((token, password) =>
+      client.signIn.resetPasswordWithToken(token, password),
+    ),
+    completeMfa: quiet<[CompleteMfaInput], Awaited<ReturnType<typeof client.signIn.completeMfa>>>((input) =>
+      client.signIn.completeMfa(input),
+    ),
+    mfaEmailOtp: quiet<[string], Awaited<ReturnType<typeof client.signIn.requestMfaEmailOtp>>>((tempToken) =>
+      client.signIn.requestMfaEmailOtp(tempToken),
+    ),
+    mfaWebAuthnStart: quiet<[string], Awaited<ReturnType<typeof client.signIn.startMfaWebAuthn>>>((tempToken) =>
+      client.signIn.startMfaWebAuthn(tempToken),
+    ),
+    enrollSetup: quiet<[string | undefined], Awaited<ReturnType<typeof client.signIn.enrollTotpSetup>>>((token) =>
+      client.signIn.enrollTotpSetup(token),
+    ),
+    enrollConfirm: quiet<[string, string | undefined], Awaited<ReturnType<typeof client.signIn.enrollTotpConfirm>>>(
+      (code, token) => client.signIn.enrollTotpConfirm(code, token),
+    ),
+    inviteRequestNew: quiet<[string], Awaited<ReturnType<typeof client.invites.requestNew>>>((token) =>
+      client.invites.requestNew(token),
     ),
     verifyMfa: quiet<[string, string], Awaited<ReturnType<typeof client.signIn.verifyMfa>>>((tempToken, code) =>
       client.signIn.verifyMfa(tempToken, code),
@@ -30,7 +69,7 @@ export function createAuthApi(client: SentryClient) {
       (tempToken, code) => client.signIn.verifyMfaBackupCode(tempToken, code),
     ),
     register: quiet<[RegisterRequest], unknown>((request) => client.account.register(request)),
-    verifyEmail: quiet<[string], unknown>((token) => client.account.verifyEmail(token)),
+    verifyEmail: quiet<[string], RedirectResult>((token) => client.account.verifyEmail(token)),
     resendVerification: quiet<[string], unknown>((email) => client.account.resendVerification(email)),
     forgotPassword: quiet<[string], void>((email) => client.signIn.forgotPassword(email)),
     resetPassword: quiet<[string, string, string], void>((email, otp, password) =>

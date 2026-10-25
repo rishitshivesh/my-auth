@@ -10,11 +10,9 @@ import { useStepUpContext } from "./step-up-context";
  *
  * `recentAuthFor(failure)` derives the ConfirmDialog `recentAuth` prop from the last failure:
  * when the server answered ACCESS_RECENT_AUTH_REQUIRED the dialog offers "Sign in again",
- * which remembers `action` and returns to this page. `resumed` is true after coming back so
- * the view can re-open the confirmation (it never re-runs the action by itself).
- *
- * TODO(gap:Step-up / recent auth): there is no step-up endpoint, so re-authentication is a
- * full sign-in round trip through /u/login?reauth=1 and any in-progress draft is lost.
+ * which opens the step-up dialog (password, plus an authenticator code or passkey when two-step
+ * verification is on) without leaving the page. `resumed` is true once the server accepted the proof
+ * so the view can re-open the confirmation (it never re-runs the action by itself).
  */
 export function useStepUp(action: string) {
   const { t } = useCopy();

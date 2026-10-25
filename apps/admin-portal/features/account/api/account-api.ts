@@ -1,4 +1,5 @@
 import type {
+  ReauthInput, ReauthRequirements,
   ActiveSession, BackupCodes, ChangePasswordRequest, MessageResult, MfaStatus, Passkey, Profile, ProfileUpdate,
   RevokeSessionsResult, SecurityEvent, SocialConnection, TotpEnabled, TotpSetup,
 } from "@scrolloop/sdk";
@@ -22,6 +23,30 @@ export const accountApi = {
     (limit) => authClient.account.listSecurityEvents(limit), quiet,
   ),
 
+  /** Which proof a step-up needs (derived from the MFA status). */
+  reauthRequirements: withErrorHandler<[], ReauthRequirements>(() => authClient.getReauthRequirements(), quiet),
+  /** Step-up on the CURRENT session; resolves when the server accepted the proof. */
+  reauthenticate: withErrorHandler<[ReauthInput], true>(async (input) => {
+    await authClient.account.reauthenticate(input);
+    return true;
+  }, quiet),
+  /** Passkey step-up: server challenge, browser prompt, then the proof. */
+  reauthenticateWithPasskey: withErrorHandler<[], true>(async () => {
+    const { sessionNonce, ...optionsJSON } = await authClient.account.startReauthWebAuthn();
+    const lib = await import("@simplewebauthn/browser");
+    let webauthnResponse;
+    try {
+      webauthnResponse = await lib.startAuthentication({ optionsJSON: optionsJSON as never });
+    } catch (error) {
+      const name = typeof error === "object" && error !== null && "name" in error ? String((error as { name: unknown }).name) : "";
+      throw Object.assign(new Error("Passkey prompt cancelled"), {
+        code: name === "NotAllowedError" || name === "AbortError" ? "PASSKEY_AUTH_CANCELLED" : "PASSKEY_NOT_SUPPORTED",
+      });
+    }
+    await authClient.account.reauthenticate({ method: "webauthn", webauthnResponse: webauthnResponse as never, sessionNonce });
+    return true;
+  }, quiet),
+
   getMfaStatus: withErrorHandler<[], MfaStatus>(() => authClient.mfa.getStatus(), quiet),
   setupTotp: withErrorHandler<[], TotpSetup>(() => authClient.mfa.setupTotp(), quiet),
   confirmTotp: withErrorHandler<[string], TotpEnabled>((code) => authClient.mfa.confirmTotp(code), quiet),
@@ -39,8 +64,6 @@ export const accountApi = {
 
   listConnections: withErrorHandler<[], SocialConnection[]>(() => authClient.social.listConnections(), quiet),
   unlinkConnection: withErrorHandler<[string], true>(async (provider) => { await authClient.social.unlink(provider); return true; }, quiet),
-  // TODO(gap:Social login completion claims): the link-token route reads `req.user.userId` while
-  // other routes read `req.user.sub`; linking depends on the JWT carrying both.
   /** Fetches a short-lived link token then navigates the browser to the provider. */
   startLinking: withErrorHandler<[string], void>((provider) => authClient.social.startLinking(provider), quiet),
 

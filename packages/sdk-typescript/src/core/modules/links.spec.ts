@@ -7,7 +7,13 @@ import {
   isLinkWrongAccount,
   linkFailureReason,
 } from "../errors";
-import { isMagicLinkPending, isMfaChallenge, isMfaEnrollmentRequired } from "../api-types";
+import {
+  isConfirmedOnOtherDevice,
+  isMagicLinkPending,
+  isMfaChallenge,
+  isMfaEnrollmentRequired,
+  isSessionEstablished,
+} from "../api-types";
 
 const SESSION = { tenantId: "t", tenantSlug: "acme", groups: [] };
 
@@ -114,6 +120,39 @@ describe("magic link polling and redirect", () => {
     expect(client.isAuthenticated()).toBe(true);
     expect(isMfaChallenge(await client.signIn.pollMagicLink("pn") as never)).toBe(true);
     expect(isMfaEnrollmentRequired(await client.signIn.pollMagicLink("pn") as never)).toBe(true);
+  });
+
+  it("send with poll returns the number-matching code", async () => {
+    const { client } = await makeClient(() => ok({ message: "m", expiresInSeconds: 600, pollingNonce: "n".repeat(40), matchCode: "123456" }));
+    const sent = await client.sendMagicLink("a@b.c", { poll: true });
+    expect(sent).toMatchObject({ matchCode: "123456", expiresInSeconds: 600 });
+  });
+
+  it("preview is a non-consuming GET and models an unknown requester", async () => {
+    const { client, last } = await makeClient(() => ok({ requestedFrom: { userAgent: "Chrome on macOS", ip: "1.2.3.4" }, requiresMatchCode: true }));
+    const preview = await client.previewMagicLink("a b");
+    expect(preview).toEqual({ requestedFrom: { userAgent: "Chrome on macOS", ip: "1.2.3.4" }, requiresMatchCode: true });
+    expect(last()).toMatchObject({ method: "GET", url: `${BASE}/auth/magic-link/preview?token=a+b` });
+    const { client: c2 } = await makeClient(() => ok({ requestedFrom: null, requiresMatchCode: false }));
+    expect((await c2.previewMagicLink("t")).requestedFrom).toBeNull();
+  });
+
+  it("verify with matchCode resolves confirmed-on-other-device and creates no session", async () => {
+    const { client, last } = await makeClient(() => ok({ status: "confirmed-on-other-device", redirectUri: "https://app" }));
+    const out = await client.verifyMagicLink("tok", { matchCode: "123456" });
+    expect(last().body).toEqual({ token: "tok", matchCode: "123456" });
+    expect(isConfirmedOnOtherDevice(out)).toBe(true);
+    expect(isSessionEstablished(out)).toBe(false);
+    expect(out).toMatchObject({ redirectUri: "https://app" });
+    expect(client.isAuthenticated()).toBe(false);
+  });
+
+  it("a wrong match code surfaces AUTH_OTP_INVALID and a replayed poll surfaces LINK_ALREADY_USED", async () => {
+    const { client } = await makeClient(() => problem(401, "AUTH_OTP_INVALID", "Wrong code"));
+    await expect(client.verifyMagicLink("tok", { matchCode: "000000" })).rejects.toMatchObject({ code: "AUTH_OTP_INVALID" });
+    const { client: c2 } = await makeClient(() => problem(409, "LINK_ALREADY_USED", "Used"));
+    const err = await c2.signIn.pollMagicLink("n".repeat(40)).catch((e: unknown) => e);
+    expect(isLinkAlreadyUsed(err)).toBe(true);
   });
 
   it("verify carries redirectUri on every branch", async () => {
